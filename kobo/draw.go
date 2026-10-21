@@ -787,8 +787,8 @@ func (a *App) drawRestart() {
 	c := a.C
 	b := c.Bounds()
 	c.Fill(b, White)
-	c.Text(a.F.Huge, image.Rect(0, b.Dy()/2-130, b.Dx(), b.Dy()/2+30), "brb bro", Black, AlignCenter)
-	c.Text(a.F.Body, image.Rect(0, b.Dy()/2+60, b.Dx(), b.Dy()/2+110), "restarting into the new hellobro…", Dark, AlignCenter)
+	c.Text(a.F.Huge, image.Rect(0, b.Dy()/2-130, b.Dx(), b.Dy()/2+30), "hello bro", Black, AlignCenter)
+	c.Text(a.F.Body, image.Rect(0, b.Dy()/2+60, b.Dx(), b.Dy()/2+110), "starting the new hellobro…", Dark, AlignCenter)
 	a.markAll(true)
 }
 
