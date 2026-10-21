@@ -999,33 +999,43 @@ func (a *bro) termKey(code uint16, value int32) bool {
 		return true
 	}
 
-	var mod uv.KeyMod
+	if k, ok := termKeyEvent(code, *m); ok {
+		t.emu.SendKey(k)
+	}
+	return true
+}
+
+// termKeyEvent is the key for the emulator to send on, if it's one it
+// knows. Never IsRepeat: vt matches keys whole, so a held arrow would
+// match none and go out as its private-use rune.
+func termKeyEvent(code uint16, m termMods) (uv.KeyPressEvent, bool) {
+	var k uv.KeyPressEvent
 	if m.ctrl {
-		mod |= uv.ModCtrl
+		k.Mod |= uv.ModCtrl
 	}
 	if m.alt {
-		mod |= uv.ModAlt
+		k.Mod |= uv.ModAlt
 	}
 	if m.meta {
-		mod |= uv.ModMeta
+		k.Mod |= uv.ModMeta
 	}
-	k := uv.KeyPressEvent{Mod: mod, IsRepeat: value == 2}
 	if special, ok := termSpecialKeys[code]; ok {
 		k.Code = special
 		if m.shift {
 			k.Mod |= uv.ModShift
 		}
-	} else if printable {
-		plain, _ := kobo.KeyChar(code, false, false)
-		k.Code = []rune(plain)[0]
-		if !m.ctrl {
-			k.Text = ch
-		}
-	} else {
-		return true
+		return k, true
 	}
-	t.emu.SendKey(k)
-	return true
+	ch, printable := kobo.KeyChar(code, m.shift, m.caps)
+	if !printable {
+		return k, false
+	}
+	plain, _ := kobo.KeyChar(code, false, false)
+	k.Code = []rune(plain)[0]
+	if !m.ctrl {
+		k.Text = ch
+	}
+	return k, true
 }
 
 const (

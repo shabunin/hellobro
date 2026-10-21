@@ -92,3 +92,41 @@ func TestRenderRecording(t *testing.T) {
 	defer f.Close()
 	png.Encode(f, a.C.SubImage(v.grid))
 }
+
+// TestTermKeys: what a key sends, held down too (a held arrow once went
+// out as a private-use rune).
+func TestTermKeys(t *testing.T) {
+	for _, c := range []struct {
+		code uint16
+		m    termMods
+		want string
+	}{
+		{keyUp, termMods{}, "\x1b[A"},
+		{keyDown, termMods{}, "\x1b[B"},
+		{keyLeft, termMods{}, "\x1b[D"},
+		{keyRight, termMods{}, "\x1b[C"},
+		{keyPgUp, termMods{}, "\x1b[5~"},
+		{kobo.KeyA, termMods{}, "a"},
+		{kobo.KeyA, termMods{shift: true}, "A"},
+		{kobo.KeyA, termMods{ctrl: true}, "\x01"},
+		{kobo.KeyBackspace, termMods{}, "\x7f"},
+	} {
+		k, ok := termKeyEvent(c.code, c.m)
+		if !ok {
+			t.Errorf("%d: no key", c.code)
+			continue
+		}
+		emu := vt.NewEmulator(80, 24)
+		got := make(chan string)
+		go func() {
+			buf := make([]byte, 64)
+			n, _ := emu.Read(buf)
+			got <- string(buf[:n])
+		}()
+		emu.SendKey(k)
+		if s := <-got; s != c.want {
+			t.Errorf("%d %+v: %q, want %q", c.code, c.m, s, c.want)
+		}
+		emu.Close()
+	}
+}
