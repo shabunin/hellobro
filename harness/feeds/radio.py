@@ -1,4 +1,4 @@
-# The Wi-Fi/BT tab with the stand-in radios (HELLOBRO_FAKE_RADIO, which
+# The Settings tab's radios, the stand-ins (HELLOBRO_FAKE_RADIO, which
 # run.sh sets): a network with a wrong password and then the right one,
 # a Bluetooth scan, pairing with a code to confirm, Wi-Fi off and on; then
 # the switcher (Ctrl+Shift+Tab, typed into) and Ctrl+Alt+N tabs; then
@@ -24,7 +24,7 @@ key(DOWN); key(DOWN); time.sleep(1)
 key(ENTER); time.sleep(3)                             # pair: confirm the code
 keys("y"); time.sleep(4)                              # paired, connected
 key(DOWN); key(ENTER); time.sleep(3)                  # the FiiO (paired, below the connected ones): connect
-key(TAB); keys("o"); time.sleep(4)                    # Wi-Fi off
+key(TAB); key(TAB); keys("o"); time.sleep(4)          # past the settings to Wi-Fi: off
 keys("o"); time.sleep(6)                              # and on
 key(TAB, ctrl=True, shift=True); time.sleep(2)        # the switcher
 keys("mus"); time.sleep(1)
@@ -33,7 +33,7 @@ key(K1, ctrl=True, alt=True); time.sleep(3)           # the SSH tab
 key(F11); time.sleep(2)
 key(TAB, ctrl=True, shift=True); time.sleep(2)        # the switcher, fullscreen
 key(ESC); time.sleep(2)
-key(K4, ctrl=True, alt=True); time.sleep(3)           # out of fullscreen, to Wi-Fi/BT
+key(K4, ctrl=True, alt=True); time.sleep(3)           # out of fullscreen, to Settings
 key(KS, ctrl=True, alt=True); time.sleep(1)           # sleep: the screen, the radios off
 keys("o"); time.sleep(8)                              # ignored while asleep; awake, radios back on
 exit_app()

@@ -4,7 +4,8 @@ package kobo
 // way Nickel and KOReader do it on these devices (state-extended, then
 // "mem"), and the app back as it was on waking. Nickel holds the power
 // button, so going to sleep is ours to ask for (the header's button,
-// Ctrl+Alt+S, Sleep); the button still wakes the device up.
+// Ctrl+Alt+S, Sleep); the button still wakes the device up. A Dozer may
+// doze instead (doze.go), or go on to sleep from a doze.
 
 import (
 	"fmt"
@@ -30,10 +31,22 @@ func (a *App) Sleep() {
 	if a.asleep || a.calib != nil {
 		return
 	}
+	if d, ok := a.prog.(Dozer); ok && !a.dozing && d.DozeInstead() {
+		a.Doze()
+		return
+	}
 	log.Print("sleep: going to sleep")
 	var prep func()
 	if s, ok := a.prog.(Sleeper); ok {
-		prep = s.Sleep()
+		prep = s.Sleep() // while still dozing, if it was
+	}
+	light := -1
+	if a.light != nil {
+		light = a.light.level
+	}
+	if a.dozing { // from a doze: the page's canvas back, the light as before it
+		a.endDoze()
+		light = a.dozeLight
 	}
 	a.HideGauge()
 	a.lightOverlay = nil
@@ -43,9 +56,7 @@ func (a *App) Sleep() {
 	a.flush() // the sleep screen; nothing else gets to the panel until we wake
 	a.asleep = true
 	a.sleeping.Store(true)
-	light := -1
 	if a.light != nil {
-		light = a.light.level
 		a.light.set(0)
 	}
 	go func() {

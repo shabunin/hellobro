@@ -270,7 +270,9 @@ func (a *bro) closeAlbum() {
 
 // --- drawing ---
 
-func (a *bro) showingMusic() bool { return a.Tab == tabMusic && !a.Calibrating() && a.picker == nil }
+func (a *bro) showingMusic() bool {
+	return a.Tab == tabMusic && !a.Calibrating() && a.picker == nil && !a.Dozing()
+}
 
 func (a *bro) redrawMusic() {
 	if a.showingMusic() {
@@ -381,6 +383,7 @@ func (a *bro) loadCover(path string) {
 			if a.showingMusic() && m.album >= 0 && m.albums[m.album].cover == path {
 				a.drawCover()
 			}
+			a.redoze()
 		})
 	}()
 }
@@ -564,6 +567,7 @@ func (a *bro) nowPlaying() string {
 func (a *bro) musicHeader() {
 	a.SetStatus(a.nowPlaying())
 	a.drawStat(false)
+	a.redoze()
 }
 
 // --- playing ---
@@ -791,6 +795,10 @@ func (a *bro) musicMediaKey(code uint16) {
 		a.musicSkip(1)
 	case kobo.KeyPreviousSong:
 		a.musicSkip(-1)
+	case kobo.KeyVolumeUp:
+		a.musicGain(gainStep)
+	case kobo.KeyVolumeDown:
+		a.musicGain(-gainStep)
 	}
 }
 

@@ -5,7 +5,7 @@
 //   - Shell: terminals with a shell on the Kobo itself;
 //   - Music: a player for the albums on the Kobo, over Bluetooth; it
 //     goes on playing on the other tabs;
-//   - Wi-Fi/BT: Kobo's Wi-Fi and Bluetooth settings.
+//   - Settings: Kobo's Wi-Fi and Bluetooth, and hellobro's sleep and status bar.
 //
 // A swipe along the right edge sets the font size, F11 gives the
 // terminal the whole screen. The rest (the screen, touch, the frontlight
@@ -31,7 +31,7 @@ const (
 	tabRadio
 )
 
-var tabNames = []string{"SSH", "Shell", "Music", "Wi-Fi/BT"}
+var tabNames = []string{"SSH", "Shell", "Music", "Settings"}
 
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
@@ -52,6 +52,9 @@ type bro struct {
 	rv     [2]radioPanelView
 	rs     radioState
 	slp    sleepState
+	sv     settingsView
+	set    settings
+	doze   dozeState
 	lay    kobo.Layout // the last layout, to lay out again
 }
 
@@ -69,6 +72,7 @@ func main() {
 		a.mus.gain = max(0, min(gainMax, g))
 	}
 	a.loadStatBar()
+	a.set = loadSettings()
 	radio.StateDir = kobo.AppFile("")
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames}, a)
 	a.tf.setSize(termFontDefault)
@@ -95,7 +99,7 @@ func (a *bro) Draw() {
 	case tabMusic:
 		a.drawMusic()
 	case tabRadio:
-		a.rv[panelWiFi].shown, a.rv[panelBT].shown = "", ""
+		a.rv[panelWiFi].shown, a.rv[panelBT].shown, a.sv.shown = "", "", ""
 		a.drawRadio()
 	default:
 		a.drawTerm()
@@ -133,6 +137,11 @@ func (a *bro) Tap(p image.Point) {
 }
 
 func (a *bro) Tick() {
+	if a.Dozing() {
+		a.dozeTick()
+		return
+	}
+	a.dozeWhenIdle()
 	a.termTick()
 	a.statTick()
 	a.radioTick()
@@ -146,6 +155,9 @@ func (a *bro) Exit() {
 }
 
 func (a *bro) IdleTimeout() time.Duration {
+	if a.Dozing() { // dozeTick sleeps when the music's over
+		return playingIdle
+	}
 	if d, ok := a.musicIdleTimeout(); ok {
 		return d
 	}
@@ -159,9 +171,9 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 	switch {
 	case m.Connected != "" || m.Gone != "":
 		return true
-	case kobo.IsMediaKey(m.Code): // the music's, on any tab
-		if m.Value == 1 {
-			a.musicMediaKey(m.Code)
+	case kobo.IsMediaKey(m.Code): // the music's, on any tab, dozing too
+		if m.Value == 1 || m.Value == 2 && (m.Code == kobo.KeyVolumeUp || m.Code == kobo.KeyVolumeDown) {
+			a.mediaKey(m.Code)
 		}
 		return true
 	case a.Calibrating():
@@ -209,12 +221,15 @@ func (a *bro) hotkey(code uint16) {
 		a.toggleStat()
 		return
 	}
-	media := map[uint16]uint16{kobo.KeySpace: kobo.KeyPlayPause, keyComma: kobo.KeyPreviousSong, keyDot: kobo.KeyNextSong}[code]
+	a.mediaKey(map[uint16]uint16{kobo.KeySpace: kobo.KeyPlayPause, keyComma: kobo.KeyPreviousSong, keyDot: kobo.KeyNextSong}[code])
+}
+
+func (a *bro) mediaKey(code uint16) {
 	if !a.mus.scanned { // the Music tab hasn't been up yet: find the albums first
-		a.scanMusic(func() { a.musicMediaKey(media) })
+		a.scanMusic(func() { a.musicMediaKey(code) })
 		return
 	}
-	a.musicMediaKey(media)
+	a.musicMediaKey(code)
 }
 
 func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {

@@ -15,9 +15,10 @@ everywhere, fullscreen and in a session too):
 - **Music**: a player for the albums on the Kobo (folders of MP3/WAV, with
   their covers), to Bluetooth headphones or a DAC. It goes on playing on
   the other tabs.
-- **Wi-Fi/BT**: Wi-Fi and Bluetooth without going back to Nickel: on and
+- **Settings**: Wi-Fi and Bluetooth without going back to Nickel: on and
   off, networks (join, with a password; leave; forget; one by name), and
-  devices (scan, pair, connect, disconnect, forget).
+  devices (scan, pair, connect, disconnect, forget); and hellobro's own
+  settings: light sleep, sleep with music on, the status bar.
 
 Ctrl+Shift+Tab, anywhere, is a switcher in the manner of rofi: the
 sessions, the tabs, the saved hosts (a new session to one) and a new
@@ -33,6 +34,16 @@ reconnect once Wi-Fi is back. Nickel keeps the power button to itself
 while hellobro is up, so pressing it doesn't put the Kobo to sleep, and
 the presses that wake it may reach Nickel when hellobro quits (it may
 then go to sleep once).
+
+**Light sleep** is for listening: the light goes off and the screen shows
+what's playing (the cover, the track, the album), but the Kobo stays
+awake, so the music plays on and the headphones' buttons (or a keyboard's
+media keys) play and pause, skip, and set the volume. A tap or any other
+key wakes it up, to the page as it was. With music playing it comes
+after a while without input (5 minutes; Settings), and Ctrl+Alt+S dozes
+instead of sleeping (Settings: or not). Wi-Fi goes off meanwhile (or not),
+and comes back on waking. Once the music has stopped for a while (10
+minutes), the Kobo goes to sleep properly.
 
 **brotools** ("Bro Tools") is diagnostics. Tabs (tap, or Ctrl+Alt+1–7):
 
@@ -64,7 +75,8 @@ with a session up, 6 hours while music plays).
   Kobo does it (after KOReader's scripts); Bluetooth through BlueZ, with a
   pairing agent.
 - `cmd/hellobro/`: the terminal (the emulator view, SSH, the local shell),
-  the status bar, the switcher, the Music and Wi-Fi/BT tabs.
+  the status bar, the switcher, the Music and Settings tabs, sleep and
+  light sleep.
 - `cmd/brotools/`: the diagnostics pages.
 
 ## Terminal
@@ -102,13 +114,14 @@ with a session up, 6 hours while music plays).
 - It plays to the Bluetooth device connected in Kobo's settings; a paired
   one that isn't connected gets a "connect" button.
 - On any tab: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
-  the previous and next track; so do media keys.
+  the previous and next track; so do media keys, and the volume keys (a
+  headset's, a keyboard's) set the volume.
 - On the Music tab: Space or k play/pause, Left/Right (j/l) seek 10 s, n/p
   next/previous, s stop, = and − volume, Up/Down/PgUp/PgDn/Home/End and
   Enter pick, Esc or Backspace back to the albums; or tap.
 - The volume, and the track and where it was, are kept in `music-state`.
 
-## Wi-Fi and Bluetooth
+## Settings: Wi-Fi and Bluetooth
 
 - Wi-Fi: tap a network to pick it, again (or Enter) to join or leave it;
   a new secured one asks for its password (Tab or `show` reveals it).
@@ -126,7 +139,8 @@ with a session up, 6 hours while music plays).
   Realtek UART chip), and starts bluetoothd and bluealsa if they aren't
   running, as [bluetooth.koplugin](https://github.com/Tharavol/bluetooth.koplugin)
   does on the Sage; off undoes it.
-- Tab moves between the two panels.
+- Tab moves between the panels: Wi-Fi, Bluetooth, and the settings,
+  where a tap (or ←/→, Enter) changes one. They're kept in `settings`.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
   since Nickel wakes up thinking so; networks and devices added stay. On
   the first visit to the tab, what's found of the setup (Kobo's variables,
@@ -200,6 +214,7 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     MUSIC=~/Music harness/run.sh /tmp/hb 0 music      # the Music tab
     MUSIC=~/Music harness/run.sh /tmp/hb 0 statbar    # the status bar, the music hotkeys
     harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
+    MUSIC=~/Music harness/run.sh /tmp/hb 0 doze        # settings, light sleep with music, media keys
 
 `MUSIC` is the music folder (default `harness/music`); the sound goes to
 `OUT/pcm.raw` (`HELLOBRO_FAKE_PCM`: 48 kHz, 16-bit stereo), at the pace it

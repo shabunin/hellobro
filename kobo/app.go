@@ -151,22 +151,26 @@ type App struct {
 	inputAt time.Time   // last touch or key
 	call    chan func() // work from goroutines, run on the UI loop
 
-	status   string          // the header's status text, as drawn
-	note     string          // the Program's, left of it
-	dirty    []dirtyRect     // pending screen updates, blitted one at a time
-	flash    bool            // the next full-screen update should flash
-	flashR   image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
-	blitting bool
-	jobs     chan blitJob
-	done     chan error
-	quit     bool
-	alive    atomic.Int64 // last loop tick, for the watchdog
-	blitAt   atomic.Int64 // start of the blit in flight, or 0
-	noPower  bool         // the power button doesn't reach us
-	asleep   bool         // the sleep screen is up: nothing else gets drawn
-	sleeping atomic.Bool  // asleep, for the watchdog: the clock jumps
-	ctrl     [2]bool      // left and right Ctrl held, for Ctrl+Alt+N
-	alt      [2]bool      // and Alt
+	status    string          // the header's status text, as drawn
+	note      string          // the Program's, left of it
+	dirty     []dirtyRect     // pending screen updates, blitted one at a time
+	flash     bool            // the next full-screen update should flash
+	flashR    image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
+	blitting  bool
+	jobs      chan blitJob
+	done      chan error
+	quit      bool
+	alive     atomic.Int64 // last loop tick, for the watchdog
+	blitAt    atomic.Int64 // start of the blit in flight, or 0
+	noPower   bool         // the power button doesn't reach us
+	asleep    bool         // the sleep screen is up: nothing else gets drawn
+	sleeping  atomic.Bool  // asleep, for the watchdog: the clock jumps
+	dozing    bool         // a light sleep: the doze screen on the panel, the page going on in C
+	panelC    Canvas       // while dozing, what's on the panel
+	dozeLight int          // the light's level before dozing
+	eatTouch  bool         // the contact that woke us from dozing isn't over
+	ctrl      [2]bool      // left and right Ctrl held, for Ctrl+Alt+N
+	alt       [2]bool      // and Alt
 }
 
 // New opens the log and the screen. The Program, which embeds the App, is
@@ -283,6 +287,10 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 		case ev := <-touches:
 			a.stats.event("touch", time.Since(ev.At))
 			if a.asleep {
+				continue
+			}
+			if a.dozing || a.eatTouch {
+				a.dozeTouch(ev)
 				continue
 			}
 			a.onTouch(ev)
@@ -689,6 +697,14 @@ func (a *App) onKey(m KeyMsg) {
 	if a.asleep {
 		return
 	}
+	if a.dozing { // the media keys play on; any other key wakes
+		if IsMediaKey(m.Code) {
+			a.prog.Key(m)
+		} else if m.Value == 1 {
+			a.Undoze()
+		}
+		return
+	}
 	if n := int(m.Code) - Key1; (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) && n >= 0 && n < min(9, len(a.cfg.Tabs)) {
 		if m.Value == 1 {
 			a.SwitchTab(n)
@@ -723,7 +739,7 @@ func compact(a, b image.Rectangle) bool { return Area(a.Union(b)) <= (Area(a)+Ar
 // areas get a grayscale waveform, others (black & white ink only) the
 // fast one.
 func (a *App) Mark(r image.Rectangle, ui bool) {
-	if r.Empty() {
+	if r.Empty() || a.dozing { // the page is off the panel
 		return
 	}
 	for i, d := range a.dirty {
@@ -738,6 +754,9 @@ func (a *App) Mark(r image.Rectangle, ui bool) {
 // MarkFlash redraws r with a flash, which clears the ghosting that
 // non-flashing updates leave behind.
 func (a *App) MarkFlash(r image.Rectangle) {
+	if a.dozing {
+		return
+	}
 	a.Mark(r, true)
 	a.flashR = r
 }
@@ -770,7 +789,11 @@ func (a *App) flush() {
 	}
 	a.dirty = rest
 	img := image.NewGray(d.r)
-	draw.Draw(img, d.r, a.C.Gray, d.r.Min, draw.Src)
+	src := a.C
+	if a.dozing {
+		src = a.panelC
+	}
+	draw.Draw(img, d.r, src.Gray, d.r.Min, draw.Src)
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {
 		flash, a.flashR = true, image.Rectangle{}

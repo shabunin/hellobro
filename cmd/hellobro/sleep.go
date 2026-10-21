@@ -31,8 +31,12 @@ func (a *bro) Sleep() func() {
 	}
 	r.prompt = nil
 	wifi, bt := r.wifi, r.bt
+	dozedOff := a.doze.wifiOff // off for a doze we're leaving for sleep: it was on
+	if dozedOff {
+		a.dozeWiFi("forget")
+	}
 	return func() {
-		s.wifiWas = wifi.Status().On // also notes how Kobo runs it, for turning it on again
+		s.wifiWas = wifi.Status().On || dozedOff // also notes how Kobo runs it, for turning it on again
 		if s.wifiWas {
 			if err := wifi.SetPower(false, func(p string) { log.Printf("sleep: wifi: %s", p) }); err != nil {
 				log.Printf("sleep: wifi off: %v", err)

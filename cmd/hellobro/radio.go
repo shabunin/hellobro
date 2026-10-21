@@ -1,7 +1,7 @@
 package main
 
-// The Wi-Fi/BT tab: Kobo's Wi-Fi and Bluetooth settings without leaving
-// for Nickel. Each panel has its power, a scan, a list (networks;
+// The Settings tab: Kobo's Wi-Fi and Bluetooth settings without leaving
+// for Nickel, and hellobro's own (settings.go) under them. Each panel has its power, a scan, a list (networks;
 // devices) and, for the row picked, what can be done with it: connect,
 // disconnect, forget, pair. Passwords and pairing codes are asked for in
 // the panel. When hellobro quits, the radios' power goes back to how
@@ -97,7 +97,16 @@ var factsOnce sync.Once
 
 func (a *bro) layoutRadio(K kobo.Layout) {
 	v := &a.rv
-	wr, br := K.Split(K.Body, 0.5)
+	var wr, br, sr image.Rectangle
+	if K.Landscape { // the radios side by side, the settings under them
+		st := K.Stack(K.Body, 64)
+		wr, br = K.Split(st[0], 0.5)
+		sr = st[1]
+	} else {
+		st := K.Stack(K.Body, 37, 74)
+		wr, br, sr = st[0], st[1], st[2]
+	}
+	a.layoutSettings(sr)
 	v[panelWiFi].p = kobo.NewPanel(a.F, "Wi-Fi", wr, "")
 	v[panelBT].p = kobo.NewPanel(a.F, "Bluetooth", br, "")
 	for i := range v {
@@ -126,7 +135,9 @@ func (a *bro) enterRadio() {
 	a.radioPoll(!a.rs.scanned)
 }
 
-func (a *bro) showingRadio() bool { return a.Tab == tabRadio && !a.Calibrating() && a.picker == nil }
+func (a *bro) showingRadio() bool {
+	return a.Tab == tabRadio && !a.Calibrating() && a.picker == nil && !a.Dozing()
+}
 
 // radioPoll reads both radios' state, off the UI, and redraws what
 // changed; scan also asks Wi-Fi for the networks around.
@@ -453,6 +464,7 @@ func (g radioAgent) Cancel() {
 func (a *bro) drawRadio() {
 	a.drawRadioPanel(panelWiFi)
 	a.drawRadioPanel(panelBT)
+	a.drawSettings()
 }
 
 func (a *bro) drawRadioPanel(i int) {
@@ -727,7 +739,7 @@ func (a *bro) drawRadioPanel(i int) {
 			a.drawRadioInput(pv, prompt)
 		}
 	} else {
-		hint := "Tap a row, or ↑ ↓ and Enter; Tab: the other panel; f: forget; s: scan; o: on/off."
+		hint := "Tap a row, or ↑ ↓ and Enter; Tab: the next panel; f: forget; s: scan; o: on/off."
 		if len(acts) > 0 {
 			hint = rows[*sel].name
 		}
@@ -815,6 +827,14 @@ func (a *bro) radioPromptButton(label string) {
 
 func (a *bro) radioTap(pt image.Point) {
 	r := &a.rs
+	if pt.In(a.sv.p.Outer) && r.prompt == nil {
+		if r.focus != panelSet {
+			r.focus = panelSet
+			defer a.drawRadio()
+		}
+		a.settingsTap(pt)
+		return
+	}
 	for i := range a.rv {
 		pv := &a.rv[i]
 		if !pt.In(pv.p.Outer) {
@@ -910,6 +930,18 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 		}
 		return true
 	}
+	if code == kobo.KeyTab {
+		r.focus = (r.focus + 1) % 3
+		a.drawRadio()
+		return true
+	}
+	if r.focus == panelSet {
+		if code == kobo.KeyEsc {
+			return false
+		}
+		a.settingsKey(code)
+		return true
+	}
 	sel, n := &r.wSel, len(r.nets)
 	if r.focus == panelBT {
 		sel, n = &r.bSel, len(r.devs)
@@ -923,9 +955,6 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 	switch {
 	case code == kobo.KeyEsc:
 		return false
-	case code == kobo.KeyTab:
-		r.focus = 1 - r.focus
-		a.drawRadio()
 	case code == keyUp:
 		move(-1)
 	case code == keyDown:

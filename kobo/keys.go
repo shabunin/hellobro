@@ -94,11 +94,13 @@ const (
 	KeyStopCD       = 166
 	KeyPlayCD       = 200
 	KeyPauseCD      = 201
+	KeyVolumeDown   = 114
+	KeyVolumeUp     = 115
 )
 
 func IsMediaKey(code uint16) bool {
 	switch code {
-	case KeyNextSong, KeyPlayPause, KeyPreviousSong, KeyStopCD, KeyPlayCD, KeyPauseCD:
+	case KeyNextSong, KeyPlayPause, KeyPreviousSong, KeyStopCD, KeyPlayCD, KeyPauseCD, KeyVolumeDown, KeyVolumeUp:
 		return true
 	}
 	return false

@@ -1,0 +1,229 @@
+package main
+
+// The Settings tab's third panel, under Wi-Fi and Bluetooth: how hellobro
+// sleeps, and the status bar. A tap on a setting (or Enter, ←/→) steps
+// through its values; they're kept in the settings file.
+
+import (
+	"fmt"
+	"image"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"hellobro/kobo"
+)
+
+const (
+	panelSet = 2 // the settings panel, after panelWiFi and panelBT
+	setRowH  = 56
+	setTxt   = "settings"
+)
+
+// setting is one line of the panel: its values as saved, and as shown.
+type setting struct {
+	key, label string
+	values     []string
+	shown      []string
+}
+
+var settingList = []setting{
+	{key: "doze-after", label: "Light sleep while music plays",
+		values: []string{"off", "1", "2", "5", "10", "20"},
+		shown:  []string{"never by itself", "after 1 min idle", "after 2 min idle", "after 5 min idle", "after 10 min idle", "after 20 min idle"}},
+	{key: "sleep-music", label: "Sleep (Ctrl+Alt+S) with music on",
+		values: []string{"light", "deep"},
+		shown:  []string{"light: the music plays on", "deep: the music stops"}},
+	{key: "doze-wifi", label: "Wi-Fi in light sleep",
+		values: []string{"off", "on"},
+		shown:  []string{"off (the battery lasts)", "stays on"}},
+	{key: "doze-deep", label: "Music stopped in light sleep",
+		values: []string{"5", "10", "30", "off"},
+		shown:  []string{"deep sleep after 5 min", "deep sleep after 10 min", "deep sleep after 30 min", "stay in light sleep"}},
+	{key: "status-bar", label: "Status bar (Ctrl+Shift+B)",
+		values: []string{"on", "off"},
+		shown:  []string{"shown on the terminals", "hidden"}},
+}
+
+// The defaults, by key: the index of a value.
+var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1}
+
+type settingsView struct {
+	p     kobo.Panel
+	rows  []image.Rectangle
+	hint  image.Rectangle
+	sel   int
+	shown string
+}
+
+type settings map[string]int // by key, the value's index
+
+func loadSettings() settings {
+	s := settings{}
+	for k, v := range settingDefault {
+		s[k] = v
+	}
+	b, _ := os.ReadFile(kobo.AppFile(setTxt))
+	for _, line := range strings.Split(string(b), "\n") {
+		k, v, ok := strings.Cut(strings.TrimSpace(line), "=")
+		if !ok {
+			continue
+		}
+		for _, st := range settingList {
+			if st.key != k {
+				continue
+			}
+			for i, sv := range st.values {
+				if sv == v {
+					s[k] = i
+				}
+			}
+		}
+	}
+	return s
+}
+
+func (s settings) save() {
+	var b strings.Builder
+	for _, st := range settingList {
+		if st.key != "status-bar" { // kept in status-bar, as before
+			fmt.Fprintf(&b, "%s=%s\n", st.key, st.values[s[st.key]])
+		}
+	}
+	if err := os.WriteFile(kobo.AppFile(setTxt), []byte(b.String()), 0o644); err != nil {
+		log.Printf("settings: %v", err)
+	}
+}
+
+// setting is the value of key, as saved.
+func (a *bro) setting(key string) string {
+	for _, st := range settingList {
+		if st.key == key {
+			if key == "status-bar" {
+				return map[bool]string{false: "on", true: "off"}[a.stat.off]
+			}
+			return st.values[a.set[key]]
+		}
+	}
+	return ""
+}
+
+// settingMinutes is key's value as a time; 0 for off.
+func (a *bro) settingMinutes(key string) time.Duration {
+	n, _ := strconv.Atoi(a.setting(key))
+	return time.Duration(n) * time.Minute
+}
+
+// stepSetting moves setting i on (or back) a value.
+func (a *bro) stepSetting(i, d int) {
+	st := settingList[i]
+	if st.key == "status-bar" {
+		a.toggleStat()
+	} else {
+		n := len(st.values)
+		a.set[st.key] = (a.set[st.key] + d + n) % n
+		a.set.save()
+	}
+	log.Printf("settings: %s = %s", st.key, a.setting(st.key))
+	a.drawSettings()
+}
+
+func (a *bro) layoutSettings(r image.Rectangle) {
+	v := &a.sv
+	v.p = kobo.NewPanel(a.F, "Settings", r, "")
+	b := v.p.Body.Inset(kobo.Pad)
+	v.rows = v.rows[:0]
+	for i := range settingList {
+		y := b.Min.Y + i*setRowH
+		if y+setRowH > b.Max.Y-40 {
+			break // no room: a short screen
+		}
+		v.rows = append(v.rows, image.Rect(b.Min.X, y, b.Max.X, y+setRowH))
+	}
+	v.hint = image.Rect(b.Min.X, b.Max.Y-40, b.Max.X, b.Max.Y)
+	v.shown = ""
+}
+
+func (a *bro) drawSettings() {
+	if !a.showingRadio() {
+		return
+	}
+	v, c := &a.sv, a.C
+	focused := a.rs.focus == panelSet
+	var vals []string
+	for _, st := range settingList {
+		vals = append(vals, a.setting(st.key))
+	}
+	key := fmt.Sprint(vals, v.sel, focused)
+	if key == v.shown {
+		return
+	}
+	v.shown = key
+	p := v.p
+	if focused {
+		p.Name = "► " + p.Name
+	}
+	a.DrawPanel(p, "")
+	for i, rr := range v.rows {
+		st := settingList[i]
+		fg, dim := uint8(kobo.Black), uint8(kobo.Dark)
+		if i == v.sel {
+			if focused {
+				c.Fill(rr, kobo.Black)
+				fg, dim = kobo.White, kobo.Light
+			} else {
+				c.Frame(rr, 2, kobo.Black)
+			}
+		}
+		t := rr.Inset(4)
+		t.Min.X += 12
+		t.Max.X -= 12
+		value := "‹ " + st.shown[indexOf(st.values, vals[i])] + " ›"
+		vw := kobo.TextWidth(a.F.Small, value)
+		c.Text(a.F.Small, image.Rect(t.Max.X-vw, t.Min.Y, t.Max.X, t.Max.Y), value, dim, kobo.AlignRight)
+		t.Max.X -= vw + 20
+		c.Text(a.F.Body, t, st.label, fg, kobo.AlignLeft)
+	}
+	c.Text(a.F.Small, v.hint, "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Tab: the next panel.", kobo.Dark, kobo.AlignLeft)
+	a.Mark(p.Outer, true)
+}
+
+func indexOf(vs []string, v string) int {
+	for i, s := range vs {
+		if s == v {
+			return i
+		}
+	}
+	return 0
+}
+
+// settingsTap changes the setting tapped.
+func (a *bro) settingsTap(pt image.Point) {
+	for i, rr := range a.sv.rows {
+		if pt.In(rr) {
+			a.sv.sel = i
+			a.stepSetting(i, 1)
+			return
+		}
+	}
+}
+
+// settingsKey takes the keys while the panel has the focus.
+func (a *bro) settingsKey(code uint16) {
+	v := &a.sv
+	switch code {
+	case keyUp:
+		v.sel = max(0, v.sel-1)
+	case keyDown:
+		v.sel = min(len(v.rows)-1, v.sel+1)
+	case keyLeft:
+		a.stepSetting(v.sel, -1)
+		return
+	case keyRight, kobo.KeyEnter, kobo.KeySpace:
+		a.stepSetting(v.sel, 1)
+		return
+	}
+	a.drawSettings()
+}
