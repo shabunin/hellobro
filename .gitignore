@@ -11,3 +11,9 @@
 /known_hosts
 /term-font
 /touch-calibration.conf
+# the test server's binary and its host key (made on first start)
+/server/hellobro-server
+/server/.ssh/
+# harness runs: harness/run.sh OUT ...
+/harness/out*/
+__pycache__/

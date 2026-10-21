@@ -37,7 +37,16 @@ install: hellobro bin/fbink
 log:
 	cat $(KOBO)/.adds/hellobro/hellobro.log
 
+# The SSH test server (server/), for the PC: cd server && ./hellobro-server
+server:
+	cd server && go build -o hellobro-server .
+
+# Host-side tests: the app's (no cgo, so no ARM toolchain) and the server's.
+test:
+	CGO_ENABLED=0 go test ./...
+	cd server && go test ./...
+
 clean:
 	rm -f hellobro hellobro-nocgo
 
-.PHONY: install log clean
+.PHONY: install log clean server test

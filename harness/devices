@@ -1,0 +1,24 @@
+I: Bus=0019 Vendor=0000 Product=0000 Version=0000
+N: Name="soc@03000000:gpio-keys"
+H: Handlers=kbd event0
+B: EV=3
+B: KEY=4000 0 0 0 0 0 100000
+
+I: Bus=0018 Vendor=0000 Product=0000 Version=0000
+N: Name="kx122-accel"
+H: Handlers=event1
+B: EV=9
+B: ABS=7
+
+I: Bus=0018 Vendor=0000 Product=0000 Version=0000
+N: Name="Elan Touchscreen"
+H: Handlers=event2
+B: EV=b
+B: KEY=400 0 0 0 0 0 0 0 0 0 0
+B: ABS=6e18000 0
+
+I: Bus=0005 Vendor=19f5 Product=1028 Version=0001
+N: Name="NuPhy Air75 V2-3"
+H: Handlers=sysrq kbd leds event4
+B: EV=12001f
+B: KEY=1000000000007 ff9f207ac14057ff febeffdfffefffff fffffffffffffffe

@@ -59,6 +59,40 @@ To rebuild them: `./build-fbink.sh path/to/FBInk-checkout`.
 `make hellobro-nocgo` builds without the container; every screen update then
 runs `bin/fbink`, which is slow.
 
-`go test` (on the PC, `CGO_ENABLED=0`) covers the SSH target parser;
-`termrender_test.go` renders a recorded terminal stream to a PNG with the
-app's own drawing code (see the comment at its top).
+`make test` runs the tests that work on the PC: the SSH target parser,
+the server's layout, and `termrender_test.go`, which draws a recorded
+terminal stream to a PNG with the app's own code when given one.
+
+## The test server
+
+`server/` is an SSH server made with [wish](https://github.com/charmbracelet/wish)
+and Bubble Tea, to try the terminal against: a dashboard of the PC, a todo
+list, a chat shared by everyone connected, a showcase of borders, colors,
+attributes, blocks and braille, with mouse support.
+
+    make server && (cd server && ./hellobro-server)    # listens on :2222
+
+It lets anyone in, with any key or password, so keep it on the home network.
+On Fedora, open the port with `sudo firewall-cmd --add-port=2222/tcp`. Its
+host key is made in `server/.ssh` on first start.
+
+## Testing on the PC
+
+`harness/` runs the ARM binary under `qemu-arm` (qemu-user) as if on the
+Kobo. A fake FBInk keeps the screen as a file and saves PNG snapshots of
+big updates. Scripted touch and keyboard input comes through FIFOs, and
+fake input devices, Nickel settings and frontlight stand in for the rest:
+
+    make hellobro
+    harness/run.sh /tmp/hb 0 demo           # a tour of the tabs, in portrait
+    harness/run.sh /tmp/hb 1 ssh            # landscape, a session with the server
+
+The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
+(`calls.txt` there lists every update with its waveform). The feeds live in
+`harness/feeds`, with their shared helpers in `harness/feedlib.py`.
+
+`harness/record.py` records what a terminal program prints, for
+`termrender_test.go`:
+
+    harness/record.py /tmp/hx.raw 113 33 5 hx main.go
+    HELLOBRO_TERM_RAW=/tmp/hx.raw HELLOBRO_TERM_PNG=/tmp/hx.png CGO_ENABLED=0 go test -run TestRenderRecording .

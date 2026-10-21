@@ -13,7 +13,8 @@ import (
 )
 
 // HELLOBRO_TERM_RAW=in.raw HELLOBRO_TERM_PNG=out.png go test -run TestRenderRecording
-// draws a recorded terminal stream the way the Terminal tab would.
+// draws a recorded terminal stream (harness/record.py makes one) the way
+// the Terminal tab would.
 func TestRenderRecording(t *testing.T) {
 	in, out := os.Getenv("HELLOBRO_TERM_RAW"), os.Getenv("HELLOBRO_TERM_PNG")
 	if in == "" || out == "" {
