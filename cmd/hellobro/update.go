@@ -5,6 +5,12 @@ package main
 // says it's hellobro), then hellobro restarts into it, keeping the one
 // before as hellobro.old. make push asks for that with hellobro-update;
 // one that just turns up gets a question first.
+//
+// The new build is on trial till it's going (its first Tick, and file
+// sharing up if it's meant to be): one that hangs gets trialTime, then
+// the one before comes back; one that crashes, launch.sh puts back. So a
+// bad push from afar, through the relay, doesn't leave the Kobo out of
+// reach.
 
 import (
 	"bytes"
@@ -15,6 +21,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"hellobro/kobo"
@@ -23,7 +31,12 @@ import (
 const (
 	newBinary = "hellobro.new"
 	oldBinary = "hellobro.old"
+	badBinary = "hellobro.bad" // one that failed its trial, to look at
+	trialFile = "update-trial" // the version on trial, till it's going
+	trialTime = 45 * time.Second
 )
+
+var onTrial atomic.Bool
 
 // version is set by the Makefile: the commit and when it was built.
 var version = "dev"
@@ -96,13 +109,14 @@ func (a *bro) updateTick() {
 				return
 			}
 			a.ask("A new hellobro is here", fmt.Sprintf("%s (this is %s). Restart into it? The sessions close.", ver, version),
-				"restart", func() { a.installUpdate(path) })
+				"restart", func() { a.installUpdate(path, ver) })
 		})
 	}()
 }
 
-// installUpdate puts the new build in our place and restarts into it.
-func (a *bro) installUpdate(path string) {
+// installUpdate puts the new build (version ver) in our place and
+// restarts into it.
+func (a *bro) installUpdate(path, ver string) {
 	exe, err := os.Executable()
 	if err != nil {
 		log.Printf("update: %v", err)
@@ -120,6 +134,66 @@ func (a *bro) installUpdate(path string) {
 		return
 	}
 	os.Chmod(exe, 0o755)
+	if err := os.WriteFile(kobo.AppFile(trialFile), []byte(ver+"\n"), 0o644); err != nil {
+		log.Printf("update: no trial: %v", err)
+	}
 	log.Printf("update: %s in place, %s kept", exe, old)
 	a.App.Restart(exe)
+}
+
+// updateTrial, first thing: if we're a build on trial, the one before
+// comes back unless we're going within trialTime.
+func updateTrial() {
+	path := kobo.AppFile(trialFile)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	if strings.TrimSpace(string(b)) != version { // the one before, back: the trial's over
+		os.Remove(path)
+		return
+	}
+	onTrial.Store(true) // the log isn't open yet: trialTick says how it went
+	time.AfterFunc(trialTime, func() {
+		if onTrial.CompareAndSwap(true, false) {
+			rollBack(fmt.Sprintf("not going after %v", trialTime))
+		}
+	})
+}
+
+// trialTick passes the trial once we're going.
+func (a *bro) trialTick() {
+	if onTrial.Load() && (a.setting("share") != "on" || a.share.srv != nil) && onTrial.CompareAndSwap(true, false) {
+		os.Remove(kobo.AppFile(trialFile))
+		log.Printf("update: %s is going: kept", version)
+	}
+}
+
+// rollBack puts the build before back in our place and runs it, whatever
+// we're doing (stuck, likely).
+func rollBack(why string) {
+	exe, err := os.Executable()
+	old := kobo.AppFile(oldBinary)
+	if err == nil {
+		_, err = os.Stat(old)
+	}
+	if err != nil {
+		log.Printf("update: %s %s, and there's none before: %v", version, why, err)
+		return
+	}
+	log.Printf("update: %s %s: back to the one before", version, why)
+	bad := kobo.AppFile(badBinary)
+	os.Remove(bad)
+	if err := os.Rename(exe, bad); err != nil {
+		log.Printf("update: rollback: %v", err)
+		return
+	}
+	if err := os.Rename(old, exe); err != nil {
+		log.Printf("update: rollback: %v", err)
+		os.Rename(bad, exe)
+		return
+	}
+	os.Remove(kobo.AppFile(trialFile))
+	err = syscall.Exec(exe, []string{exe}, os.Environ())
+	log.Printf("update: rollback: exec: %v", err)
 }

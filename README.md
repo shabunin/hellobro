@@ -95,10 +95,11 @@ with a session up, 6 hours while music plays).
 ## Terminal
 
 - `ssh.conf` next to hellobro lists saved hosts, one per line:
-  `name  user@host[:port]  [command]`; the command (say `tmux new -A -s
-  kobo`) runs instead of a login shell. The prompt also takes
-  `ssh -p PORT user@host [command]`, and a host typed there is added to
-  `ssh.conf` once it connects.
+  `name  user@host[:port]  [via user@jumphost[:port]]  [command]`; the
+  command (say `tmux new -A -s kobo`) runs instead of a login shell, and
+  `via` goes through a jump host, as `ssh -J` does (see "From afar"). The
+  prompt also takes `ssh -p PORT [-J user@jumphost] user@host [command]`,
+  and a host typed there is added to `ssh.conf` once it connects.
 - The Kobo's key is made on first use; `id_ed25519.pub` next to the binary
   goes in a server's `~/.ssh/authorized_keys`. Otherwise it asks for a
   password (Tab shows it while typing), and then offers to install the key
@@ -226,8 +227,92 @@ hellobro, keeps the running one as `hellobro.old`, and restarts into the
 new one: the same process, so Nickel stays frozen. `make push-rollback`
 goes back to `hellobro.old`, `make push-log` shows the log. A
 `hellobro.new` sent any other way gets a question on the screen instead.
-`make install` (USB) is still how `launch.sh`, `bin/fbink` and the menu
-entry get there. `KOBO_HOST=192.168.x.y` if `kobo.local` doesn't resolve.
+A new build is on trial till it's going (its first tick, and file
+sharing up if it's on): one that hangs for 45 s, or crashes, is put
+aside as `hellobro.bad` and `hellobro.old` comes back, by itself, so a
+bad push from afar doesn't leave the Kobo out of reach. `make push`
+sends `launch.sh` too (the crash half is there); `make install` (USB) is
+still how `bin/fbink` and the menu entry get there. `KOBO_HOST=192.168.x.y`
+if `kobo.local` doesn't resolve.
+
+## From afar: a relay on a VPS
+
+Away from home, the Kobo and the PC can't reach each other directly. A
+VPS with a fixed address, that both reach, is the meeting point; both
+keep an SSH connection to it open, and it only carries bytes between
+them, end to end encrypted (it sees no passwords, files or screens):
+
+    Kobo ── ssh ──► VPS ◄── ssh ── PC
+     │   -R 127.0.0.1:2023 → Kobo's file sharing (2022)
+     │                    -R 127.0.0.1:2222 → PC's sshd (22)
+     └─ "home" in ssh.conf: via the VPS to its 127.0.0.1:2222, the PC
+        PC: ssh -J relay@VPS -p 2023 root@127.0.0.1, the Kobo
+
+Nothing listens on the VPS's public side but its own sshd: both
+forwards are on its loopback, and each key may only open the other's.
+
+**The VPS** (once; any Linux with OpenSSH, as root):
+
+    useradd -m -s /usr/sbin/nologin relay
+    install -d -m 700 -o relay -g relay ~relay/.ssh
+
+`~relay/.ssh/authorized_keys` (mode 600, owned by relay), a line per
+key, each limited to its forwards: the Kobo's key is
+`.adds/hellobro/id_ed25519.pub` on the Kobo (made on first SSH use, or
+by turning the relay on; at home, `ssh -p 2022 kobo.local cat
+/mnt/onboard/.adds/hellobro/id_ed25519.pub`), the PC's is its
+`~/.ssh/id_ed25519.pub`:
+
+    restrict,port-forwarding,permitlisten="127.0.0.1:2023",permitopen="127.0.0.1:2222" ssh-ed25519 AAAA… hellobro@kobo
+    restrict,port-forwarding,permitlisten="127.0.0.1:2222",permitopen="127.0.0.1:2023" ssh-ed25519 AAAA… me@pc
+
+and in `/etc/ssh/sshd_config` (then `systemctl reload sshd`), so a
+forward left by a connection that died (Wi-Fi gone) is freed within a
+minute and a half for the one that comes back:
+
+    ClientAliveInterval 30
+    ClientAliveCountMax 3
+
+**The PC**: its sshd on (`sudo systemctl enable --now sshd`), the Kobo's
+key in `~/.ssh/authorized_keys` (or a password the first time, and
+hellobro offers to put its key there), and its tunnel kept open by
+`tools/relay/hellobro-tunnel.service`: put the VPS's address in it, and
+
+    cp tools/relay/hellobro-tunnel.service ~/.config/systemd/user/
+    systemctl --user daemon-reload
+    systemctl --user enable --now hellobro-tunnel
+    loginctl enable-linger $USER    # from boot, logged in or not
+
+It reconnects by itself (`Restart=always`; `ServerAliveInterval` notices
+a dead one); `systemctl --user status hellobro-tunnel` shows how it is.
+
+**The Kobo**: two files next to hellobro (over SFTP, or the Shell tab).
+`ssh.conf` gets the PC:
+
+    home  bobalus@127.0.0.1:2222  via relay@VPS  tmux new -A -s kobo
+
+and `relay.conf` (an example is written the first time the relay is
+turned on) says where the Kobo keeps its own way in open:
+
+    relay@VPS  2023
+
+then Settings, `Relay`: on (with file sharing on). The Files tab shows
+how it is, and it reconnects by itself: after 5 s, then up to a minute
+between tries. While it's on, hellobro doesn't auto-exit, light sleep
+keeps Wi-Fi on, and a light sleep with the music over doesn't become a
+deep one, so the Kobo stays reachable: that costs battery. A deep sleep
+(the power button) still drops it, till the Kobo wakes; hellobro has to
+be running for any of it.
+
+**Using it**: on the Kobo, `home` in the switcher (Ctrl+Shift+Tab) or
+the SSH tab. On the PC, the Kobo (the pairing from home holds):
+
+    ssh -J relay@VPS -p 2023 root@127.0.0.1
+    make push KOBO_HOST=127.0.0.1 KOBO_PORT=2023 KOBO_JUMP=relay@VPS
+
+(`127.0.0.1`, not `localhost`: `permitopen` takes the name as given.)
+Or in `~/.ssh/config`, `Host kobo-afar`, `HostName 127.0.0.1`, `Port
+2023`, `User root`, `ProxyJump relay@VPS`, then `ssh kobo-afar`.
 
 ## Building
 
@@ -294,6 +379,7 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
     harness/run.sh /tmp/hb 0 share                     # pairing, scp, make push's update and restart (ssh, scp on the PC)
     MUSIC=~/Music harness/run.sh /tmp/hb 0 doze        # settings, light sleep with music, media keys
+    harness/relay.sh /tmp/hb                           # the relay: sshd as the VPS, both ways through it, an update (with the server)
 
 `MUSIC` is the music folder (default `harness/music`); the sound goes to
 `OUT/pcm.raw` (`HELLOBRO_FAKE_PCM`: 48 kHz, 16-bit stereo), at the pace it

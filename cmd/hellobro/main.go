@@ -42,6 +42,7 @@ var tabNames = []string{"SSH", "Shell", "Music", "Settings", "Files"}
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
 const termIdleTimeout = 20 * time.Minute // with a session up: reading a remote screen takes longer
+const relayIdle = 24 * time.Hour        // with the relay on: as good as never
 
 // bro is the app: the kobo.App, the terminal, the music player and the
 // radios.
@@ -63,6 +64,7 @@ type bro struct {
 	set    settings
 	doze   dozeState
 	share  shareState
+	relay  relayState
 	fv     filesView
 	upd    updateState
 	lay    kobo.Layout // the last layout, to lay out again
@@ -81,6 +83,7 @@ func main() {
 		fmt.Println("hellobro", version)
 		return
 	}
+	updateTrial() // before anything that might hang
 	a := &bro{mus: musicState{lib: &library{}, gain: 40}}
 	if g, err := strconv.Atoi(readMusicState()["gain"]); err == nil {
 		a.mus.gain = max(0, min(gainMax, g))
@@ -176,6 +179,7 @@ func (a *bro) Tick() {
 	a.shareTick()
 	a.filesTick()
 	a.updateTick()
+	a.trialTick()
 }
 
 func (a *bro) Exit() {
@@ -192,6 +196,9 @@ func (a *bro) IdleTimeout() time.Duration {
 	}
 	if d, ok := a.musicIdleTimeout(); ok {
 		return d
+	}
+	if a.relayOn() { // a computer may come in from afar any time
+		return relayIdle
 	}
 	if a.termLive() || a.shareBusy() { // a computer sending music takes a while
 		return termIdleTimeout

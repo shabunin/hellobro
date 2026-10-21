@@ -379,6 +379,13 @@ func (a *App) drawTabs() {
 	a.Mark(L.tabBar, true)
 }
 
+// DrawFooter redraws the footer, for an app whose idle timeout changed.
+func (a *App) DrawFooter() {
+	if a.calib == nil && a.C.Gray != nil && !a.L.footer.Empty() { // not before the first layout
+		a.drawFooter()
+	}
+}
+
 func (a *App) drawFooter() {
 	if a.Full {
 		return
@@ -394,7 +401,11 @@ func (a *App) drawFooter() {
 	if a.light != nil {
 		hints = append(hints, "light: swipe the left edge")
 	}
-	hints = append(hints, "sleep: "+sleep, "quit: Esc or exit", fmt.Sprintf("auto-exit after %.0f min idle", IdleTimeout.Minutes()))
+	exit := fmt.Sprintf("auto-exit after %.0f min idle", IdleTimeout.Minutes())
+	if a.prog.IdleTimeout() >= 24*time.Hour { // the app wants to stay: say so
+		exit = "no auto-exit"
+	}
+	hints = append(hints, "sleep: "+sleep, "quit: Esc or exit", exit)
 	c.Text(a.F.Small, image.Rect(Pad, L.footer.Min.Y+2, L.W-Pad, L.footer.Max.Y), strings.Join(hints, "   ·   "), Dark, AlignCenter)
 	a.Mark(L.footer, true)
 }

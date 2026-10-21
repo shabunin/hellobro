@@ -64,19 +64,28 @@ uninstall-tools:
 # Over Wi-Fi, with file sharing on in hellobro (Settings) and this
 # computer paired: the new build goes next to the running one, which
 # checks it and restarts into it (keeping the old one as hellobro.old).
+# From afar, through the relay (README):
+#   make push KOBO_HOST=127.0.0.1 KOBO_PORT=2023 KOBO_JUMP=me@vps
 KOBO_HOST ?= kobo.local
+KOBO_PORT ?= 2022
+KOBO_JUMP ?=
+KOBO_DIR = /mnt/onboard/.adds/hellobro
+SSH_TO = -p $(KOBO_PORT) $(if $(KOBO_JUMP),-J $(KOBO_JUMP))
+SCP_TO = -P $(KOBO_PORT) $(if $(KOBO_JUMP),-J $(KOBO_JUMP))
 push: hellobro
-	scp -P 2022 hellobro $(KOBO_HOST):/mnt/onboard/.adds/hellobro/hellobro.new
-	ssh -p 2022 $(KOBO_HOST) hellobro-update
+	scp $(SCP_TO) hellobro $(KOBO_HOST):$(KOBO_DIR)/hellobro.new
+	scp $(SCP_TO) launch.sh $(KOBO_HOST):$(KOBO_DIR)/launch.sh.new
+	ssh $(SSH_TO) $(KOBO_HOST) 'cd $(KOBO_DIR) && mv -f launch.sh.new launch.sh' # it may be running: a new file, not over it
+	ssh $(SSH_TO) $(KOBO_HOST) hellobro-update
 
 # The same, back to the build before.
 push-rollback:
-	ssh -p 2022 $(KOBO_HOST) 'cd /mnt/onboard/.adds/hellobro && cp hellobro.old hellobro.new' && \
-	ssh -p 2022 $(KOBO_HOST) hellobro-update
+	ssh $(SSH_TO) $(KOBO_HOST) 'cd $(KOBO_DIR) && cp hellobro.old hellobro.new' && \
+	ssh $(SSH_TO) $(KOBO_HOST) hellobro-update
 
 # The log, over Wi-Fi.
 push-log:
-	ssh -p 2022 $(KOBO_HOST) cat /mnt/onboard/.adds/hellobro/hellobro.log
+	ssh $(SSH_TO) $(KOBO_HOST) cat $(KOBO_DIR)/hellobro.log
 
 log:
 	cat $(ADDS)/hellobro.log

@@ -58,5 +58,14 @@ if [ -n "$frozen" ]; then
 fi
 export HELLOBRO_FROZEN="$frozen" # so the app can thaw them itself if it gets stuck
 "./$app"
-say "$app exited ($?)"
+status=$?
+say "$app exited ($status)"
+# A new build (hellobro-update) that crashed before it got going: the one
+# before comes back, and runs.
+if [ "$app" = hellobro ] && [ "$status" -ne 0 ] && [ -f update-trial ] && [ -f hellobro.old ]; then
+	say "the new $app failed its trial ($(cat update-trial)): back to the one before"
+	mv -f hellobro hellobro.bad && mv -f hellobro.old hellobro && rm -f update-trial
+	"./$app"
+	say "$app exited ($?)"
+fi
 exit 0

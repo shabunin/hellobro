@@ -73,6 +73,7 @@ func (a *bro) shareApply() {
 		s.srv, s.code, s.conns = nil, "", nil
 		log.Print("share: off")
 	}
+	a.relayApply()
 	mdns := s.srv != nil && a.setting("mdns") == "on" && os.Getenv("HELLOBRO_NO_MDNS") == ""
 	switch {
 	case mdns && s.stopMDNS == nil:
@@ -89,6 +90,10 @@ func (a *bro) shareApply() {
 
 func (a *bro) shareExit() {
 	s := &a.share
+	if a.relay.stop != nil {
+		close(a.relay.stop)
+		a.relay.stop = nil
+	}
 	if s.srv != nil {
 		s.srv.Close()
 		s.srv = nil
@@ -215,7 +220,7 @@ func (a *bro) builtin(cmd string, out io.Writer) (int, bool) {
 			return 1, true
 		}
 		fmt.Fprintf(out, "hellobro-update: %s → %s, restarting\n", version, ver)
-		time.AfterFunc(700*time.Millisecond, func() { a.Do(func() { a.installUpdate(path) }) })
+		time.AfterFunc(700*time.Millisecond, func() { a.Do(func() { a.installUpdate(path, ver) }) })
 		return 0, true
 	}
 	return 0, false

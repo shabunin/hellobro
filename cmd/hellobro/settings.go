@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	panelSet = 2 // the settings panel, after panelWiFi and panelBT
-	setRowH  = 50
-	setTxt   = "settings"
+	panelSet  = 2 // the settings panel, after panelWiFi and panelBT
+	setRowH   = 50
+	setRowMin = 40
+	setTxt    = "settings"
 )
 
 // setting is one line of the panel: its values as saved, and as shown.
@@ -45,6 +46,9 @@ var settingList = []setting{
 	{key: "share", label: "File sharing (SFTP, port 2022)",
 		values: []string{"off", "on", "pair"},
 		shown:  []string{"off", "on (Files tab)", "pair a computer"}},
+	{key: "relay", label: "Relay, a way in from afar (relay.conf)",
+		values: []string{"off", "on"},
+		shown:  []string{"off", "on, while sharing: no auto-exit"}},
 	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
 		values: []string{"on", "off"},
 		shown:  []string{"yes, while sharing", "no"}},
@@ -152,7 +156,7 @@ func (a *bro) stepSetting(i, d int) {
 		n := len(st.values)
 		a.set[st.key] = (a.set[st.key] + d + n) % n
 		a.set.save()
-		if st.key == "mdns" {
+		if st.key == "mdns" || st.key == "relay" {
 			a.shareApply()
 		}
 	}
@@ -165,12 +169,13 @@ func (a *bro) layoutSettings(r image.Rectangle) {
 	v.p = kobo.NewPanel(a.F, "Settings", r, "")
 	b := v.p.Body.Inset(kobo.Pad)
 	v.rows = v.rows[:0]
+	h := max(setRowMin, min(setRowH, (b.Dy()-40)/len(settingList))) // closer, if that makes room for all
 	for i := range settingList {
-		y := b.Min.Y + i*setRowH
-		if y+setRowH > b.Max.Y-40 {
+		y := b.Min.Y + i*h
+		if y+h > b.Max.Y-40 {
 			break // no room: a short screen
 		}
-		v.rows = append(v.rows, image.Rect(b.Min.X, y, b.Max.X, y+setRowH))
+		v.rows = append(v.rows, image.Rect(b.Min.X, y, b.Max.X, y+h))
 	}
 	v.hint = image.Rect(b.Min.X, b.Max.Y-40, b.Max.X, b.Max.Y)
 	v.shown = ""

@@ -160,6 +160,14 @@ func (a *bro) drawShare() {
 		} else {
 			add(kobo.Dark, "Paired computers: %d  (p: pair one more)", len(s.keys))
 		}
+		switch r := &a.relay; {
+		case r.stop != nil && r.up:
+			add(kobo.Black, "Relay %s · from afar: ssh -J you@%s -p %d root@127.0.0.1", r.status, r.conf.server(), r.conf.port)
+		case r.stop != nil:
+			add(kobo.Black, "Relay %s", r.status)
+		case r.err != "":
+			add(kobo.Black, "Relay: %s", r.err)
+		}
 		for _, cn := range s.conns {
 			what := cn.What
 			if what == "" {

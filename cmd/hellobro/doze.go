@@ -62,7 +62,7 @@ func (a *bro) dozeTick() {
 	if z.quietAt.IsZero() {
 		z.quietAt = time.Now()
 	}
-	if d := a.settingMinutes("doze-deep"); d > 0 && time.Since(z.quietAt) >= d {
+	if d := a.settingMinutes("doze-deep"); d > 0 && time.Since(z.quietAt) >= d && !a.relayOn() { // asleep, it's out of reach
 		log.Printf("doze: no music for %v: sleeping", d)
 		a.App.Sleep()
 	}
@@ -80,7 +80,7 @@ func (a *bro) Dozed(on bool) {
 		r.discoverTo = time.Time{}
 		go r.bt.Discover(false)
 	}
-	if a.setting("doze-wifi") == "off" {
+	if a.setting("doze-wifi") == "off" && !a.relayOn() {
 		a.dozeWiFi("off")
 	}
 }
