@@ -97,20 +97,25 @@ var factsOnce sync.Once
 
 func (a *bro) layoutRadio(K kobo.Layout) {
 	v := &a.rv
-	var wr, br, sr image.Rectangle
+	fw, fb, fs := a.folded("wifi"), a.folded("bluetooth"), a.folded("settings")
+	var at []image.Rectangle
 	if K.Landscape { // the radios side by side, the settings under them
-		st := K.Stack(K.Body, 52)
-		wr, br = K.Split(st[0], 0.5)
-		sr = st[1]
-	} else {
-		st := K.Stack(K.Body, 32, 64) // room for all the settings
-		wr, br, sr = st[0], st[1], st[2]
+		at = K.Arrange(K.Body, kobo.Row{Height: 52, Widths: []int{50, 50}, Folded: []bool{fw, fb}},
+			kobo.Row{Height: 48, Folded: []bool{fs}})
+	} else { // room for all the settings
+		at = K.Arrange(K.Body, kobo.Row{Height: 32, Folded: []bool{fw}},
+			kobo.Row{Height: 32, Folded: []bool{fb}}, kobo.Row{Height: 36, Folded: []bool{fs}})
 	}
-	a.layoutSettings(sr)
-	v[panelWiFi].p = kobo.NewPanel(a.F, "Wi-Fi", wr, "")
-	v[panelBT].p = kobo.NewPanel(a.F, "Bluetooth", br, "")
+	a.layoutSettings(at[2], fs)
+	v[panelWiFi].p = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Wi-Fi", at[0], ""), fw)
+	v[panelBT].p = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Bluetooth", at[1], ""), fb)
 	for i := range v {
 		pv := &v[i]
+		if pv.p.Folded { // nothing in it to draw or tap
+			pv.ctl, pv.info, pv.list, pv.acts, pv.rowsOn, pv.shown = nil, image.Rectangle{}, image.Rectangle{}, image.Rectangle{}, 1, ""
+			pv.rows, pv.buttons, pv.input = nil, nil, image.Rectangle{}
+			continue
+		}
 		b := pv.p.Body.Inset(kobo.Pad)
 		n := 3
 		if i == panelBT {
@@ -164,6 +169,7 @@ func (a *bro) radioPoll(scan bool) {
 			r.polling, r.polledAt = false, time.Now()
 			wKey, bKey := r.selected()
 			r.ws, r.bs, r.devs = ws, bs, devs
+			a.SetNetwork(netText(ws))
 			if scan {
 				r.wBusy = ""
 				r.scanned = true
@@ -482,6 +488,24 @@ func (a *bro) drawRadio() {
 	a.drawSettings()
 }
 
+func (a *bro) radioFolded(i int) bool {
+	if i == panelSet {
+		return a.sv.p.Folded
+	}
+	return a.rv[i].p.Folded
+}
+
+// radioFocusOpen moves the focus off a folded panel, to an open one.
+func (a *bro) radioFocusOpen() {
+	r := &a.rs
+	for range 3 {
+		if !a.radioFolded(r.focus) {
+			return
+		}
+		r.focus = (r.focus + 1) % 3
+	}
+}
+
 func (a *bro) drawRadioPanel(i int) {
 	if !a.showingRadio() {
 		return
@@ -668,6 +692,10 @@ func (a *bro) drawRadioPanel(i int) {
 		p.Name = "► " + p.Name
 	}
 	a.DrawPanel(p, status)
+	if p.Folded {
+		pv.rows, pv.buttons = nil, nil
+		return
+	}
 	for j, label := range ctl {
 		b := pv.ctl[j]
 		c.Fill(b, kobo.White)
@@ -946,7 +974,11 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 		return true
 	}
 	if code == kobo.KeyTab {
-		r.focus = (r.focus + 1) % 3
+		for range 3 { // the next open panel
+			if r.focus = (r.focus + 1) % 3; !a.radioFolded(r.focus) {
+				break
+			}
+		}
 		a.drawRadio()
 		return true
 	}

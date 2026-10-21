@@ -141,6 +141,10 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 - A new key is a command in `commands.go` (with its default keys), not
   a case in a Key function: then keys.conf, the switcher and the hints
   know of it.
+- A page's panels are placed with `Layout.Arrange` and made foldable with
+  `kobo.WithFold` (listed in `fold.go`). A folded panel's inner rects are
+  zeroed in its layout and its draw stops after `DrawPanel`, so nothing
+  of it is drawn or tapped.
 - Tests sit next to the code (`*_test.go`). Parsers and logic get table
   tests.
 - User-facing text is short and lower-key, like the rest of the UI.

@@ -74,7 +74,9 @@ type bro struct {
 	relay    relayState
 	fv       filesView
 	upd      updateState
-	lay      kobo.Layout // the last layout, to lay out again
+	folds    map[string]bool // the panels folded, by key (fold.go)
+	net      netState        // the header's network
+	lay      kobo.Layout     // the last layout, to lay out again
 }
 
 // fontSwipe is a contact that started on the right edge.
@@ -99,6 +101,7 @@ func main() {
 	a.set = loadSettings()
 	radio.StateDir = kobo.AppFile("")
 	a.tabs = loadTabs()
+	a.folds = loadFolds()
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames, OwnKeys: true}, a)
 	log.Printf("hellobro %s", version)
 	a.keys = loadKeys()
@@ -169,6 +172,9 @@ func (a *bro) Tap(p image.Point) {
 		a.pickerTap(p)
 		return
 	}
+	if a.foldTap(p) {
+		return
+	}
 	if isTermTab(a.Tab) && p.In(a.stat.r) {
 		a.mediaKey(kobo.KeyPlayPause)
 		return
@@ -192,6 +198,7 @@ func (a *bro) Tick() {
 	}
 	a.dozeWhenIdle()
 	a.keysTick()
+	a.netTick()
 	a.termTick()
 	a.statTick()
 	a.radioTick()

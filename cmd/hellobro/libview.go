@@ -63,6 +63,10 @@ type libAct struct {
 
 func (a *bro) layoutLibrary() {
 	v := &a.mv
+	if v.libP.Folded { // nothing in it to draw or tap
+		v.segs, v.actR, v.listR, v.rowsOnScreen = [numViews]image.Rectangle{}, image.Rectangle{}, image.Rectangle{}, 1
+		return
+	}
 	b := v.libP.Body.Inset(kobo.Pad)
 	const segH, gap, barH = 56, 12, 68
 	w := min(260, (b.Dx()-2*gap)/numViews)
@@ -446,6 +450,10 @@ func (a *bro) drawLibrary() {
 	}
 	p := a.libPanel()
 	a.DrawPanel(p, a.libStatus())
+	if p.Folded {
+		m.rows, m.acts = nil, nil
+		return
+	}
 	for i, r := range v.segs {
 		fg := uint8(kobo.Black)
 		if i == m.view {

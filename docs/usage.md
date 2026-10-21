@@ -30,6 +30,19 @@ one, or Space, shows or hides it; the arrows, or Shift+Up/Down, move it.
 Settings itself can't be hidden. It's kept in `tabs`
 (`ssh -shell music settings files`: a `-` hides one).
 
+## The header and the panels
+
+The header says where the Kobo is on the network: the Wi-Fi's name and
+its address (`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`),
+then the battery and the time. It looks again every 15 s.
+
+A panel folds: the − at the end of its title strip folds it to the
+strip, and the other panels on the page take the room. The + (or a tap
+anywhere on the strip) opens it again. The switcher can too ("Wi-Fi
+panel: minimize", "… open"). They stay folded, kept in `folded`. The
+terminal doesn't fold: it's alone on its tab. On Settings, Tab skips
+a folded panel.
+
 ## The switcher
 
 Ctrl+Shift+P, anywhere, is a switcher in the manner of rofi (or VS
@@ -316,7 +329,7 @@ Kobo's storage:
 | `known_hosts` | host keys trusted on first use |
 | `authorized_keys` | computers paired for file sharing |
 | `ssh_host_ed25519_key` | the Kobo's host key, for file sharing |
-| `settings`, `status-bar`, `term-font`, `tabs` | settings |
+| `settings`, `status-bar`, `term-font`, `tabs`, `folded` | settings |
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |
 | `music-state` | volume, shuffle, repeat, what was playing |

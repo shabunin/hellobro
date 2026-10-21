@@ -97,14 +97,22 @@ type musicState struct {
 
 func (a *bro) layoutMusic(K kobo.Layout) {
 	v := &a.mv
-	var nr, lr image.Rectangle
+	fn, fl := a.folded("now"), a.folded("library")
+	var at []image.Rectangle
 	if K.Landscape {
-		nr, lr = K.Split(K.Body, 0.42)
+		at = K.Arrange(K.Body, kobo.Row{Height: 100, Widths: []int{42, 58}, Folded: []bool{fn, fl}})
 	} else {
-		nr, lr = K.Split(K.Body, 0.31)
+		at = K.Arrange(K.Body, kobo.Row{Height: 31, Folded: []bool{fn}}, kobo.Row{Height: 69, Folded: []bool{fl}})
 	}
-	v.nowP = kobo.NewPanel(a.F, "Now playing", nr, "")
-	v.libP = kobo.NewPanel(a.F, "Library", lr, "")
+	v.nowP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Now playing", at[0], ""), fn)
+	v.libP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Library", at[1], ""), fl)
+	a.layoutLibrary()
+	if fn { // nothing in it to draw or tap
+		z := image.Rectangle{}
+		v.cover, v.albumR, v.titleR, v.trackR, v.times, v.bar, v.statusR, v.chipRow = z, z, z, z, z, z, z, z
+		v.buttons, v.chips = [numButtons]image.Rectangle{}, [numChips]image.Rectangle{}
+		return
+	}
 
 	b := v.nowP.Body.Inset(kobo.Pad)
 	var info image.Rectangle
@@ -144,7 +152,6 @@ func (a *bro) layoutMusic(K kobo.Layout) {
 		v.buttons[i] = image.Rect(x, row.Min.Y, x+bw, row.Max.Y)
 		x += bw + gap
 	}
-	a.layoutLibrary()
 }
 
 // --- the library ---
@@ -336,6 +343,9 @@ func (a *bro) queueLine() string {
 func (a *bro) drawNow() {
 	m, v := &a.mus, &a.mv
 	a.DrawPanel(a.nowPanel(), a.outputStatus())
+	if v.nowP.Folded {
+		return
+	}
 	a.drawCover()
 
 	c := a.C
@@ -370,6 +380,9 @@ func (a *bro) drawNow() {
 
 // drawChips draws shuffle, repeat and "+ playlist", under the buttons.
 func (a *bro) drawChips() {
+	if a.mv.nowP.Folded {
+		return
+	}
 	m, v, c := &a.mus, &a.mv, a.C
 	c.Fill(v.chipRow, kobo.White)
 	labels := [numChips]string{"shuffle", "repeat " + repeatNames[m.repeat], "+ playlist"}
@@ -399,6 +412,9 @@ func (a *bro) drawChips() {
 }
 
 func (a *bro) drawCover() {
+	if a.mv.nowP.Folded {
+		return
+	}
 	r := a.mv.cover
 	c := a.C
 	c.Fill(r, kobo.White)
@@ -463,6 +479,9 @@ func (a *bro) loadCover(path string) {
 }
 
 func (a *bro) drawButton(i int, r image.Rectangle) {
+	if a.mv.nowP.Folded {
+		return
+	}
 	c := a.C
 	fg, bg := uint8(kobo.Black), uint8(kobo.White)
 	if i == btnPlay {
@@ -511,6 +530,9 @@ func triangle(c kobo.Canvas, p, q, s image.Point, g uint8) {
 
 // drawProgress draws the times and the bar.
 func (a *bro) drawProgress() {
+	if a.mv.nowP.Folded {
+		return
+	}
 	m, v, c := &a.mus, &a.mv, a.C
 	m.shownSec = int(m.pos.Seconds())
 	c.Fill(v.times, kobo.White)
@@ -529,6 +551,9 @@ func (a *bro) drawProgress() {
 }
 
 func (a *bro) drawMusicStatus() {
+	if a.mv.nowP.Folded {
+		return
+	}
 	m, v := &a.mus, &a.mv
 	a.C.Fill(v.statusR, kobo.White)
 	s := fmt.Sprintf("volume %d%%", m.gain)

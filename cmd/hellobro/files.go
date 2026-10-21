@@ -51,33 +51,39 @@ type filesView struct {
 
 func (a *bro) layoutFiles(K kobo.Layout) {
 	v := &a.fv
-	var sr, lr image.Rectangle
+	fs, fl := a.folded("sharing"), a.folded("files")
+	var at []image.Rectangle
 	if K.Landscape {
-		sr, lr = K.Split(K.Body, 0.45)
+		at = K.Arrange(K.Body, kobo.Row{Height: 100, Widths: []int{45, 55}, Folded: []bool{fs, fl}})
 	} else {
-		st := K.Stack(K.Body, 31)
-		sr, lr = st[0], st[1]
+		at = K.Arrange(K.Body, kobo.Row{Height: 31, Folded: []bool{fs}}, kobo.Row{Height: 69, Folded: []bool{fl}})
 	}
-	v.shareP = kobo.NewPanel(a.F, "Sharing", sr, "")
-	v.listP = kobo.NewPanel(a.F, "On this Kobo", lr, "")
-	b := v.shareP.Body.Inset(kobo.Pad)
-	v.text = image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Max.Y-76)
-	v.shareBtns = v.shareBtns[:0]
-	for i, label := range []string{"on/off", "pair", "forget paired"} {
-		x := b.Min.X + i*262
-		v.shareBtns = append(v.shareBtns, radioButton{r: image.Rect(x, b.Max.Y-64, x+250, b.Max.Y), label: label})
+	v.shareP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Sharing", at[0], ""), fs)
+	v.listP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "On this Kobo", at[1], ""), fl)
+	v.shownShare, v.shownList = "", ""
+	v.text, v.shareBtns = image.Rectangle{}, v.shareBtns[:0]
+	if !fs {
+		b := v.shareP.Body.Inset(kobo.Pad)
+		v.text = image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Max.Y-76)
+		for i, label := range []string{"on/off", "pair", "forget paired"} {
+			x := b.Min.X + i*262
+			v.shareBtns = append(v.shareBtns, radioButton{r: image.Rect(x, b.Max.Y-64, x+250, b.Max.Y), label: label})
+		}
+	}
+	v.pathR, v.acts, v.list, v.rowsOn, v.rows = image.Rectangle{}, image.Rectangle{}, image.Rectangle{}, 1, nil
+	v.listBtns = v.listBtns[:0]
+	if fl { // nothing in it to draw or tap
+		return
 	}
 	l := v.listP.Body.Inset(kobo.Pad)
 	v.pathR = image.Rect(l.Min.X, l.Min.Y, l.Max.X, l.Min.Y+44)
 	v.acts = image.Rect(l.Min.X, l.Max.Y-64, l.Max.X, l.Max.Y)
 	v.list = image.Rect(l.Min.X, v.pathR.Max.Y+8, l.Max.X, v.acts.Min.Y-12)
 	v.rowsOn = max(1, v.list.Dy()/fileRowH)
-	v.listBtns = v.listBtns[:0]
 	for i, label := range []string{"open", "up", "delete", "refresh"} {
 		x := l.Min.X + i*212
 		v.listBtns = append(v.listBtns, radioButton{r: image.Rect(x, v.acts.Min.Y, x+200, v.acts.Max.Y), label: label})
 	}
-	v.shownShare, v.shownList = "", ""
 }
 
 func (a *bro) showingFiles() bool {
@@ -190,6 +196,9 @@ func (a *bro) drawShare() {
 	}
 	v.shownShare = key
 	a.DrawPanel(v.shareP, status)
+	if v.shareP.Folded {
+		return
+	}
 	y := v.text.Min.Y
 	for _, l := range lines {
 		f, h := a.F.Small, 40
@@ -306,6 +315,10 @@ func (a *bro) drawFileList() {
 	}
 	v.shownList = key
 	a.DrawPanel(v.listP, v.free)
+	if v.listP.Folded {
+		v.rows = v.rows[:0]
+		return
+	}
 	c.Text(a.F.Small, v.pathR, v.path+"/", kobo.Dark, kobo.AlignLeft)
 	c.Fill(image.Rect(v.list.Min.X, v.list.Min.Y-4, v.list.Max.X, v.list.Min.Y-2), kobo.Light)
 	v.rows = v.rows[:0]

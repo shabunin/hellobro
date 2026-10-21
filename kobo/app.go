@@ -168,6 +168,7 @@ type App struct {
 
 	status    string          // the header's status text, as drawn
 	note      string          // the Program's, left of it
+	network   string          // the Program's, first: the Wi-Fi and the address
 	dirty     []dirtyRect     // pending screen updates, blitted one at a time
 	flash     bool            // the next full-screen update should flash
 	flashR    image.Rectangle // an area whose next update should flash (GC16), to clear ghosting

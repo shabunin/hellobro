@@ -178,11 +178,15 @@ func (a *bro) stepSetting(i, d int) {
 	a.drawSettings()
 }
 
-func (a *bro) layoutSettings(r image.Rectangle) {
+func (a *bro) layoutSettings(r image.Rectangle, folded bool) {
 	v := &a.sv
-	v.p = kobo.NewPanel(a.F, "Settings", r, "")
+	v.p = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Settings", r, ""), folded)
 	b := v.p.Body.Inset(kobo.Pad)
 	v.rows = v.rows[:0]
+	if folded {
+		v.hint, v.shown = image.Rectangle{}, ""
+		return
+	}
 	h := max(setRowMin, min(setRowH, (b.Dy()-40)/len(settingList))) // closer, if that makes room for all
 	for i := range settingList {
 		y := b.Min.Y + i*h

@@ -103,6 +103,7 @@ func makeCommands() []*command {
 		&command{id: "tabs", title: "Tabs: show, hide, order", run: (*bro).openTabs},
 		&command{id: "keys", title: "Keys: set a command's", run: func(a *bro) { a.openKeys(nil) }},
 	)
+	cs = append(cs, foldCommands()...)
 	for t, name := range tabNames {
 		if t == tabRadio {
 			continue // where tabs are set: always there

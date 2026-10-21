@@ -162,6 +162,8 @@ type Panel struct {
 	Outer, Title, Body image.Rectangle
 	Button             image.Rectangle // optional, inside the title strip
 	ButtonLabel        string
+	Fold               image.Rectangle // the − / + box at the strip's end, if it folds
+	Folded             bool            // only the title strip shows
 }
 
 // Layout is where things go on the screen.
@@ -184,7 +186,8 @@ const (
 	footerH   = 46
 	titleH    = 48
 	border    = 3
-	tapMargin = 12 // buttons accept taps a little outside their frame
+	FoldH     = titleH + 2*border // a folded panel: its frame and title strip
+	tapMargin = 12                // buttons accept taps a little outside their frame
 )
 
 // makeLayout places the frame; full gives the whole screen to the page.
@@ -266,10 +269,138 @@ func NewPanel(f Fonts, name string, outer image.Rectangle, buttonLabel string) P
 func WithButton(f Fonts, p Panel, label string) Panel {
 	p.ButtonLabel, p.Button = label, image.Rectangle{}
 	if label != "" {
+		end := p.Title.Max.X - 10
+		if !p.Fold.Empty() {
+			end = p.Fold.Min.X - 12
+		}
 		bw := TextWidth(f.Small, label) + 36
-		p.Button = image.Rect(p.Title.Max.X-10-bw, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
+		p.Button = image.Rect(end-bw, p.Title.Min.Y+6, end, p.Title.Max.Y-8)
 	}
 	return p
+}
+
+// WithFold is p with a box at the end of its title strip: − folds it to
+// the strip, + (folded) opens it again.
+func WithFold(f Fonts, p Panel, folded bool) Panel {
+	s := p.Title.Dy() - 14
+	p.Fold = image.Rect(p.Title.Max.X-10-s, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
+	p.Folded = folded
+	return WithButton(f, p, p.ButtonLabel)
+}
+
+// FoldHit says whether a tap at pt folds or opens p: on its box, or
+// anywhere on the strip of a folded one (but its button).
+func FoldHit(pt image.Point, p Panel) bool {
+	switch {
+	case p.Fold.Empty() || Hit(pt, p.Button):
+		return false
+	case p.Folded:
+		return pt.In(p.Outer)
+	}
+	return Hit(pt, p.Fold)
+}
+
+// Row is a row of panels for Arrange: its share of the height (percent,
+// as Stack takes them), its panels' shares of its width (nil: one panel),
+// and which of them are folded.
+type Row struct {
+	Height int
+	Widths []int
+	Folded []bool
+}
+
+// Arrange places a page's panels, row by row, as Stack and Split would.
+// A folded panel is only its strip, FoldH high, across its row's place:
+// above the open ones if it comes before them, below if after. The rest
+// share what it leaves. The places come back in order, row by row.
+func (L Layout) Arrange(r image.Rectangle, rows ...Row) []image.Rectangle {
+	type item struct {
+		row, panel int // panel < 0: the row's open panels
+	}
+	var items []item
+	var weights []int
+	flex := r
+	n := 0
+	for i, row := range rows {
+		if row.Widths == nil {
+			rows[i].Widths = []int{100}
+		}
+		open := false
+		for j := range rows[i].Widths {
+			n++
+			switch {
+			case j < len(row.Folded) && row.Folded[j]:
+				items = append(items, item{i, j})
+				flex.Max.Y -= FoldH + Pad
+			case !open: // the first open one: the open ones go here
+				open = true
+				items = append(items, item{i, -1})
+				weights = append(weights, row.Height)
+			}
+		}
+	}
+	// The open rows' heights, cut as Stack cuts.
+	total := 0
+	for _, w := range weights {
+		total += w
+	}
+	var heights []int
+	cum, top := 0, flex.Min.Y
+	for k, w := range weights {
+		cum += w
+		bot := flex.Min.Y + flex.Dy()*cum/max(1, total)
+		lo, hi := top, bot
+		if k > 0 {
+			lo += Pad / 2
+		}
+		if k < len(weights)-1 {
+			hi -= Pad / 2
+		}
+		heights = append(heights, hi-lo)
+		top = bot
+	}
+
+	out := make([]image.Rectangle, n)
+	first := make([]int, len(rows)) // where each row's panels start in out
+	for i := 1; i < len(rows); i++ {
+		first[i] = first[i-1] + len(rows[i-1].Widths)
+	}
+	y, k := r.Min.Y, 0
+	for _, it := range items {
+		if it.panel >= 0 {
+			out[first[it.row]+it.panel] = image.Rect(r.Min.X, y, r.Max.X, y+FoldH)
+			y += FoldH + Pad
+			continue
+		}
+		row := rows[it.row]
+		h := heights[k]
+		k++
+		var open []int
+		wsum := 0
+		for j, w := range row.Widths {
+			if j >= len(row.Folded) || !row.Folded[j] {
+				open = append(open, j)
+				wsum += w
+			}
+		}
+		// Side by side, cut as Split cuts.
+		left, c := r.Min.X, 0
+		for m, j := range open {
+			c += row.Widths[j]
+			right := r.Min.X + r.Dx()*c/max(1, wsum)
+			lo, hi := left, right
+			if m > 0 {
+				lo += Pad / 2
+			}
+			if m < len(open)-1 {
+				hi -= Pad / 2
+			}
+			out[first[it.row]+j] = image.Rect(lo, y, hi, y+h)
+			left = right
+		}
+		y += h + Pad
+	}
+	return out
 }
 
 // Hit says whether p is on the button r, give or take a little.
@@ -317,6 +448,15 @@ func (a *App) SetStatus(note string) {
 	}
 }
 
+// SetNetwork puts the network first in the header's status, where the
+// orientation goes otherwise: "home-wifi · 192.168.1.20".
+func (a *App) SetNetwork(s string) {
+	if s != a.network {
+		a.network = s
+		a.drawStatus()
+	}
+}
+
 // Notify puts text in the header for a few seconds, over the note:
 // "copied 3 lines".
 func (a *App) Notify(text string) {
@@ -327,7 +467,7 @@ func (a *App) Notify(text string) {
 
 // drawStatus refreshes the note, battery & clock text, if they changed.
 func (a *App) drawStatus() {
-	s := statusText(a.scr.info)
+	s := statusText(a.scr.info, a.network)
 	note := a.note
 	if a.notice != "" {
 		note = a.notice
@@ -346,12 +486,16 @@ func (a *App) drawStatus() {
 	a.Mark(a.L.status, true)
 }
 
-func statusText(s ScreenInfo) string {
-	orient := "portrait"
-	if s.Landscape() {
-		orient = "landscape"
+func statusText(s ScreenInfo, network string) string {
+	first := network
+	switch {
+	case first != "":
+	case s.Landscape():
+		first = "landscape"
+	default:
+		first = "portrait"
 	}
-	parts := []string{orient}
+	parts := []string{first}
 	if b, err := os.ReadFile("/sys/class/power_supply/battery/capacity"); err == nil {
 		bat := strings.TrimSpace(string(b)) + "%"
 		if st, err := os.ReadFile("/sys/class/power_supply/battery/status"); err == nil && strings.TrimSpace(string(st)) == "Charging" {
@@ -473,6 +617,16 @@ func (a *App) DrawPanelTitle(p Panel, status string) {
 	c.Fill(p.Title, Light)
 	c.Fill(image.Rect(p.Title.Min.X, p.Title.Max.Y-2, p.Title.Max.X, p.Title.Max.Y), Black)
 	t := image.Rect(p.Title.Min.X+16, p.Title.Min.Y, p.Title.Max.X-16, p.Title.Max.Y-2)
+	if f := p.Fold; !f.Empty() {
+		c.Fill(f, White)
+		c.Frame(f, 2, Black)
+		m := f.Min.Add(f.Max).Div(2)
+		c.Fill(image.Rect(m.X-9, m.Y-1, m.X+10, m.Y+2), Black) // −
+		if p.Folded {
+			c.Fill(image.Rect(m.X-1, m.Y-9, m.X+2, m.Y+10), Black) // +
+		}
+		t.Max.X = f.Min.X - 16
+	}
 	if p.ButtonLabel != "" {
 		c.Fill(p.Button, White)
 		c.Frame(p.Button, 2, Black)
