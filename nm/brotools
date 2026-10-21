@@ -1,0 +1,5 @@
+# Launch brotools (diagnostics) from NickelMenu; make install-tools puts it
+# on the Kobo, as nm/hellobro explains.
+menu_item : main : Bro Tools : cmd_output : 9999 : quiet : exec /bin/sh /mnt/onboard/.adds/hellobro/launch.sh brotools
+chain_always : nickel_open : library : library
+chain_always : nickel_misc : home

@@ -33,17 +33,29 @@ bin/fbink third_party/fbink/libfbink.a: | .cross-image
 # this PC's address on the Kobo's Wi-Fi, for ssh.conf
 PC_IP ?= $(shell ip -4 -o addr show wlp4s0 2>/dev/null | awk '{sub("/.*","",$$4); print $$4}')
 
-# Both apps live in .adds/hellobro, sharing the launcher, fbink and the
-# touch calibration; NickelMenu gets an entry for each.
-install: $(APPS) bin/fbink
+# The apps live in .adds/hellobro, sharing the launcher, fbink and the
+# touch calibration, each with its NickelMenu entry. install puts hellobro
+# there; brotools, the diagnostics, only goes on with install-tools, and
+# uninstall-tools takes it off again.
+install: hellobro bin/fbink
 	test -d $(KOBO)/.adds || { echo "Kobo not mounted at $(KOBO)"; exit 1; }
 	mkdir -p $(ADDS)
-	cp $(APPS) launch.sh bin/fbink $(ADDS)/
+	cp hellobro launch.sh bin/fbink $(ADDS)/
 	rm -f $(ADDS)/hellobro.sh # the launcher before launch.sh
 	cp nm/hellobro $(KOBO)/.adds/nm/hellobro
 	@# a first ssh.conf pointing at hellobro-server on this PC; kept if it's there
 	test -f $(ADDS)/ssh.conf || \
 		printf '# name  user@host[:port]\nhellobro-server  bro@%s:2222\n' "$(PC_IP)" > $(ADDS)/ssh.conf
+	sync
+
+install-tools: brotools install
+	cp brotools $(ADDS)/
+	cp nm/brotools $(KOBO)/.adds/nm/brotools
+	sync
+
+uninstall-tools:
+	test -d $(KOBO)/.adds || { echo "Kobo not mounted at $(KOBO)"; exit 1; }
+	rm -f $(ADDS)/brotools $(ADDS)/brotools.log $(ADDS)/brotools-old.log $(KOBO)/.adds/nm/brotools
 	sync
 
 log:
@@ -65,4 +77,4 @@ test:
 clean:
 	rm -f $(APPS) $(APPS:=-nocgo)
 
-.PHONY: all install log log-tools clean server test
+.PHONY: all install install-tools uninstall-tools log log-tools clean server test

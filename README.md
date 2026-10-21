@@ -127,11 +127,14 @@ The build runs in a podman container with Go and an ARM toolchain
 (`tools/Containerfile`), since FBInk is linked in with cgo:
 
     make                   # static ARM binaries: hellobro, brotools
-    make install           # copy to a mounted Kobo (KOBO=/run/media/$USER/KOBOeReader)
+    make install           # hellobro to a mounted Kobo (KOBO=/run/media/$USER/KOBOeReader)
+    make install-tools     # brotools as well, when it's wanted
+    make uninstall-tools   # and off again
 
-`make install` copies `hellobro`, `brotools`, `launch.sh`, `bin/fbink` and
-the NickelMenu entries (`nm/hellobro`) to `.adds/hellobro`, and writes a
-first `ssh.conf` pointing at this PC. The apps share that directory, so
+`make install` copies `hellobro`, `launch.sh`, `bin/fbink` and its
+NickelMenu entry (`nm/hellobro`) to `.adds/hellobro`, and writes a first
+`ssh.conf` pointing at this PC. brotools only goes there with
+`make install-tools` (and its entry, `nm/brotools`). The apps share that directory, so
 they share the touch calibration; each logs to its own `NAME.log` there.
 `launch.sh APP` freezes Nickel while the app runs (leaving whatever holds
 the watchdog alone) and thaws it afterwards; the app thaws it itself if it
