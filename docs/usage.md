@@ -2,6 +2,9 @@
 
 Back to the [README](../README.md). From afar: [relay.md](relay.md).
 
+It starts on a "hello bro" screen while it gets going, and says "bye
+bro!" as it hands the Kobo back.
+
 ## Tabs
 
 Tap a tab, or Ctrl+Alt+1–4 (by place; works everywhere, fullscreen and
@@ -180,8 +183,8 @@ minutes), the Kobo goes to sleep properly.
   to the next and previous one, folded ones too. − or Ctrl+Shift+M folds
   one to its strip; Enter on the strip, or picking it in the switcher,
   opens it again. Esc on an idle one or `close` drops it.
-- Ctrl+Shift+F: fullscreen, the session in focus alone (Ctrl+Tab goes on to the
-  next). Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
+- Ctrl+Shift+F: fullscreen, the session in focus alone (Ctrl+Tab goes
+  on to the next). Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
   edge: font size (remembered in `term-font`).
 - A status bar along the bottom, fullscreen too: what's playing, and the
   battery (charge, temperature), CPU and memory use, every 5 s.
@@ -298,7 +301,8 @@ the auto-exit.
 sends the new build as `hellobro.new` and asks hellobro to take it
 (`hellobro-update`). It checks it's an ARM build that runs and says it's
 hellobro, keeps the running one as `hellobro.old`, and restarts into the
-new one: the same process, so Nickel stays frozen. `make push-rollback`
+new one ("hello bro, starting the new hellobro…"): the same process, so
+Nickel stays frozen. `make push-rollback`
 goes back to `hellobro.old`, `make push-log` shows the log. A
 `hellobro.new` sent any other way gets a question on the screen instead.
 A new build is on trial till it's going (its first tick, and file
@@ -328,8 +332,8 @@ It's only installed when asked for: `make install-tools`.
 ## In both apps
 
 In both: swipe the left edge for the frontlight (in hellobro also
-Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Ctrl+Shift+F in hellobro): swipe
-in from the top or bottom edge to leave it. Esc or the exit button leave;
+Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Ctrl+Shift+F
+in hellobro): swipe in from the top or bottom edge to leave it. Esc or the exit button leave;
 the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
 with a session up, 6 hours while music plays).
 

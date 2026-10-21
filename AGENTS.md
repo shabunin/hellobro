@@ -63,9 +63,9 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
   (the app hides Shell by default). `HB_TABS="ssh -shell music settings
   files"` sets the tabs file as you like: `harness/feeds/tabs.py` wants
   that one.
-- Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`, `panes`, `foldkeys`,
-  `fontswipe` and `relay` need the test server: `cd server && go run .`
-  (port 2222).
+- Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`,
+  `panes`, `foldkeys`, `fontswipe` and `relay` need the test server:
+  `cd server && go run .` (port 2222).
 - Put outputs in your scratch directory, not the repo.
 
 A UI change isn't done until a harness snapshot shows it, in portrait and
