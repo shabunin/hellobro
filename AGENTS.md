@@ -80,7 +80,8 @@ make push-rollback
 ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 ```
 
-- `KOBO_HOST` (default `kobo.local`; or the IP), `KOBO_PORT`,
+- `KOBO_HOST` (default `kobo.local`; or the IP, or a `~/.ssh/config` Host
+  such as `kobo-afar`, whose Port it takes), `KOBO_PORT`,
   `KOBO_JUMP` (through the relay, see [docs/relay.md](docs/relay.md)).
 - Updates are on trial: a build that doesn't tick within 45 s, or
   crashes, rolls back to `hellobro.old` by itself. Still, read the log

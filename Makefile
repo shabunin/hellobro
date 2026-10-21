@@ -66,8 +66,10 @@ uninstall-tools:
 # checks it and restarts into it (keeping the old one as hellobro.old).
 # From afar, through the relay (README):
 #   make push KOBO_HOST=127.0.0.1 KOBO_PORT=2023 KOBO_JUMP=me@vps
+# or a Host in ~/.ssh/config that says all that: make push KOBO_HOST=kobo-afar.
+# The port is that Host's if it sets one, else file sharing's 2022.
 KOBO_HOST ?= kobo.local
-KOBO_PORT ?= 2022
+KOBO_PORT ?= $(or $(shell ssh -G $(KOBO_HOST) 2>/dev/null | awk '$$1 == "port" && $$2 != 22 { print $$2 }'),2022)
 KOBO_JUMP ?=
 KOBO_DIR = /mnt/onboard/.adds/hellobro
 SSH_TO = -p $(KOBO_PORT) $(if $(KOBO_JUMP),-J $(KOBO_JUMP))

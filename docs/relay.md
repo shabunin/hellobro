@@ -132,7 +132,8 @@ Host kobo-afar
     ProxyJump relay@VPS
 ```
 
-then `ssh kobo-afar`, `scp -r Album kobo-afar:Music/`, and so on.
+then `ssh kobo-afar`, `scp -r Album kobo-afar:Music/`,
+`make push KOBO_HOST=kobo-afar`, and so on.
 
 Updates from afar are safe: a new build is on trial until it's running
 with file sharing up. One that hangs for 45 s, or crashes, is put aside
