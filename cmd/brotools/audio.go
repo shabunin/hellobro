@@ -18,11 +18,13 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/go-mp3"
+
+	"hellobro/kobo"
 )
 
 const toneTrack = "test tone (a little arpeggio)"
 
-var musicDir = envOr("HELLOBRO_MUSIC_DIR", "/mnt/onboard")
+var musicDir = kobo.EnvOr("HELLOBRO_MUSIC_DIR", "/mnt/onboard")
 
 // findTracks lists MP3 and WAV files a few folders deep, skipping hidden ones.
 func findTracks() []string {

@@ -1,8 +1,11 @@
-# Launch hellobro from NickelMenu.
-# cmd_output keeps Nickel waiting while hellobro.sh freezes it. Its 10 s
-# limit runs out while Nickel is frozen, but hellobro.sh has exited by the
+# Launch hellobro (the terminal) and brotools (diagnostics) from NickelMenu.
+# cmd_output keeps Nickel waiting while launch.sh freezes it. Its 10 s
+# limit runs out while Nickel is frozen, but launch.sh has exited by the
 # time Nickel wakes up, so Nickel finds it done. Then Nickel switches views,
-# which repaints over whatever hellobro left on screen.
-menu_item : main : Hello Bro : cmd_output : 9999 : quiet : exec /bin/sh /mnt/onboard/.adds/hellobro/hellobro.sh
+# which repaints over whatever the app left on screen.
+menu_item : main : Hello Bro : cmd_output : 9999 : quiet : exec /bin/sh /mnt/onboard/.adds/hellobro/launch.sh hellobro
+chain_always : nickel_open : library : library
+chain_always : nickel_misc : home
+menu_item : main : Bro Tools : cmd_output : 9999 : quiet : exec /bin/sh /mnt/onboard/.adds/hellobro/launch.sh brotools
 chain_always : nickel_open : library : library
 chain_always : nickel_misc : home

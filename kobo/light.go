@@ -1,4 +1,4 @@
-package main
+package kobo
 
 // The frontlight, the way KOReader drives the Elipsa's: an ioctl on
 // /dev/ntx_io taking 0-100. It can't be read back, so we start from the
@@ -20,7 +20,7 @@ import (
 
 const ntxSetLight = 241 // ioctl on /dev/ntx_io: set the frontlight, 0-100
 
-var nickelConf = envOr("HELLOBRO_NICKEL_CONF", "/mnt/onboard/.kobo/Kobo/Kobo eReader.conf")
+var nickelConf = EnvOr("HELLOBRO_NICKEL_CONF", "/mnt/onboard/.kobo/Kobo/Kobo eReader.conf")
 
 type frontlight struct {
 	f       *os.File
@@ -30,7 +30,7 @@ type frontlight struct {
 }
 
 func openFrontlight() *frontlight {
-	f, err := os.OpenFile(envOr("HELLOBRO_NTX_IO", "/dev/ntx_io"), os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	f, err := os.OpenFile(EnvOr("HELLOBRO_NTX_IO", "/dev/ntx_io"), os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		log.Printf("frontlight: %v", err)
 		return nil
@@ -126,12 +126,12 @@ func sysfsBrightness() (int, bool) {
 // --- the swipe's gauge ---
 
 // lightGaugeRect sits right of the finger, centered vertically.
-func (a *app) lightGaugeRect() image.Rectangle {
-	cy := a.c.Bounds().Dy() / 2
-	return image.Rect(lightEdge+20, cy-260, lightEdge+130, cy+260)
+func (a *App) lightGaugeRect() image.Rectangle {
+	cy := a.C.Bounds().Dy() / 2
+	return image.Rect(EdgeWidth+20, cy-260, EdgeWidth+130, cy+260)
 }
 
-func (a *app) setLight(level int) {
+func (a *App) setLight(level int) {
 	level = max(0, min(100, level))
 	if level == a.light.level && a.lightOverlay != nil {
 		return
@@ -139,45 +139,50 @@ func (a *app) setLight(level int) {
 	if err := a.light.set(level); err != nil {
 		log.Print(err)
 	}
-	a.drawLightGauge()
-}
-
-func (a *app) drawLightGauge() {
 	a.drawGauge(&a.lightOverlay, a.lightGaugeRect(), a.light.level, 100, fmt.Sprintf("%d%%", a.light.level))
 }
 
-func (a *app) hideLightGauge() { a.hideGauge(&a.lightOverlay) }
+// DrawGauge shows a gauge like the light's: a bar in r, filled n/of,
+// labeled; HideGauge takes it away again.
+func (a *App) DrawGauge(r image.Rectangle, n, of int, label string) {
+	a.drawGauge(&a.gaugeOverlay, r, n, of, label)
+}
 
-// drawGauge shows a bar filled n/of in r, labeled, saving what it covers
-// in *under the first time.
-func (a *app) drawGauge(under **image.Gray, r image.Rectangle, n, of int, label string) {
+func (a *App) HideGauge() { a.hideGauge(&a.gaugeOverlay) }
+
+// GaugeUp says whether a gauge is on screen: drawing under it would be
+// undone when it goes.
+func (a *App) GaugeUp() bool { return a.lightOverlay != nil || a.gaugeOverlay != nil }
+
+// drawGauge draws the gauge, saving what it covers in *under the first time.
+func (a *App) drawGauge(under **image.Gray, r image.Rectangle, n, of int, label string) {
 	if *under == nil {
 		*under = image.NewGray(r)
-		draw.Draw(*under, r, a.c.Gray, r.Min, draw.Src)
+		draw.Draw(*under, r, a.C.Gray, r.Min, draw.Src)
 	}
-	c := a.c
-	c.fill(r, white)
-	c.frame(r, 3, black)
+	c := a.C
+	c.Fill(r, White)
+	c.Frame(r, 3, Black)
 	bar := image.Rect(r.Min.X+20, r.Min.Y+20, r.Max.X-20, r.Max.Y-70)
-	c.frame(bar, 2, black)
+	c.Frame(bar, 2, Black)
 	in := bar.Inset(6)
-	c.fill(image.Rect(in.Min.X, in.Max.Y-in.Dy()*n/of, in.Max.X, in.Max.Y), black)
-	c.text(a.f.panel, image.Rect(r.Min.X, r.Max.Y-64, r.Max.X, r.Max.Y-10), label, black, alignCenter)
-	a.mark(r, false) // black & white only, so the fast waveform is fine
+	c.Fill(image.Rect(in.Min.X, in.Max.Y-in.Dy()*n/of, in.Max.X, in.Max.Y), Black)
+	c.Text(a.F.Panel, image.Rect(r.Min.X, r.Max.Y-64, r.Max.X, r.Max.Y-10), label, Black, AlignCenter)
+	a.Mark(r, false) // black & white only, so the fast waveform is fine
 }
 
 // hideGauge puts back what the gauge covered.
-func (a *app) hideGauge(under **image.Gray) {
+func (a *App) hideGauge(under **image.Gray) {
 	if *under == nil {
 		return
 	}
 	r := (*under).Bounds()
-	draw.Draw(a.c.Gray, r, *under, r.Min, draw.Src)
+	draw.Draw(a.C.Gray, r, *under, r.Min, draw.Src)
 	*under = nil
-	a.mark(r, true)
+	a.Mark(r, true)
 }
 
-func (a *app) lightInfo() string {
+func (a *App) lightInfo() string {
 	if a.light == nil {
 		return "frontlight: not available"
 	}

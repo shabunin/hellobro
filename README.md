@@ -1,10 +1,18 @@
 # hello bro
 
-A Go app for the Kobo Elipsa (N604, sunxi): it takes over the screen from
-Nickel, draws its own e-ink UI through [FBInk](https://github.com/NiLuJe/FBInk),
-and gives Nickel back when you leave. Launched from NickelMenu.
+Go apps for the Kobo Elipsa (N604, sunxi): they take over the screen from
+Nickel, draw their own e-ink UI through [FBInk](https://github.com/NiLuJe/FBInk),
+and give Nickel back when you leave. Each has its own NickelMenu entry.
 
-Tabs (tap, or F1–F9 on a Bluetooth keyboard; Alt+F1–F9 from a terminal):
+**hellobro** ("Hello Bro") is a terminal for a Bluetooth keyboard. Tabs
+(tap, or F1/F2; Alt+F1/F2 while a session is up):
+
+- **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
+  Claude Code…), mouse taps and scrolling; several sessions at once.
+- **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
+  several too.
+
+**brotools** ("Bro Tools") is diagnostics. Tabs (tap, or F1–F7):
 
 - **Keys**: a text box for a Bluetooth keyboard, plus the last key's code.
 - **Finger** / **Stylus**: drawing canvases; the stylus draws with pressure.
@@ -12,22 +20,27 @@ Tabs (tap, or F1–F9 on a Bluetooth keyboard; Alt+F1–F9 from a terminal):
   browser, and an HTTPS test.
 - **Sound**: Bluetooth audio through bluealsa: a test tone and an MP3/WAV
   player, with media keys.
-- **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
-  Claude Code…), mouse taps and scrolling; several sessions at once.
-- **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
-  several too.
 - **System**: the device and firmware, user, kernel, uptime, CPU, memory,
   IP addresses, storage, battery, temperatures, add-ons, running SSH/telnet
   servers, and which developer tools are installed (or busybox applets).
 - **Info**: screen, touch and input device details.
 
-Anywhere: swipe the left edge for the frontlight. Esc, the exit button or the
-power button leave; it also leaves after 3 minutes idle (20 with a
-terminal session).
+In both: swipe the left edge for the frontlight. Esc, the exit button or
+the power button leave; they also leave after 3 minutes idle (hellobro: 20
+with a session up).
+
+## Code
+
+- `kobo/`: what the apps share. The screen through FBInk (the update queue
+  and e-ink waveforms), touch with its calibration, keyboards and buttons,
+  the frontlight, drawing, panels, and the app's frame (header, tabs,
+  footer). An app is a `kobo.Program` that fills in the pages.
+- `cmd/hellobro/`: the terminal: the emulator view, SSH, the local shell.
+- `cmd/brotools/`: the diagnostics pages.
 
 ## Terminal
 
-- `ssh.conf` next to the binary lists saved hosts, one per line:
+- `ssh.conf` next to hellobro lists saved hosts, one per line:
   `name  user@host[:port]  [command]`; the command (say `tmux new -A -s
   kobo`) runs instead of a login shell. The prompt also takes
   `ssh -p PORT user@host [command]`, and a host typed there is added to
@@ -57,25 +70,28 @@ both up).
 The build runs in a podman container with Go and an ARM toolchain
 (`tools/Containerfile`), since FBInk is linked in with cgo:
 
-    make hellobro          # static ARM binary
+    make                   # static ARM binaries: hellobro, brotools
     make install           # copy to a mounted Kobo (KOBO=/run/media/$USER/KOBOeReader)
 
-`make install` copies `hellobro`, `hellobro.sh`, `bin/fbink` and the
-NickelMenu entry (`nm/hellobro`), and writes a first `ssh.conf` pointing at
-this PC. `hellobro.sh` freezes Nickel while the app runs (leaving whatever
-holds the watchdog alone) and thaws it afterwards; the app thaws it itself
-if it ever gets stuck.
+`make install` copies `hellobro`, `brotools`, `launch.sh`, `bin/fbink` and
+the NickelMenu entries (`nm/hellobro`) to `.adds/hellobro`, and writes a
+first `ssh.conf` pointing at this PC. The apps share that directory, so
+they share the touch calibration; each logs to its own `NAME.log` there.
+`launch.sh APP` freezes Nickel while the app runs (leaving whatever holds
+the watchdog alone) and thaws it afterwards; the app thaws it itself if it
+ever gets stuck.
 
 `third_party/fbink` (header and static library) and `bin/fbink` are
 prebuilt from FBInk v1.25.0-543-g886f25f1 with image and TrueType support.
 To rebuild them: `./build-fbink.sh path/to/FBInk-checkout`.
 
-`make hellobro-nocgo` builds without the container; every screen update then
-runs `bin/fbink`, which is slow.
+`make hellobro-nocgo` (or `brotools-nocgo`) builds without the container;
+every screen update then runs `bin/fbink`, which is slow.
 
-`make test` runs the tests that work on the PC: the SSH target parser,
-the server's layout, and `termrender_test.go`, which draws a recorded
-terminal stream to a PNG with the app's own code when given one.
+`make test` runs vet and the tests that work on the PC: the SSH target
+parser, the server's layout, and `cmd/hellobro/termrender_test.go`, which
+draws a recorded terminal stream to a PNG with the app's own code when
+given one.
 
 ## The test server
 
@@ -95,23 +111,24 @@ host key is made in `server/.ssh` on first start.
 
 ## Testing on the PC
 
-`harness/` runs the ARM binary under `qemu-arm` (qemu-user) as if on the
-Kobo. A fake FBInk keeps the screen as a file and saves PNG snapshots of
+`harness/` runs an app's ARM binary under `qemu-arm` (qemu-user) as if on
+the Kobo. A fake FBInk keeps the screen as a file and saves PNG snapshots of
 big updates. Scripted touch and keyboard input comes through FIFOs, and
 fake input devices, Nickel settings and frontlight stand in for the rest:
 
-    make hellobro
-    harness/run.sh /tmp/hb 0 demo           # a tour of the tabs, in portrait
-    harness/run.sh /tmp/hb 1 ssh            # landscape, a session with the server
+    make
+    harness/run.sh /tmp/hb 0 demo           # brotools: a tour of the tabs, in portrait
+    harness/run.sh /tmp/hb 1 ssh            # hellobro: landscape, a session with the server
     SRV=$PWD/server/hellobro-server SRV_DIR=/tmp/srv harness/run.sh /tmp/hb 0 sessions
-                                            # two sessions, password + key install, reconnect, shells, System
+                                            # two sessions, password + key install, reconnect, shells
 
 The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
 (`calls.txt` there lists every update with its waveform). The feeds live in
-`harness/feeds`, with their shared helpers in `harness/feedlib.py`.
+`harness/feeds`, each with an `# app:` line naming the app it drives, and
+their shared helpers in `harness/feedlib.py`.
 
 `harness/record.py` records what a terminal program prints, for
 `termrender_test.go`:
 
     harness/record.py /tmp/hx.raw 113 33 5 hx main.go
-    HELLOBRO_TERM_RAW=/tmp/hx.raw HELLOBRO_TERM_PNG=/tmp/hx.png CGO_ENABLED=0 go test -run TestRenderRecording .
+    HELLOBRO_TERM_RAW=/tmp/hx.raw HELLOBRO_TERM_PNG=/tmp/hx.png CGO_ENABLED=0 go test -run TestRenderRecording ./cmd/hellobro

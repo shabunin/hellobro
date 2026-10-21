@@ -1,4 +1,4 @@
-package main
+package kobo
 
 // The e-ink panel, driven through FBInk: linked in (fbink_lib.go, the fast
 // path on the Kobo), or by running our fbink CLI build for every update
@@ -21,29 +21,30 @@ import (
 	"time"
 )
 
-type screenInfo struct {
-	viewW, viewH      int // what we draw into
-	screenW, screenH  int // full panel in the current rotation
-	originX, originY  int // viewport offset inside the panel
-	rota              int // current native rotation (what FBINK_FORCE_ROTA takes)
-	canonical         int // FB_ROTATE_* as the device is physically held: 0 UR, 1 CW, 2 UD, 3 CCW
-	swap, mirX, mirY  bool
-	version, codename string
-	device            string // name, platform and ID, as FBInk knows the device
+// ScreenInfo is the screen as FBInk has it set up.
+type ScreenInfo struct {
+	ViewW, ViewH      int // what we draw into
+	ScreenW, ScreenH  int // full panel in the current rotation
+	OriginX, OriginY  int // viewport offset inside the panel
+	Rota              int // current native rotation (what FBINK_FORCE_ROTA takes)
+	Canonical         int // FB_ROTATE_* as the device is physically held: 0 UR, 1 CW, 2 UD, 3 CCW
+	Swap, MirX, MirY  bool
+	Version, Codename string
+	Device            string // name, platform and ID, as FBInk knows the device
 }
 
-func (s screenInfo) landscape() bool { return s.viewW > s.viewH }
+func (s ScreenInfo) Landscape() bool { return s.ViewW > s.ViewH }
 
-func (s screenInfo) String() string {
+func (s ScreenInfo) String() string {
 	return fmt.Sprintf("FBInk %s on %s: view %dx%d (origin %d,%d) screen %dx%d rota=%d canonical=%d touch swap=%v mirX=%v mirY=%v",
-		s.version, s.codename, s.viewW, s.viewH, s.originX, s.originY, s.screenW, s.screenH,
-		s.rota, s.canonical, s.swap, s.mirX, s.mirY)
+		s.Version, s.Codename, s.ViewW, s.ViewH, s.OriginX, s.OriginY, s.ScreenW, s.ScreenH,
+		s.Rota, s.Canonical, s.Swap, s.MirX, s.MirY)
 }
 
 // fbBackend is one way of talking to FBInk.
 type fbBackend interface {
 	// setRota forces a native rotation (-1 = follow the gyro) and returns the new state.
-	setRota(rota int) (screenInfo, error)
+	setRota(rota int) (ScreenInfo, error)
 	// blit shows r of img. Waveforms: "GC16" (+flash) for full redraws,
 	// "GL16" for UI updates, "DU" for fast black & white ink.
 	blit(img *image.Gray, r image.Rectangle, waveform string, flash bool) error
@@ -52,7 +53,7 @@ type fbBackend interface {
 
 type screen struct {
 	be   fbBackend
-	info screenInfo
+	info ScreenInfo
 
 	// blit timing, logged now and then
 	blits, pixels  int
@@ -71,7 +72,7 @@ func openScreen() (*screen, error) {
 	if err := s.setRotation(-1); err != nil {
 		return nil, err
 	}
-	if err := s.setRotation(s.info.rota); err != nil {
+	if err := s.setRotation(s.info.Rota); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -94,8 +95,8 @@ func (s *screen) setRotation(rota int) error {
 	if err != nil {
 		return err
 	}
-	if rota >= 0 && info.rota != rota {
-		log.Printf("asked FBInk for rota %d, it reports %d", rota, info.rota)
+	if rota >= 0 && info.Rota != rota {
+		log.Printf("asked FBInk for rota %d, it reports %d", rota, info.Rota)
 	}
 	s.info = info
 	log.Print(info)
@@ -132,14 +133,14 @@ type fbinkCLI struct {
 	rota int // passed as FBINK_FORCE_ROTA to every call; -1 = gyro
 }
 
-func (c *fbinkCLI) setRota(rota int) (screenInfo, error) {
+func (c *fbinkCLI) setRota(rota int) (ScreenInfo, error) {
 	c.rota = rota
 	out, err := c.command("-e").Output()
 	if err != nil {
-		return screenInfo{}, fmt.Errorf("fbink -e: %w", err)
+		return ScreenInfo{}, fmt.Errorf("fbink -e: %w", err)
 	}
 	info, err := parseFbinkState(string(out))
-	info.version += " (CLI)"
+	info.Version += " (CLI)"
 	return info, err
 }
 
@@ -174,7 +175,7 @@ func (c *fbinkCLI) command(args ...string) *exec.Cmd {
 }
 
 // parseFbinkState reads the "key=value;" dump of fbink -e.
-func parseFbinkState(dump string) (screenInfo, error) {
+func parseFbinkState(dump string) (ScreenInfo, error) {
 	kv := map[string]string{}
 	for _, field := range strings.Split(strings.TrimSpace(dump), ";") {
 		if k, v, ok := strings.Cut(field, "="); ok {
@@ -182,25 +183,25 @@ func parseFbinkState(dump string) (screenInfo, error) {
 		}
 	}
 	num := func(k string) int { n, _ := strconv.Atoi(kv[k]); return n }
-	s := screenInfo{
-		viewW: num("viewWidth"), viewH: num("viewHeight"),
-		screenW: num("screenWidth"), screenH: num("screenHeight"),
-		originX: num("viewHoriOrigin"), originY: num("viewVertOrigin"),
-		rota:    num("currentRota"),
-		swap:    kv["touchSwapAxes"] == "1",
-		mirX:    kv["touchMirrorX"] == "1",
-		mirY:    kv["touchMirrorY"] == "1",
-		version: kv["FBINK_VERSION"], codename: kv["deviceCodename"],
-		device: fmt.Sprintf("Kobo %s (%s, ID %s)", kv["deviceName"], kv["devicePlatform"], kv["deviceId"]),
+	s := ScreenInfo{
+		ViewW: num("viewWidth"), ViewH: num("viewHeight"),
+		ScreenW: num("screenWidth"), ScreenH: num("screenHeight"),
+		OriginX: num("viewHoriOrigin"), OriginY: num("viewVertOrigin"),
+		Rota:    num("currentRota"),
+		Swap:    kv["touchSwapAxes"] == "1",
+		MirX:    kv["touchMirrorX"] == "1",
+		MirY:    kv["touchMirrorY"] == "1",
+		Version: kv["FBINK_VERSION"], Codename: kv["deviceCodename"],
+		Device: fmt.Sprintf("Kobo %s (%s, ID %s)", kv["deviceName"], kv["devicePlatform"], kv["deviceId"]),
 	}
-	if s.viewW == 0 || s.viewH == 0 {
+	if s.ViewW == 0 || s.ViewH == 0 {
 		return s, fmt.Errorf("unexpected fbink -e output: %q", dump)
 	}
 	// rotationMap='{ a, b, c, d }': index is native, value is canonical.
-	s.canonical = s.rota
+	s.Canonical = s.Rota
 	m := strings.Fields(strings.NewReplacer("{", "", "}", "", ",", " ").Replace(kv["rotationMap"]))
-	if len(m) == 4 && s.rota >= 0 && s.rota < 4 {
-		s.canonical, _ = strconv.Atoi(m[s.rota])
+	if len(m) == 4 && s.Rota >= 0 && s.Rota < 4 {
+		s.Canonical, _ = strconv.Atoi(m[s.Rota])
 	}
 	return s, nil
 }

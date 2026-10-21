@@ -1,4 +1,5 @@
 # A tour of the tabs: drawing, the network probes, sound, typing, light swipes.
+# app: brotools
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
@@ -25,8 +26,8 @@ tap(*scan_btn); time.sleep(12)
 tap(*mdns_btn); time.sleep(9)
 tap(*get_btn); time.sleep(6)
 tap(tab_x(4), tabs_y); time.sleep(4)                 # Sound tab
-tap(tab_x(7), tabs_y); time.sleep(4)                 # System tab
-tap(tab_x(8), tabs_y); time.sleep(2)                 # Info tab
+tap(tab_x(5), tabs_y); time.sleep(8)                 # System tab
+tap(tab_x(6), tabs_y); time.sleep(2)                 # Info tab
 tap(tab_x(0), tabs_y); time.sleep(1)                 # Keyboard tab
 keys("hello bro\nthis is the keyboard tab, typed on a fake NuPhy =)\n")
 time.sleep(2)

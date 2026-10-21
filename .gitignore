@@ -1,6 +1,8 @@
-# build outputs (make hellobro / make hellobro-nocgo)
+# build outputs (make, make APP-nocgo)
 /hellobro
 /hellobro-nocgo
+/brotools
+/brotools-nocgo
 # stamp: the cross-build image exists
 /.cross-image
 # things the app writes next to itself, should it ever run from here

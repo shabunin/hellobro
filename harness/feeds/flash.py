@@ -1,10 +1,11 @@
 # Switches server pages until the terminal earns its cleanup flash.
+# app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-tap(tab_x(5), tabs_y); time.sleep(2)
+tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
 keys("1"); time.sleep(5)
 for p in "14" * 15:
     keys(p); time.sleep(0.8)

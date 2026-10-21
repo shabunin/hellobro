@@ -10,8 +10,20 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/image/font"
+	"golang.org/x/image/font/gofont/gomono"
+	"golang.org/x/image/font/gofont/gomonobold"
+	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
+
+	"hellobro/kobo"
 )
+
+// termFonts are the terminal's faces, in its own size.
+type termFonts struct{ term, bold, fallback font.Face }
+
+func (f *termFonts) setSize(px int) {
+	f.term, f.bold, f.fallback = kobo.Face(gomono.TTF, float64(px)), kobo.Face(gomonobold.TTF, float64(px)), kobo.Face(goregular.TTF, float64(px))
+}
 
 type glyphKey struct {
 	s     string
@@ -19,7 +31,7 @@ type glyphKey struct {
 	width int
 }
 
-func (a *app) glyph(s string, bold bool, width int) *image.Alpha {
+func (a *bro) glyph(s string, bold bool, width int) *image.Alpha {
 	v := &a.tv
 	k := glyphKey{s, bold, width}
 	if g, ok := v.glyphs[k]; ok {
@@ -31,23 +43,23 @@ func (a *app) glyph(s string, bold bool, width int) *image.Alpha {
 	m := image.NewAlpha(image.Rect(0, 0, v.cw*width, v.ch))
 	r, _ := utf8.DecodeRuneInString(s)
 	if !drawSpecial(m, r) {
-		f := a.f.term
+		f := a.tf.term
 		if bold {
-			f = a.f.termBold
+			f = a.tf.bold
 		}
 		if _, ok := f.GlyphAdvance(r); !ok {
-			f = a.f.termFallback // Go Mono lacks it: try the proportional Go font, centered
+			f = a.tf.fallback // Go Mono lacks it: try the proportional Go font, centered
 		}
 		x := 0
-		if f == a.f.termFallback {
+		if f == a.tf.fallback {
 			if _, ok := f.GlyphAdvance(r); !ok {
 				drawMissing(m)
 				v.glyphs[k] = m
 				return m
 			}
-			x = (v.cw*width - textWidth(f, s)) / 2
+			x = (v.cw*width - kobo.TextWidth(f, s)) / 2
 		}
-		d := font.Drawer{Dst: m, Src: image.Opaque, Face: f, Dot: fixed.P(x, 1+a.f.term.Metrics().Ascent.Ceil())}
+		d := font.Drawer{Dst: m, Src: image.Opaque, Face: f, Dot: fixed.P(x, 1+a.tf.term.Metrics().Ascent.Ceil())}
 		d.DrawString(s)
 	}
 	v.glyphs[k] = m
@@ -115,13 +127,13 @@ func drawSpecial(m *image.Alpha, r rune) bool {
 				var in bool
 				switch dir {
 				case 0:
-					in = u >= 0.2 && u <= 0.85 && abs(int((v-0.5)*1000)) <= int((0.85-u)/0.65*0.3*1000)
+					in = u >= 0.2 && u <= 0.85 && kobo.Abs(int((v-0.5)*1000)) <= int((0.85-u)/0.65*0.3*1000)
 				case 1:
-					in = u >= 0.15 && u <= 0.8 && abs(int((v-0.5)*1000)) <= int((u-0.15)/0.65*0.3*1000)
+					in = u >= 0.15 && u <= 0.8 && kobo.Abs(int((v-0.5)*1000)) <= int((u-0.15)/0.65*0.3*1000)
 				case 2:
-					in = v >= 0.3 && v <= 0.7 && abs(int((u-0.5)*1000)) <= int((v-0.3)/0.4*0.4*1000)
+					in = v >= 0.3 && v <= 0.7 && kobo.Abs(int((u-0.5)*1000)) <= int((v-0.3)/0.4*0.4*1000)
 				case 3:
-					in = v >= 0.3 && v <= 0.7 && abs(int((u-0.5)*1000)) <= int((0.7-v)/0.4*0.4*1000)
+					in = v >= 0.3 && v <= 0.7 && kobo.Abs(int((u-0.5)*1000)) <= int((0.7-v)/0.4*0.4*1000)
 				}
 				if in {
 					m.SetAlpha(x, y, color.Alpha{255})

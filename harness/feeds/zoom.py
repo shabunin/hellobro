@@ -1,10 +1,11 @@
 # Ctrl+= / Ctrl+- / Ctrl+0 font sizes in a session.
+# app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-tap(tab_x(5), tabs_y); time.sleep(2)
+tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
 keys("1"); time.sleep(5)
 keys("4"); time.sleep(2)                              # Showcase: shows the window size
 for _ in range(3): key(13, ctrl=True); time.sleep(2)  # Ctrl+= x3: 32 px

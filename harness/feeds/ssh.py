@@ -1,10 +1,11 @@
 # Connects to the server (server/, on :2222), walks its pages, chats, quits.
+# app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-tap(tab_x(5), tabs_y); time.sleep(2)                 # SSH tab: connect screen
+tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab: connect screen
 keys("1"); time.sleep(5)                             # saved host 1: the wish server
 key(DOWN); time.sleep(1); key(ENTER); time.sleep(1.5)   # Todo
 key(DOWN); key(DOWN); key(57); time.sleep(1.5)       # toggle an item (space)

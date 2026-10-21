@@ -1,6 +1,6 @@
 package main
 
-// SSH for the Terminal tab: hosts from ssh.conf, our own key (made on
+// SSH for the SSH tab: hosts from ssh.conf, our own key (made on
 // first use), trust-on-first-use host keys in known_hosts, and password /
 // keyboard-interactive prompts answered from the Kobo's keyboard.
 
@@ -14,7 +14,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +22,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
+
+	"hellobro/kobo"
 )
 
 type sshHost struct {
@@ -37,14 +38,6 @@ func (h sshHost) line() string { return strings.TrimSpace(h.name + "  " + h.Stri
 
 func (h sshHost) same(o sshHost) bool { return h.user == o.user && h.addr == o.addr && h.cmd == o.cmd }
 
-// appFile is a file next to the binary.
-func appFile(name string) string {
-	if exe, err := os.Executable(); err == nil {
-		return filepath.Join(filepath.Dir(exe), name)
-	}
-	return name
-}
-
 const sshConfExample = `# hellobro ssh hosts, one per line:  name  user@host[:port]  [command]
 # The command, if any, runs instead of a login shell; with tmux, a dropped
 # connection comes back where it was:
@@ -54,7 +47,7 @@ const sshConfExample = `# hellobro ssh hosts, one per line:  name  user@host[:po
 
 // loadSSHHosts reads ssh.conf, creating an example if there's none.
 func loadSSHHosts() []sshHost {
-	path := appFile("ssh.conf")
+	path := kobo.AppFile("ssh.conf")
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		os.WriteFile(path, []byte(sshConfExample), 0o644)
@@ -89,7 +82,7 @@ func saveSSHHost(hosts []sshHost, h sshHost) (string, error) {
 		name = fmt.Sprintf("%s-%d", base, n)
 	}
 	h.name = name
-	path := appFile("ssh.conf")
+	path := kobo.AppFile("ssh.conf")
 	b, _ := os.ReadFile(path)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -168,7 +161,7 @@ func parseSSHTarget(s string) (sshHost, error) {
 // clientKey loads id_ed25519, or makes one (plus id_ed25519.pub, to copy
 // into a server's authorized_keys).
 func clientKey() (ssh.Signer, error) {
-	path := appFile("id_ed25519")
+	path := kobo.AppFile("id_ed25519")
 	if b, err := os.ReadFile(path); err == nil {
 		return ssh.ParsePrivateKey(b)
 	}
@@ -198,7 +191,7 @@ func authorizedKey(s ssh.Signer) string {
 // tofuHostKeys accepts and remembers a host's key the first time, and
 // refuses a different one afterwards. note gets what happened.
 func tofuHostKeys(note func(string)) ssh.HostKeyCallback {
-	path := appFile("known_hosts")
+	path := kobo.AppFile("known_hosts")
 	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		if f, err := os.OpenFile(path, os.O_CREATE|os.O_RDONLY, 0o644); err == nil {
 			f.Close()

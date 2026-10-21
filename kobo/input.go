@@ -1,4 +1,4 @@
-package main
+package kobo
 
 // evdev plumbing: device discovery, touch contacts, keyboards.
 
@@ -43,7 +43,7 @@ const (
 	eviocgrab = 0x40044590 // _IOW('E', 0x90, int)
 )
 
-var inputDir = envOr("HELLOBRO_INPUT_DIR", "/dev/input") // overridable for testing
+var inputDir = EnvOr("HELLOBRO_INPUT_DIR", "/dev/input") // overridable for testing
 
 type inputDev struct {
 	name, handler    string
@@ -53,14 +53,14 @@ type inputDev struct {
 func (d inputDev) path() string { return filepath.Join(inputDir, d.handler) }
 
 func (d inputDev) isKeyboard() bool {
-	return hasBit(d.keyBits, keyA) && hasBit(d.keyBits, keyZ) && hasBit(d.keyBits, keySpace)
+	return hasBit(d.keyBits, KeyA) && hasBit(d.keyBits, KeyZ) && hasBit(d.keyBits, KeySpace)
 }
 
 func (d inputDev) isTouch() bool { return hasBit(d.absBits, absMTPositionX) }
 
 // hasMediaKeys: e.g. Bluetooth headphones' play/pause buttons (AVRCP).
 func (d inputDev) hasMediaKeys() bool {
-	return hasBit(d.keyBits, keyPlayPause) || hasBit(d.keyBits, keyPlayCD)
+	return hasBit(d.keyBits, KeyPlayPause) || hasBit(d.keyBits, KeyPlayCD)
 }
 
 // role is a short label for the device list.
@@ -82,7 +82,7 @@ func (d inputDev) role() string {
 
 // inputDevices parses /proc/bus/input/devices, keeping devices with an event handler.
 func inputDevices() []inputDev {
-	f, err := os.Open(envOr("HELLOBRO_DEVICES", "/proc/bus/input/devices"))
+	f, err := os.Open(EnvOr("HELLOBRO_DEVICES", "/proc/bus/input/devices"))
 	if err != nil {
 		log.Printf("input devices: %v", err)
 		return nil
@@ -136,20 +136,20 @@ func hasBit(words []string, bit int) bool {
 // --- touch ---
 
 const (
-	touchDown = iota
-	touchMove
-	touchUp
-	touchHover // pen in range but not touching
+	TouchDown = iota
+	TouchMove
+	TouchUp
+	TouchHover // pen in range but not touching
 )
 
-// touchEv is one change of one contact (finger or pen), in raw panel units.
-type touchEv struct {
-	kind     int
+// TouchEv is one change of one contact (finger or pen).
+type TouchEv struct {
+	Kind     int
 	slot     int32
-	x, y     int32
-	pen      bool
-	pressure int32
-	at       time.Time
+	x, y     int32 // raw panel units
+	Pen      bool
+	Pressure int32
+	At       time.Time
 }
 
 type absRange struct{ min, max int32 }
@@ -199,7 +199,7 @@ func (c *contact) down() bool { return c.id >= 0 && !(c.tool == mtToolPen && c.p
 
 // run turns the multitouch slot protocol into per-contact down/move/up
 // (plus hover for the pen).
-func (t *touchDevice) run(out chan<- touchEv) {
+func (t *touchDevice) run(out chan<- TouchEv) {
 	defer t.f.Close()
 	slots := map[int32]*contact{}
 	slot := func(n int32) *contact {
@@ -248,16 +248,16 @@ func (t *touchDevice) run(out chan<- touchEv) {
 				kind := -1
 				switch {
 				case c.down() && !p.down():
-					kind = touchDown
+					kind = TouchDown
 				case c.down() && (moved || c.pressure != p.pressure):
-					kind = touchMove
+					kind = TouchMove
 				case !c.down() && p.down():
-					kind = touchUp
+					kind = TouchUp
 				case c.id >= 0 && c.tool == mtToolPen && moved:
-					kind = touchHover
+					kind = TouchHover
 				}
 				if kind >= 0 {
-					out <- touchEv{kind, n, c.x, c.y, c.tool == mtToolPen || (kind == touchUp && p.tool == mtToolPen), c.pressure, now}
+					out <- TouchEv{kind, n, c.x, c.y, c.tool == mtToolPen || (kind == TouchUp && p.tool == mtToolPen), c.pressure, now}
 				}
 				prev[n] = *c
 			}
@@ -268,13 +268,13 @@ func (t *touchDevice) run(out chan<- touchEv) {
 
 // --- keyboards ---
 
-// kbdMsg is what keyboard goroutines send to the UI loop.
-// Exactly one of the fields is meaningful: a key event, or a (dis)connect.
-type kbdMsg struct {
-	code      uint16
-	value     int32 // 1 press, 0 release, 2 autorepeat
-	connected string
-	gone      string
+// KeyMsg is what keyboard goroutines send to the UI loop: a key event,
+// or a keyboard connecting or going away.
+type KeyMsg struct {
+	Code      uint16
+	Value     int32 // 1 press, 0 release, 2 autorepeat
+	Connected string
+	Gone      string
 	button    bool // from the device's own buttons (power, sleep cover), not a keyboard
 	ungrabbed bool // the buttons are someone else's: we won't see the power button
 	at        time.Time
@@ -282,7 +282,7 @@ type kbdMsg struct {
 
 // watchKeyboards polls for keyboards and starts a reader for each new one.
 // Bluetooth keyboards appear as ordinary input devices once paired.
-func watchKeyboards(out chan<- kbdMsg) {
+func watchKeyboards(out chan<- KeyMsg) {
 	var mu sync.Mutex
 	open := map[string]bool{}
 	for {
@@ -305,7 +305,7 @@ func watchKeyboards(out chan<- kbdMsg) {
 					delete(open, path)
 					mu.Unlock()
 					if !media {
-						out <- kbdMsg{gone: name}
+						out <- KeyMsg{Gone: name}
 					}
 				}()
 				f, err := openGrabbed(path)
@@ -317,11 +317,11 @@ func watchKeyboards(out chan<- kbdMsg) {
 				if media {
 					log.Printf("media buttons: %s", name)
 				} else {
-					out <- kbdMsg{connected: name}
+					out <- KeyMsg{Connected: name}
 				}
 				err = readEvents(f, func(typ, code uint16, val int32) {
 					if typ == evKey {
-						out <- kbdMsg{code: code, value: val, at: time.Now()}
+						out <- KeyMsg{Code: code, Value: val, at: time.Now()}
 					}
 				})
 				log.Printf("keyboard %s: %v", path, err)
@@ -333,7 +333,7 @@ func watchKeyboards(out chan<- kbdMsg) {
 
 // watchButtons forwards the power button and sleep cover. Grabbing them
 // also keeps Nickel from finding a queued power press when it wakes up.
-func watchButtons(d inputDev, out chan<- kbdMsg) {
+func watchButtons(d inputDev, out chan<- KeyMsg) {
 	f, err := os.Open(d.path())
 	if err != nil {
 		log.Printf("open buttons %s: %v", d.path(), err)
@@ -343,12 +343,12 @@ func watchButtons(d inputDev, out chan<- kbdMsg) {
 	if err := grab(f); err != nil {
 		// Someone (Nickel?) holds them, so their events never reach us.
 		log.Printf("EVIOCGRAB %s: %v: no power button for us", d.path(), err)
-		out <- kbdMsg{button: true, ungrabbed: true}
+		out <- KeyMsg{button: true, ungrabbed: true}
 		return
 	}
 	err = readEvents(f, func(typ, code uint16, val int32) {
 		if typ == evKey {
-			out <- kbdMsg{code: code, value: val, button: true}
+			out <- KeyMsg{Code: code, Value: val, button: true}
 		}
 	})
 	log.Printf("buttons %s: %v", d.path(), err)
@@ -394,7 +394,8 @@ func readEvents(f *os.File, fn func(typ, code uint16, val int32)) error {
 	}
 }
 
-func envOr(key, def string) string {
+// EnvOr is the environment variable key, or def if it's unset.
+func EnvOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}

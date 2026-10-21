@@ -81,7 +81,8 @@ def start():
     time.sleep(1.5)
 
 tabs_y = 76 + 34
-tab_x = lambda i: (i + 0.5) * W / 9   # Keys Finger Stylus Net Sound SSH Shell System Info
+TABS = int(os.environ.get('TABS', 2))  # hellobro: SSH Shell; brotools: Keys Finger Stylus Net Sound System Info
+tab_x = lambda i: (i + 0.5) * min(W // TABS, W // 4)
 land = W > H
 cx0, cy0 = (60, 200)
 cw, ch = ((W - 32) * 0.66 - 60, H - 76 - 68 - 46 - 32 - 100) if land else (W - 120, (H - 76 - 68 - 46 - 32) * 0.66 - 110)

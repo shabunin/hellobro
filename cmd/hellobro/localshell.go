@@ -9,10 +9,14 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"hellobro/kobo"
 )
 
 type localShell struct {
@@ -98,6 +102,13 @@ func ptyMaster() (string, error) {
 	return "/dev/pts/ptmx", nil
 }
 
+func whoami() string {
+	if u, err := user.Current(); err == nil {
+		return u.Username
+	}
+	return "uid " + strconv.Itoa(os.Getuid())
+}
+
 // shellEnv is ours, minus what's only for hellobro, plus what a terminal sets.
 func shellEnv() []string {
 	var env []string
@@ -115,7 +126,7 @@ func shellEnv() []string {
 		env = append(env, kv)
 	}
 	if !home {
-		env = append(env, "HOME="+appFile(""))
+		env = append(env, "HOME="+kobo.AppFile(""))
 	}
 	host, _ := os.Hostname()
 	if host == "" || host == "(none)" || host == "localhost" {

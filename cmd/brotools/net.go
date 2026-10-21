@@ -31,6 +31,8 @@ import (
 	"time"
 
 	_ "golang.org/x/crypto/x509roots/fallback" // CA roots, in case the Kobo has none Go can find
+
+	"hellobro/kobo"
 )
 
 const (
@@ -54,7 +56,7 @@ const httpTestURL = "https://httpbin.org/get"
 var sweepPorts = []int{22, 53, 80, 443, 445, 8080}
 
 // wifiIface is the Wi-Fi interface: Nickel exports it to what it starts.
-func wifiIface() string { return envOr("INTERFACE", "wlan0") }
+func wifiIface() string { return kobo.EnvOr("INTERFACE", "wlan0") }
 
 // --- Wi-Fi status ---
 
@@ -67,7 +69,7 @@ func wifiStatus(out chan<- netMsg) {
 	if err != nil {
 		out <- netMsg{netWifi, ifname + " missing", []string{
 			fmt.Sprintf("no %s: %v", ifname, err),
-			"Turn Wi-Fi on in Kobo before starting hellobro.",
+			"Turn Wi-Fi on in Kobo before starting brotools.",
 		}, true}
 		return
 	}
@@ -491,7 +493,7 @@ func httpTest(out chan<- netMsg) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, trace), "GET", httpTestURL, nil)
-	req.Header.Set("User-Agent", "hellobro (Kobo Elipsa)")
+	req.Header.Set("User-Agent", "brotools (Kobo Elipsa)")
 	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
 
 	start = time.Now()
@@ -542,5 +544,5 @@ func rootsNote() string {
 			}
 		}
 	}
-	return "CA roots: built into hellobro (Mozilla's set)"
+	return "CA roots: built into brotools (Mozilla's set)"
 }

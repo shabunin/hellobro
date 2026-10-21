@@ -1,4 +1,4 @@
-package main
+package kobo
 
 // Mapping raw touch coordinates to what we draw on.
 //
@@ -60,11 +60,11 @@ func (m touchMap) toView(x, y int32) image.Point {
 }
 
 // defaultAxes composes FBInk's portrait touch quirks with the rotation.
-func defaultAxes(s screenInfo) axes {
-	quirks := axes{s.swap, s.mirX, s.mirY}
+func defaultAxes(s ScreenInfo) axes {
+	quirks := axes{s.Swap, s.MirX, s.MirY}
 	composed := func(u, v float64) (float64, float64) {
 		u, v = quirks.apply(u, v)
-		switch s.canonical { // c.f. KOReader's GestureDetector:translateCoordinates
+		switch s.Canonical { // c.f. KOReader's GestureDetector:translateCoordinates
 		case 1:
 			u, v = 1-v, u
 		case 2:

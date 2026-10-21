@@ -1,17 +1,26 @@
 KOBO ?= /run/media/$(USER)/KOBOeReader
 CROSS ?= hellobro-cross
+APPS = hellobro brotools
+ADDS = $(KOBO)/.adds/hellobro
+
+all: $(APPS)
+
+# What every app is made of: the kobo package, and FBInk.
+KOBO_SRC = $(wildcard kobo/*.go) go.mod go.sum
+hellobro: $(wildcard cmd/hellobro/*.go)
+brotools: $(wildcard cmd/brotools/*.go)
 
 # cgo + FBInk need an ARM C toolchain, so the build runs in a container (tools/Containerfile).
-hellobro: $(wildcard *.go) go.mod go.sum third_party/fbink/libfbink.a .cross-image
+$(APPS): $(KOBO_SRC) third_party/fbink/libfbink.a .cross-image
 	podman run --rm --security-opt label=disable -v $(CURDIR):/src -w /src \
 		-v $(shell go env GOMODCACHE):/go/pkg/mod -v hellobro-gocache:/root/.cache/go-build \
 		-e GOOS=linux -e GOARCH=arm -e GOARM=7 -e CGO_ENABLED=1 -e CC=arm-linux-gnueabihf-gcc -e GOFLAGS=-mod=mod \
 		$(CROSS) go build -trimpath -tags netgo,osusergo \
-		-ldflags='-s -w -linkmode external -extldflags "-static"' -o $@ .
+		-ldflags='-s -w -linkmode external -extldflags "-static"' -o $@ ./cmd/$@
 
 # Without cgo: no linked-in FBInk, every update runs bin/fbink (slow, but no container needed).
-hellobro-nocgo: $(wildcard *.go) go.mod go.sum
-	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o $@ .
+%-nocgo: $(KOBO_SRC) $(wildcard cmd/*/*.go)
+	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o $@ ./cmd/$*
 
 .cross-image: tools/Containerfile
 	podman build -t $(CROSS) -f tools/Containerfile tools
@@ -24,29 +33,36 @@ bin/fbink third_party/fbink/libfbink.a: | .cross-image
 # this PC's address on the Kobo's Wi-Fi, for ssh.conf
 PC_IP ?= $(shell ip -4 -o addr show wlp4s0 2>/dev/null | awk '{sub("/.*","",$$4); print $$4}')
 
-install: hellobro bin/fbink
+# Both apps live in .adds/hellobro, sharing the launcher, fbink and the
+# touch calibration; NickelMenu gets an entry for each.
+install: $(APPS) bin/fbink
 	test -d $(KOBO)/.adds || { echo "Kobo not mounted at $(KOBO)"; exit 1; }
-	mkdir -p $(KOBO)/.adds/hellobro
-	cp hellobro hellobro.sh bin/fbink $(KOBO)/.adds/hellobro/
+	mkdir -p $(ADDS)
+	cp $(APPS) launch.sh bin/fbink $(ADDS)/
+	rm -f $(ADDS)/hellobro.sh # the launcher before launch.sh
 	cp nm/hellobro $(KOBO)/.adds/nm/hellobro
 	@# a first ssh.conf pointing at hellobro-server on this PC; kept if it's there
-	test -f $(KOBO)/.adds/hellobro/ssh.conf || \
-		printf '# name  user@host[:port]\nhellobro-server  bro@%s:2222\n' "$(PC_IP)" > $(KOBO)/.adds/hellobro/ssh.conf
+	test -f $(ADDS)/ssh.conf || \
+		printf '# name  user@host[:port]\nhellobro-server  bro@%s:2222\n' "$(PC_IP)" > $(ADDS)/ssh.conf
 	sync
 
 log:
-	cat $(KOBO)/.adds/hellobro/hellobro.log
+	cat $(ADDS)/hellobro.log
+
+log-tools:
+	cat $(ADDS)/brotools.log
 
 # The SSH test server (server/), for the PC: cd server && ./hellobro-server
 server:
 	cd server && go build -o hellobro-server .
 
-# Host-side tests: the app's (no cgo, so no ARM toolchain) and the server's.
+# Host-side tests: the apps' (no cgo, so no ARM toolchain) and the server's.
 test:
+	CGO_ENABLED=0 go vet ./...
 	CGO_ENABLED=0 go test ./...
 	cd server && go test ./...
 
 clean:
-	rm -f hellobro hellobro-nocgo
+	rm -f $(APPS) $(APPS:=-nocgo)
 
-.PHONY: install log clean server test
+.PHONY: all install log log-tools clean server test

@@ -7,6 +7,8 @@ import (
 	"image"
 	"log"
 	"time"
+
+	"hellobro/kobo"
 )
 
 type soundState struct {
@@ -28,7 +30,7 @@ type soundState struct {
 
 const firstTrackLine = 3 // the player's lines before the track list
 
-func (a *app) enterSound() {
+func (a *tools) enterSound() {
 	if a.snd.tracks == nil {
 		a.snd.tracks = append([]string{toneTrack}, findTracks()...)
 		log.Printf("sound: %d tracks under %s", len(a.snd.tracks)-1, musicDir)
@@ -38,34 +40,34 @@ func (a *app) enterSound() {
 	}
 }
 
-func (a *app) refreshBluetooth() {
+func (a *tools) refreshBluetooth() {
 	if a.snd.btBusy {
 		return
 	}
 	a.snd.btBusy = true
 	go func() {
 		r := probeBluetooth()
-		a.call <- func() {
+		a.Do(func() {
 			if old := a.snd.bt.bus; old != nil && old != r.bus {
 				old.Close()
 			}
 			a.snd.bt, a.snd.btBusy = r, false
 			log.Printf("bluetooth:\n\t%s", joinLines(a.btLines()))
 			a.redrawSound()
-		}
+		})
 	}()
 	a.redrawSound()
 }
 
-func (a *app) redrawSound() {
-	if a.tab == tabSound && a.calib == nil {
+func (a *tools) redrawSound() {
+	if a.Tab == tabSound && !a.Calibrating() {
 		a.drawBluetooth()
 		a.drawPlayer()
 	}
 }
 
 // btLines is the Bluetooth panel: general lines, then one per device, then PCMs.
-func (a *app) btLines() []string {
+func (a *tools) btLines() []string {
 	r := a.snd.bt
 	lines := append([]string(nil), r.lines...)
 	for _, d := range r.devices {
@@ -90,8 +92,8 @@ func (a *app) btLines() []string {
 	return lines
 }
 
-func (a *app) drawBluetooth() {
-	if a.tab != tabSound || a.calib != nil {
+func (a *tools) drawBluetooth() {
+	if a.Tab != tabSound || a.Calibrating() {
 		return
 	}
 	status := ""
@@ -100,12 +102,12 @@ func (a *app) drawBluetooth() {
 	} else if len(a.snd.bt.pcms) > 0 {
 		status = "audio ready"
 	}
-	a.drawPanel(a.L.btP, status)
-	a.snd.btRows = a.drawText(a.L.btP, a.f.small, a.btLines(), "Tap refresh.", true)
+	a.DrawPanel(a.L.btP, status)
+	a.snd.btRows = a.DrawText(a.L.btP, a.F.Small, a.btLines(), "Tap refresh.", true)
 }
 
-func (a *app) drawPlayer() {
-	if a.tab != tabSound || a.calib != nil {
+func (a *tools) drawPlayer() {
+	if a.Tab != tabSound || a.Calibrating() {
 		return
 	}
 	s := &a.snd
@@ -113,7 +115,7 @@ func (a *app) drawPlayer() {
 	if s.playing != "" {
 		status = fmt.Sprintf("%s / %s", clock(s.pos), clock(s.len))
 	}
-	a.drawPanel(a.L.playerP, status)
+	a.DrawPanel(a.L.playerP, status)
 	now := "nothing playing"
 	if s.playing != "" {
 		now = "playing: " + s.playing
@@ -133,17 +135,17 @@ func (a *app) drawPlayer() {
 		}
 		lines = append(lines, mark+t)
 	}
-	rows := a.drawText(a.L.playerP, a.f.body, lines, "", true)
+	rows := a.DrawText(a.L.playerP, a.F.Body, lines, "", true)
 	s.volRow, s.trackRows = rows[0], rows[firstTrackLine:]
 }
 
 // tapSound handles taps on the Sound tab.
-func (a *app) tapSound(p image.Point) {
+func (a *tools) tapSound(p image.Point) {
 	s := &a.snd
 	switch {
-	case hit(p, a.L.btP.button):
+	case kobo.Hit(p, a.L.btP.Button):
 		a.refreshBluetooth()
-	case hit(p, a.L.playerP.button):
+	case kobo.Hit(p, a.L.playerP.Button):
 		a.stopPlayback("stopped")
 		a.drawPlayer()
 	case p.In(s.volRow):
@@ -169,13 +171,13 @@ func (a *app) tapSound(p image.Point) {
 	}
 }
 
-func (a *app) connect(d btDevice) {
+func (a *tools) connect(d btDevice) {
 	a.snd.btNote = "connecting to " + d.name + "…"
 	a.drawBluetooth()
 	bus := a.snd.bt.bus
 	go func() {
 		err := connectDevice(bus, d)
-		a.call <- func() {
+		a.Do(func() {
 			if err != nil {
 				a.snd.btNote = fmt.Sprintf("connect %s: %v", d.name, err)
 			} else {
@@ -183,12 +185,12 @@ func (a *app) connect(d btDevice) {
 			}
 			log.Print(a.snd.btNote)
 			a.refreshBluetooth()
-		}
+		})
 	}()
 }
 
 // pickPCM prefers a playback PCM of a connected device.
-func (a *app) pickPCM() (bluealsaPCM, bool) {
+func (a *tools) pickPCM() (bluealsaPCM, bool) {
 	var found []bluealsaPCM
 	for _, p := range a.snd.bt.pcms {
 		if p.mode == "sink" {
@@ -208,7 +210,7 @@ func (a *app) pickPCM() (bluealsaPCM, bool) {
 	return bluealsaPCM{}, false
 }
 
-func (a *app) play(track string) {
+func (a *tools) play(track string) {
 	a.stopPlayback("")
 	s := &a.snd
 	pcm, ok := a.pickPCM()
@@ -247,13 +249,13 @@ func (a *app) play(track string) {
 	go func() {
 		defer src.close()
 		done := func(note string) {
-			a.call <- func() {
+			a.Do(func() {
 				log.Printf("sound: %q ended: %s", track, note)
 				if a.snd.stop == stop {
 					a.snd.playing, a.snd.stop, a.snd.note = "", nil, note
 					a.drawPlayer()
 				}
-			}
+			})
 		}
 		data, ctrl, err := openPCM(bus, pcm)
 		if err != nil {
@@ -270,7 +272,7 @@ func (a *app) play(track string) {
 			}
 			return curGain
 		}, stop, func(pos time.Duration) {
-			a.call <- func() {
+			a.Do(func() {
 				if a.snd.stop == stop {
 					a.snd.pos = pos
 					select { // pass on volume changes
@@ -279,7 +281,7 @@ func (a *app) play(track string) {
 					}
 					a.drawPlayerStatus()
 				}
-			}
+			})
 		})
 		select {
 		case <-stop:
@@ -300,14 +302,14 @@ func (a *app) play(track string) {
 }
 
 // drawPlayerStatus updates just the position in the title strip.
-func (a *app) drawPlayerStatus() {
-	if a.tab != tabSound || a.calib != nil || a.blitting {
+func (a *tools) drawPlayerStatus() {
+	if a.Tab != tabSound || a.Calibrating() || a.Blitting() {
 		return
 	}
-	a.drawPanelTitle(a.L.playerP, fmt.Sprintf("%s / %s", clock(a.snd.pos), clock(a.snd.len)))
+	a.DrawPanelTitle(a.L.playerP, fmt.Sprintf("%s / %s", clock(a.snd.pos), clock(a.snd.len)))
 }
 
-func (a *app) stopPlayback(note string) {
+func (a *tools) stopPlayback(note string) {
 	if a.snd.stop != nil {
 		close(a.snd.stop)
 		a.snd.stop, a.snd.playing = nil, ""
@@ -323,27 +325,9 @@ func clock(d time.Duration) string {
 	return fmt.Sprintf("%d:%02d", s/60, s%60)
 }
 
-// linux/input-event-codes.h media keys
-const (
-	keyNextSong     = 163
-	keyPlayPause    = 164
-	keyPreviousSong = 165
-	keyStopCD       = 166
-	keyPlayCD       = 200
-	keyPauseCD      = 201
-)
-
-func isMediaKey(code uint16) bool {
-	switch code {
-	case keyNextSong, keyPlayPause, keyPreviousSong, keyStopCD, keyPlayCD, keyPauseCD:
-		return true
-	}
-	return false
-}
-
 // mediaKey handles headphone/keyboard media buttons. There's no pause:
 // "pause" stops, "play" starts the last track again.
-func (a *app) mediaKey(code uint16) {
+func (a *tools) mediaKey(code uint16) {
 	s := &a.snd
 	log.Printf("media key %d", code)
 	if s.tracks == nil {
@@ -356,19 +340,19 @@ func (a *app) mediaKey(code uint16) {
 		}
 	}
 	switch code {
-	case keyStopCD, keyPauseCD:
+	case kobo.KeyStopCD, kobo.KeyPauseCD:
 		a.stopPlayback("stopped")
 		a.drawPlayer()
-	case keyPlayPause, keyPlayCD:
-		if s.playing != "" && code == keyPlayPause {
+	case kobo.KeyPlayPause, kobo.KeyPlayCD:
+		if s.playing != "" && code == kobo.KeyPlayPause {
 			a.stopPlayback("stopped")
 			a.drawPlayer()
 		} else if s.playing == "" {
 			a.play(s.tracks[cur])
 		}
-	case keyNextSong:
+	case kobo.KeyNextSong:
 		a.play(s.tracks[(cur+1)%len(s.tracks)])
-	case keyPreviousSong:
+	case kobo.KeyPreviousSong:
 		a.play(s.tracks[(cur+len(s.tracks)-1)%len(s.tracks)])
 	}
 }

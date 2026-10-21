@@ -19,6 +19,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"hellobro/kobo"
 )
 
 const (
@@ -35,28 +37,28 @@ type sysState struct {
 	at    time.Time
 }
 
-func (a *app) startSys() {
+func (a *tools) startSys() {
 	if a.sys.busy {
 		return
 	}
 	a.sys.busy = true
-	if a.tab == tabSystem && a.calib == nil {
+	if a.Tab == tabSystem && !a.Calibrating() {
 		a.drawSystem()
 	}
-	info := a.scr.info
+	info := a.Screen()
 	go func() {
 		r := sysReport(info)
-		a.call <- func() {
+		a.Do(func() {
 			a.sys = sysState{lines: r, at: time.Now()}
 			log.Printf("system report:\n\t%s\n\t%s\n\t%s\n\t%s", joinLines(r[0]), joinLines(r[1]), joinLines(r[2]), joinLines(r[3]))
-			if a.tab == tabSystem && a.calib == nil {
+			if a.Tab == tabSystem && !a.Calibrating() {
 				a.drawSystem()
 			}
-		}
+		})
 	}()
 }
 
-func (a *app) drawSystem() {
+func (a *tools) drawSystem() {
 	for i, p := range a.L.sys {
 		status := ""
 		if i == sysDevice {
@@ -67,19 +69,19 @@ func (a *app) drawSystem() {
 				status = "as of " + a.sys.at.Format("15:04:05")
 			}
 		}
-		a.drawPanel(p, status)
-		a.drawText(p, a.f.small, a.sys.lines[i], "…", true)
+		a.DrawPanel(p, status)
+		a.DrawText(p, a.F.Small, a.sys.lines[i], "…", true)
 	}
 }
 
-func sysReport(s screenInfo) [numSysPanels][]string {
+func sysReport(s kobo.ScreenInfo) [numSysPanels][]string {
 	return [numSysPanels][]string{deviceLines(s), systemLines(), storageLines(), softwareLines(s)}
 }
 
 // --- device ---
 
-func deviceLines(s screenInfo) []string {
-	lines := []string{s.device}
+func deviceLines(s kobo.ScreenInfo) []string {
+	lines := []string{s.Device}
 	// serial, ?, firmware, ?, ?, model ID; the serial stays private.
 	if b, err := os.ReadFile("/mnt/onboard/.kobo/version"); err == nil {
 		f := strings.Split(strings.TrimSpace(string(b)), ",")
@@ -92,7 +94,7 @@ func deviceLines(s screenInfo) []string {
 	if hw := cpuinfo()["Hardware"]; hw != "" {
 		lines = append(lines, "SoC "+hw)
 	}
-	lines = append(lines, fmt.Sprintf("screen %d×%d px, codename %s", s.screenW, s.screenH, s.codename))
+	lines = append(lines, fmt.Sprintf("screen %d×%d px, codename %s", s.ScreenW, s.ScreenH, s.Codename))
 	if b, err := os.ReadFile("/proc/device-tree/model"); err == nil {
 		lines = append(lines, "device tree: "+strings.Trim(string(b), "\x00\n "))
 	}
@@ -353,8 +355,8 @@ var devTools = []struct{ name, args string }{
 	{"gcc", "--version"}, {"make", "--version"}, {"openssl", "version"}, {"sqlite3", "--version"}, {"evtest", ""},
 }
 
-func softwareLines(s screenInfo) []string {
-	lines := []string{fmt.Sprintf("hellobro: %s %s/%s, FBInk %s", runtime.Version(), runtime.GOOS, runtime.GOARCH, s.version)}
+func softwareLines(s kobo.ScreenInfo) []string {
+	lines := []string{fmt.Sprintf("brotools: %s %s/%s, FBInk %s", runtime.Version(), runtime.GOOS, runtime.GOARCH, s.Version)}
 
 	applets := map[string]bool{}
 	if bb, err := exec.LookPath("busybox"); err == nil {

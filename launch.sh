@@ -1,5 +1,8 @@
 #!/bin/sh
-# Starts hellobro with Nickel frozen, so Nickel can't draw over it.
+# Starts one of the apps next to it (hellobro, brotools) with Nickel
+# frozen, so Nickel can't draw over it.
+#
+# usage: launch.sh APP
 #
 # NickelMenu runs this with cmd_output (see nm/hellobro), which makes
 # Nickel wait for us; we SIGSTOP it meanwhile, and SIGCONT it only once
@@ -7,11 +10,13 @@
 # entry, which switches views so it repaints the whole screen.
 # Freezing (unlike killing, as KOReader does) leaves Wi-Fi and Bluetooth up.
 cd "$(dirname "$0")" || exit 0
+app=${1:-hellobro}
+case $app in hellobro | brotools) ;; *) exit 0 ;; esac
 exec </dev/null >/dev/null 2>&1 # Nickel reads our output, and it'll be frozen: never block on it
 PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin # for wpa_cli
-say() { echo "$(date '+%Y/%m/%d %H:%M:%S') hellobro.sh: $*" >>hellobro.log; }
+say() { echo "$(date '+%Y/%m/%d %H:%M:%S') launch.sh: $*" >>"$app.log"; }
 
-[ -s hellobro.log ] && [ "$(wc -c <hellobro.log)" -gt 1000000 ] && mv hellobro.log hellobro-old.log
+[ -s "$app.log" ] && [ "$(wc -c <"$app.log")" -gt 1000000 ] && mv "$app.log" "$app-old.log"
 
 # A process feeding the hardware watchdog must keep running.
 watchdog=""
@@ -51,7 +56,7 @@ if [ -n "$frozen" ]; then
 	say "freezing$frozen"
 	kill -STOP $frozen
 fi
-export HELLOBRO_FROZEN="$frozen" # so hellobro can thaw them itself if it gets stuck
-./hellobro
-say "hellobro exited ($?)"
+export HELLOBRO_FROZEN="$frozen" # so the app can thaw them itself if it gets stuck
+"./$app"
+say "$app exited ($?)"
 exit 0

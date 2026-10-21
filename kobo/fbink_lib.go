@@ -1,14 +1,14 @@
 //go:build cgo
 
-package main
+package kobo
 
 // FBInk linked in (third_party/fbink, built by build-fbink.sh): the screen
 // stays open for the whole session, so an update is just a copy and an
 // ioctl, instead of starting a process that sets up the display again.
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/third_party/fbink
-#cgo LDFLAGS: ${SRCDIR}/third_party/fbink/libfbink.a -lm
+#cgo CFLAGS: -I${SRCDIR}/../third_party/fbink
+#cgo LDFLAGS: ${SRCDIR}/../third_party/fbink/libfbink.a -lm
 #include <errno.h>
 #include "fbink.h"
 */
@@ -50,26 +50,26 @@ func openFbinkLib() (fbBackend, error) {
 	return l, nil
 }
 
-func (l *fbinkLib) setRota(rota int) (screenInfo, error) {
+func (l *fbinkLib) setRota(rota int) (ScreenInfo, error) {
 	rc := C.fbink_sunxi_ntx_enforce_rota(l.fd, C.SUNXI_FORCE_ROTA_INDEX_T(rota), &l.cfg)
-	if rc == -C.ENOSYS { // not a sunxi device: FBInk follows the gyro on its own
+	if rc == -C.ENOSYS { // not a sunxi Device: FBInk follows the gyro on its own
 		rc = C.fbink_reinit(l.fd, &l.cfg)
 	}
 	if rc < 0 {
-		return screenInfo{}, fmt.Errorf("fbink rotation %d: %d", rota, rc)
+		return ScreenInfo{}, fmt.Errorf("fbink rotation %d: %d", rota, rc)
 	}
 	var st C.FBInkState
 	C.fbink_get_state(&l.cfg, &st)
-	return screenInfo{
-		viewW: int(st.view_width), viewH: int(st.view_height),
-		screenW: int(st.screen_width), screenH: int(st.screen_height),
-		originX: int(st.view_hori_origin), originY: int(st.view_vert_origin),
-		rota:      int(st.current_rota),
-		canonical: int(st.rotation_map[st.current_rota&3]),
-		swap:      bool(st.touch_swap_axes), mirX: bool(st.touch_mirror_x), mirY: bool(st.touch_mirror_y),
-		version:  C.GoString(C.fbink_version()) + " (linked in)",
-		codename: C.GoString(&st.device_codename[0]),
-		device:   fmt.Sprintf("Kobo %s (%s, ID %d)", C.GoString(&st.device_name[0]), C.GoString(&st.device_platform[0]), int(st.device_id)),
+	return ScreenInfo{
+		ViewW: int(st.view_width), ViewH: int(st.view_height),
+		ScreenW: int(st.screen_width), ScreenH: int(st.screen_height),
+		OriginX: int(st.view_hori_origin), OriginY: int(st.view_vert_origin),
+		Rota:      int(st.current_rota),
+		Canonical: int(st.rotation_map[st.current_rota&3]),
+		Swap:      bool(st.touch_swap_axes), MirX: bool(st.touch_mirror_x), MirY: bool(st.touch_mirror_y),
+		Version:  C.GoString(C.fbink_version()) + " (linked in)",
+		Codename: C.GoString(&st.device_codename[0]),
+		Device:   fmt.Sprintf("Kobo %s (%s, ID %d)", C.GoString(&st.device_name[0]), C.GoString(&st.device_platform[0]), int(st.device_id)),
 	}, nil
 }
 

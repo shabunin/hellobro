@@ -1,4 +1,5 @@
 # Five minutes of typing and menu hopping in a session (TIMEOUT=400).
+# app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
@@ -6,7 +7,7 @@ from feedlib import *
 start()
 import random
 random.seed(1)
-tap(tab_x(5), tabs_y); time.sleep(2)                 # SSH tab
+tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
 keys("1"); time.sleep(5)                             # connect
 end = time.time() + 330
 n = 0
