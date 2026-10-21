@@ -203,7 +203,8 @@ minutes), the Kobo goes to sleep properly.
 
 - Wi-Fi: tap a network to pick it, again (or Enter) to join or leave it;
   a new secured one asks for its password (Tab or `show` reveals it).
-  "other network…" (or n) joins a hidden one by name. Networks are saved
+  "other network…" (or n) joins a hidden one by name. The address comes
+  from the DHCP client already running (Kobo's), or one started for it. Networks are saved
   when wpa_supplicant's file allows it. `turn off`/`turn on` (or o) unload
   and load the driver and power the chip, as Kobo does; s scans, f forgets.
   Turning it on starts wpa_supplicant and the DHCP client the way Kobo ran

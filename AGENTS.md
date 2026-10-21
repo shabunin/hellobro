@@ -83,6 +83,15 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 - `KOBO_HOST` (default `kobo.local`; or the IP, or a `~/.ssh/config` Host
   such as `kobo-afar`, whose Port it takes), `KOBO_PORT`,
   `KOBO_JUMP` (through the relay, see [docs/relay.md](docs/relay.md)).
+- Off the PC's LAN (a phone's hotspot, say) `kobo.local` doesn't
+  resolve and its last IP has no route: the Kobo can reach out, nothing
+  can reach in. Go through the relay: `make push KOBO_HOST=kobo-afar`.
+- **Never run the hellobro binary by hand** on the Kobo, not even
+  `--help`: it starts a second app on the same screen and keyboard. New
+  builds go through `hellobro-update`. If one slipped out: `ps | grep
+  hellobro`, and kill the one not under `launch.sh`.
+- The system log is `logread` (busybox): wpa_supplicant and dhcpcd write
+  there, not to `hellobro.log`.
 - Updates are on trial: a build that doesn't tick within 45 s, or
   crashes, rolls back to `hellobro.old` by itself. Still, read the log
   after every push.
@@ -114,6 +123,14 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   PC's loopback is up.
 - sshd's `permitopen` matches the host name as asked: `127.0.0.1` and
   `localhost` are different.
+- Kobo's dhcpcd is 6.6.6, started by Nickel (`dhcpcd -d -z wlan0`). It
+  follows a new network by itself (carrier lost: address gone; carrier
+  back: a new lease). `dhcpcd -n` (rebind) kills it, and then nothing
+  asks for an address: leave a running one alone (`radio.renewIP`).
+- sshd's `ClientAliveInterval` only holds for connections made after it
+  was set. An older dead connection keeps its `-R` port for good: the
+  relay is refused (`tcpip-forward request denied`) till its `sshd`
+  process is killed on the VPS.
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 

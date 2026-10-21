@@ -135,6 +135,15 @@ Host kobo-afar
 then `ssh kobo-afar`, `scp -r Album kobo-afar:Music/`,
 `make push KOBO_HOST=kobo-afar`, and so on.
 
+### Off your LAN
+
+On another network (a café's, a phone's hotspot) the PC can't reach the
+Kobo straight: `kobo.local` doesn't resolve, its old address has no
+route, and behind a hotspot it's out of reach anyway. The Kobo can still
+reach out: `home` works, and so does the relay, so from the PC go
+through `kobo-afar` (or `-J`) as above. When the Kobo changes networks
+the relay notices within a minute (keepalives) and comes back by itself.
+
 Updates from afar are safe: a new build is on trial until it's running
 with file sharing up. One that hangs for 45 s, or crashes, is put aside
 as `hellobro.bad` and the build before comes back by itself, so a bad
@@ -146,6 +155,8 @@ push can't leave the Kobo out of reach.
 | --- | --- |
 | Files tab: `Relay down (… permission denied …)` | The Kobo's key isn't in `~relay/.ssh/authorized_keys`, or the file's mode/owner is wrong (sshd's log: `journalctl -u sshd` on the VPS). |
 | `Relay down (listening on the server's port 2023: …)` | A dead connection still holds the port. Wait 90 s (`ClientAliveInterval`), or check `ss -ltnp` on the VPS. A connection made before the keepalives were set up is never let go: kill its `sshd: relay` process (the one as old as the Kobo's last good relay). |
+| PC: `ssh kobo-afar` hangs (`timed out during banner exchange`) | The VPS's port 2023 is held by a dead connection, so ours can't take it (the Files tab says `Relay down`). As above. On the VPS, `ps -o pid,lstart,args -u relay \| grep sshd` shows the sessions with their start times. |
+| PC: `stdio forwarding failed` | Nothing listens on the VPS's 2023: the relay is off or down on the Kobo, or the port asked for isn't 2023. |
 | `Relay: say where in relay.conf` | `relay.conf` is still the example. |
 | PC: `administratively prohibited: open failed` | `localhost` instead of `127.0.0.1`, or a port that doesn't match `permitopen`. |
 | Kobo: `home` says `through VPS to 127.0.0.1:2222: … refused` | The PC's tunnel is down: `systemctl --user status hellobro-tunnel`. |
