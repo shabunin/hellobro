@@ -218,6 +218,23 @@ func New(cfg Config, prog Program) *App {
 // Run runs the app until it quits, then gives the screen back.
 func (a *App) Run() {
 	var err error
+	go func() {
+		for j := range a.jobs {
+			a.blitAt.Store(time.Now().UnixNano())
+			err := a.scr.blit(j.img, j.img.Bounds(), j.wf, j.flash)
+			a.blitAt.Store(0)
+			a.done <- err
+		}
+	}()
+	// Hello first, while the rest gets going; restarted, the one before
+	// said it already.
+	if os.Getenv(restartedEnv) == "" {
+		s := a.scr.info
+		a.C = Canvas{image.NewGray(image.Rect(0, 0, s.ViewW, s.ViewH))}
+		a.drawCard(a.cfg.Title, "starting…")
+		a.flush()
+	}
+	os.Unsetenv(restartedEnv)
 	a.light = openFrontlight()
 	a.devs = inputDevices()
 	touches := make(chan TouchEv, 4096)
@@ -239,15 +256,7 @@ func (a *App) Run() {
 			go watchButtons(d, keys)
 		}
 	}
-	go func() {
-		for j := range a.jobs {
-			a.blitAt.Store(time.Now().UnixNano())
-			err := a.scr.blit(j.img, j.img.Bounds(), j.wf, j.flash)
-			a.blitAt.Store(0)
-			a.done <- err
-		}
-	}()
-
+	a.WaitBlit()
 	a.relayout()
 	a.loop(touches, keys)
 
@@ -282,12 +291,15 @@ func (a *App) Restart(exe string) {
 	a.restart, a.quit = exe, true
 }
 
+// restartedEnv tells a new build it's taking over from the one before.
+const restartedEnv = "HELLOBRO_RESTARTED"
+
 func (a *App) exec() {
 	log.Printf("restarting: exec %s", a.restart)
 	if logFile != nil {
 		logFile.Sync()
 	}
-	err := syscall.Exec(a.restart, []string{a.restart}, os.Environ())
+	err := syscall.Exec(a.restart, []string{a.restart}, append(os.Environ(), restartedEnv+"=1"))
 	log.Printf("restart: %v", err)
 }
 
