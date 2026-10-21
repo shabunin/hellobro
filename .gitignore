@@ -13,6 +13,14 @@
 /known_hosts
 /term-font
 /touch-calibration.conf
+/ssh_host_ed25519_key
+/authorized_keys
+/settings
+/status-bar
+/music-state
+/wifi-recipe
+/hellobro.new
+/hellobro.old
 # the test server's binary and its host key (made on first start)
 /server/hellobro-server
 /server/.ssh/
