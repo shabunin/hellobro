@@ -281,7 +281,7 @@ func (a *bro) outputStatus() string {
 }
 
 func (a *bro) nowPanel() kobo.Panel {
-	p := focusMark(a.mv.nowP, a.mv.nowFocus, !a.mv.libP.Folded)
+	p := focusMark(a.mv.nowP, a.mv.nowFocus)
 	if _, ok := a.audioDevice(); ok && !a.mus.connecting {
 		return kobo.WithButton(a.F, p, "connect")
 	}

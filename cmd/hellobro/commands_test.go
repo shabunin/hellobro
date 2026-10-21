@@ -89,9 +89,9 @@ oops
 	for key, want := range map[string]string{
 		"f5":           "tab.next",
 		"ctrl+tab":     "tab.next panel.next", // the file's first
-		"ctrl+shift+p": "palette",               // named, and freed of its default (which it is too)
-		"f11":          "",                      // freed
-		"ctrl+shift+t": "session.new",           // as by default
+		"ctrl+shift+p": "palette",             // named, and freed of its default (which it is too)
+		"f11":          "",                    // freed
+		"ctrl+shift+t": "session.new",         // as by default
 		"ctrl+alt+9":   "tab.9",
 	} {
 		if got := strings.Join(ids(key), " "); got != want {

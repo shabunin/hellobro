@@ -270,6 +270,11 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.runKey(m.Code, m.Value): // ours, never the remote's
 		return true
+	case a.focusFolded(): // a panel folded to its strip: Enter opens it, the rest waits
+		if m.Value == 1 && m.Code == kobo.KeyEnter {
+			a.foldFocused()
+		}
+		return true
 	case a.Tab == tabMusic:
 		return a.musicKey(m.Code, m.Value)
 	case a.Tab == tabRadio:

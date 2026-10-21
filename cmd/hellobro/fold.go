@@ -82,22 +82,23 @@ func (a *bro) setFold(key string, on bool) {
 		log.Printf("folds: %v", err)
 	}
 	log.Printf("folds: %s %s", key, map[bool]string{true: "folded", false: "open"}[on])
+	// The focus goes to the panel opened, or off the one folded.
 	switch foldables[i].tab {
 	case tabMusic:
-		if on {
-			a.mv.nowFocus = key == "library" // the focus goes to the open one
-		}
+		a.mv.nowFocus = (key == "now") != on
 		a.layoutMusic(a.lay)
 	case tabRadio:
 		if p := a.rs.prompt; on && p != nil && p.panel == radioPanelOf(key) {
 			a.radioAnswer(false) // nowhere to answer it now
 		}
 		a.layoutRadio(a.lay)
-		a.radioFocusOpen()
-	case tabFiles:
 		if on {
-			a.fv.shareFocus = key == "files"
+			a.radioFocusOpen()
+		} else {
+			a.rs.focus = radioPanelOf(key)
 		}
+	case tabFiles:
+		a.fv.shareFocus = (key == "sharing") != on
 		a.layoutFiles(a.lay)
 	}
 	if foldables[i].tab == a.Tab && !a.overlay() {
@@ -160,9 +161,9 @@ func (a *bro) foldTap(p image.Point) bool {
 // foldCommands are the switcher's: minimize or open a panel of the page.
 // A folded session opens as it's picked in the switcher.
 func foldCommands() []*command {
-	cs := []*command{{id: "fold.session", title: "Session panel: minimize",
-		when: func(a *bro) bool { t := a.term(); return t != nil && !t.folded && !a.Full },
-		run:  func(a *bro) { a.setSessionFold(a.term(), true) }}}
+	cs := []*command{{id: "panel.fold", title: "Panel in focus: minimize / open", keys: []string{"ctrl+shift+m"},
+		when: func(a *bro) bool { return !isTermTab(a.Tab) || a.term() != nil && !a.Full },
+		run:  (*bro).foldFocused}}
 	for _, f := range foldables {
 		cs = append(cs,
 			&command{id: "fold." + f.key, title: f.name + " panel: minimize",
@@ -221,21 +222,18 @@ func netText(ws radio.WiFiStatus) string {
 
 // --- the focus ---
 
-// stepPanel moves the focus to the next open panel on the page (d -1: the
-// one before), as Ctrl+Tab does: the keys go to it.
+// stepPanel moves the focus to the next panel on the page (d -1: the one
+// before), as Ctrl+Tab does: the keys go to it. A folded one takes the
+// focus too, and Enter opens it.
 func (a *bro) stepPanel(d int) {
 	switch a.Tab {
 	case tabMusic:
-		if !a.mv.nowP.Folded && !a.mv.libP.Folded {
-			a.mv.nowFocus = !a.mv.nowFocus
-			a.redrawMusic()
-		}
+		a.mv.nowFocus = !a.mv.nowFocus
+		a.redrawMusic()
 	case tabFiles:
-		if !a.fv.shareP.Folded && !a.fv.listP.Folded {
-			a.fv.shareFocus = !a.fv.shareFocus
-			a.fv.shownShare, a.fv.shownList = "", ""
-			a.drawFiles()
-		}
+		a.fv.shareFocus = !a.fv.shareFocus
+		a.fv.shownShare, a.fv.shownList = "", ""
+		a.drawFiles()
 	case tabRadio:
 		a.radioStep(d)
 	default:
@@ -243,11 +241,41 @@ func (a *bro) stepPanel(d int) {
 	}
 }
 
-// focusMark marks the name of the panel in focus, when there's more than
-// one open to choose from.
-func focusMark(p kobo.Panel, focused, others bool) kobo.Panel {
-	if focused && others {
+// focusMark marks the name of the panel in focus.
+func focusMark(p kobo.Panel, focused bool) kobo.Panel {
+	if focused {
 		p.Name = "► " + p.Name
 	}
 	return p
+}
+
+// focusKey is the foldable panel in focus; "" on a terminal tab.
+func (a *bro) focusKey() string {
+	switch a.Tab {
+	case tabMusic:
+		return map[bool]string{true: "now", false: "library"}[a.mv.nowFocus]
+	case tabFiles:
+		return map[bool]string{true: "sharing", false: "files"}[a.fv.shareFocus]
+	case tabRadio:
+		return []string{"wifi", "bluetooth", "settings"}[a.rs.focus]
+	}
+	return ""
+}
+
+// focusFolded says whether the panel in focus is folded to its strip.
+func (a *bro) focusFolded() bool {
+	if k := a.focusKey(); k != "" {
+		return a.folded(k)
+	}
+	t := a.term()
+	return t != nil && t.folded && !a.Full
+}
+
+// foldFocused folds the panel in focus, or opens it.
+func (a *bro) foldFocused() {
+	if k := a.focusKey(); k != "" {
+		a.setFold(k, !a.folded(k))
+	} else if t := a.term(); t != nil && !a.Full {
+		a.setSessionFold(t, !t.folded)
+	}
 }

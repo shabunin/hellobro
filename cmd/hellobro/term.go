@@ -139,14 +139,14 @@ type termView struct {
 	hosts    []sshHost
 	keyAsked map[string]bool // hosts we offered to install our key on
 
-	sel     *termSel // the selection, or a contact that may become one (clipboard.go): the focused session's
-	cw, ch  int      // cell size
-	drawnAt time.Time
-	outAt      time.Time       // last output drawn
-	fastArea   image.Rectangle // drawn with the fast (DU) waveform since the last clean refresh
-	fastAt     time.Time       // when fastArea got its first update
-	churn      int             // pixels changed since the last flash
-	bigAt      time.Time       // the last change of more than a few rows
+	sel      *termSel // the selection, or a contact that may become one (clipboard.go): the focused session's
+	cw, ch   int      // cell size
+	drawnAt  time.Time
+	outAt    time.Time       // last output drawn
+	fastArea image.Rectangle // drawn with the fast (DU) waveform since the last clean refresh
+	fastAt   time.Time       // when fastArea got its first update
+	churn    int             // pixels changed since the last flash
+	bigAt    time.Time       // the last change of more than a few rows
 
 	mods   termMods
 	glyphs map[glyphKey]*image.Alpha
@@ -278,8 +278,6 @@ func (t *termSession) startSize() image.Point {
 	return image.Pt(t.pane.cols, t.pane.rows)
 }
 
-// termPanel is the terminal panel as the current session has it: named
-// after the tab, with a button that fits what the session is doing.
 // termPanel is t's panel as it is now: in focus or not, with a button
 // that fits what the session is doing.
 func (a *bro) termPanel(t *termSession) kobo.Panel {
@@ -288,7 +286,7 @@ func (a *bro) termPanel(t *termSession) kobo.Panel {
 		return p
 	}
 	g := &a.tv.groups[t.kind]
-	if a.termOpen(t.kind) > 1 && g.cur < len(g.sessions) && g.sessions[g.cur] == t {
+	if len(g.sessions) > 1 && g.cur < len(g.sessions) && g.sessions[g.cur] == t {
 		p.Name = "► " + p.Name
 	}
 	label := ""
@@ -301,17 +299,6 @@ func (a *bro) termPanel(t *termSession) kobo.Panel {
 		label = "close"
 	}
 	return kobo.WithButton(a.F, p, label)
-}
-
-// termOpen counts a tab's sessions not folded.
-func (a *bro) termOpen(tab int) int {
-	n := 0
-	for _, t := range a.tv.groups[tab].sessions {
-		if !t.folded {
-			n++
-		}
-	}
-	return n
 }
 
 // --- drawing ---
@@ -683,17 +670,21 @@ func (a *bro) newSession(start bool) {
 	}
 }
 
-// switchSession shows session i of the current tab.
-func (a *bro) switchSession(i int) {
+// switchSession shows session i of the current tab, opened.
+func (a *bro) switchSession(i int) { a.focusSession(i, true) }
+
+// focusSession moves the focus to session i of the current tab; open, it
+// opens it too if it's folded.
+func (a *bro) focusSession(i int, open bool) {
 	g := a.termGroup()
-	if g == nil || i < 0 || i >= len(g.sessions) || i == g.cur && !g.sessions[i].folded {
+	if g == nil || i < 0 || i >= len(g.sessions) || i == g.cur && !(open && g.sessions[i].folded) {
 		return
 	}
 	was := a.term()
 	g.cur = i
 	a.tv.sel = nil
-	if t := g.sessions[i]; t.folded || a.lay.Full { // its panel changes: lay them out again
-		t.folded = false
+	if t := g.sessions[i]; t.folded && open || a.lay.Full { // its panel changes: lay them out again
+		t.folded = t.folded && !open
 		a.layoutSessions(a.Tab)
 		a.drawTerm()
 		a.MarkFlash(a.termP.Outer) // a whole new screen: clean, not ghosted

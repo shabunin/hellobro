@@ -196,7 +196,7 @@ func (a *bro) drawShare() {
 		return
 	}
 	v.shownShare = key
-	a.DrawPanel(focusMark(v.shareP, v.shareFocus, !v.listP.Folded), status)
+	a.DrawPanel(focusMark(v.shareP, v.shareFocus), status)
 	if v.shareP.Folded {
 		return
 	}
@@ -315,7 +315,7 @@ func (a *bro) drawFileList() {
 		return
 	}
 	v.shownList = key
-	a.DrawPanel(focusMark(v.listP, !v.shareFocus, !v.shareP.Folded), v.free)
+	a.DrawPanel(focusMark(v.listP, !v.shareFocus), v.free)
 	if v.listP.Folded {
 		v.rows = v.rows[:0]
 		return

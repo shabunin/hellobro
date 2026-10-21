@@ -495,14 +495,10 @@ func (a *bro) radioFolded(i int) bool {
 	return a.rv[i].p.Folded
 }
 
-// radioStep moves the focus to the next open panel (d -1: the one before).
+// radioStep moves the focus to the next panel (d -1: the one before),
+// folded or not.
 func (a *bro) radioStep(d int) {
-	r := &a.rs
-	for range 3 {
-		if r.focus = (r.focus + d + 3) % 3; !a.radioFolded(r.focus) {
-			break
-		}
-	}
+	a.rs.focus = (a.rs.focus + d + 3) % 3
 	a.drawRadio()
 }
 

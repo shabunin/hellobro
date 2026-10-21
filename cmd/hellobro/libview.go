@@ -88,7 +88,7 @@ func (a *bro) atTop() bool {
 }
 
 func (a *bro) libPanel() kobo.Panel {
-	p := focusMark(a.mv.libP, !a.mv.nowFocus, !a.mv.nowP.Folded)
+	p := focusMark(a.mv.libP, !a.mv.nowFocus)
 	if !a.atTop() {
 		return kobo.WithButton(a.F, p, "back")
 	}

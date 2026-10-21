@@ -39,13 +39,16 @@ then the battery and the time. It looks again every 15 s.
 
 A panel folds: the − at the end of its title strip folds it to the
 strip, and the other panels on the page take the room. The + (or a tap
-anywhere on the strip) opens it again. The switcher can too ("Wi-Fi
+anywhere on the strip) opens it again. From the keys, Ctrl+Shift+M
+folds the panel in focus or opens it, and the switcher can too ("Wi-Fi
 panel: minimize", "… open"). They stay folded, kept in `folded` (a
 session's fold lasts as long as the session).
 
 One panel on a page has the focus, marked ►: the keys go to it.
-Ctrl+Tab moves it to the next open panel, Ctrl+Shift+Tab back; a tap
-on a panel gives it the focus too. On Music, Now playing in focus takes
+Ctrl+Tab moves it to the next panel, Ctrl+Shift+Tab back; a tap on a
+panel gives it the focus too. A folded one takes the focus as well, on
+its strip: there the keys wait, and Enter (or Ctrl+Shift+M) opens it.
+Folding the one in focus moves the focus to an open one. On Music, Now playing in focus takes
 ↑ ↓ for the volume and Enter to play or pause; the Library has them
 otherwise. On Files, the arrows are the list's. On Settings, Tab works
 as well.
@@ -167,8 +170,9 @@ minutes), the Kobo goes to sleep properly.
   its own size. Ctrl+Shift+T or the `+` in the focused one's title adds
   one; Ctrl+Tab and Ctrl+Shift+Tab (or Ctrl+PgUp/PgDn,
   Ctrl+Shift+Left/Right, or a tap on it) move the focus, and the keys,
-  to the next and previous one. − folds one to its strip, and picking it
-  in the switcher opens it again. Esc on an idle one or `close` drops it.
+  to the next and previous one, folded ones too. − or Ctrl+Shift+M folds
+  one to its strip; Enter on the strip, or picking it in the switcher,
+  opens it again. Esc on an idle one or `close` drops it.
 - F11: fullscreen, the session in focus alone (Ctrl+Tab goes on to the
   next). Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
   edge: font size (remembered in `term-font`).

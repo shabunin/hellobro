@@ -517,20 +517,12 @@ func (a *bro) stepTab(d int) {
 	}
 }
 
-// stepSession moves the focus to the next session (d -1: the one before)
-// whose panel is open; with them all folded, to the next one, opened.
+// stepSession moves the focus to the next session (d -1: the one
+// before), folded or not: Enter opens a folded one.
 func (a *bro) stepSession(d int) {
-	g := a.termGroup()
-	if g == nil || len(g.sessions) < 2 {
-		return
-	}
-	n := len(g.sessions)
-	open := a.termOpen(a.Tab) > 0
-	for k := 1; k < n; k++ {
-		if j := (g.cur + d*k + n*k) % n; !open || !g.sessions[j].folded {
-			a.switchSession(j)
-			return
-		}
+	if g := a.termGroup(); g != nil && len(g.sessions) > 1 {
+		n := len(g.sessions)
+		a.focusSession((g.cur+d+n)%n, false)
 	}
 }
 
