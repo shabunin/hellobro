@@ -88,7 +88,7 @@ oops
 	}
 	for key, want := range map[string]string{
 		"f5":           "tab.next",
-		"ctrl+tab":     "tab.next session.next", // the file's first
+		"ctrl+tab":     "tab.next panel.next", // the file's first
 		"ctrl+shift+p": "palette",               // named, and freed of its default (which it is too)
 		"f11":          "",                      // freed
 		"ctrl+shift+t": "session.new",           // as by default
@@ -171,8 +171,10 @@ func TestRewriteKeys(t *testing.T) {
 		{"tab.next", nil, true, "none doze"},
 		{"tab.next", []combo{}, false, "none doze|none tab.next"},
 		{"doze", []combo{k("ctrl+alt+d")}, false, "f5 tab.next|ctrl+alt+d doze"},
-		// Ctrl+Tab was session.next's: it keeps its others.
-		{"doze", []combo{k("ctrl+tab")}, false, "f5 tab.next|ctrl+pgdn session.next|ctrl+shift+right session.next|ctrl+tab doze"},
+		// Ctrl+PgDn was session.next's: it keeps its other.
+		{"doze", []combo{k("ctrl+pgdn")}, false, "f5 tab.next|ctrl+shift+right session.next|ctrl+pgdn doze"},
+		// Ctrl+Tab was panel.next's only key: it has none then.
+		{"doze", []combo{k("ctrl+tab")}, false, "f5 tab.next|none panel.next|ctrl+tab doze"},
 	} {
 		m, _ := parseKeys(conf)
 		out := rewriteKeys(conf, m, c.id, c.keys, c.reset)

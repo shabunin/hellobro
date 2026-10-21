@@ -115,10 +115,12 @@ func main() {
 
 func (a *bro) Layout(L kobo.Layout) {
 	a.lay = L
-	if L.Full { // no frame: the cells get it all
+	// The terminals' area: the sessions' panels go in it, the status bar
+	// under them. Fullscreen, no frames: the cells get it all.
+	if L.Full {
 		a.termP = kobo.Panel{Name: "Terminal", Outer: L.Page, Body: L.Page}
 	} else {
-		a.termP = kobo.NewPanel(a.F, "Terminal", L.Body, "")
+		a.termP = kobo.Panel{Name: "Terminal", Outer: L.Body, Body: L.Body}
 	}
 	a.layoutStat()
 	if a.tv.cw != 0 {

@@ -495,6 +495,17 @@ func (a *bro) radioFolded(i int) bool {
 	return a.rv[i].p.Folded
 }
 
+// radioStep moves the focus to the next open panel (d -1: the one before).
+func (a *bro) radioStep(d int) {
+	r := &a.rs
+	for range 3 {
+		if r.focus = (r.focus + d + 3) % 3; !a.radioFolded(r.focus) {
+			break
+		}
+	}
+	a.drawRadio()
+}
+
 // radioFocusOpen moves the focus off a folded panel, to an open one.
 func (a *bro) radioFocusOpen() {
 	r := &a.rs
@@ -979,12 +990,7 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 		return true
 	}
 	if code == kobo.KeyTab {
-		for range 3 { // the next open panel
-			if r.focus = (r.focus + 1) % 3; !a.radioFolded(r.focus) {
-				break
-			}
-		}
-		a.drawRadio()
+		a.radioStep(map[bool]int{false: 1, true: -1}[m.shift])
 		return true
 	}
 	if r.focus == panelSet {

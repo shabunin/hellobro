@@ -210,10 +210,14 @@ func (a *bro) selMove(p image.Point, g *kobo.Gesture) {
 		s.on, g.Owner = true, ownSelect
 		log.Print("terminal: selecting")
 	}
-	v := &a.tv
-	q := p.Sub(v.grid.Min)
-	s.to = image.Pt(max(0, min(v.cols-1, q.X/max(1, v.cw))), max(0, min(v.rows-1, q.Y/max(1, v.ch))))
-	if t := a.term(); t != nil && t.connected() {
+	v, t := &a.tv, a.term()
+	if t == nil {
+		return
+	}
+	pn := &t.pane
+	q := p.Sub(pn.grid.Min)
+	s.to = image.Pt(max(0, min(pn.cols-1, q.X/max(1, v.cw))), max(0, min(pn.rows-1, q.Y/max(1, v.ch))))
+	if t.connected() {
 		a.renderTerm(t)
 	}
 }
@@ -230,7 +234,7 @@ func (a *bro) selLift(g *kobo.Gesture) bool {
 	}
 	if t := a.term(); t != nil && t.connected() {
 		from, to := s.span()
-		a.copyText(cellText(t, a.tv.cols, from, to), "")
+		a.copyText(cellText(t, t.pane.cols, from, to), "")
 	}
 	return true
 }
@@ -281,8 +285,8 @@ func cellText(t *termSession, cols int, from, to image.Point) string {
 
 // screenText is all the terminal shows, the blank rows at its end left off.
 func (a *bro) screenText(t *termSession) string {
-	v := &a.tv
-	return strings.TrimRight(cellText(t, v.cols, image.Pt(0, 0), image.Pt(v.cols-1, v.rows-1)), "\n ")
+	pn := &t.pane
+	return strings.TrimRight(cellText(t, pn.cols, image.Pt(0, 0), image.Pt(pn.cols-1, pn.rows-1)), "\n ")
 }
 
 // copySel copies the selection again, or says how to make one.
@@ -293,5 +297,5 @@ func (a *bro) copySel() {
 		return
 	}
 	from, to := s.span()
-	a.copyText(cellText(t, a.tv.cols, from, to), "")
+	a.copyText(cellText(t, t.pane.cols, from, to), "")
 }

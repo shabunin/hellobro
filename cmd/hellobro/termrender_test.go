@@ -34,8 +34,11 @@ func TestRenderRecording(t *testing.T) {
 	a.termGeometry()
 	tr := &termSession{}
 	a.tv.groups[kindSSH].sessions = []*termSession{tr}
-	v := &a.tv
+	tr.pane.p = a.termP
+	a.paneGeometry(tr)
+	v := &tr.pane
 	tr.emu = vt.NewSafeEmulator(v.cols, v.rows)
+	tr.size = image.Pt(v.cols, v.rows)
 	tr.emu.SetDefaultForegroundColor(image.Black.C)
 	tr.emu.SetDefaultBackgroundColor(image.White.C)
 	tr.state = termConnected

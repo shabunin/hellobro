@@ -65,9 +65,13 @@ func makeCommands() []*command {
 				a.drawTerm()
 				a.MarkFlash(a.termP.Outer)
 			}},
-		&command{id: "session.next", title: "Next session", keys: []string{"ctrl+tab", "ctrl+pgdn", "ctrl+shift+right"},
+		&command{id: "panel.next", title: "Next panel", keys: []string{"ctrl+tab"}, repeat: true,
+			run: func(a *bro) { a.stepPanel(1) }},
+		&command{id: "panel.prev", title: "Previous panel", keys: []string{"ctrl+shift+tab"}, repeat: true,
+			run: func(a *bro) { a.stepPanel(-1) }},
+		&command{id: "session.next", title: "Next session", keys: []string{"ctrl+pgdn", "ctrl+shift+right"},
 			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(1) }},
-		&command{id: "session.prev", title: "Previous session", keys: []string{"ctrl+shift+tab", "ctrl+pgup", "ctrl+shift+left"},
+		&command{id: "session.prev", title: "Previous session", keys: []string{"ctrl+pgup", "ctrl+shift+left"},
 			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(-1) }},
 		&command{id: "copy", title: "Copy the selection", keys: []string{"ctrl+shift+c"}, when: onTerm, run: (*bro).copySel},
 		&command{id: "copy.screen", title: "Copy the screen's text", when: onTerm, run: func(a *bro) {
@@ -513,9 +517,20 @@ func (a *bro) stepTab(d int) {
 	}
 }
 
+// stepSession moves the focus to the next session (d -1: the one before)
+// whose panel is open; with them all folded, to the next one, opened.
 func (a *bro) stepSession(d int) {
-	if g := a.termGroup(); len(g.sessions) > 1 {
-		a.switchSession((g.cur + d + len(g.sessions)) % len(g.sessions))
+	g := a.termGroup()
+	if g == nil || len(g.sessions) < 2 {
+		return
+	}
+	n := len(g.sessions)
+	open := a.termOpen(a.Tab) > 0
+	for k := 1; k < n; k++ {
+		if j := (g.cur + d*k + n*k) % n; !open || !g.sessions[j].folded {
+			a.switchSession(j)
+			return
+		}
 	}
 }
 

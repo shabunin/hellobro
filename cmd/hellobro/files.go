@@ -44,6 +44,7 @@ type filesView struct {
 	rows          []image.Rectangle
 	rowsOn        int
 	err, free     string
+	shareFocus    bool // the keys go to Sharing, not the list
 	listAt        time.Time
 	shownShare    string
 	shownList     string
@@ -195,7 +196,7 @@ func (a *bro) drawShare() {
 		return
 	}
 	v.shownShare = key
-	a.DrawPanel(v.shareP, status)
+	a.DrawPanel(focusMark(v.shareP, v.shareFocus, !v.listP.Folded), status)
 	if v.shareP.Folded {
 		return
 	}
@@ -314,7 +315,7 @@ func (a *bro) drawFileList() {
 		return
 	}
 	v.shownList = key
-	a.DrawPanel(v.listP, v.free)
+	a.DrawPanel(focusMark(v.listP, !v.shareFocus, !v.shareP.Folded), v.free)
 	if v.listP.Folded {
 		v.rows = v.rows[:0]
 		return
@@ -436,9 +437,12 @@ func (a *bro) filesKey(code uint16, value int32) bool {
 		a.drawFileList()
 	}
 	ch, _ := kobo.KeyChar(code, false, false)
+	list := !(v.shareFocus && !v.shareP.Folded) || v.listP.Folded // the arrows are the list's
 	switch {
 	case code == kobo.KeyEsc:
 		return false
+	case !list && ch == "":
+		// Sharing has no rows: its keys are the letters, below
 	case code == keyUp:
 		move(-1)
 	case code == keyDown:
@@ -472,6 +476,11 @@ func (a *bro) filesKey(code uint16, value int32) bool {
 
 func (a *bro) filesTap(p image.Point) {
 	v := &a.fv
+	if share := p.In(v.shareP.Outer); share != v.shareFocus && (share || p.In(v.listP.Outer)) { // the panel tapped takes the focus
+		v.shareFocus = share
+		v.shownShare, v.shownList = "", ""
+		a.drawFiles()
+	}
 	for _, b := range v.shareBtns {
 		if kobo.Hit(p, b.r) {
 			switch b.label {

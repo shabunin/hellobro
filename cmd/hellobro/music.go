@@ -65,6 +65,7 @@ type musicView struct {
 	segs                    [numViews]image.Rectangle // Albums, Folders, Playlists
 	listR, actR             image.Rectangle           // the rows, and the action bar under them
 	coverSide, rowsOnScreen int
+	nowFocus                bool // the keys go to Now playing, not the library
 }
 
 type musicState struct {
@@ -280,10 +281,11 @@ func (a *bro) outputStatus() string {
 }
 
 func (a *bro) nowPanel() kobo.Panel {
+	p := focusMark(a.mv.nowP, a.mv.nowFocus, !a.mv.libP.Folded)
 	if _, ok := a.audioDevice(); ok && !a.mus.connecting {
-		return kobo.WithButton(a.F, a.mv.nowP, "connect")
+		return kobo.WithButton(a.F, p, "connect")
 	}
-	return a.mv.nowP
+	return p
 }
 
 // --- drawing ---
@@ -918,7 +920,14 @@ func (a *bro) musicKey(code uint16, value int32) bool {
 	shift := a.tv.mods.shift
 	once := value == 1 // not held down
 	ch, _ := kobo.KeyChar(code, false, false)
+	now := a.mv.nowFocus && !a.mv.nowP.Folded || a.mv.libP.Folded // the keys are the player's
 	switch {
+	case now && code == keyUp:
+		a.mediaKey(kobo.KeyVolumeUp)
+	case now && code == keyDown:
+		a.mediaKey(kobo.KeyVolumeDown)
+	case now && code == kobo.KeyEnter && once:
+		a.musicToggle()
 	case code == kobo.KeySpace || ch == "k":
 		if once {
 			a.musicToggle()
@@ -995,6 +1004,10 @@ func (a *bro) musicKey(code uint16, value int32) bool {
 
 func (a *bro) musicTap(p image.Point) {
 	m, v := &a.mus, &a.mv
+	if now := p.In(v.nowP.Outer); now != v.nowFocus && (now || p.In(v.libP.Outer)) { // the panel tapped takes the focus
+		v.nowFocus = now
+		a.redrawMusic()
+	}
 	switch {
 	case kobo.Hit(p, a.nowPanel().Button):
 		a.musicConnect()

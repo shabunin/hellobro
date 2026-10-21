@@ -84,6 +84,9 @@ func (a *bro) setFold(key string, on bool) {
 	log.Printf("folds: %s %s", key, map[bool]string{true: "folded", false: "open"}[on])
 	switch foldables[i].tab {
 	case tabMusic:
+		if on {
+			a.mv.nowFocus = key == "library" // the focus goes to the open one
+		}
 		a.layoutMusic(a.lay)
 	case tabRadio:
 		if p := a.rs.prompt; on && p != nil && p.panel == radioPanelOf(key) {
@@ -92,6 +95,9 @@ func (a *bro) setFold(key string, on bool) {
 		a.layoutRadio(a.lay)
 		a.radioFocusOpen()
 	case tabFiles:
+		if on {
+			a.fv.shareFocus = key == "files"
+		}
 		a.layoutFiles(a.lay)
 	}
 	if foldables[i].tab == a.Tab && !a.overlay() {
@@ -133,6 +139,15 @@ func radioPanelOf(key string) int {
 
 // foldTap folds or opens the panel tapped on its box (or its strip).
 func (a *bro) foldTap(p image.Point) bool {
+	if g := a.termGroup(); g != nil && !a.Full {
+		for _, t := range g.sessions {
+			if kobo.FoldHit(p, a.termPanel(t)) {
+				a.setSessionFold(t, !t.folded)
+				return true
+			}
+		}
+		return false
+	}
 	for _, f := range foldables {
 		if f.tab == a.Tab && kobo.FoldHit(p, a.foldPanel(f.key)) {
 			a.setFold(f.key, !a.folded(f.key))
@@ -143,8 +158,11 @@ func (a *bro) foldTap(p image.Point) bool {
 }
 
 // foldCommands are the switcher's: minimize or open a panel of the page.
+// A folded session opens as it's picked in the switcher.
 func foldCommands() []*command {
-	var cs []*command
+	cs := []*command{{id: "fold.session", title: "Session panel: minimize",
+		when: func(a *bro) bool { t := a.term(); return t != nil && !t.folded && !a.Full },
+		run:  func(a *bro) { a.setSessionFold(a.term(), true) }}}
 	for _, f := range foldables {
 		cs = append(cs,
 			&command{id: "fold." + f.key, title: f.name + " panel: minimize",
@@ -199,4 +217,37 @@ func netText(ws radio.WiFiStatus) string {
 		return ws.SSID + " · no address"
 	}
 	return ws.SSID + " · " + ws.IP
+}
+
+// --- the focus ---
+
+// stepPanel moves the focus to the next open panel on the page (d -1: the
+// one before), as Ctrl+Tab does: the keys go to it.
+func (a *bro) stepPanel(d int) {
+	switch a.Tab {
+	case tabMusic:
+		if !a.mv.nowP.Folded && !a.mv.libP.Folded {
+			a.mv.nowFocus = !a.mv.nowFocus
+			a.redrawMusic()
+		}
+	case tabFiles:
+		if !a.fv.shareP.Folded && !a.fv.listP.Folded {
+			a.fv.shareFocus = !a.fv.shareFocus
+			a.fv.shownShare, a.fv.shownList = "", ""
+			a.drawFiles()
+		}
+	case tabRadio:
+		a.radioStep(d)
+	default:
+		a.stepSession(d)
+	}
+}
+
+// focusMark marks the name of the panel in focus, when there's more than
+// one open to choose from.
+func focusMark(p kobo.Panel, focused, others bool) kobo.Panel {
+	if focused && others {
+		p.Name = "► " + p.Name
+	}
+	return p
 }

@@ -145,6 +145,12 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   `kobo.WithFold` (listed in `fold.go`). A folded panel's inner rects are
   zeroed in its layout and its draw stops after `DrawPanel`, so nothing
   of it is drawn or tapped.
+- Each terminal session has its own panel and cells (`termPane`: grid,
+  cols, rows, what's drawn); `a.term()` is the one in focus, which the
+  keys and the selection go to. `layoutSessions` places a tab's
+  sessions; the emulator and the remote are resized only when a pane
+  that shows changes size (`t.size`). Ctrl+Tab moves the focus on any
+  page through `stepPanel`; the panel in focus gets `focusMark`'s ►.
 - Tests sit next to the code (`*_test.go`). Parsers and logic get table
   tests.
 - User-facing text is short and lower-key, like the rest of the UI.

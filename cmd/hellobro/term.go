@@ -104,33 +104,44 @@ type termSession struct {
 	password string    // typed for this connection, for connecting again (only kept in memory)
 	retries  int       // connection attempts since it dropped
 	retryAt  time.Time // when the next one starts
+
+	pane   termPane
+	folded bool        // its panel is only its title strip
+	size   image.Point // the emulator's and the remote's, in cells
+}
+
+// termPane is where a session shows: its panel, and its cells in it.
+type termPane struct {
+	p            kobo.Panel
+	grid         image.Rectangle // the cells' area; empty when they don't show
+	cols, rows   int
+	shown        [][]cellKey // what's drawn
+	shownConnect []string    // the connect screen's rows as drawn, nil: draw it all
+	shownStatus  string
+	hostRows     []image.Rectangle // where the saved hosts are listed, for taps
+	newR         image.Rectangle   // "+", a new session: in the focused one's title strip
 }
 
 func (t *termSession) connected() bool { return t.state == termConnected }
 
+// termGroup is a tab's sessions; cur is the one in focus, which the keys
+// go to.
 type termGroup struct {
 	sessions []*termSession
 	cur      int
 }
 
-// termView is the terminal on screen. Only one session shows at a time,
-// so they share the grid, the font and the glyph cache.
+// termView is the terminals on screen. Each session has a panel of its
+// own (the open ones share the page); they share the font and the glyph
+// cache.
 type termView struct {
 	groups   [2]termGroup // the SSH tab's sessions, the Shell tab's
 	hosts    []sshHost
 	keyAsked map[string]bool // hosts we offered to install our key on
 
-	hostRows     []image.Rectangle // where the saved hosts are listed, for taps
-	chips        []image.Rectangle // the session buttons in the title strip; the last may be "+"
-	shownConnect []string          // the connect screen's rows as drawn, nil: draw it all
-	shownStatus  string
-
-	grid       image.Rectangle // the cells' area
-	sel        *termSel        // the selection, or a contact that may become one (clipboard.go)
-	cw, ch     int             // cell size
-	cols, rows int
-	shown      [][]cellKey // what's drawn
-	drawnAt    time.Time
+	sel     *termSel // the selection, or a contact that may become one (clipboard.go): the focused session's
+	cw, ch  int      // cell size
+	drawnAt time.Time
 	outAt      time.Time       // last output drawn
 	fastArea   image.Rectangle // drawn with the fast (DU) waveform since the last clean refresh
 	fastAt     time.Time       // when fastArea got its first update
@@ -158,8 +169,14 @@ func (a *bro) term() *termSession {
 	return nil
 }
 
+// onScreen says whether t's panel is up, even folded to its strip.
+func (a *bro) onScreen(t *termSession) bool {
+	return !a.Calibrating() && !a.overlay() && t != nil && isTermTab(a.Tab) && t.kind == a.Tab && !t.pane.p.Outer.Empty()
+}
+
+// showing says whether t's cells or connect screen are up.
 func (a *bro) showing(t *termSession) bool {
-	return !a.Calibrating() && !a.overlay() && t != nil && a.term() == t
+	return a.onScreen(t) && !t.pane.p.Folded
 }
 
 // termLive says whether any session is connected, or about to be.
@@ -176,36 +193,103 @@ func (a *bro) termLive() bool {
 
 // --- layout & geometry ---
 
+// termGeometry measures the cells and lays the sessions out again.
 func (a *bro) termGeometry() {
 	v := &a.tv
 	v.sel = nil // its cells are other ones now
-	v.grid = a.termP.Body.Inset(6)
 	v.cw = kobo.TextWidth(a.tf.term, "M")
 	m := a.tf.term.Metrics()
 	v.ch = m.Ascent.Ceil() + m.Descent.Ceil() + 2
-	v.cols, v.rows = max(20, v.grid.Dx()/v.cw), max(5, v.grid.Dy()/v.ch)
-	// Center the grid in the body.
-	gw, gh := v.cols*v.cw, v.rows*v.ch
-	min := image.Pt(v.grid.Min.X+(v.grid.Dx()-gw)/2, v.grid.Min.Y+(v.grid.Dy()-gh)/2)
-	v.grid = image.Rectangle{min, min.Add(image.Pt(gw, gh))}
-	v.shown = nil
-	for _, g := range v.groups {
-		for _, t := range g.sessions {
-			if t.connected() {
-				t.emu.Resize(v.cols, v.rows)
-				t.back.resize(v.cols, v.rows)
-			}
-		}
+	a.layoutSessions(tabSSH)
+	a.layoutSessions(tabShell)
+}
+
+// layoutSessions places a terminal tab's sessions, a panel each: the
+// open ones share the page (portrait: one above the other; landscape:
+// two abreast), a folded one is its strip. Fullscreen, the one in focus
+// has it all and the others don't show.
+func (a *bro) layoutSessions(tab int) {
+	g := &a.tv.groups[tab]
+	if a.tv.cw == 0 || len(g.sessions) == 0 {
+		return
 	}
+	area := a.termP.Body
+	if a.lay.Full {
+		for i, t := range g.sessions {
+			t.pane.p = kobo.Panel{}
+			if i == g.cur {
+				t.pane.p = kobo.Panel{Name: sessionName(tab, i), Outer: area, Body: area}
+			}
+			a.paneGeometry(t)
+		}
+		return
+	}
+	if !a.stat.r.Empty() {
+		area.Max.Y -= kobo.Pad / 2 // a gap above the status bar
+	}
+	per := 1
+	if a.lay.Landscape {
+		per = 2
+	}
+	var rows []kobo.Row
+	for i := 0; i < len(g.sessions); i += per {
+		row := kobo.Row{Height: 1}
+		for _, t := range g.sessions[i:min(i+per, len(g.sessions))] {
+			row.Widths, row.Folded = append(row.Widths, 1), append(row.Folded, t.folded)
+		}
+		rows = append(rows, row)
+	}
+	at := a.lay.Arrange(area, rows...)
+	for i, t := range g.sessions {
+		t.pane.p = kobo.WithFold(a.F, kobo.NewPanel(a.F, sessionName(tab, i), at[i], ""), t.folded)
+		a.paneGeometry(t)
+	}
+}
+
+func sessionName(tab, i int) string { return fmt.Sprintf("%s %d", tabNames[tab], i+1) }
+
+// paneGeometry fits t's cells to its panel. A session that doesn't show
+// keeps its size: the remote isn't told of every fold.
+func (a *bro) paneGeometry(t *termSession) {
+	v, pn := &a.tv, &t.pane
+	pn.shown, pn.shownConnect, pn.hostRows, pn.grid = nil, nil, nil, image.Rectangle{}
+	if pn.p.Folded || pn.p.Body.Empty() {
+		return
+	}
+	grid := pn.p.Body.Inset(6)
+	pn.cols, pn.rows = max(20, grid.Dx()/v.cw), max(5, grid.Dy()/v.ch)
+	// Centered in the body.
+	gw, gh := pn.cols*v.cw, pn.rows*v.ch
+	at := image.Pt(grid.Min.X+(grid.Dx()-gw)/2, grid.Min.Y+(grid.Dy()-gh)/2)
+	pn.grid = image.Rectangle{at, at.Add(image.Pt(gw, gh))}
+	if size := image.Pt(pn.cols, pn.rows); t.connected() && size != t.size {
+		t.size = size
+		t.emu.Resize(pn.cols, pn.rows)
+		t.back.resize(pn.cols, pn.rows)
+	}
+}
+
+// startSize is the size a new connection starts with: its panel's, or a
+// classic one while it doesn't show.
+func (t *termSession) startSize() image.Point {
+	if t.pane.cols == 0 {
+		return image.Pt(80, 24)
+	}
+	return image.Pt(t.pane.cols, t.pane.rows)
 }
 
 // termPanel is the terminal panel as the current session has it: named
 // after the tab, with a button that fits what the session is doing.
-func (a *bro) termPanel() kobo.Panel {
-	p := a.termP
-	t := a.term()
-	if p.Title.Empty() || t == nil {
+// termPanel is t's panel as it is now: in focus or not, with a button
+// that fits what the session is doing.
+func (a *bro) termPanel(t *termSession) kobo.Panel {
+	p := t.pane.p
+	if p.Title.Empty() {
 		return p
+	}
+	g := &a.tv.groups[t.kind]
+	if a.termOpen(t.kind) > 1 && g.cur < len(g.sessions) && g.sessions[g.cur] == t {
+		p.Name = "► " + p.Name
 	}
 	label := ""
 	switch {
@@ -213,11 +297,21 @@ func (a *bro) termPanel() kobo.Panel {
 		label = "kill"
 	case t.state != termIdle:
 		label = "disconnect"
-	case len(a.termGroup().sessions) > 1:
+	case len(g.sessions) > 1:
 		label = "close"
 	}
-	p.Name = a.TabName()
 	return kobo.WithButton(a.F, p, label)
+}
+
+// termOpen counts a tab's sessions not folded.
+func (a *bro) termOpen(tab int) int {
+	n := 0
+	for _, t := range a.tv.groups[tab].sessions {
+		if !t.folded {
+			n++
+		}
+	}
+	return n
 }
 
 // --- drawing ---
@@ -233,7 +327,7 @@ func (t *termSession) status(v *termView) string {
 		if t.kind == kindShell {
 			where = "sh on this Kobo"
 		}
-		s := fmt.Sprintf("%s · %d×%d · %d px", where, v.cols, v.rows, v.fontPx)
+		s := fmt.Sprintf("%s · %d×%d · %d px", where, t.size.X, t.size.Y, v.fontPx)
 		if t.title != "" {
 			s = t.title + " · " + s
 		}
@@ -246,90 +340,102 @@ func (t *termSession) status(v *termView) string {
 }
 
 // drawTerm draws the whole terminal panel.
+// drawTerm draws the tab's sessions, each in its panel, and the status bar.
 func (a *bro) drawTerm() {
-	t := a.term()
-	if t == nil || a.Calibrating() {
+	g := a.termGroup()
+	if g == nil || len(g.sessions) == 0 || a.Calibrating() {
 		return
 	}
-	v := &a.tv
-	p := a.termPanel()
-	v.shownConnect = nil
-	a.DrawPanel(p, "")
-	a.drawTermTitle()
+	a.C.Fill(a.termP.Outer, kobo.White) // the gaps between the panels
+	a.Mark(a.termP.Outer, true)
+	for _, t := range g.sessions {
+		a.drawPane(t)
+	}
 	a.drawStat(true)
-	if t.connected() {
-		v.shown = nil
-		a.renderTerm(t)
+}
+
+// drawPane draws one session's panel: its frame and title strip, then
+// its cells or its connect screen.
+func (a *bro) drawPane(t *termSession) {
+	pn := &t.pane
+	if pn.p.Outer.Empty() {
 		return
 	}
-	a.drawConnect(t)
+	pn.shownConnect = nil
+	a.DrawPanel(a.termPanel(t), "")
+	a.drawTermTitle(t)
+	switch {
+	case pn.p.Folded:
+	case t.connected():
+		pn.shown = nil
+		a.renderTerm(t)
+	default:
+		a.drawConnect(t)
+	}
 }
 
 // drawTermTitle draws the title strip: the name, a button per session
 // (and "+" for another one), and the session's status.
-func (a *bro) drawTermTitle() {
-	t, g := a.term(), a.termGroup()
-	p := a.termPanel()
-	v := &a.tv
-	v.shownStatus = t.status(v)
-	v.chips = nil
+// drawTermTitle draws t's title strip: the name, "+" for another session
+// (in the focused one's), and the session's status.
+func (a *bro) drawTermTitle(t *termSession) {
+	p := a.termPanel(t)
+	pn, g := &t.pane, &a.tv.groups[t.kind]
+	pn.shownStatus = t.status(&a.tv)
+	pn.newR = image.Rectangle{}
 	if p.Title.Empty() {
 		return
 	}
 	a.DrawPanelTitle(p, "")
 	x := p.Title.Min.X + 16 + kobo.TextWidth(a.F.Panel, p.Name) + 24
-	n := len(g.sessions)
-	if n < maxSessions {
-		n++
-	}
-	for i := range n {
-		r := image.Rect(x, p.Title.Min.Y+6, x+44, p.Title.Max.Y-8)
-		label := strconv.Itoa(i + 1)
-		if i == len(g.sessions) {
-			label = "+"
-		}
-		if i == g.cur {
-			a.C.Fill(r, kobo.Black)
-			a.C.Text(a.F.Small, r, label, kobo.White, kobo.AlignCenter)
-		} else {
-			a.C.Fill(r, kobo.White)
-			a.C.Frame(r, 2, kobo.Black)
-			a.C.Text(a.F.Small, r, label, kobo.Black, kobo.AlignCenter)
-		}
-		v.chips = append(v.chips, r)
-		x = r.Max.X + 8
+	if g.cur < len(g.sessions) && g.sessions[g.cur] == t && len(g.sessions) < maxSessions {
+		pn.newR = image.Rect(x, p.Title.Min.Y+6, x+44, p.Title.Max.Y-8)
+		a.C.Fill(pn.newR, kobo.White)
+		a.C.Frame(pn.newR, 2, kobo.Black)
+		a.C.Text(a.F.Small, pn.newR, "+", kobo.Black, kobo.AlignCenter)
+		x = pn.newR.Max.X + 8
 	}
 	end := p.Title.Max.X - 16
-	if !p.Button.Empty() {
+	switch {
+	case !p.Button.Empty():
 		end = p.Button.Min.X - 16
+	case !p.Fold.Empty():
+		end = p.Fold.Min.X - 16
 	}
-	a.C.Text(a.F.Small, image.Rect(x+16, p.Title.Min.Y, end, p.Title.Max.Y-2), v.shownStatus, kobo.Dark, kobo.AlignRight)
+	a.C.Text(a.F.Small, image.Rect(x+16, p.Title.Min.Y, end, p.Title.Max.Y-2), pn.shownStatus, kobo.Dark, kobo.AlignRight)
 }
 
 // drawTermStatus redraws the title strip if the status changed.
+// drawTermStatus redraws the title strips whose status changed.
 func (a *bro) drawTermStatus() {
-	if t := a.term(); t != nil && !a.Calibrating() && t.status(&a.tv) != a.tv.shownStatus {
-		a.drawTermTitle()
+	g := a.termGroup()
+	if g == nil {
+		return
+	}
+	for _, t := range g.sessions {
+		if a.onScreen(t) && t.status(&a.tv) != t.pane.shownStatus {
+			a.drawTermTitle(t)
+		}
 	}
 }
 
 func (a *bro) drawConnect(t *termSession) {
-	v := &a.tv
-	keys := a.keyHints("session.new", "new session", "session.next", "next session", "palette", "go to…",
+	v, pn := &a.tv, &t.pane
+	keys := a.keyHints("session.new", "new session", "panel.next", "next panel", "palette", "go to…",
 		"fullscreen", "fullscreen (or swipe in from the top or bottom edge to leave it)")
 	music := a.keyHints("music.play", "play/pause", "music.prev", "previous track", "music.next", "next track", "statusbar", "status bar")
 	var lines []string
 	if t.kind == kindShell {
 		lines = []string{"A shell on this Kobo (/bin/sh, as " + whoami() + "): Enter or tap here to start it.", keys, music}
-		if t.state == termIdle && len(a.termGroup().sessions) > 1 {
+		if t.state == termIdle && len(a.tv.groups[t.kind].sessions) > 1 {
 			lines = append(lines, "Esc: close this session.")
 		}
 		if len(t.notes) > 0 {
 			lines = append(lines, "")
 			lines = append(lines, t.notes...)
 		}
-		a.DrawTextRows(a.termPanel(), a.F.Body, lines, &v.shownConnect)
-		v.hostRows = nil
+		a.DrawTextRows(a.termPanel(t), a.F.Body, lines, &pn.shownConnect)
+		pn.hostRows = nil
 		return
 	}
 	lines = []string{"Type user@host[:port] [command] and Enter, or tap / press 1-9 for a saved host.", keys, music}
@@ -382,10 +488,10 @@ func (a *bro) drawConnect(t *termSession) {
 		lines = append(lines, "")
 		lines = append(lines, t.notes...)
 	}
-	rows := a.DrawTextRows(a.termPanel(), a.F.Body, lines, &v.shownConnect)
-	v.hostRows = nil
+	rows := a.DrawTextRows(a.termPanel(t), a.F.Body, lines, &pn.shownConnect)
+	pn.hostRows = nil
 	if len(v.hosts) > 0 {
-		v.hostRows = rows[firstHost : firstHost+len(v.hosts)]
+		pn.hostRows = rows[firstHost : firstHost+len(v.hosts)]
 	}
 }
 
@@ -393,31 +499,32 @@ func (a *bro) drawConnect(t *termSession) {
 // screen: a key typed into a line shouldn't repaint the whole panel (in
 // fullscreen, the whole screen).
 func (a *bro) updateTerm(t *termSession) {
-	if !a.showing(t) {
-		return
+	switch {
+	case !a.onScreen(t):
+	case t.pane.p.Folded:
+		a.drawTermTitle(t)
+	case t.connected() || t.pane.shownConnect == nil:
+		a.drawPane(t)
+	default:
+		a.drawTermStatus()
+		a.drawConnect(t)
 	}
-	if t.connected() || a.tv.shownConnect == nil {
-		a.drawTerm()
-		return
-	}
-	a.drawTermStatus()
-	a.drawConnect(t)
 }
 
 // renderTerm redraws the cells that changed since the last time.
 func (a *bro) renderTerm(t *termSession) {
-	v := &a.tv
-	if t.emu == nil {
+	v, pn := &a.tv, &t.pane
+	if t.emu == nil || pn.grid.Empty() {
 		return
 	}
 	t.dirty.Store(false)
 	v.drawnAt = time.Now()
-	if len(v.shown) != v.rows || (v.rows > 0 && len(v.shown[0]) != v.cols) {
-		v.shown = make([][]cellKey, v.rows)
-		for y := range v.shown {
-			v.shown[y] = make([]cellKey, v.cols)
-			for x := range v.shown[y] {
-				v.shown[y][x].width = -1 // never matches
+	if len(pn.shown) != pn.rows || (pn.rows > 0 && len(pn.shown[0]) != pn.cols) {
+		pn.shown = make([][]cellKey, pn.rows)
+		for y := range pn.shown {
+			pn.shown[y] = make([]cellKey, pn.cols)
+			for x := range pn.shown[y] {
+				pn.shown[y][x].width = -1 // never matches
 			}
 		}
 	}
@@ -428,16 +535,16 @@ func (a *bro) renderTerm(t *termSession) {
 		gray bool
 	}
 	var rows []changed
-	for y := 0; y < v.rows; y++ {
+	for y := 0; y < pn.rows; y++ {
 		from, to, gray := -1, -1, false
-		for x := 0; x < v.cols; x++ {
+		for x := 0; x < pn.cols; x++ {
 			k := t.cellKeyAt(x, y, showCursor && cur.X == x && cur.Y == y)
-			k.sel = v.sel.has(x, y)
-			if k == v.shown[y][x] {
+			k.sel = t == a.term() && v.sel.has(x, y)
+			if k == pn.shown[y][x] {
 				continue
 			}
-			v.shown[y][x] = k
-			a.drawCell(x, y, k)
+			pn.shown[y][x] = k
+			a.drawCell(pn, x, y, k)
 			if from < 0 {
 				from = x
 			}
@@ -445,8 +552,8 @@ func (a *bro) renderTerm(t *termSession) {
 			gray = gray || !bw(k.fg) || !bw(k.bg)
 		}
 		if from >= 0 {
-			r := image.Rect(v.grid.Min.X+from*v.cw, v.grid.Min.Y+y*v.ch, v.grid.Min.X+(to+1)*v.cw, v.grid.Min.Y+(y+1)*v.ch)
-			rows = append(rows, changed{r.Inset(-1).Intersect(v.grid), gray})
+			r := image.Rect(pn.grid.Min.X+from*v.cw, pn.grid.Min.Y+y*v.ch, pn.grid.Min.X+(to+1)*v.cw, pn.grid.Min.Y+(y+1)*v.ch)
+			rows = append(rows, changed{r.Inset(-1).Intersect(pn.grid), gray})
 		}
 	}
 	// Black & white changes to a row or three (typing, a spinner) take the
@@ -509,13 +616,13 @@ func gray(c color.Color) uint8 {
 	return uint8((y + 8) / 17 * 17)
 }
 
-func (a *bro) drawCell(x, y int, k cellKey) {
+func (a *bro) drawCell(pn *termPane, x, y int, k cellKey) {
 	v := &a.tv
 	if k.width == 0 {
 		return // the right half of a wide character, drawn with it
 	}
 	w := max(1, k.width)
-	r := image.Rect(v.grid.Min.X+x*v.cw, v.grid.Min.Y+y*v.ch, v.grid.Min.X+(x+w)*v.cw, v.grid.Min.Y+(y+1)*v.ch).Intersect(v.grid)
+	r := image.Rect(pn.grid.Min.X+x*v.cw, pn.grid.Min.Y+y*v.ch, pn.grid.Min.X+(x+w)*v.cw, pn.grid.Min.Y+(y+1)*v.ch).Intersect(pn.grid)
 	fg, bg := k.fg, k.bg
 	if k.cursor != k.sel {
 		fg, bg = bg, fg
@@ -568,6 +675,8 @@ func (a *bro) newSession(start bool) {
 	t := &termSession{kind: a.Tab}
 	g.sessions = append(g.sessions, t)
 	g.cur = len(g.sessions) - 1
+	a.tv.sel = nil
+	a.layoutSessions(a.Tab)
 	log.Printf("terminal: session %d on the %s tab", g.cur+1, a.TabName())
 	if t.kind == kindShell && start {
 		a.termStartShell(t)
@@ -577,13 +686,55 @@ func (a *bro) newSession(start bool) {
 // switchSession shows session i of the current tab.
 func (a *bro) switchSession(i int) {
 	g := a.termGroup()
-	if g == nil || i < 0 || i >= len(g.sessions) || i == g.cur {
+	if g == nil || i < 0 || i >= len(g.sessions) || i == g.cur && !g.sessions[i].folded {
 		return
 	}
+	was := a.term()
 	g.cur = i
 	a.tv.sel = nil
-	a.drawTerm()
-	a.MarkFlash(a.termP.Outer) // a whole new screen: clean, not ghosted
+	if t := g.sessions[i]; t.folded || a.lay.Full { // its panel changes: lay them out again
+		t.folded = false
+		a.layoutSessions(a.Tab)
+		a.drawTerm()
+		a.MarkFlash(a.termP.Outer) // a whole new screen: clean, not ghosted
+		return
+	}
+	// Only the focus moves: the two title strips.
+	if was != nil {
+		a.drawTermTitle(was)
+		if was.connected() {
+			a.renderTerm(was) // its selection goes
+		}
+	}
+	a.drawTermTitle(g.sessions[i])
+}
+
+// setSessionFold folds t's panel or opens it; the focus leaves a folded
+// one for an open one.
+func (a *bro) setSessionFold(t *termSession, on bool) {
+	g := &a.tv.groups[t.kind]
+	if t.folded == on {
+		return
+	}
+	t.folded = on
+	log.Printf("folds: %s %s", sessionName(t.kind, slices.Index(g.sessions, t)), map[bool]string{true: "folded", false: "open"}[on])
+	if on && g.sessions[g.cur] == t {
+		for d := 1; d < len(g.sessions); d++ {
+			if j := (g.cur + d) % len(g.sessions); !g.sessions[j].folded {
+				g.cur = j
+				break
+			}
+		}
+		a.tv.sel = nil
+	}
+	if !on {
+		g.cur = slices.Index(g.sessions, t)
+	}
+	a.layoutSessions(t.kind)
+	if a.Tab == t.kind {
+		a.drawTerm()
+		a.MarkFlash(a.termP.Outer)
+	}
 }
 
 // closeSession ends the session on screen and drops it, unless it's the
@@ -596,6 +747,8 @@ func (a *bro) closeSession() {
 	a.termClose(t)
 	g.sessions = slices.Delete(g.sessions, g.cur, g.cur+1)
 	g.cur = min(g.cur, len(g.sessions)-1)
+	a.tv.sel = nil
+	a.layoutSessions(a.Tab)
 	a.drawTerm()
 	a.MarkFlash(a.termP.Outer)
 }
@@ -634,7 +787,7 @@ func (a *bro) setTermFont(px int) {
 	os.WriteFile(kobo.AppFile("term-font"), []byte(strconv.Itoa(px)+"\n"), 0o644)
 	if a.term() != nil {
 		a.drawTerm()
-		a.MarkFlash(a.termP.Body) // every glyph changed: clean, not ghosted
+		a.MarkFlash(a.termP.Outer) // every glyph changed: clean, not ghosted
 	}
 }
 
@@ -689,8 +842,9 @@ func (a *bro) termConnect(t *termSession, h sshHost) {
 		}
 		return ans, nil
 	}
+	size := t.startSize()
 	o := dialOpts{
-		cols: a.tv.cols, rows: a.tv.rows, password: t.password,
+		cols: size.X, rows: size.Y, password: t.password,
 		ask:  func(q string, echo bool) (string, error) { return ask(q, echo, false) },
 		note: func(s string) { a.Do(func() { a.termNote(t, s) }) },
 	}
@@ -751,7 +905,8 @@ func (a *bro) termStartShell(t *termSession) {
 		return
 	}
 	t.notes, t.title = nil, ""
-	s, err := startShell(a.tv.cols, a.tv.rows)
+	size := t.startSize()
+	s, err := startShell(size.X, size.Y)
 	if err != nil {
 		a.termNote(t, "couldn't start a shell: "+err.Error())
 		return
@@ -761,9 +916,10 @@ func (a *bro) termStartShell(t *termSession) {
 }
 
 func (a *bro) termStart(t *termSession, back termBackend, gen int) {
-	v := &a.tv
+	t.size = t.startSize()
+	cols, rows := t.size.X, t.size.Y
 	t.back, t.state = back, termConnected
-	t.emu = vt.NewSafeEmulator(v.cols, v.rows)
+	t.emu = vt.NewSafeEmulator(cols, rows)
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
 	t.emu.SetDefaultBackgroundColor(color.White)
 	t.emu.SetScrollbackSize(1000) // not shown; the default 10000 costs a big copy per line once full
@@ -771,18 +927,18 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 		Title: func(s string) {
 			a.Do(func() {
 				t.title = s
-				if a.showing(t) {
+				if a.onScreen(t) {
 					a.drawTermStatus()
 				}
 			})
 		},
 	})
 	t.emu.RegisterOscHandler(52, a.osc52(t))
-	back.resize(v.cols, v.rows)
+	back.resize(cols, rows)
 	if t.kind == kindShell {
-		log.Printf("shell: started, %d×%d", v.cols, v.rows)
+		log.Printf("shell: started, %d×%d", cols, rows)
 	} else {
-		log.Printf("ssh: connected to %s, %d×%d", t.target, v.cols, v.rows)
+		log.Printf("ssh: connected to %s, %d×%d", t.target, cols, rows)
 	}
 	emu := t.emu
 	go func() { // remote → emulator
@@ -816,8 +972,8 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 			}
 		}
 	}()
-	if a.showing(t) {
-		a.drawTerm()
+	if a.onScreen(t) {
+		a.drawPane(t)
 	}
 }
 
@@ -858,9 +1014,7 @@ func (a *bro) termClose(t *termSession) {
 	}
 	t.gen++
 	t.state = termIdle
-	if a.showing(t) {
-		a.tv.shown = nil
-	}
+	t.pane.shown = nil
 }
 
 // termCloseAll ends every session, when we quit.
@@ -883,22 +1037,23 @@ func (a *bro) termTick() {
 			}
 		}
 	}
-	t, v := a.term(), &a.tv
-	if t == nil || a.Calibrating() {
+	g, v := a.termGroup(), &a.tv
+	if g == nil || a.Calibrating() {
 		return
 	}
-	if t.state == termWaiting {
+	if slices.ContainsFunc(g.sessions, func(t *termSession) bool { return t.state == termWaiting }) {
 		a.drawTermStatus() // the countdown
-	}
-	if !t.connected() {
-		return
 	}
 	if a.GaugeUp() || a.overlay() {
 		return // something is up over the terminal: drawing under it would be undone when it goes
 	}
-	if t.dirty.Load() && time.Since(v.drawnAt) >= termFrame {
-		v.outAt = time.Now()
-		a.renderTerm(t)
+	if time.Since(v.drawnAt) >= termFrame {
+		for _, t := range g.sessions {
+			if t.connected() && t.dirty.Load() && a.showing(t) {
+				v.outAt = time.Now()
+				a.renderTerm(t)
+			}
+		}
 	}
 	if a.Blitting() {
 		return
@@ -912,9 +1067,9 @@ func (a *bro) termTick() {
 	// Grayscale updates leave ghosts too, slowly: after a few screenfuls
 	// of change, flash the terminal clean once it settles (a clock or a
 	// spinner may still tick), as e-readers do every few pages.
-	if v.churn > 4*kobo.Area(v.grid) && time.Since(v.bigAt) > 2500*time.Millisecond {
+	if v.churn > 4*kobo.Area(a.termP.Body) && time.Since(v.bigAt) > 2500*time.Millisecond {
 		v.churn, v.fastArea = 0, image.Rectangle{}
-		a.MarkFlash(v.grid)
+		a.MarkFlash(a.termP.Body)
 	}
 }
 
@@ -1099,11 +1254,23 @@ func (a *bro) termMod(code uint16, value int32) bool {
 
 // termCell maps a screen point to a cell, if it's on the grid.
 func (a *bro) termCell(p image.Point) (int, int, bool) {
-	v := &a.tv
-	if !p.In(v.grid) || v.cw == 0 {
+	t, v := a.term(), &a.tv
+	if t == nil || !p.In(t.pane.grid) || v.cw == 0 {
 		return 0, 0, false
 	}
-	return (p.X - v.grid.Min.X) / v.cw, (p.Y - v.grid.Min.Y) / v.ch, true
+	return (p.X - t.pane.grid.Min.X) / v.cw, (p.Y - t.pane.grid.Min.Y) / v.ch, true
+}
+
+// sessionAt is the session whose panel p is on, and its place in the tab.
+func (a *bro) sessionAt(p image.Point) (*termSession, int) {
+	if g := a.termGroup(); g != nil {
+		for i, t := range g.sessions {
+			if p.In(t.pane.p.Outer) {
+				return t, i
+			}
+		}
+	}
+	return nil, -1
 }
 
 // termTap handles a tap on a terminal tab: the panel's button, the
@@ -1113,36 +1280,34 @@ func (a *bro) termTap(p image.Point) {
 	if t == nil {
 		return
 	}
-	if kobo.Hit(p, a.termPanel().Button) {
+	if on, i := a.sessionAt(p); on != nil && on != t { // another panel: it takes the focus, and that's all
+		a.switchSession(i)
+		return
+	}
+	if kobo.Hit(p, a.termPanel(t).Button) {
 		switch {
 		case t.state != termIdle:
 			a.termClose(t)
 			t.retries = 0
 			a.termNote(t, "disconnected")
-			a.drawTerm()
+			a.drawPane(t)
 		default:
 			a.closeSession()
 		}
 		return
 	}
-	for i, r := range v.chips {
-		if p.In(r.Inset(-4)) {
-			if g := a.termGroup(); i == len(g.sessions) {
-				a.newSession(true)
-				a.drawTerm()
-				a.MarkFlash(a.termP.Outer)
-			} else {
-				a.switchSession(i)
-			}
-			return
-		}
+	if kobo.Hit(p, t.pane.newR) {
+		a.newSession(true)
+		a.drawTerm()
+		a.MarkFlash(a.termP.Outer)
+		return
 	}
 	if !t.connected() {
-		if t.kind == kindShell && p.In(a.termP.Body) && t.state == termIdle {
+		if t.kind == kindShell && p.In(t.pane.p.Body) && t.state == termIdle {
 			a.termStartShell(t)
 			return
 		}
-		for i, r := range v.hostRows {
+		for i, r := range t.pane.hostRows {
 			if p.In(r) && t.state == termIdle {
 				a.termConnect(t, v.hosts[i])
 				return

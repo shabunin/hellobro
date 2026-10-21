@@ -8,7 +8,8 @@ Tap a tab, or Ctrl+Alt+1–4 (by place; works everywhere, fullscreen and
 in a session too):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
-  Claude Code…), mouse taps and scrolling; several sessions at once.
+  Claude Code…), mouse taps and scrolling; several sessions at once, side
+  by side.
 - **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
   several too. Hidden at first: turn it on in Settings, Tabs.
 - **Music**: a player for the music on the Kobo (folders of MP3/WAV, with
@@ -39,9 +40,15 @@ then the battery and the time. It looks again every 15 s.
 A panel folds: the − at the end of its title strip folds it to the
 strip, and the other panels on the page take the room. The + (or a tap
 anywhere on the strip) opens it again. The switcher can too ("Wi-Fi
-panel: minimize", "… open"). They stay folded, kept in `folded`. The
-terminal doesn't fold: it's alone on its tab. On Settings, Tab skips
-a folded panel.
+panel: minimize", "… open"). They stay folded, kept in `folded` (a
+session's fold lasts as long as the session).
+
+One panel on a page has the focus, marked ►: the keys go to it.
+Ctrl+Tab moves it to the next open panel, Ctrl+Shift+Tab back; a tap
+on a panel gives it the focus too. On Music, Now playing in focus takes
+↑ ↓ for the volume and Enter to play or pause; the Library has them
+otherwise. On Files, the arrows are the list's. On Settings, Tab works
+as well.
 
 ## The switcher
 
@@ -155,11 +162,15 @@ minutes), the Kobo goes to sleep properly.
 - Keepalives every 15 s notice a dead connection; a dropped one (not one the
   remote closed) is made again, after 2, 4, 8… up to 30 s, with the password
   typed earlier (kept in memory only). Esc stops it.
-- Sessions: Ctrl+Shift+T or the `+` button adds one, Ctrl+Tab and
-  Ctrl+Shift+Tab (or Ctrl+PgUp/PgDn, Ctrl+Shift+Left/Right, or the
-  numbered buttons) go to the next and previous one, Esc on an idle one or
-  `close` drops it.
-- F11: fullscreen. Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
+- Sessions are panels: each has its own, and the open ones share the
+  tab (portrait: one above the other; landscape: two abreast), each with
+  its own size. Ctrl+Shift+T or the `+` in the focused one's title adds
+  one; Ctrl+Tab and Ctrl+Shift+Tab (or Ctrl+PgUp/PgDn,
+  Ctrl+Shift+Left/Right, or a tap on it) move the focus, and the keys,
+  to the next and previous one. − folds one to its strip, and picking it
+  in the switcher opens it again. Esc on an idle one or `close` drops it.
+- F11: fullscreen, the session in focus alone (Ctrl+Tab goes on to the
+  next). Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
   edge: font size (remembered in `term-font`).
 - A status bar along the bottom, fullscreen too: what's playing, and the
   battery (charge, temperature), CPU and memory use, every 5 s.
