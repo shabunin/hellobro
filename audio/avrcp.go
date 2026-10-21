@@ -23,6 +23,12 @@ func WatchPlayerCalls(cmd func(member string)) error {
 	if err != nil {
 		return err
 	}
+	return watchPlayerCalls(conn, "org.bluez", cmd)
+}
+
+// watchPlayerCalls watches on conn, a private connection not yet
+// authenticated, for the calls service (by name) makes.
+func watchPlayerCalls(conn *dbus.Conn, service string, cmd func(member string)) error {
 	if err := conn.Auth(nil); err != nil {
 		conn.Close()
 		return err
@@ -32,16 +38,18 @@ func WatchPlayerCalls(cmd func(member string)) error {
 		return err
 	}
 	var bluez string // its unique name: only its calls count; "" till bluetoothd runs
-	conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, "org.bluez").Store(&bluez)
+	conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, service).Store(&bluez)
 	ch := make(chan *dbus.Message, 16)
 	conn.Eavesdrop(ch)
 	rules := []string{
 		"type='method_call',interface='" + mprisPlayer + "'",
-		"type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.bluez'", // bluetoothd restarted
+		"type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='" + service + "'", // bluetoothd restarted
 	}
-	if err := conn.BusObject().Call("org.freedesktop.DBus.Monitoring.BecomeMonitor", 0, rules, uint32(0)).Err; err != nil {
+	// Sent, not called: eavesdropping, its reply comes to ch like all else
+	// (a Call would wait for it forever). An error comes there too.
+	if call := conn.BusObject().Go("org.freedesktop.DBus.Monitoring.BecomeMonitor", 0, nil, rules, uint32(0)); call.Err != nil {
 		conn.Close()
-		return fmt.Errorf("BecomeMonitor: %w", err)
+		return fmt.Errorf("BecomeMonitor: %w", call.Err)
 	}
 	log.Printf("audio: watching BlueZ's calls to media players (bluez is %s)", bluez)
 	go func() {
@@ -50,8 +58,12 @@ func WatchPlayerCalls(cmd func(member string)) error {
 			sender, _ := msg.Headers[dbus.FieldSender].Value().(string)
 			member, _ := msg.Headers[dbus.FieldMember].Value().(string)
 			iface, _ := msg.Headers[dbus.FieldInterface].Value().(string)
+			if msg.Type == dbus.TypeError {
+				log.Printf("audio: watching the bus: %v", msg.Body)
+				continue
+			}
 			if msg.Type == dbus.TypeSignal && member == "NameOwnerChanged" && len(msg.Body) == 3 {
-				if name, _ := msg.Body[0].(string); name == "org.bluez" {
+				if name, _ := msg.Body[0].(string); name == service {
 					bluez, _ = msg.Body[2].(string)
 					log.Printf("audio: bluez is %q now", bluez)
 				}

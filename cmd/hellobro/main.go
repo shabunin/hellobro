@@ -92,7 +92,7 @@ func main() {
 	log.Printf("hellobro %s", version)
 	a.tf.setSize(termFontDefault)
 	a.shareApply()
-	a.watchHeadphones()
+	go a.watchHeadphones() // the bus may be slow: never in the way of starting
 	a.Run()
 }
 
