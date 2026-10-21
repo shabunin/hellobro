@@ -489,24 +489,33 @@ func (w *wpaWiFi) Forget(n Network) error {
 // --- addresses ---
 
 // renewIP gets an address for the network just joined: from the DHCP
-// client that's running, or one started as Kobo starts it.
+// client that's running, or one started as Kobo starts it. A running
+// dhcpcd is left to it: it saw the carrier go and come back, dropped the
+// old address and asks for a new one by itself. Telling it to rebind
+// (dhcpcd -n) kills Kobo's dhcpcd 6.6.6, and then nobody asks.
 func (w *wpaWiFi) renewIP() (string, error) {
-	switch {
-	case len(pidsOf("dhcpcd")) > 0:
-		run("dhcpcd", "-n", w.iface) // rebind: a new network may mean a new subnet
-	default:
+	started := false
+	if !dhcpRunning() {
 		w.releaseIP()
 		w.obtainIP()
+		started = true
 	}
 	end := time.Now().Add(30 * time.Second)
 	for time.Now().Before(end) {
 		if ip := ipv4Of(w.iface); ip != "" {
 			return ip, nil
 		}
+		if !started && !dhcpRunning() { // it went meanwhile
+			log.Print("wifi: the DHCP client went: starting one")
+			w.obtainIP()
+			started = true
+		}
 		time.Sleep(500 * time.Millisecond)
 	}
 	return "", errors.New("joined, but got no address (DHCP)")
 }
+
+func dhcpRunning() bool { return len(pidsOf("dhcpcd", "udhcpc")) > 0 }
 
 // obtainIP starts the DHCP client, as KOReader's obtain-ip.sh does.
 func (w *wpaWiFi) obtainIP() {
