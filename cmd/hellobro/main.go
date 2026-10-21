@@ -59,6 +59,7 @@ type bro struct {
 	stat     statBar     // the terminal tabs' status bar
 	picker   *picker     // the switcher, while it's up
 	asking   *askBox     // a question, while it's up
+	info     *infoBox    // facts to read, while they're up
 	tabsEd   *tabsEditor // the Tabs dialog, while it's up
 	tabs     tabsConf
 	keys     keyMap
@@ -160,6 +161,10 @@ func (a *bro) Tap(p image.Point) {
 		a.askTap(p)
 		return
 	}
+	if a.info != nil {
+		a.infoTap(p)
+		return
+	}
 	if a.tabsEd != nil {
 		a.tabsTap(p)
 		return
@@ -246,6 +251,9 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return false
 	case a.asking != nil:
 		a.askKey(m.Code, m.Value)
+		return true
+	case a.info != nil:
+		a.infoKey(m.Code, m.Value)
 		return true
 	case a.tabsEd != nil:
 		a.tabsKey(m.Code, m.Value)

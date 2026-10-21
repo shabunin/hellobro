@@ -221,7 +221,10 @@ minutes), the Kobo goes to sleep properly.
   when wpa_supplicant's file allows it. `turn off`/`turn on` (or o) unload
   and load the driver and power the chip, as Kobo does; s scans, f forgets.
   Turning it on starts wpa_supplicant and the DHCP client the way Kobo ran
-  them, as seen while Wi-Fi was on (kept in `wifi-recipe`).
+  them, as seen while Wi-Fi was on (kept in `wifi-recipe`). `info` (or i)
+  shows the details: the network, access point, band and channel,
+  signal, address, gateway, DNS, the interface and its MAC; c copies
+  them, Esc closes.
 - Bluetooth: `scan` (s) looks for 40 s; a new device pairs (with a code to
   confirm, or to type on a keyboard, shown in the panel), then gets trusted
   and connected. Paired ones connect, disconnect, and are forgotten with f.

@@ -33,7 +33,7 @@ const (
 // radioPanelView is where one panel's parts are on screen.
 type radioPanelView struct {
 	p      kobo.Panel
-	ctl    []image.Rectangle // power, scan, (Wi-Fi: other network)
+	ctl    []image.Rectangle // power, scan, (Wi-Fi: other network, info)
 	info   image.Rectangle   // two lines: the status, and what's going on
 	list   image.Rectangle
 	acts   image.Rectangle // the picked row's actions, or a question
@@ -117,7 +117,7 @@ func (a *bro) layoutRadio(K kobo.Layout) {
 			continue
 		}
 		b := pv.p.Body.Inset(kobo.Pad)
-		n := 3
+		n := 4
 		if i == panelBT {
 			n = 2
 		}
@@ -528,7 +528,7 @@ func (a *bro) drawRadioPanel(i int) {
 		if ws.On {
 			power = "turn off"
 		}
-		ctl = []string{power, "scan", "other network…"}
+		ctl = []string{power, "scan", "other network…", "info"}
 		switch {
 		case !ws.On:
 			status, line1 = "off", "Wi-Fi is off."
@@ -783,6 +783,9 @@ func (a *bro) drawRadioPanel(i int) {
 		}
 	} else {
 		hint := "Tap a row, or ↑ ↓ and Enter; Tab: the next panel; f: forget; s: scan; o: on/off."
+		if i == panelWiFi {
+			hint = strings.TrimSuffix(hint, ".") + "; i: info."
+		}
 		if len(acts) > 0 {
 			hint = rows[*sel].name
 		}
@@ -907,6 +910,8 @@ func (a *bro) radioTap(pt image.Point) {
 				a.radioPoll(true)
 			case i == panelWiFi && j == 2:
 				a.radioAsk(&radioPrompt{panel: panelWiFi, kind: "ssid", text: "The network's name (SSID):"})
+			case i == panelWiFi && j == 3:
+				a.wifiInfo()
 			case i == panelBT && j == 0:
 				a.btPower()
 			case i == panelBT && j == 1:
@@ -1040,6 +1045,8 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 		}
 	case ch == "n" && r.focus == panelWiFi:
 		a.radioAsk(&radioPrompt{panel: panelWiFi, kind: "ssid", text: "The network's name (SSID):"})
+	case ch == "i" && r.focus == panelWiFi:
+		a.wifiInfo()
 	}
 	return true
 }
