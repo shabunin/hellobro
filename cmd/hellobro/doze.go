@@ -13,6 +13,7 @@ import (
 	"image"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -141,9 +142,9 @@ func (a *bro) dozeWiFiBusy(what string) {
 // dozeKey is what the doze screen shows, to redraw it only for a change.
 func (a *bro) dozeKey() string {
 	m := &a.mus
-	key := fmt.Sprint(m.album, m.track, a.musicPlaying(), m.player != nil)
-	if m.album >= 0 && m.albums[m.album].cover != "" {
-		key += fmt.Sprint(m.covers[m.albums[m.album].cover] != nil)
+	key := fmt.Sprint(a.playing(), a.musicPlaying(), m.player != nil, m.shuffle)
+	if m.q != nil {
+		key += fmt.Sprint(m.q.pos, m.covers[a.playingCover()] != nil)
 	}
 	return key
 }
@@ -168,10 +169,10 @@ func (a *bro) DrawDoze() {
 	y += 100
 
 	side := min(a.mv.coverSide, b.Dx()-160, b.Dy()*2/5)
-	if m.album >= 0 && side > 0 {
+	if m.q != nil && side > 0 {
 		r := image.Rect(b.Min.X+(b.Dx()-side)/2, y, b.Min.X+(b.Dx()+side)/2, y+side)
 		var img *image.Gray
-		if path := m.albums[m.album].cover; path != "" {
+		if path := a.playingCover(); path != "" {
 			if img = m.covers[path]; img == nil {
 				a.loadCover(path) // redozes once it's in
 			}
@@ -186,14 +187,13 @@ func (a *bro) DrawDoze() {
 		y = r.Max.Y + 50
 	}
 
-	if m.album < 0 {
+	if m.q == nil {
 		line(y, 60, a.F.Panel, "Nothing playing.", kobo.Dark)
 		y += 80
 	} else {
-		al := m.albums[m.album]
-		line(y, 60, a.F.Panel, trackName(al.tracks[m.track]), kobo.Black)
+		line(y, 60, a.F.Panel, trackName(filepath.Base(a.playing())), kobo.Black)
 		y += 64
-		line(y, 50, a.F.Body, al.name, kobo.Dark)
+		line(y, 50, a.F.Body, a.playingAlbum(), kobo.Dark)
 		y += 56
 		state := "playing"
 		switch {
@@ -202,7 +202,10 @@ func (a *bro) DrawDoze() {
 		case !a.musicPlaying():
 			state = "stopped"
 		}
-		line(y, 44, a.F.Small, fmt.Sprintf("track %d of %d · %s", m.track+1, len(al.tracks), state), kobo.Dark)
+		if m.shuffle {
+			state += " · shuffled"
+		}
+		line(y, 44, a.F.Small, a.queueLine()+" · "+state, kobo.Dark)
 		y += 70
 	}
 

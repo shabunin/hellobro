@@ -1,10 +1,11 @@
 package main
 
-// The Music tab: albums from the Kobo's storage, played over Bluetooth to
-// headphones or a DAC connected in Kobo's settings. Music goes on while
-// the terminals are up; the header says what's playing. Where it was
-// (album, track, position, volume) is kept in music-state, so it picks up
-// there next time.
+// The Music tab: albums, folders and playlists from the Kobo's storage,
+// played over Bluetooth to headphones or a DAC connected in Kobo's
+// settings, in order or shuffled. Music goes on while the terminals are
+// up; the header says what's playing. Where it was (what was playing,
+// the track, position, volume, shuffle) is kept in music-state, so it
+// picks up there next time. The library's side is in libview.go.
 
 import (
 	"fmt"
@@ -43,6 +44,15 @@ const (
 	musicStateTxt = "music-state"
 )
 
+// The chips under the buttons: shuffle, repeat, and adding the track to
+// a playlist.
+const (
+	chipShuffle = iota
+	chipRepeat
+	chipAdd
+	numChips
+)
+
 // musicView is where the Music tab's things are.
 type musicView struct {
 	nowP, libP              kobo.Panel
@@ -50,22 +60,31 @@ type musicView struct {
 	albumR, titleR, trackR  image.Rectangle
 	times, bar, statusR     image.Rectangle
 	buttons                 [numButtons]image.Rectangle
+	chipRow                 image.Rectangle
+	chips                   [numChips]image.Rectangle
+	segs                    [numViews]image.Rectangle // Albums, Folders, Playlists
+	listR, actR             image.Rectangle           // the rows, and the action bar under them
 	coverSide, rowsOnScreen int
 }
 
 type musicState struct {
-	albums            []album
+	lib               *library
 	scanned, scanning bool
-	thens             []func()          // to run once scanned
-	open              int               // the album listed, or -1 for the list of albums
-	sel, top          int               // the selected row, and the first one on screen
-	rows              []image.Rectangle // the rows on screen, for taps
+	thens             []func() // to run once scanned
+
+	view   int               // the library's view: viewAlbums, viewFolders, viewPlaylists
+	places [numViews]place   // where each view is
+	list   []libRow          // the rows of the place shown; nil: to be made
+	rows   []image.Rectangle // the rows on screen, for taps
+	acts   []libAct          // the action bar's buttons, as drawn
 
 	bt                 audio.Report
 	btBusy, connecting bool
 	player             *audio.Player
-	gen                int // bumps per track started, so a late start is dropped
-	album, track       int // playing, paused, or played last; -1: none
+	gen                int    // bumps per track started, so a late start is dropped
+	q                  *queue // playing, paused, or played last; nil: none
+	shuffle            bool
+	repeat             repeatMode
 	pos, length        time.Duration
 	starting           bool
 	gain               int
@@ -94,7 +113,7 @@ func (a *bro) layoutMusic(K kobo.Layout) {
 		v.cover = image.Rect(b.Min.X, b.Min.Y, b.Min.X+side, b.Min.Y+side)
 		info = image.Rect(v.cover.Max.X+2*kobo.Pad, b.Min.Y, b.Max.X, b.Max.Y)
 	} else { // cover on top
-		side := max(100, min(b.Dx(), b.Dy()-360))
+		side := max(100, min(b.Dx(), b.Dy()-410))
 		x := b.Min.X + (b.Dx()-side)/2
 		v.cover = image.Rect(x, b.Min.Y, x+side, b.Min.Y+side)
 		info = image.Rect(b.Min.X, v.cover.Max.Y+kobo.Pad, b.Max.X, b.Max.Y)
@@ -115,6 +134,8 @@ func (a *bro) layoutMusic(K kobo.Layout) {
 	y += 20
 	row := next(76)
 	y += 12
+	v.chipRow = next(52)
+	y += 8
 	v.statusR = next(36)
 	const gap = 12
 	bw := min(130, (row.Dx()-gap*(numButtons-1))/numButtons)
@@ -123,7 +144,7 @@ func (a *bro) layoutMusic(K kobo.Layout) {
 		v.buttons[i] = image.Rect(x, row.Min.Y, x+bw, row.Max.Y)
 		x += bw + gap
 	}
-	v.rowsOnScreen = max(1, (v.libP.Body.Dy()-2*kobo.Pad)/rowH)
+	a.layoutLibrary()
 }
 
 // --- the library ---
@@ -135,7 +156,8 @@ func (a *bro) enterMusic() {
 	}
 }
 
-// scanMusic finds the albums, once; then runs when they're known.
+// scanMusic finds the albums and playlists, once; then runs when they're
+// known.
 func (a *bro) scanMusic(then func()) {
 	m := &a.mus
 	if m.scanned {
@@ -152,15 +174,12 @@ func (a *bro) scanMusic(then func()) {
 	}
 	m.scanning = true
 	go func() {
-		albums := scanLibrary(musicRoot)
+		lib := scanLibrary(musicRoot)
 		a.Do(func() {
-			m.albums, m.scanned, m.scanning = albums, true, false
-			n := 0
-			for _, al := range albums {
-				n += len(al.tracks)
-			}
-			log.Printf("music: %d albums, %d tracks under %s", len(albums), n, musicRoot)
+			m.lib, m.scanned, m.scanning = lib, true, false
+			log.Printf("music: %d albums, %d tracks, %d playlists under %s", len(lib.albums), lib.tracks, len(lib.playlists), musicRoot)
 			a.loadMusicState()
+			a.relist()
 			a.redrawMusic()
 			for _, f := range m.thens {
 				f()
@@ -171,7 +190,8 @@ func (a *bro) scanMusic(then func()) {
 }
 
 // rescanMusic finds the albums again (a computer sent some), keeping
-// what's playing and what's open where they are.
+// what's playing and where the library is. What's playing goes on:
+// its queue is a list of files.
 func (a *bro) rescanMusic() {
 	m := &a.mus
 	if !m.scanned || m.scanning {
@@ -179,35 +199,13 @@ func (a *bro) rescanMusic() {
 	}
 	m.scanning = true
 	go func() {
-		albums := scanLibrary(musicRoot)
+		lib := scanLibrary(musicRoot)
 		a.Do(func() {
 			m.scanning = false
-			dirOf := func(i int) string {
-				if i >= 0 && i < len(m.albums) {
-					return m.albums[i].dir
-				}
-				return ""
-			}
-			find := func(dir string) int {
-				for i, al := range albums {
-					if dir != "" && al.dir == dir {
-						return i
-					}
-				}
-				return -1
-			}
-			playing, open, sel := dirOf(m.album), dirOf(m.open), dirOf(m.sel)
-			was := len(m.albums)
-			m.albums = albums
-			m.album, m.open = find(playing), find(open)
-			if m.open < 0 {
-				m.sel = max(0, find(sel))
-			}
-			if m.album < 0 && m.player != nil {
-				a.musicStop() // its album went
-				a.musicHeader()
-			}
-			log.Printf("music: rescanned: %d albums (%+d)", len(albums), len(albums)-was)
+			was := len(m.lib.albums)
+			m.lib = lib
+			log.Printf("music: rescanned: %d albums (%+d), %d playlists", len(lib.albums), len(lib.albums)-was, len(lib.playlists))
+			a.relist()
 			a.redrawMusic()
 		})
 	}()
@@ -281,36 +279,6 @@ func (a *bro) nowPanel() kobo.Panel {
 	return a.mv.nowP
 }
 
-func (a *bro) libPanel() kobo.Panel {
-	if a.mus.open >= 0 {
-		return kobo.WithButton(a.F, a.mv.libP, "albums")
-	}
-	return a.mv.libP
-}
-
-// libLen is how many rows the library has.
-func (a *bro) libLen() int {
-	if m := &a.mus; m.open >= 0 {
-		return len(m.albums[m.open].tracks)
-	}
-	return len(a.mus.albums)
-}
-
-func (a *bro) openAlbum(i int) {
-	m := &a.mus
-	m.open, m.sel, m.top = i, 0, 0
-	if m.album == i && m.track >= 0 {
-		m.sel = m.track
-	}
-	a.drawLibrary()
-}
-
-func (a *bro) closeAlbum() {
-	m := &a.mus
-	m.sel, m.open = m.open, -1
-	a.drawLibrary()
-}
-
 // --- drawing ---
 
 func (a *bro) showingMusic() bool {
@@ -329,6 +297,41 @@ func (a *bro) drawMusic() {
 	a.drawLibrary()
 }
 
+// playing is the file playing, paused, or played last; "" for none.
+func (a *bro) playing() string {
+	if q := a.mus.q; q != nil {
+		return q.path()
+	}
+	return ""
+}
+
+// playingAlbum is the name of the album (the folder) playing.
+func (a *bro) playingAlbum() string {
+	dir := filepath.Dir(a.playing())
+	if al := a.mus.lib.album(dir); al != nil {
+		return al.name
+	}
+	return filepath.Base(dir)
+}
+
+// playingCover is the cover of the album playing, or "".
+func (a *bro) playingCover() string {
+	if al := a.mus.lib.album(filepath.Dir(a.playing())); al != nil {
+		return al.cover
+	}
+	return ""
+}
+
+// queueLine says where in the queue it is: "track 3 of 40 · folder Heroes".
+func (a *bro) queueLine() string {
+	q := a.mus.q
+	s := fmt.Sprintf("track %d of %d", q.pos+1, q.len())
+	if q.kind != qAlbum {
+		s += " · " + q.kind + " " + q.name
+	}
+	return s
+}
+
 // drawNow draws the Now playing panel.
 func (a *bro) drawNow() {
 	m, v := &a.mus, &a.mv
@@ -336,17 +339,16 @@ func (a *bro) drawNow() {
 	a.drawCover()
 
 	c := a.C
-	if m.album < 0 {
+	if m.q == nil {
 		c.Text(a.F.Body, v.albumR, "nothing playing", kobo.Mid, kobo.AlignLeft)
-		hint := "Pick an album below."
+		hint := "Pick an album, a folder or a playlist below."
 		if !m.scanned {
 			hint = "Looking for music…"
 		}
 		c.Text(a.F.Small, v.trackR, hint, kobo.Dark, kobo.AlignLeft)
 	} else {
-		al := m.albums[m.album]
-		c.Text(a.F.Body, v.albumR, al.name, kobo.Dark, kobo.AlignLeft)
-		c.Text(a.F.Title, v.titleR, trackName(al.tracks[m.track]), kobo.Black, kobo.AlignLeft)
+		c.Text(a.F.Body, v.albumR, a.playingAlbum(), kobo.Dark, kobo.AlignLeft)
+		c.Text(a.F.Title, v.titleR, trackName(filepath.Base(a.playing())), kobo.Black, kobo.AlignLeft)
 		state := ""
 		switch {
 		case m.starting:
@@ -356,26 +358,55 @@ func (a *bro) drawNow() {
 		case m.player == nil:
 			state = "  ·  stopped"
 		}
-		c.Text(a.F.Small, v.trackR, fmt.Sprintf("track %d of %d%s", m.track+1, len(al.tracks), state), kobo.Dark, kobo.AlignLeft)
+		c.Text(a.F.Small, v.trackR, a.queueLine()+state, kobo.Dark, kobo.AlignLeft)
 	}
 	for i, r := range v.buttons {
 		a.drawButton(i, r)
 	}
 	a.drawProgress()
+	a.drawChips()
 	a.drawMusicStatus()
 }
 
+// drawChips draws shuffle, repeat and "+ playlist", under the buttons.
+func (a *bro) drawChips() {
+	m, v, c := &a.mus, &a.mv, a.C
+	c.Fill(v.chipRow, kobo.White)
+	labels := [numChips]string{"shuffle", "repeat " + repeatNames[m.repeat], "+ playlist"}
+	on := [numChips]bool{m.shuffle, m.repeat != repeatOff, false}
+	x := v.chipRow.Min.X
+	for i, l := range labels {
+		w := kobo.TextWidth(a.F.Small, "repeat all") + 40 // all the same, so they don't jump
+		if i == chipAdd {
+			w = kobo.TextWidth(a.F.Small, l) + 40
+		}
+		r := image.Rect(x, v.chipRow.Min.Y, x+w, v.chipRow.Max.Y)
+		x += w + 12
+		v.chips[i] = r
+		fg := uint8(kobo.Black)
+		if on[i] {
+			c.Fill(r, kobo.Black)
+			fg = kobo.White
+		} else {
+			c.Frame(r, 2, kobo.Black)
+		}
+		if i == chipAdd && m.q == nil {
+			fg = kobo.Mid
+		}
+		c.Text(a.F.Small, r, l, fg, kobo.AlignCenter)
+	}
+	a.Mark(v.chipRow, true)
+}
+
 func (a *bro) drawCover() {
-	m, r := &a.mus, a.mv.cover
+	r := a.mv.cover
 	c := a.C
 	c.Fill(r, kobo.White)
 	var img *image.Gray
-	if m.album >= 0 {
-		if path := m.albums[m.album].cover; path != "" {
-			img = m.covers[path]
-			if img == nil {
-				a.loadCover(path)
-			}
+	if path := a.playingCover(); path != "" {
+		img = a.mus.covers[path]
+		if img == nil {
+			a.loadCover(path)
 		}
 	}
 	if img != nil {
@@ -423,7 +454,7 @@ func (a *bro) loadCover(path string) {
 				m.covers = map[string]*image.Gray{}
 			}
 			m.covers[path] = img
-			if a.showingMusic() && m.album >= 0 && m.albums[m.album].cover == path {
+			if a.showingMusic() && a.playingCover() == path {
 				a.drawCover()
 			}
 			a.redoze()
@@ -484,7 +515,7 @@ func (a *bro) drawProgress() {
 	m.shownSec = int(m.pos.Seconds())
 	c.Fill(v.times, kobo.White)
 	c.Fill(v.bar, kobo.White)
-	if m.album >= 0 {
+	if m.q != nil {
 		c.Text(a.F.Small, v.times, audio.Clock(m.pos), kobo.Black, kobo.AlignLeft)
 		c.Text(a.F.Small, v.times, audio.Clock(m.length), kobo.Dark, kobo.AlignRight)
 	}
@@ -508,102 +539,17 @@ func (a *bro) drawMusicStatus() {
 	a.Mark(v.statusR, true)
 }
 
-// drawLibrary draws the list: the albums, or the open album's tracks.
-func (a *bro) drawLibrary() {
-	if !a.showingMusic() {
-		return
-	}
-	m, v, c := &a.mus, &a.mv, a.C
-	p := a.libPanel()
-	n := a.libLen()
-	m.sel = max(0, min(m.sel, n-1))
-	rows := v.rowsOnScreen
-	if m.sel < m.top {
-		m.top = m.sel
-	}
-	if m.sel >= m.top+rows {
-		m.top = m.sel - rows + 1
-	}
-	m.top = max(0, min(m.top, n-rows))
-
-	status := ""
-	switch {
-	case m.scanning || !m.scanned:
-		status = "looking…"
-	case m.open >= 0:
-		status = m.albums[m.open].name
-	default:
-		tracks := 0
-		for _, al := range m.albums {
-			tracks += len(al.tracks)
-		}
-		status = fmt.Sprintf("%d albums · %d tracks", len(m.albums), tracks)
-	}
-	a.DrawPanel(p, status)
-	if m.scanned && len(m.albums) == 0 {
-		a.DrawText(p, a.F.Body, []string{
-			"No MP3 or WAV files under " + musicRoot + ".",
-			"Copy some there, a folder per album, with its cover (cover.jpg),",
-			"and come back.",
-		}, "", true)
-		return
-	}
-
-	in := p.Body.Inset(kobo.Pad)
-	m.rows = m.rows[:0]
-	for i := m.top; i < min(n, m.top+rows); i++ {
-		r := image.Rect(in.Min.X, in.Min.Y+(i-m.top)*rowH, in.Max.X-14, in.Min.Y+(i-m.top+1)*rowH)
-		m.rows = append(m.rows, r)
-		fg, dim := uint8(kobo.Black), uint8(kobo.Dark)
-		if i == m.sel {
-			c.Fill(r, kobo.Black)
-			fg, dim = kobo.White, kobo.Light
-		}
-		text := r.Inset(4)
-		text.Min.X += 44
-		if m.open < 0 {
-			al := m.albums[i]
-			count := fmt.Sprintf("%d tracks", len(al.tracks))
-			cw := kobo.TextWidth(a.F.Small, count)
-			c.Text(a.F.Small, image.Rect(text.Max.X-cw, text.Min.Y, text.Max.X, text.Max.Y), count, dim, kobo.AlignRight)
-			text.Max.X -= cw + 24
-			c.Text(a.F.Body, text, al.name, fg, kobo.AlignLeft)
-			if i == m.album {
-				a.playingMark(r, fg)
-			}
-			continue
-		}
-		c.Text(a.F.Body, text, trackName(m.albums[m.open].tracks[i]), fg, kobo.AlignLeft)
-		if m.open == m.album && i == m.track {
-			a.playingMark(r, fg)
-		}
-	}
-	if n > rows { // where the screenful is in the list
-		track := image.Rect(in.Max.X-6, in.Min.Y, in.Max.X, in.Min.Y+rows*rowH)
-		c.Fill(track, kobo.Light)
-		h := max(24, track.Dy()*rows/n)
-		y := track.Min.Y + (track.Dy()-h)*m.top/max(1, n-rows)
-		c.Fill(image.Rect(track.Min.X, y, track.Max.X, y+h), kobo.Dark)
-	}
-	a.Mark(p.Body, true)
-}
-
-// playingMark is the ▶ at the start of the row that's playing.
-func (a *bro) playingMark(r image.Rectangle, g uint8) {
-	cx, cy := r.Min.X+20, r.Min.Y+r.Dy()/2
-	triangle(a.C, image.Pt(cx-8, cy-10), image.Pt(cx-8, cy+10), image.Pt(cx+10, cy), g)
-}
-
 // nowPlaying is what's playing, for the header and the status bar.
 func (a *bro) nowPlaying() string {
 	m := &a.mus
+	name := trackName(filepath.Base(a.playing()))
 	switch {
-	case m.album < 0 || m.player == nil && !m.starting:
+	case m.q == nil || m.player == nil && !m.starting:
 		return ""
 	case m.player != nil && m.player.Paused():
-		return "♪ " + trackName(m.albums[m.album].tracks[m.track]) + " (paused)"
+		return "♪ " + name + " (paused)"
 	}
-	return "♪ " + trackName(m.albums[m.album].tracks[m.track])
+	return "♪ " + name
 }
 
 // musicHeader shows what's playing, on every tab.
@@ -615,20 +561,41 @@ func (a *bro) musicHeader() {
 
 // --- playing ---
 
-// musicPlay plays track tr of album al, from at.
-func (a *bro) musicPlay(al, tr int, at time.Duration) {
+// playQueue plays q from its track start (an index in its tracks), or
+// with start < 0 from its first (shuffled: any).
+func (a *bro) playQueue(q *queue, start int) {
 	m := &a.mus
-	if al < 0 || al >= len(m.albums) || tr < 0 || tr >= len(m.albums[al].tracks) {
+	if q == nil {
+		return
+	}
+	if q.len() == 0 {
+		m.note = "nothing to play in " + q.name
+		a.redrawMusic()
+		return
+	}
+	if start >= 0 {
+		q.jump(start)
+	}
+	if m.shuffle {
+		q.shuffle(start >= 0)
+	}
+	m.q = q
+	log.Printf("music: playing %s %s (%d tracks, shuffle %v, repeat %s)", q.kind, q.src, q.len(), m.shuffle, repeatNames[m.repeat])
+	a.musicPlay(0)
+}
+
+// musicPlay plays the queue's track on, from at.
+func (a *bro) musicPlay(at time.Duration) {
+	m := &a.mus
+	path := a.playing()
+	if path == "" {
 		return
 	}
 	a.musicStop()
-	m.album, m.track, m.pos, m.length, m.note, m.starting = al, tr, at, 0, "", true
+	m.pos, m.length, m.note, m.starting = at, 0, "", true
 	m.gen++
 	gen, bt := m.gen, m.bt
-	path := filepath.Join(m.albums[al].dir, m.albums[al].tracks[tr])
-	if m.open == al {
-		m.sel = tr
-	}
+	a.followPlaying()
 	go func() {
 		if _, ok := bt.Sink(); !ok {
 			bt = audio.Probe() // a device may have come since
@@ -698,11 +665,14 @@ func (a *bro) musicEnded(p *audio.Player, how string) {
 	log.Printf("music: track ended: %s", how)
 	switch how {
 	case "finished":
-		if m.track+1 < len(m.albums[m.album].tracks) {
-			a.musicPlay(m.album, m.track+1, 0)
+		if m.q.step(1, m.repeat, m.shuffle) {
+			a.musicPlay(0)
 			return
 		}
-		m.pos, m.note = 0, "end of the album"
+		m.pos, m.note = 0, "end of the "+m.q.kind
+		if m.q.kind != qAlbum {
+			m.note += " " + m.q.name
+		}
 	default:
 		m.note = "stopped: " + how
 		a.setBluetooth(audio.Report{}) // look again next time: the device may have gone
@@ -738,25 +708,69 @@ func (a *bro) musicToggle() {
 			a.drawNow()
 		}
 		a.musicHeader()
-	case m.album >= 0:
-		a.musicPlay(m.album, m.track, m.pos)
-	case m.open >= 0:
-		a.musicPlay(m.open, m.sel, 0)
-	case len(m.albums) > 0:
-		a.musicPlay(m.sel, 0, 0)
+	case m.q != nil:
+		a.musicPlay(m.pos)
+	default: // the row selected, or the place it's in
+		a.playSelected()
 	}
 }
 
-// musicSkip goes d tracks on; back from a few seconds in restarts the track.
+// musicSkip goes d tracks on; back from a few seconds in restarts the
+// track. By hand, "repeat one" goes on to the next all the same.
 func (a *bro) musicSkip(d int) {
 	m := &a.mus
-	if m.album < 0 {
+	if m.q == nil {
 		return
 	}
 	if d < 0 && m.pos > 3*time.Second {
-		d = 0
+		a.musicPlay(0)
+		return
 	}
-	a.musicPlay(m.album, max(0, min(m.track+d, len(m.albums[m.album].tracks)-1)), 0)
+	rep := m.repeat
+	if rep == repeatOne {
+		rep = repeatAll
+	}
+	if !m.q.step(d, rep, m.shuffle) && d > 0 {
+		m.note = "that's the last one"
+		if a.showingMusic() {
+			a.drawMusicStatus()
+		}
+		return
+	}
+	a.musicPlay(0)
+}
+
+// setShuffle turns shuffle on or off; what's playing plays on.
+func (a *bro) setShuffle(on bool) {
+	m := &a.mus
+	m.shuffle = on
+	if m.q != nil {
+		if on {
+			m.q.shuffle(true)
+		} else {
+			m.q.unshuffle()
+		}
+	}
+	m.note = map[bool]string{false: "in order", true: "shuffled"}[on]
+	log.Printf("music: shuffle %v", on)
+	a.saveMusicState()
+	if a.showingMusic() {
+		a.drawNow()
+	}
+	a.redoze()
+}
+
+// cycleRepeat goes off, all, one, and round.
+func (a *bro) cycleRepeat() {
+	m := &a.mus
+	m.repeat = (m.repeat + 1) % 3
+	m.note = map[repeatMode]string{repeatOff: "stops at the end", repeatAll: "goes round again", repeatOne: "plays the track over"}[m.repeat]
+	log.Printf("music: repeat %s", repeatNames[m.repeat])
+	a.saveMusicState()
+	if a.showingMusic() {
+		a.drawChips()
+		a.drawMusicStatus()
+	}
 }
 
 func (a *bro) musicSeek(d time.Duration) {
@@ -858,51 +872,74 @@ func (a *bro) musicKey(code uint16, value int32) bool {
 	if value == 0 {
 		return true
 	}
-	m := &a.mus
-	move := func(d int) {
-		m.sel = max(0, min(m.sel+d, a.libLen()-1))
-		a.drawLibrary()
-	}
+	shift := a.tv.mods.shift
+	once := value == 1 // not held down
 	ch, _ := kobo.KeyChar(code, false, false)
 	switch {
 	case code == kobo.KeySpace || ch == "k":
-		if value == 1 {
+		if once {
 			a.musicToggle()
 		}
+	case code == keyUp && shift:
+		a.libMoveEntry(-1)
+	case code == keyDown && shift:
+		a.libMoveEntry(1)
 	case code == keyUp:
-		move(-1)
+		a.libMove(-1)
 	case code == keyDown:
-		move(1)
+		a.libMove(1)
 	case code == keyPgUp:
-		move(-a.mv.rowsOnScreen)
+		a.libMove(-a.mv.rowsOnScreen)
 	case code == keyPgDn:
-		move(a.mv.rowsOnScreen)
+		a.libMove(a.mv.rowsOnScreen)
 	case code == keyHome:
-		move(-a.libLen())
+		a.libMove(-len(a.mus.list))
 	case code == keyEnd:
-		move(a.libLen())
-	case code == kobo.KeyEnter && value == 1:
-		if m.open < 0 && len(m.albums) > 0 {
-			a.openAlbum(m.sel)
-		} else if m.open >= 0 {
-			a.musicPlay(m.open, m.sel, 0)
+		a.libMove(len(a.mus.list))
+	case code == kobo.KeyEnter && once:
+		if shift {
+			a.playSelected()
+		} else {
+			a.libActivate(a.place().sel)
 		}
-	case (code == kobo.KeyBackspace || code == kobo.KeyEsc) && m.open >= 0:
-		if value == 1 {
-			a.closeAlbum()
+	case (code == kobo.KeyBackspace || code == kobo.KeyEsc) && !a.atTop():
+		if once {
+			a.libUp()
+		}
+	case code == kobo.KeyTab || ch == "v":
+		if once {
+			a.setView((a.mus.view + map[bool]int{false: 1, true: numViews - 1}[shift]) % numViews)
+		}
+	case ch >= "1" && ch <= "3":
+		if once {
+			a.setView(int(ch[0] - '1'))
 		}
 	case code == keyLeft || ch == "j":
 		a.musicSeek(-seekStep)
 	case code == keyRight || ch == "l":
 		a.musicSeek(seekStep)
-	case ch == "n" && value == 1:
+	case ch == "n" && once:
 		a.musicSkip(1)
-	case ch == "p" && value == 1:
+	case ch == "p" && once:
 		a.musicSkip(-1)
-	case ch == "s" && value == 1:
+	case ch == "s" && once:
 		a.musicStop()
 		a.musicHeader()
 		a.redrawMusic()
+	case ch == "r" && once:
+		a.setShuffle(!a.mus.shuffle)
+	case ch == "t" && once:
+		a.cycleRepeat()
+	case ch == "a" && once:
+		if shift {
+			a.addPlace()
+		} else {
+			a.addSelected()
+		}
+	case (code == keyDelete || ch == "x") && once:
+		a.libDelete()
+	case ch == "f" && once:
+		a.showPlaying()
 	case code == keyEqual:
 		a.musicGain(gainStep)
 	case code == keyMinus:
@@ -920,7 +957,7 @@ func (a *bro) musicTap(p image.Point) {
 		a.musicConnect()
 		return
 	case kobo.Hit(p, a.libPanel().Button):
-		a.closeAlbum()
+		a.libUp()
 		return
 	case p.In(v.cover):
 		a.musicToggle()
@@ -952,45 +989,41 @@ func (a *bro) musicTap(p image.Point) {
 		}
 		return
 	}
-	for i, r := range m.rows {
-		if !p.In(r) {
+	for i, r := range v.chips {
+		if !kobo.Hit(p, r) {
 			continue
 		}
-		m.sel = m.top + i
-		if m.open < 0 {
-			a.openAlbum(m.sel)
-		} else {
-			a.musicPlay(m.open, m.sel, 0)
+		switch i {
+		case chipShuffle:
+			a.setShuffle(!m.shuffle)
+		case chipRepeat:
+			a.cycleRepeat()
+		case chipAdd:
+			a.addPlaying()
 		}
 		return
 	}
-}
-
-// musicSwipe scrolls the library: a row per row the finger moved.
-func (a *bro) musicSwipe(from, to image.Point) {
-	m := &a.mus
-	dy := to.Y - from.Y
-	if !from.In(a.mv.libP.Body) || kobo.Abs(dy) < rowH || kobo.Abs(dy) < 2*kobo.Abs(to.X-from.X) {
-		return
-	}
-	d := -dy / rowH
-	m.top = max(0, min(m.top+d, a.libLen()-a.mv.rowsOnScreen))
-	m.sel = max(m.top, min(m.sel+d, m.top+a.mv.rowsOnScreen-1))
-	a.drawLibrary()
+	a.libTap(p)
 }
 
 // --- remembering ---
 
+// saveMusicState writes music-state. dir and file are the track, as
+// hellobro has always written them; queue and src are what it's playing
+// from.
 func (a *bro) saveMusicState() {
 	m := &a.mus
+	if !m.scanned {
+		return // what's in it now is all there is to say
+	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "gain=%d\n", m.gain)
-	if m.album >= 0 {
+	fmt.Fprintf(&b, "gain=%d\nshuffle=%v\nrepeat=%s\nview=%s\n", m.gain, m.shuffle, repeatNames[m.repeat], viewNames[m.view])
+	if path := a.playing(); path != "" {
 		pos := m.pos
 		if m.player != nil {
 			pos = m.player.Pos()
 		}
-		fmt.Fprintf(&b, "dir=%s\nfile=%s\npos=%d\n", m.albums[m.album].dir, m.albums[m.album].tracks[m.track], int(pos.Seconds()))
+		fmt.Fprintf(&b, "queue=%s\nsrc=%s\ndir=%s\nfile=%s\npos=%d\n", m.q.kind, m.q.src, filepath.Dir(path), filepath.Base(path), int(pos.Seconds()))
 	}
 	if err := os.WriteFile(kobo.AppFile(musicStateTxt), []byte(b.String()), 0o644); err != nil {
 		log.Printf("music: %v", err)
@@ -1009,25 +1042,39 @@ func readMusicState() map[string]string {
 	return kv
 }
 
-// loadMusicState finds the track played last, once the library is known.
+// loadMusicState finds what played last, once the library is known: the
+// track, in what it was playing from (or else its album).
 func (a *bro) loadMusicState() {
 	m := &a.mus
 	kv := readMusicState()
-	if m.album >= 0 {
-		return // something got played meanwhile
+	m.shuffle = kv["shuffle"] == "true"
+	m.repeat = repeatMode(indexOf(repeatNames, kv["repeat"]))
+	m.view = indexOf(viewNames[:], kv["view"])
+	if m.q != nil || kv["dir"] == "" {
+		return // something got played meanwhile, or nothing ever was
 	}
-	for i, al := range m.albums {
-		if al.dir != kv["dir"] {
-			continue
-		}
-		for j, t := range al.tracks {
-			if t == kv["file"] {
-				sec, _ := strconv.Atoi(kv["pos"])
-				m.album, m.track, m.pos = i, j, time.Duration(sec)*time.Second
-				m.open, m.sel = i, j
-				m.note = "Space or ▶ goes on from here"
-				return
-			}
-		}
+	path := filepath.Join(kv["dir"], kv["file"])
+	kind, src := kv["queue"], kv["src"]
+	if kind == "" {
+		kind, src = qAlbum, kv["dir"]
 	}
+	q := a.queueOf(kind, src)
+	if q == nil || q.find(path) < 0 {
+		q = a.queueOf(qAlbum, kv["dir"])
+	}
+	if q == nil || q.find(path) < 0 {
+		return
+	}
+	q.jump(q.find(path))
+	if m.shuffle {
+		q.shuffle(true)
+	}
+	sec, _ := strconv.Atoi(kv["pos"])
+	m.q, m.pos = q, time.Duration(sec)*time.Second
+	if al := m.lib.album(kv["dir"]); al != nil { // the Albums view opens on it
+		m.places[viewAlbums] = place{at: al.dir}
+	}
+	m.list = nil
+	a.followPlaying()
+	m.note = "Space or ▶ goes on from here"
 }

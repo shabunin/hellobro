@@ -13,9 +13,10 @@ everywhere, fullscreen and in a session too):
   Claude Code…), mouse taps and scrolling; several sessions at once.
 - **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
   several too.
-- **Music**: a player for the albums on the Kobo (folders of MP3/WAV, with
-  their covers), to Bluetooth headphones or a DAC. It goes on playing on
-  the other tabs.
+- **Music**: a player for the music on the Kobo (folders of MP3/WAV, with
+  their covers), to Bluetooth headphones or a DAC: by album, by folder
+  (subfolders and all) or by playlist, in order or shuffled. It goes on
+  playing on the other tabs.
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel: on and
   off, networks (join, with a password; leave; forget; one by name), and
   devices (scan, pair, connect, disconnect, forget); and hellobro's own
@@ -123,10 +124,32 @@ with a session up, 6 hours while music plays).
 - On any tab: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
   the previous and next track; so do media keys, and the volume keys (a
   headset's, a keyboard's) set the volume.
+- The library has three views (tap them, or Tab / v / 1-3):
+  - **Albums**: every folder with tracks in it.
+  - **Folders**: the folders as they are, from the one all the music is
+    in. A folder plays with all its subfolders, in path order.
+  - **Playlists**: M3U files (`.m3u`, `.m3u8`). New ones go in
+    `Music/Playlists/` (or `Playlists/` with no `Music` folder); ones found
+    anywhere in the library show up too, Windows paths and all. Tracks
+    that aren't there any more show dimmed, and are skipped.
+- A tap (or Enter) opens an album, a folder or a playlist, or plays a
+  track: what it's in plays on from there. The bar at the bottom plays
+  what's open from the start, in order (play) or shuffled (shuffle); at the
+  top of Albums or Folders that's all the music. "+ playlist" adds what's
+  open to a playlist, picked or new (type its name). In a playlist: remove,
+  ↑ and ↓ move the track selected.
+- Under the player's buttons: shuffle (on, the track playing stays and the
+  rest come in a random order), repeat (off, all: round again, one: the
+  track over) and "+ playlist" for the track playing.
 - On the Music tab: Space or k play/pause, Left/Right (j/l) seek 10 s, n/p
-  next/previous, s stop, = and − volume, Up/Down/PgUp/PgDn/Home/End and
-  Enter pick, Esc or Backspace back to the albums; or tap.
-- The volume, and the track and where it was, are kept in `music-state`.
+  next/previous, s stop, = and − volume, r shuffle, t repeat;
+  Up/Down/PgUp/PgDn/Home/End and Enter pick, Shift+Enter plays the row
+  selected whole, Esc or Backspace go back up, f shows what's playing in
+  its album; a adds the row selected to a playlist, Shift+A what's open;
+  in a playlist, Shift+Up/Down move a track, Delete or x takes it off (on
+  a playlist itself: deletes the playlist, asked first). Or tap.
+- The volume, shuffle and repeat, what's playing (the album, folder or
+  playlist, the track, where in it) are kept in `music-state`.
 
 ## Settings: Wi-Fi and Bluetooth
 
@@ -259,6 +282,7 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
                                             # two sessions, password + key install, reconnect, shells
     MUSIC=~/Music harness/run.sh /tmp/hb 0 music      # the Music tab
     MUSIC=~/Music harness/run.sh /tmp/hb 0 statbar    # the status bar, the music hotkeys
+    MUSIC=/tmp/lib harness/run.sh /tmp/hb 0 playlists  # folders, shuffle, repeat, playlists (/tmp/lib/Music/<folder>/<album>; it writes a playlist there)
     harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
     harness/run.sh /tmp/hb 0 share                     # pairing, scp, make push's update and restart (ssh, scp on the PC)
     MUSIC=~/Music harness/run.sh /tmp/hb 0 doze        # settings, light sleep with music, media keys

@@ -1,7 +1,8 @@
 package main
 
 // The Music tab's library: albums are folders with MP3 or WAV files in
-// them, found under the Kobo's storage, each with its cover if it has one.
+// them, found under the Kobo's storage, each with its cover if it has one;
+// and the playlists found there.
 
 import (
 	"image"
@@ -34,11 +35,25 @@ type album struct {
 // trackName is a track as shown: its file name less the extension.
 func trackName(file string) string { return strings.TrimSuffix(file, filepath.Ext(file)) }
 
-// scanLibrary finds the albums under root, in path order, skipping hidden
-// folders (.kobo, .adds).
-func scanLibrary(root string) []album {
+// library is what the scan found.
+type library struct {
+	root      string
+	albums    []album
+	byDir     map[string]int // albums' indexes, by folder
+	playlists []*playlist    // by name
+	top       string         // the deepest folder that has all the albums in it
+	tracks    int
+}
+
+// scanLibrary finds the albums under root, in path order, and the
+// playlists, skipping hidden folders (.kobo, .adds).
+func scanLibrary(root string) *library {
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
 	byDir := map[string]*album{}
 	images := map[string][]string{}
+	var lists []string
 	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -54,6 +69,10 @@ func scanLibrary(root string) []album {
 		switch strings.ToLower(filepath.Ext(p)) {
 		case ".jpg", ".jpeg", ".png":
 			images[dir] = append(images[dir], d.Name())
+		case ".m3u", ".m3u8":
+			if !strings.HasPrefix(d.Name(), ".") {
+				lists = append(lists, p)
+			}
 		default:
 			if !audio.Playable(p) {
 				return nil
@@ -70,17 +89,127 @@ func scanLibrary(root string) []album {
 		}
 		return nil
 	})
-	var albums []album
+	lib := &library{root: root, byDir: map[string]int{}}
 	for _, al := range byDir {
 		slices.SortFunc(al.tracks, naturalCompare)
 		al.cover = pickCover(images[al.dir])
 		if al.cover != "" {
 			al.cover = filepath.Join(al.dir, al.cover)
 		}
-		albums = append(albums, *al)
+		lib.albums = append(lib.albums, *al)
+		lib.tracks += len(al.tracks)
 	}
-	slices.SortFunc(albums, func(a, b album) int { return naturalCompare(a.dir, b.dir) })
-	return albums
+	slices.SortFunc(lib.albums, func(a, b album) int { return pathCompare(a.dir, b.dir) })
+	for i, al := range lib.albums {
+		lib.byDir[al.dir] = i
+		if i == 0 {
+			lib.top = al.dir
+		}
+		for !under(al.dir, lib.top) && lib.top != filepath.Dir(lib.top) {
+			lib.top = filepath.Dir(lib.top)
+		}
+	}
+	if lib.top == "" {
+		lib.top = root
+	}
+	for _, p := range lists {
+		if pl, err := readPlaylist(p); err == nil {
+			lib.playlists = append(lib.playlists, pl)
+		}
+	}
+	lib.sortPlaylists()
+	return lib
+}
+
+func (lib *library) sortPlaylists() {
+	slices.SortFunc(lib.playlists, func(a, b *playlist) int {
+		if c := naturalCompare(a.name, b.name); c != 0 {
+			return c
+		}
+		return pathCompare(a.path, b.path)
+	})
+}
+
+// album is the album in dir, or nil.
+func (lib *library) album(dir string) *album {
+	if i, ok := lib.byDir[dir]; ok {
+		return &lib.albums[i]
+	}
+	return nil
+}
+
+// paths is the album's tracks, whole paths.
+func (al *album) paths() []string {
+	out := make([]string, len(al.tracks))
+	for i, t := range al.tracks {
+		out[i] = filepath.Join(al.dir, t)
+	}
+	return out
+}
+
+// under says whether path is dir or in it, however deep.
+func under(path, dir string) bool {
+	return path == dir || strings.HasPrefix(path, strings.TrimSuffix(dir, "/")+"/")
+}
+
+// subfolders is the folders right in dir with music in them, somewhere.
+func (lib *library) subfolders(dir string) []string {
+	var out []string
+	for _, al := range lib.albums {
+		if al.dir == dir || !under(al.dir, dir) {
+			continue
+		}
+		rel, _ := filepath.Rel(dir, al.dir)
+		sub := filepath.Join(dir, strings.Split(filepath.ToSlash(rel), "/")[0])
+		if len(out) == 0 || out[len(out)-1] != sub { // the albums are in path order
+			out = append(out, sub)
+		}
+	}
+	return out
+}
+
+// folderTracks is every track in dir and its subfolders, in path order.
+func (lib *library) folderTracks(dir string) []string {
+	var out []string
+	for i := range lib.albums {
+		if under(lib.albums[i].dir, dir) {
+			out = append(out, lib.albums[i].paths()...)
+		}
+	}
+	return out
+}
+
+// folderCount is how many tracks folderTracks has.
+func (lib *library) folderCount(dir string) int {
+	n := 0
+	for _, al := range lib.albums {
+		if under(al.dir, dir) {
+			n += len(al.tracks)
+		}
+	}
+	return n
+}
+
+// playlist is the one in the file path, or nil.
+func (lib *library) playlist(path string) *playlist {
+	for _, pl := range lib.playlists {
+		if pl.path == path {
+			return pl
+		}
+	}
+	return nil
+}
+
+// pathCompare orders paths a folder at a time, naturally, so a folder's
+// subfolders come right after it.
+func pathCompare(a, b string) int {
+	as, bs := strings.Split(a, "/"), strings.Split(b, "/")
+	for i := 0; i < len(as) && i < len(bs); i++ {
+		if c := naturalCompare(as[i], bs[i]); c != 0 {
+			return c
+		}
+	}
+	return len(as) - len(bs)
 }
 
 // pickCover prefers cover.jpg, folder.jpg and the like, then a front.

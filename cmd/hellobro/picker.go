@@ -5,7 +5,9 @@ package main
 // the saved SSH hosts (a new session to one). Typing narrows the list,
 // Up/Down (or Tab, Shift+Tab) move, Enter goes; with nothing typed, 1-9 go
 // straight to that row. Esc, Ctrl+Shift+Tab again or a tap outside close
-// it. The page under it holds still meanwhile.
+// it. The page under it holds still meanwhile. The Music tab puts up the
+// same menu to pick a playlist, with an entry for a new one, named as
+// typed.
 
 import (
 	"fmt"
@@ -31,11 +33,13 @@ type pickEntry struct {
 }
 
 type picker struct {
-	all, shown []pickEntry
-	query      string
-	sel, top   int
-	box        image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
-	rows       []image.Rectangle
+	title, hint string
+	all, shown  []pickEntry
+	extra       func(query string) *pickEntry // an entry made of what's typed, or nil
+	query       string
+	sel, top    int
+	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
+	rows        []image.Rectangle
 }
 
 func (a *bro) openPicker() {
@@ -65,9 +69,24 @@ func (a *bro) openPicker() {
 	p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }},
 		pickEntry{kind: "kobo", title: "sleep", detail: "Ctrl+Alt+S · the power button wakes it", do: a.App.Sleep},
 		pickEntry{kind: "kobo", title: "light sleep", detail: "the music plays on · a tap or a key wakes it", do: a.Doze})
+	p.title, p.hint = "Go to", "sessions, tabs, hosts…"
+	a.showPicker(p)
+}
+
+// openMenu puts up the menu with other entries: title over them, hint in
+// the empty query, and extra (if not nil) making one of what's typed.
+func (a *bro) openMenu(title, hint string, entries []pickEntry, extra func(string) *pickEntry) {
+	a.showPicker(&picker{title: title, hint: hint, all: entries, extra: extra})
+}
+
+func (a *bro) showPicker(p *picker) {
 	b := a.C.Bounds()
 	w := min(1100, b.Dx()-80)
-	h := 136 + min(len(p.all), pickRowsMax)*pickRowH + 16
+	n := len(p.all)
+	if p.extra != nil {
+		n++
+	}
+	h := 136 + min(max(1, n), pickRowsMax)*pickRowH + 16
 	top := b.Min.Y + max(40, b.Dy()/8)
 	p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
 	a.picker = p
@@ -146,6 +165,13 @@ func (a *bro) filterPicker() {
 	if p.query != "" {
 		slices.SortStableFunc(p.shown, func(x, y pickEntry) int { return y.score - x.score })
 	}
+	if p.extra != nil {
+		e := p.extra(p.query)
+		// After what matches: "road" picks Road trip, ↓ makes "road".
+		if !slices.ContainsFunc(p.all, func(x pickEntry) bool { return strings.EqualFold(x.title, strings.TrimSpace(p.query)) }) {
+			p.shown = append(p.shown, *e)
+		}
+	}
 	p.sel, p.top = 0, 0
 	if p.query == "" {
 		for i, e := range p.shown {
@@ -204,7 +230,7 @@ func (a *bro) drawPicker() {
 	c.Fill(p.box, kobo.White)
 	c.Frame(p.box, 4, kobo.Black)
 	head := image.Rect(p.box.Min.X+24, p.box.Min.Y+10, p.box.Max.X-24, p.box.Min.Y+60)
-	c.Text(a.F.Panel, head, "Go to", kobo.Black, kobo.AlignLeft)
+	c.Text(a.F.Panel, head, p.title, kobo.Black, kobo.AlignLeft)
 	c.Text(a.F.Small, head, "type to narrow · ↑ ↓ Enter · Esc closes", kobo.Dark, kobo.AlignRight)
 	in := image.Rect(p.box.Min.X+20, head.Max.Y+6, p.box.Max.X-20, head.Max.Y+64)
 	c.Frame(in, 2, kobo.Black)
@@ -215,7 +241,7 @@ func (a *bro) drawPicker() {
 	cx := tr.Min.X + kobo.TextWidth(a.F.Body, q) + 3
 	c.Fill(image.Rect(cx, in.Min.Y+12, cx+3, in.Max.Y-12), kobo.Black) // the cursor
 	if p.query == "" {
-		c.Text(a.F.Small, tr, "sessions, tabs, hosts…", kobo.Mid, kobo.AlignRight)
+		c.Text(a.F.Small, tr, p.hint, kobo.Mid, kobo.AlignRight)
 	}
 
 	p.rows = p.rows[:0]
@@ -235,7 +261,7 @@ func (a *bro) drawPicker() {
 		}
 		text := r.Inset(4)
 		text.Min.X += 12
-		if p.query == "" && n < 9 {
+		if p.query == "" && p.extra == nil && n < 9 {
 			c.Text(a.F.Panel, image.Rect(text.Min.X, text.Min.Y, text.Min.X+40, text.Max.Y), strconv.Itoa(n+1), fg, kobo.AlignLeft)
 		}
 		text.Min.X += 48
@@ -267,7 +293,7 @@ func (a *bro) pickerKey(code uint16, value int32) {
 	case code == kobo.KeyEnter:
 		a.pick(p.sel)
 		return
-	case p.query == "" && ch >= "1" && ch <= "9" && !m.ctrl:
+	case p.query == "" && p.extra == nil && ch >= "1" && ch <= "9" && !m.ctrl: // a name typed can start with one
 		a.pick(int(ch[0] - '1'))
 		return
 	case code == keyUp || code == kobo.KeyTab && m.shift:

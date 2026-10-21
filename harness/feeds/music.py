@@ -6,7 +6,7 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-row = lambda i: (700, 746 + 26 + 52 * i)              # library rows
+row = lambda i: (700, 814 + 26 + 52 * i)              # library rows, under Albums Folders Playlists
 button = lambda i: (484 + 58 + 128 * i, 483)          # prev −10 play +10 next vol− vol+
 bar = lambda f: (489 + f * 875, 414)
 
@@ -22,5 +22,5 @@ tap(*button(4)); time.sleep(6)                        # next track
 tap(*bar(0.985)); time.sleep(10)                      # near its end: then the next one by itself
 tap(tab_x(0), tabs_y); time.sleep(3)                  # SSH tab: the header says what's on
 tap(tab_x(2), tabs_y); time.sleep(2)
-tap(1322, 705); time.sleep(2)                         # "albums"
+tap(1334, 705); time.sleep(2)                         # "back": the albums
 exit_app()

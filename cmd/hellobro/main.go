@@ -81,7 +81,7 @@ func main() {
 		fmt.Println("hellobro", version)
 		return
 	}
-	a := &bro{mus: musicState{open: -1, album: -1, track: -1, gain: 40}}
+	a := &bro{mus: musicState{lib: &library{}, gain: 40}}
 	if g, err := strconv.Atoi(readMusicState()["gain"]); err == nil {
 		a.mus.gain = max(0, min(gainMax, g))
 	}
