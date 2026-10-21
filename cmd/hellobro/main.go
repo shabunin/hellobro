@@ -50,29 +50,31 @@ const relayIdle = 24 * time.Hour         // with the relay on: as good as never
 // radios.
 type bro struct {
 	*kobo.App
-	tf     termFonts
-	termP  kobo.Panel
-	tv     termView
-	font   *fontSwipe // a contact along the right edge, which may become a font swipe
-	mv     musicView
-	mus    musicState
-	stat   statBar     // the terminal tabs' status bar
-	picker *picker     // the switcher, while it's up
-	asking *askBox     // a question, while it's up
-	tabsEd *tabsEditor // the Tabs dialog, while it's up
-	tabs   tabsConf
-	keys   keyMap
-	rv     [2]radioPanelView
-	rs     radioState
-	slp    sleepState
-	sv     settingsView
-	set    settings
-	doze   dozeState
-	share  shareState
-	relay  relayState
-	fv     filesView
-	upd    updateState
-	lay    kobo.Layout // the last layout, to lay out again
+	tf       termFonts
+	termP    kobo.Panel
+	tv       termView
+	font     *fontSwipe // a contact along the right edge, which may become a font swipe
+	mv       musicView
+	mus      musicState
+	stat     statBar     // the terminal tabs' status bar
+	picker   *picker     // the switcher, while it's up
+	asking   *askBox     // a question, while it's up
+	tabsEd   *tabsEditor // the Tabs dialog, while it's up
+	tabs     tabsConf
+	keys     keyMap
+	keyset   *keySet // Settings' Keys: a key being asked for
+	lightWas int     // the light's level before light.toggle turned it off
+	rv       [2]radioPanelView
+	rs       radioState
+	slp      sleepState
+	sv       settingsView
+	set      settings
+	doze     dozeState
+	share    shareState
+	relay    relayState
+	fv       filesView
+	upd      updateState
+	lay      kobo.Layout // the last layout, to lay out again
 }
 
 // fontSwipe is a contact that started on the right edge.
@@ -159,6 +161,10 @@ func (a *bro) Tap(p image.Point) {
 		a.tabsTap(p)
 		return
 	}
+	if a.keyset != nil {
+		a.keySetTap(p)
+		return
+	}
 	if a.picker != nil {
 		a.pickerTap(p)
 		return
@@ -236,6 +242,9 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.tabsEd != nil:
 		a.tabsKey(m.Code, m.Value)
+		return true
+	case a.keyset != nil:
+		a.keySetKey(m.Code, m.Value)
 		return true
 	case a.picker != nil:
 		a.pickerKey(m.Code, m.Value)

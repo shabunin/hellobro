@@ -57,6 +57,7 @@ var settingList = []setting{
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
 	{key: "tabs", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
+	{key: "keys", label: "Keys", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
 }
 
 // The defaults, by key: the index of a value.
@@ -109,7 +110,7 @@ func loadSettings() settings {
 func (s settings) save() {
 	var b strings.Builder
 	for _, st := range settingList {
-		if st.key != "status-bar" && st.key != "tabs" { // kept in their own files
+		if st.key != "status-bar" && st.key != "tabs" && st.key != "keys" { // kept in their own files
 			fmt.Fprintf(&b, "%s=%s\n", st.key, st.values[s[st.key]])
 		}
 	}
@@ -127,6 +128,8 @@ func (a *bro) setting(key string) string {
 				return map[bool]string{false: "on", true: "off"}[a.stat.off]
 			case "tabs":
 				return a.tabs.String()
+			case "keys":
+				return fmt.Sprint(a.keys.named)
 			}
 			return st.values[a.set[key]]
 		}
@@ -146,6 +149,9 @@ func (a *bro) stepSetting(i, d int) {
 	switch st.key {
 	case "tabs":
 		a.openTabs()
+		return
+	case "keys":
+		a.openKeys(nil)
 		return
 	case "status-bar":
 		a.toggleStat()
@@ -229,6 +235,10 @@ func (a *bro) drawSettings() {
 			shown = "pairing: code " + a.share.code
 		case st.key == "tabs":
 			shown = a.tabsSummary()
+		case st.key == "keys" && len(a.keys.named) == 0:
+			shown = "the defaults (keys.conf)"
+		case st.key == "keys":
+			shown = fmt.Sprintf("%d set by you (keys.conf)", len(a.keys.named))
 		}
 		value := "‹ " + shown + " ›"
 		vw := kobo.TextWidth(a.F.Small, value)

@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const ntxSetLight = 241 // ioctl on /dev/ntx_io: set the frontlight, 0-100
@@ -149,6 +150,25 @@ func (a *App) setLight(level int) {
 	a.C.Frame(r, 3, Black)
 	a.C.Text(a.F.Panel, r, fmt.Sprintf("light %d%%", a.light.level), Black, AlignCenter)
 	a.Mark(r, false) // black & white only, so the fast waveform is fine
+}
+
+// Light is the frontlight's level, 0 (off) to 100; false if there's none.
+func (a *App) Light() (int, bool) {
+	if a.light == nil {
+		return 0, false
+	}
+	return a.light.level, true
+}
+
+// SetLight sets the frontlight, its level shown for a moment as a swipe
+// shows it.
+func (a *App) SetLight(level int) {
+	if a.light == nil || a.calib != nil {
+		return
+	}
+	a.setLight(level)
+	a.lightHideAt = time.Now().Add(1500 * time.Millisecond)
+	log.Printf("light: %d%%", a.light.level)
 }
 
 // DrawGauge shows a gauge like the light's: a bar in r, filled n/of,

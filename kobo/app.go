@@ -154,6 +154,7 @@ type App struct {
 
 	light        *frontlight
 	lightOverlay *image.Gray // what the light gauge covers, while it's shown
+	lightHideAt  time.Time   // when the gauge SetLight put up goes
 	order        []int       // the tabs shown, in order; nil: all
 	hints        []string    // in the tabs' corners, by place; nil: numbers
 	footerTabs   string      // the footer's word on the tabs; "": Ctrl+Alt+N
@@ -406,6 +407,10 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 		case <-tick.C:
 			a.stats.event("tick", 0)
 			a.alive.Store(time.Now().UnixNano())
+			if !a.lightHideAt.IsZero() && time.Now().After(a.lightHideAt) {
+				a.lightHideAt = time.Time{}
+				a.hideGauge(&a.lightOverlay)
+			}
 			if !a.asleep {
 				a.prog.Tick()
 			}
@@ -570,9 +575,19 @@ func (a *App) Quit() {
 	a.quit = true
 }
 
-func (a *App) rotate() {
+func (a *App) rotate() { a.SetRotation((a.scr.info.Rota + 1) % 4) }
+
+// Rotation is the screen's, as FBInk counts: 0 and 2 portrait (2 upside
+// down), 1 and 3 landscape.
+func (a *App) Rotation() int { return a.scr.info.Rota }
+
+// SetRotation turns the screen to r.
+func (a *App) SetRotation(r int) {
+	if r = (r%4 + 4) % 4; r == a.scr.info.Rota {
+		return
+	}
 	a.WaitBlit()
-	if err := a.scr.setRotation((a.scr.info.Rota + 1) % 4); err != nil {
+	if err := a.scr.setRotation(r); err != nil {
 		log.Printf("rotate: %v", err)
 	}
 	a.relayout()

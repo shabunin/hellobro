@@ -3,10 +3,11 @@ package main
 // Commands: what hellobro does on a key, or from the switcher. Each has
 // an id for keys.conf, a title for the switcher, and default keys.
 // keys.conf, next to hellobro, changes them: a line is a key and a
-// command ("ctrl+alt+1 tab.1"), or a key and "-", which frees it (a
-// terminal gets it then). A command named there loses its defaults.
-// The file is written the first time, every default in it commented
-// out, and read again when it's saved.
+// command ("ctrl+alt+1 tab.1"), a key and "-", which frees it (a
+// terminal gets it then), or "none" and a command, which has no key
+// then. A command named there loses its defaults. The file is written
+// the first time, every default in it commented out, and read again
+// when it's saved; Settings' Keys row writes it too (keyset.go).
 
 import (
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"log"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,6 +92,7 @@ func makeCommands() []*command {
 		&command{id: "sharing.pair", title: "Pair a computer", run: (*bro).sharePair},
 		&command{id: "relay", title: "Relay on / off", run: func(a *bro) { a.stepSetting(settingIndex("relay"), 1) }},
 		&command{id: "tabs", title: "Tabs: show, hide, order", run: (*bro).openTabs},
+		&command{id: "keys", title: "Keys: set a command's", run: func(a *bro) { a.openKeys(nil) }},
 	)
 	for t, name := range tabNames {
 		if t == tabRadio {
@@ -102,7 +105,18 @@ func makeCommands() []*command {
 				when: func(a *bro) bool { return !a.tabs.hidden[t] }, run: func(a *bro) { a.showTab(t, false) }})
 	}
 	cs = append(cs,
+		&command{id: "light.up", title: "Light: brighter", keys: []string{"ctrl+alt+up", "brightnessup"}, repeat: true,
+			run: func(a *bro) { a.stepLight(lightStep) }},
+		&command{id: "light.down", title: "Light: dimmer", keys: []string{"ctrl+alt+down", "brightnessdown"}, repeat: true,
+			run: func(a *bro) { a.stepLight(-lightStep) }},
+		&command{id: "light.toggle", title: "Light: on / off (the backlight)", keys: []string{"ctrl+alt+l"}, run: (*bro).toggleLight},
 		&command{id: "rotate", title: "Rotate the screen", run: func(a *bro) { a.Rotate() }},
+	)
+	for r, name := range []string{"Portrait", "Landscape", "Portrait, upside down", "Landscape, the other way"} {
+		cs = append(cs, &command{id: "screen." + []string{"portrait", "landscape", "portrait2", "landscape2"}[r], title: "Screen: " + name,
+			when: func(a *bro) bool { return a.Rotation() != r }, run: func(a *bro) { a.SetRotation(r) }})
+	}
+	cs = append(cs,
 		&command{id: "calibrate", title: "Touch calibration", run: func(a *bro) { a.Calibrate() }},
 		&command{id: "quit", title: "Quit, back to Nickel", run: func(a *bro) { a.Quit() }},
 	)
@@ -145,8 +159,13 @@ var keyCodes = map[string]uint16{
 	"esc": kobo.KeyEsc, "tab": kobo.KeyTab, "space": kobo.KeySpace, "enter": kobo.KeyEnter,
 	"backspace": kobo.KeyBackspace, "up": keyUp, "down": keyDown, "left": keyLeft, "right": keyRight,
 	"pgup": keyPgUp, "pgdn": keyPgDn, "home": 102, "end": 107, "insert": 110, "delete": 111,
-	"f11": keyF11, "f12": keyF12,
+	"f11": keyF11, "f12": keyF12, "minus": keyMinus, "brightnessdown": 224, "brightnessup": 225,
 }
+
+var keyLabelNames = map[uint16]string{224: "Brightness−", 225: "Brightness+"}
+
+// keyConfNames are the keys' names in keys.conf, by code.
+var keyConfNames = map[uint16]string{}
 
 func init() {
 	for code := uint16(kobo.Key1); code <= 53; code++ { // the rows of letters, digits and marks
@@ -157,6 +176,10 @@ func init() {
 	for i := range uint16(10) {
 		keyCodes[fmt.Sprintf("f%d", i+1)] = kobo.KeyF1 + i
 	}
+	for name, code := range keyCodes {
+		keyConfNames[code] = name
+	}
+	keyConfNames[keyMinus] = "minus" // of its two names, the one that reads well before " -"
 }
 
 // parseKey reads a key as keys.conf has it: "ctrl+shift+p", "f11", "ctrl+=".
@@ -174,9 +197,15 @@ func parseKey(s string) (combo, error) {
 		}
 		c.mods |= modNames[i].bit
 	}
-	code, ok := keyCodes[parts[len(parts)-1]]
+	name := parts[len(parts)-1]
+	code, ok := keyCodes[name]
+	if num, isNum := strings.CutPrefix(name, "key"); !ok && isNum {
+		if n, err := strconv.Atoi(num); err == nil && n > 0 && n < 0x300 {
+			code, ok = uint16(n), true // any other, by its Linux code: key183
+		}
+	}
 	if !ok {
-		return c, fmt.Errorf("%q: no key %q", s, parts[len(parts)-1])
+		return c, fmt.Errorf("%q: no key %q", s, name)
 	}
 	c.code = code
 	return c, nil
@@ -185,10 +214,22 @@ func parseKey(s string) (combo, error) {
 // label is c as shown: "Ctrl+Shift+P", "Ctrl+Shift+<".
 func (c combo) label() string {
 	name := kobo.KeyName(c.code)
+	if n, ok := keyLabelNames[c.code]; ok {
+		name = n
+	}
 	if ch, ok := kobo.KeyChar(c.code, false, false); ok && c.mods&modShift != 0 && ch != " " && !isAlnum(ch) {
 		name, _ = kobo.KeyChar(c.code, true, false) // Shift+, is <
 	}
 	return modsLabel(c.mods) + name
+}
+
+// String is c as keys.conf has it: "ctrl+shift+p".
+func (c combo) String() string {
+	name, ok := keyConfNames[c.code]
+	if !ok {
+		name = fmt.Sprintf("key%d", c.code)
+	}
+	return strings.ToLower(modsLabel(c.mods)) + name
 }
 
 // modsLabel is "Ctrl+Alt+" for those.
@@ -208,6 +249,7 @@ func isAlnum(s string) bool { return s >= "a" && s <= "z" || s >= "0" && s <= "9
 type keyMap struct {
 	bind      map[combo][]*command // the first that can, runs
 	keys      map[string][]combo   // by command
+	named     map[string]bool      // the commands keys.conf sets, not left at their defaults
 	down      map[uint16]bool      // keys pressed for a command, their releases ours too
 	mtime     time.Time
 	checkedAt time.Time
@@ -233,9 +275,9 @@ func loadKeys() keyMap {
 }
 
 func parseKeys(conf string) (keyMap, []string) {
-	m := keyMap{bind: map[combo][]*command{}, keys: map[string][]combo{}, down: map[uint16]bool{}}
-	var errs []string
 	named := map[string]bool{}
+	m := keyMap{bind: map[combo][]*command{}, keys: map[string][]combo{}, named: named, down: map[uint16]bool{}}
+	var errs []string
 	freed := map[combo]bool{}
 	add := func(k combo, c *command) {
 		if !slices.Contains(m.bind[k], c) {
@@ -251,6 +293,14 @@ func parseKeys(conf string) (keyMap, []string) {
 		}
 		if len(f) != 2 {
 			errs = append(errs, fmt.Sprintf("line %d: a key and a command, not %q", n+1, line))
+			continue
+		}
+		if f[0] == "none" {
+			if c := commandByID(f[1]); c != nil {
+				named[c.id] = true
+			} else {
+				errs = append(errs, fmt.Sprintf("line %d: no command %q", n+1, f[1]))
+			}
 			continue
 		}
 		k, err := parseKey(f[0])
@@ -290,12 +340,15 @@ func parseKeys(conf string) (keyMap, []string) {
 func defaultKeysConf() string {
 	var b strings.Builder
 	b.WriteString(`# hellobro's keys. A line is a key and a command, "ctrl+alt+1 tab.1",
-# or a key and -, "f11 -": the key isn't ours then, a terminal gets it.
-# A command named here loses its default keys; the rest keep theirs.
+# a key and -, "f11 -": the key isn't ours then, a terminal gets it, or
+# none and a command, "none session.new": it has no key. A command named
+# here loses its default keys; the rest keep theirs. Settings, Keys, sets
+# them too, and writes here.
 #
 # Modifiers: ctrl shift alt meta. Keys: a-z 0-9 f1-f12 tab space enter esc
-# backspace up down left right pgup pgdn home end insert delete, and
-# - = [ ] ; ' ` + "`" + ` \ , . /
+# backspace up down left right pgup pgdn home end insert delete, the marks
+# (minus or -, = [ ] ; ' ` + "`" + ` \ , . /), brightnessup brightnessdown,
+# and any other by its Linux code: key183.
 # Saved, it's read again at once.
 #
 # The defaults:
@@ -421,6 +474,27 @@ func (a *bro) keyHints(pairs ...string) string {
 }
 
 // --- what the commands do ---
+
+const lightStep = 10
+
+func (a *bro) stepLight(d int) {
+	if l, ok := a.Light(); ok {
+		a.SetLight(l + d)
+	}
+}
+
+// toggleLight turns the light off, or back on as it was.
+func (a *bro) toggleLight() {
+	l, ok := a.Light()
+	switch {
+	case !ok:
+	case l > 0:
+		a.lightWas = l
+		a.SetLight(0)
+	default:
+		a.SetLight(max(lightStep, a.lightWas))
+	}
+}
 
 func (a *bro) stepTab(d int) {
 	tabs := a.Tabs()

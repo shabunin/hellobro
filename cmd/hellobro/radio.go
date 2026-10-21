@@ -99,11 +99,11 @@ func (a *bro) layoutRadio(K kobo.Layout) {
 	v := &a.rv
 	var wr, br, sr image.Rectangle
 	if K.Landscape { // the radios side by side, the settings under them
-		st := K.Stack(K.Body, 56)
+		st := K.Stack(K.Body, 52)
 		wr, br = K.Split(st[0], 0.5)
 		sr = st[1]
 	} else {
-		st := K.Stack(K.Body, 34, 68)
+		st := K.Stack(K.Body, 32, 64) // room for all the settings
 		wr, br, sr = st[0], st[1], st[2]
 	}
 	a.layoutSettings(sr)

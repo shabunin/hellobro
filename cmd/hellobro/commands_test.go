@@ -24,6 +24,10 @@ func TestParseKey(t *testing.T) {
 		{"meta+tab", "Meta+Tab"},
 		{"alt+shift+ctrl+x", "Ctrl+Shift+Alt+X"},
 		{"ctrl+shift+1", "Ctrl+Shift+1"},
+		{"brightnessup", "Brightness+"},
+		{"ctrl+key183", "Ctrl+key 183"},
+		{"ctrl+minus", "Ctrl+-"},
+		{"key0", ""},
 		{"ctrl++", ""},
 		{"hyper+x", ""},
 		{"ctrl+", ""},
@@ -135,6 +139,54 @@ func TestTabHints(t *testing.T) {
 		hints, footer := a.tabHints()
 		if !slices.Equal(hints, c.hints) || footer != c.footer {
 			t.Errorf("%q: %q, %q; want %q, %q", c.conf, hints, footer, c.hints, c.footer)
+		}
+	}
+}
+
+func TestKeyString(t *testing.T) {
+	for name, code := range keyCodes {
+		for _, mods := range []uint8{0, modCtrl | modShift, modAlt | modMeta} {
+			c := combo{mods, code}
+			back, err := parseKey(c.String())
+			if err != nil || back != c {
+				t.Errorf("%s (%v): %q gives %v, %v", name, c, c.String(), back, err)
+			}
+		}
+	}
+	if s := (combo{modCtrl, 183}).String(); s != "ctrl+key183" {
+		t.Errorf("key183: %q", s)
+	}
+}
+
+func TestRewriteKeys(t *testing.T) {
+	conf := "# the defaults\n# ctrl+tab session.next\nf5 tab.next\nnone doze\n"
+	k := func(s string) combo { c, _ := parseKey(s); return c }
+	for _, c := range []struct {
+		id    string
+		keys  []combo
+		reset bool
+		want  string // the lines that aren't comments
+	}{
+		{"tab.next", []combo{k("f6")}, false, "none doze|f6 tab.next"},
+		{"tab.next", nil, true, "none doze"},
+		{"tab.next", []combo{}, false, "none doze|none tab.next"},
+		{"doze", []combo{k("ctrl+alt+d")}, false, "f5 tab.next|ctrl+alt+d doze"},
+		// Ctrl+Tab was session.next's: it keeps its others.
+		{"doze", []combo{k("ctrl+tab")}, false, "f5 tab.next|ctrl+pgdn session.next|ctrl+shift+right session.next|ctrl+tab doze"},
+	} {
+		m, _ := parseKeys(conf)
+		out := rewriteKeys(conf, m, c.id, c.keys, c.reset)
+		var got []string
+		for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+			if !strings.HasPrefix(l, "#") {
+				got = append(got, l)
+			}
+		}
+		if g := strings.Join(got, "|"); g != c.want {
+			t.Errorf("%s %v %v: %q, want %q", c.id, c.keys, c.reset, g, c.want)
+		}
+		if _, errs := parseKeys(out); len(errs) > 0 {
+			t.Errorf("%s: %v", c.id, errs)
 		}
 	}
 }

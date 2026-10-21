@@ -65,10 +65,11 @@ Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
 | Ctrl+Shift+Space | play / pause, on any tab |
 | Ctrl+Shift+< / > | previous / next track |
 | Ctrl+Alt+S, power button | sleep |
-| swipe the left edge | frontlight |
+| swipe the left edge, Ctrl+Alt+Up / Down | frontlight |
+| Ctrl+Alt+L | frontlight on / off |
 | Esc, `exit` | back to Nickel |
 
-Every key can be changed in `keys.conf`, and which tabs show (Shell
+Every key can be changed in Settings (Keys) or `keys.conf`, and which tabs show (Shell
 starts hidden), and in what order, in Settings. See
 [Keys](docs/usage.md#keys).
 

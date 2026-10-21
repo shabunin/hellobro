@@ -36,27 +36,38 @@ Ctrl+Shift+P, anywhere, is a switcher in the manner of rofi (or VS
 Code's command palette): the sessions, the tabs, the saved hosts (a new
 session to one), a new shell, and the commands (Wi-Fi or Bluetooth on
 and off, sharing, pairing, the relay, showing or hiding a tab, light
-sleep, rotating…), each with its keys. Typing narrows it (fuzzy);
+sleep, the light brighter, dimmer, on and off, the screen to portrait or
+landscape…), each with its keys. Typing narrows it (fuzzy);
 Up/Down and Enter, or 1–9 before typing.
 
 ## Keys
 
-The keys are hellobro's commands', and `keys.conf` changes them. It's
-written the first time hellobro runs, every command in it with its
-default keys, commented out. A line is a key and a command:
+The keys are hellobro's commands'. To change one: Settings, the last
+row, **Keys** (or "keys" in the switcher), lists the commands with
+their keys. Pick one and press its new key, with Ctrl, Alt or Meta (an
+F-key alone will do): it takes the place of the ones it had, and a
+command that had that key lets it go. Backspace leaves it no key,
+Delete puts its defaults back, Esc leaves it be.
+
+It all goes into `keys.conf`, which can be edited too. It's written the
+first time hellobro runs, every command in it with its default keys,
+commented out. A line is a key and a command:
 
 ```
 ctrl+alt+m   tab.music        # a tab of its own
 f1           tab.1            # the first tab, whichever it is
 ctrl+shift+n session.new
 f11          -                # not ours: the terminal gets F11
+none         session.prev     # no key at all
 ```
 
 A command named there loses its default keys; the others keep theirs.
 `KEY -` frees a key, so it goes on to the terminal (or the page). Keys
 are a-z, 0-9, f1-f12, tab, space, enter, esc, backspace, up, down,
-left, right, pgup, pgdn, home, end, insert, delete and the marks
-(`- = [ ] ; ' , . /`), with any of ctrl, shift, alt and meta. Saved (over
+left, right, pgup, pgdn, home, end, insert, delete, the marks
+(`- = [ ] ; ' , . /`, and `minus` for `-`), brightnessup and
+brightnessdown (a keyboard's light keys), and any other by its Linux
+code (`key183`), with any of ctrl, shift, alt and meta. Saved (over
 SFTP, say), it takes effect at once; the log says what it didn't
 understand. The tabs' corners, the footer and the hints show the keys as
 they are.
@@ -253,7 +264,8 @@ It's only installed when asked for: `make install-tools`.
 
 ## In both apps
 
-In both: swipe the left edge for the frontlight. Fullscreen (F11): swipe
+In both: swipe the left edge for the frontlight (in hellobro also
+Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (F11): swipe
 in from the top or bottom edge to leave it. Esc or the exit button leave;
 the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
 with a session up, 6 hours while music plays).
