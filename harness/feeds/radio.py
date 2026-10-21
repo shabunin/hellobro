@@ -30,7 +30,7 @@ key(KEY_P, ctrl=True, shift=True); time.sleep(2)        # the switcher
 keys("mus"); time.sleep(1)
 key(ENTER); time.sleep(3)                             # the Music tab
 key(K1, ctrl=True, alt=True); time.sleep(3)           # the SSH tab
-key(F11); time.sleep(2)
+fullscreen(); time.sleep(2)
 key(KEY_P, ctrl=True, shift=True); time.sleep(2)        # the switcher, fullscreen
 key(ESC); time.sleep(2)
 key(K4, ctrl=True, alt=True); time.sleep(3)           # out of fullscreen, to Settings

@@ -646,7 +646,7 @@ func (a *App) onTouch(ev TouchEv) {
 		a.gestures[ev.slot] = g
 		a.prog.Touch(ev, p, g)
 		g.lightZone = a.light != nil && !ev.Pen && p.X < EdgeWidth && g.Owner == 0
-		if a.Full && !ev.Pen && !g.lightZone && g.Owner == 0 { // no F11 without a keyboard: a way out by touch
+		if a.Full && !ev.Pen && !g.lightZone && g.Owner == 0 { // no fullscreen key without a keyboard: a way out by touch
 			switch {
 			case p.Y < unfullEdge:
 				g.unfull = 1
@@ -819,7 +819,7 @@ func (a *App) onKey(m KeyMsg) {
 		} else {
 			log.Printf("keyboard gone: %s", m.Gone)
 			a.Keyboard = ""
-			a.SetFull(false) // F11 is the way back, so don't strand the user there
+			a.SetFull(false) // the keys are the way back, so don't strand the user there
 		}
 		a.devs = inputDevices()
 		a.prog.Key(m)

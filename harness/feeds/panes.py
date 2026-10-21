@@ -1,7 +1,7 @@
 # Sessions as panels: two SSH sessions to the test server (:2222) share
 # the tab (landscape: side by side; portrait: one above the other);
 # Ctrl+Tab moves the focus, and the keys follow it. The second folds to
-# its strip and the first has it all; the switcher opens it again. F11
+# its strip and the first has it all; the switcher opens it again. Ctrl+Shift+F
 # gives the one in focus the whole screen. Then Ctrl+Tab on the other
 # tabs: Music (to Now playing: Up turns the volume up), Settings, Files.
 # app: hellobro
@@ -30,9 +30,9 @@ tap(right - 30, top + 26); time.sleep(3)              # session 2 folded
 key(KEY_P, ctrl=True, shift=True); time.sleep(1)
 keys("ssh 2"); time.sleep(2)
 key(ENTER); time.sleep(3)                             # open again, in focus
-key(F11); time.sleep(3)                               # fullscreen: session 2 alone
+fullscreen(); time.sleep(3)                               # fullscreen: session 2 alone
 key(TAB, ctrl=True); time.sleep(3)                    # session 1, alone
-key(F11); time.sleep(3)
+fullscreen(); time.sleep(3)
 key(K3, ctrl=True, alt=True); time.sleep(3)           # Music
 key(TAB, ctrl=True); time.sleep(2)                    # Now playing in focus
 key(UP); time.sleep(2)                                # the volume up

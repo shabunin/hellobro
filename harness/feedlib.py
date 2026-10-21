@@ -95,6 +95,9 @@ def key(code, shift=False, ctrl=False, alt=False):
     time.sleep(0.15)
 UP, DOWN, ENTER, ESC, TAB, BACKSPACE, SPACE, F11 = 103, 108, 28, 1, 15, 14, 57, 87
 PGUP, PGDN, KEY_T, LEFT, RIGHT, KEY_P = 104, 109, 20, 105, 106, 25
+KEY_F, KEY_M = 33, 50
+
+def fullscreen(): key(KEY_F, ctrl=True, shift=True)  # on and off
 F = lambda n: 58 + n                                  # F1..F10
 
 def power():

@@ -10,8 +10,8 @@
 //   - Files: sharing with a computer (SFTP, ssh, mDNS), and the Kobo's
 //     storage.
 //
-// A swipe along the right edge sets the font size, F11 gives the
-// terminal the whole screen. Which tabs show, and in what order, is up
+// A swipe along the right edge sets the font size, Ctrl+Shift+F gives
+// the session in focus the whole screen. Which tabs show, and in what order, is up
 // to the user (tabs.go), and so are the keys (commands.go). The rest
 // (the screen, touch, the frontlight on the left edge, quitting) is the
 // kobo package's.

@@ -71,7 +71,7 @@ f5 tab.next  # a comment too
 ctrl+tab tab.next
 ctrl+shift+p palette
 ctrl+shift+p -
-f11 -
+ctrl+shift+f -
 ctrl+alt+9 nope
 oops
 `)
@@ -90,7 +90,7 @@ oops
 		"f5":           "tab.next",
 		"ctrl+tab":     "tab.next panel.next", // the file's first
 		"ctrl+shift+p": "palette",             // named, and freed of its default (which it is too)
-		"f11":          "",                    // freed
+		"ctrl+shift+f": "",                    // freed
 		"ctrl+shift+t": "session.new",         // as by default
 		"ctrl+alt+9":   "tab.9",
 	} {

@@ -6,12 +6,12 @@ from feedlib import *
 
 start()
 tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
-key(F11); time.sleep(2)                              # fullscreen
+fullscreen(); time.sleep(2)                              # fullscreen
 for _ in range(3):                                   # type a command line, slowly, and wipe it
     keys("ssh -p 2222 bro@127.0.0.1"); time.sleep(1)
     for _ in range(25): key(14)
     time.sleep(1)
 keys("ssh -p 2222 bro@127.0.0.1"); key(ENTER); time.sleep(5)   # connects
 keys("q"); time.sleep(3)
-key(F11); time.sleep(2)
+fullscreen(); time.sleep(2)
 exit_app()

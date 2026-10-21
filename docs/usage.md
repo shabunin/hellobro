@@ -104,7 +104,7 @@ commented out. A line is a key and a command:
 ctrl+alt+m   tab.music        # a tab of its own
 f1           tab.1            # the first tab, whichever it is
 ctrl+shift+n session.new
-f11          -                # not ours: the terminal gets F11
+f12          -                # not ours: the terminal gets F12
 none         session.prev     # no key at all
 ```
 
@@ -173,7 +173,7 @@ minutes), the Kobo goes to sleep properly.
   to the next and previous one, folded ones too. − or Ctrl+Shift+M folds
   one to its strip; Enter on the strip, or picking it in the switcher,
   opens it again. Esc on an idle one or `close` drops it.
-- F11: fullscreen, the session in focus alone (Ctrl+Tab goes on to the
+- Ctrl+Shift+F: fullscreen, the session in focus alone (Ctrl+Tab goes on to the
   next). Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
   edge: font size (remembered in `term-font`).
 - A status bar along the bottom, fullscreen too: what's playing, and the
@@ -321,7 +321,7 @@ It's only installed when asked for: `make install-tools`.
 ## In both apps
 
 In both: swipe the left edge for the frontlight (in hellobro also
-Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (F11): swipe
+Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Ctrl+Shift+F in hellobro): swipe
 in from the top or bottom edge to leave it. Esc or the exit button leave;
 the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
 with a session up, 6 hours while music plays).

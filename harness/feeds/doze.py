@@ -29,7 +29,7 @@ power(); time.sleep(4)                                # the power button does
 power(); time.sleep(5)                                # dozes again: the music's on
 power(); time.sleep(4)                                # awake
 key(K1, ctrl=True, alt=True); time.sleep(3)           # the SSH tab
-key(F11); time.sleep(3)                               # fullscreen
+fullscreen(); time.sleep(3)                               # fullscreen
 stroke([(W // 2, 20 + 18 * i) for i in range(16)]); time.sleep(3)  # in from the top: framed again
 key(SPACE, ctrl=True, shift=True); time.sleep(2)      # paused
 power(); time.sleep(10)                               # sleeps properly (pretended), wakes

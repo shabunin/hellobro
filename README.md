@@ -63,7 +63,7 @@ Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
 | Ctrl+Shift+M | minimize / open the panel in focus (Enter opens it too) |
 | Ctrl+Shift+T | new session |
 | pen across text, Ctrl+Shift+V | copy, paste |
-| F11 | fullscreen (swipe in from the top or bottom edge to leave) |
+| Ctrl+Shift+F | fullscreen, the session in focus (swipe in from the top or bottom edge to leave) |
 | Ctrl+Shift+Space | play / pause, on any tab |
 | Ctrl+Shift+< / > | previous / next track |
 | Ctrl+Alt+S, power button | sleep |

@@ -9,8 +9,8 @@ start()
 tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab: connect screen
 keys("1"); time.sleep(5)                             # saved host 1: a login shell
 keys("btop\n"); time.sleep(10)                       # its graphs fill in
-key(F11); time.sleep(10)                             # fullscreen
-key(F11); time.sleep(3)
+fullscreen(); time.sleep(10)                             # fullscreen
+fullscreen(); time.sleep(3)
 keys("q"); time.sleep(2)
 keys("exit\n"); time.sleep(2)
 exit_app()

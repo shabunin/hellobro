@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 K3, K4 = 4, 5
-KEY_M = 50
 
 start(); time.sleep(3)
 key(K4, ctrl=True, alt=True); time.sleep(5)           # Settings, Wi-Fi in focus
