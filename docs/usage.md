@@ -40,6 +40,30 @@ sleep, the light brighter, dimmer, on and off, the screen to portrait or
 landscape…), each with its keys. Typing narrows it (fuzzy);
 Up/Down and Enter, or 1–9 before typing.
 
+## Copy and paste
+
+- **Copy** in a terminal: draw the pen across the text, or hold a finger
+  still a moment and then move it. What's selected shows reversed, and
+  it's copied as you lift. A key or a tap takes the highlight away;
+  Ctrl+Shift+C copies it again. "Copy the screen's text" in the switcher
+  takes all of it.
+- **Paste**: Ctrl+Shift+V. Into a terminal goes all of it (as a paste, so
+  editors know it's not typed); into a password or a question, the
+  switcher or the `ssh>` line, its first line.
+- **The Kobo's SSH key**: "Copy the Kobo's SSH key" and "Paste the
+  Kobo's SSH key" in the switcher. Pasting types it in, the clipboard
+  left as it was: on a server, `echo ` then paste then
+  ` >> ~/.ssh/authorized_keys`.
+- A program on the other end that copies (OSC 52: tmux, helix, Claude
+  Code, vim with a plugin) copies into the clipboard too. It can't read
+  the clipboard back.
+- The clipboard is the file `clipboard` next to hellobro, so the
+  computer gets at it as well: `ssh -p 2022 kobo.local cat
+  /mnt/onboard/.adds/hellobro/clipboard`, or write it over SFTP and
+  paste on the Kobo.
+
+The header says what was copied or pasted, for a moment.
+
 ## Keys
 
 The keys are hellobro's commands'. To change one: Settings, the last
@@ -293,6 +317,7 @@ Kobo's storage:
 | `ssh_host_ed25519_key` | the Kobo's host key, for file sharing |
 | `settings`, `status-bar`, `term-font`, `tabs` | settings |
 | `keys.conf` | the keys ([Keys](#keys)) |
+| `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |
 | `music-state` | volume, shuffle, repeat, what was playing |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |

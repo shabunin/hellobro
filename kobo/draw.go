@@ -317,19 +317,31 @@ func (a *App) SetStatus(note string) {
 	}
 }
 
+// Notify puts text in the header for a few seconds, over the note:
+// "copied 3 lines".
+func (a *App) Notify(text string) {
+	log.Printf("notice: %s", text)
+	a.notice, a.noticeUntil = text, time.Now().Add(3*time.Second)
+	a.drawStatus()
+}
+
 // drawStatus refreshes the note, battery & clock text, if they changed.
 func (a *App) drawStatus() {
 	s := statusText(a.scr.info)
-	if s+"\x00"+a.note == a.status || a.calib != nil || a.Full {
+	note := a.note
+	if a.notice != "" {
+		note = a.notice
+	}
+	if s+"\x00"+note == a.status || a.calib != nil || a.Full {
 		return
 	}
-	a.status = s + "\x00" + a.note
+	a.status = s + "\x00" + note
 	r := a.L.status
 	a.C.Fill(r, Black)
 	a.C.Text(a.F.Small, r, s, Light, AlignRight)
-	if a.note != "" {
+	if note != "" {
 		r.Max.X -= TextWidth(a.F.Small, s) + 28
-		a.C.Text(a.F.Small, r, a.note, White, AlignRight)
+		a.C.Text(a.F.Small, r, note, White, AlignRight)
 	}
 	a.Mark(a.L.status, true)
 }

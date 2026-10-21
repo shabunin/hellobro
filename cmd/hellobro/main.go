@@ -275,9 +275,15 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	switch {
 	case g == nil:
 	case ev.Kind == kobo.TouchDown:
-		if isTermTab(a.Tab) && !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth {
+		switch {
+		case !isTermTab(a.Tab):
+		case !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth:
 			a.font = &fontSwipe{g: g}
+		default:
+			a.selStart(p, g)
 		}
+	case a.tv.sel != nil && a.tv.sel.g == g:
+		a.selMove(p, g)
 	case a.font != nil && a.font.g == g:
 		dy := g.Start.Y - p.Y
 		if g.Owner == 0 && kobo.Abs(dy) > kobo.SwipeStart && kobo.Abs(dy) > 2*kobo.Abs(p.X-g.Start.X) {
@@ -291,6 +297,9 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 }
 
 func (a *bro) Lift(g *kobo.Gesture) {
+	if a.selLift(g) {
+		return
+	}
 	if f := a.font; f != nil && f.g == g {
 		a.font = nil
 		if g.Owner == ownFont {

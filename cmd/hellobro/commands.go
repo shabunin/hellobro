@@ -69,6 +69,15 @@ func makeCommands() []*command {
 			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(1) }},
 		&command{id: "session.prev", title: "Previous session", keys: []string{"ctrl+shift+tab", "ctrl+pgup", "ctrl+shift+left"},
 			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(-1) }},
+		&command{id: "copy", title: "Copy the selection", keys: []string{"ctrl+shift+c"}, when: onTerm, run: (*bro).copySel},
+		&command{id: "copy.screen", title: "Copy the screen's text", when: onTerm, run: func(a *bro) {
+			if t := a.term(); t != nil && t.connected() {
+				a.copyText(a.screenText(t), "")
+			}
+		}},
+		&command{id: "paste", title: "Paste", keys: []string{"ctrl+shift+v"}, run: func(a *bro) { a.paste(readClip(), "") }},
+		&command{id: "copy.key", title: "Copy the Kobo's SSH key", run: (*bro).copyKoboKey},
+		&command{id: "paste.key", title: "Paste the Kobo's SSH key", run: (*bro).pasteKoboKey},
 		&command{id: "fullscreen", title: "Fullscreen", keys: []string{"f11"}, when: onTerm,
 			run: func(a *bro) { a.SetFull(!a.Full) }},
 		&command{id: "font.bigger", title: "Bigger font", keys: []string{"ctrl+="}, when: onTerm, repeat: true,

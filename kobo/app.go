@@ -155,6 +155,8 @@ type App struct {
 	light        *frontlight
 	lightOverlay *image.Gray // what the light gauge covers, while it's shown
 	lightHideAt  time.Time   // when the gauge SetLight put up goes
+	notice       string      // Notify's, in the header for a moment
+	noticeUntil  time.Time
 	order        []int       // the tabs shown, in order; nil: all
 	hints        []string    // in the tabs' corners, by place; nil: numbers
 	footerTabs   string      // the footer's word on the tabs; "": Ctrl+Alt+N
@@ -407,6 +409,10 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 		case <-tick.C:
 			a.stats.event("tick", 0)
 			a.alive.Store(time.Now().UnixNano())
+			if !a.noticeUntil.IsZero() && time.Now().After(a.noticeUntil) {
+				a.notice, a.noticeUntil = "", time.Time{}
+				a.drawStatus()
+			}
 			if !a.lightHideAt.IsZero() && time.Now().After(a.lightHideAt) {
 				a.lightHideAt = time.Time{}
 				a.hideGauge(&a.lightOverlay)

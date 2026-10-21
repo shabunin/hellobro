@@ -69,6 +69,7 @@ type cellKey struct {
 	attrs, ul uint8
 	width     int
 	cursor    bool
+	sel       bool // selected: shown reversed
 }
 
 type termMods struct{ shift, ctrl, alt, meta, caps bool }
@@ -125,6 +126,7 @@ type termView struct {
 	shownStatus  string
 
 	grid       image.Rectangle // the cells' area
+	sel        *termSel        // the selection, or a contact that may become one (clipboard.go)
 	cw, ch     int             // cell size
 	cols, rows int
 	shown      [][]cellKey // what's drawn
@@ -176,6 +178,7 @@ func (a *bro) termLive() bool {
 
 func (a *bro) termGeometry() {
 	v := &a.tv
+	v.sel = nil // its cells are other ones now
 	v.grid = a.termP.Body.Inset(6)
 	v.cw = kobo.TextWidth(a.tf.term, "M")
 	m := a.tf.term.Metrics()
@@ -429,6 +432,7 @@ func (a *bro) renderTerm(t *termSession) {
 		from, to, gray := -1, -1, false
 		for x := 0; x < v.cols; x++ {
 			k := t.cellKeyAt(x, y, showCursor && cur.X == x && cur.Y == y)
+			k.sel = v.sel.has(x, y)
 			if k == v.shown[y][x] {
 				continue
 			}
@@ -513,7 +517,7 @@ func (a *bro) drawCell(x, y int, k cellKey) {
 	w := max(1, k.width)
 	r := image.Rect(v.grid.Min.X+x*v.cw, v.grid.Min.Y+y*v.ch, v.grid.Min.X+(x+w)*v.cw, v.grid.Min.Y+(y+1)*v.ch).Intersect(v.grid)
 	fg, bg := k.fg, k.bg
-	if k.cursor {
+	if k.cursor != k.sel {
 		fg, bg = bg, fg
 	}
 	a.C.Fill(r, bg)
@@ -535,6 +539,7 @@ func (a *bro) drawCell(x, y int, k cellKey) {
 // first session (the Shell tab's starts its shell right away).
 func (a *bro) enterTerm() {
 	v := &a.tv
+	v.sel = nil // the other tab's
 	if v.hosts == nil {
 		v.hosts = loadSSHHosts()
 	}
@@ -576,6 +581,7 @@ func (a *bro) switchSession(i int) {
 		return
 	}
 	g.cur = i
+	a.tv.sel = nil
 	a.drawTerm()
 	a.MarkFlash(a.termP.Outer) // a whole new screen: clean, not ghosted
 }
@@ -771,6 +777,7 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 			})
 		},
 	})
+	t.emu.RegisterOscHandler(52, a.osc52(t))
 	back.resize(v.cols, v.rows)
 	if t.kind == kindShell {
 		log.Printf("shell: started, %d×%d", v.cols, v.rows)
@@ -925,6 +932,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 	if value == 0 {
 		return true
 	}
+	a.clearSel() // a key: the selection's done with
 	ch, printable := kobo.KeyChar(code, m.shift, m.caps)
 
 	if t.prompt != nil {
@@ -1144,6 +1152,10 @@ func (a *bro) termTap(p image.Point) {
 	}
 	x, y, ok := a.termCell(p)
 	if !ok {
+		return
+	}
+	if a.tv.sel != nil && a.tv.sel.on { // a tap takes the selection away, and only that
+		a.clearSel()
 		return
 	}
 	m := uv.Mouse{X: x, Y: y, Button: uv.MouseLeft}
