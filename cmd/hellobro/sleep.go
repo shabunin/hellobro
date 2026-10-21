@@ -32,6 +32,7 @@ func (a *bro) Sleep() func() {
 	r.prompt = nil
 	wifi, bt := r.wifi, r.bt
 	dozedOff := a.doze.wifiOff // off for a doze we're leaving for sleep: it was on
+	a.doze.wifiAsk = false     // and waking from the doze doesn't turn it on: sleep does
 	if dozedOff {
 		a.dozeWiFi("forget")
 	}

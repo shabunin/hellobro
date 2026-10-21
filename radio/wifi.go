@@ -557,8 +557,9 @@ func (w *wpaWiFi) SetPower(on bool, progress func(string)) error {
 		return nil
 	}
 	if on {
+		kept := w.kept
 		w.kept = false
-		return w.powerOn(progress)
+		return w.powerOn(progress, kept)
 	}
 	return w.powerOff(progress, false)
 }
@@ -605,14 +606,19 @@ func kobChip() chip {
 	return c
 }
 
-func (w *wpaWiFi) powerOn(progress func(string)) error {
+// powerOn turns Wi-Fi on; kept, the chip still has its power and its
+// driver (Down), so it's only the interface and wpa_supplicant.
+func (w *wpaWiFi) powerOn(progress func(string), kept bool) error {
 	c := kobChip()
-	log.Printf("wifi: turning on: module %q, platform %q, power by %s", c.module, c.platform, c.power)
+	log.Printf("wifi: turning on: module %q, platform %q, power by %s, chip kept on %v", c.module, c.platform, c.power, kept)
 	if c.module == "" || c.platform == "" {
 		return errors.New("don't know this Kobo's Wi-Fi chip (WIFI_MODULE, PLATFORM unset)")
 	}
 	if c.power == "wmt" {
 		return errors.New("turning Wi-Fi on isn't done for this Kobo's chip yet; use Kobo's settings")
+	}
+	if kept && loaded(c.module) {
+		return w.start(c, progress)
 	}
 	progress("powering the chip…")
 	switch {
@@ -660,6 +666,12 @@ func (w *wpaWiFi) powerOn(progress func(string)) error {
 	} else {
 		time.Sleep(time.Second)
 	}
+	return w.start(c, progress)
+}
+
+// start brings the interface up, starts wpa_supplicant and waits for a
+// network and an address.
+func (w *wpaWiFi) start(c chip, progress func(string)) error {
 	run("ifconfig", w.iface, "up")
 	if c.module == "dhd" {
 		run("wlarm_le", "-i", w.iface, "up")

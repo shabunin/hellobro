@@ -94,7 +94,7 @@ def key(code, shift=False, ctrl=False, alt=False):
     for m in reversed(mods): kbd.write(ev(1, m, 0) + SYN)
     time.sleep(0.15)
 UP, DOWN, ENTER, ESC, TAB, BACKSPACE, SPACE, F11 = 103, 108, 28, 1, 15, 14, 57, 87
-PGUP, PGDN, KEY_T, LEFT, RIGHT = 104, 109, 20, 105, 106
+PGUP, PGDN, KEY_T, LEFT, RIGHT, KEY_P = 104, 109, 20, 105, 106, 25
 F = lambda n: 58 + n                                  # F1..F10
 
 def power():

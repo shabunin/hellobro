@@ -5,8 +5,10 @@ package main
 // buttons (or a keyboard's media keys) play, pause, skip and set the
 // volume. It comes after a while without input while music plays, or
 // from Sleep with music on (the settings say); a tap or a key wakes it.
-// Wi-Fi goes off meanwhile, unless the settings keep it; once the music
-// has stopped a while, the Kobo goes to sleep properly.
+// Wi-Fi goes off once it's lasted a few minutes, unless the settings keep
+// it: Wi-Fi and Bluetooth share the chip, and Wi-Fi coming back (a scan,
+// joining, DHCP) takes the air from the music, so a short doze leaves it
+// be. Once the music has stopped a while, the Kobo goes to sleep properly.
 
 import (
 	"fmt"
@@ -22,11 +24,14 @@ import (
 	"hellobro/kobo"
 )
 
+const dozeWiFiAfter = 3 * time.Minute // a doze this long turns Wi-Fi off
+
 type dozeState struct {
 	since    time.Time
 	quietAt  time.Time // when the music stopped, while dozing
 	shown    string    // what the doze screen shows
 	wifiOff  bool      // Wi-Fi is off for the doze, to go back on after
+	wifiAsk  bool      // this doze asked for it off
 	wifiBusy bool      // the Wi-Fi panel shows it coming back
 	jobs     chan string
 }
@@ -55,6 +60,10 @@ func (a *bro) dozeWhenIdle() {
 // a while, sleep.
 func (a *bro) dozeTick() {
 	z := &a.doze
+	if !z.wifiAsk && time.Since(z.since) >= dozeWiFiAfter && a.setting("doze-wifi") == "off" && !a.relayOn() {
+		z.wifiAsk = true
+		a.dozeWiFi("off")
+	}
 	if a.musicPlaying() {
 		z.quietAt = time.Time{}
 		return
@@ -72,16 +81,16 @@ func (a *bro) Dozed(on bool) {
 	z, r := &a.doze, &a.rs
 	z.quietAt, z.shown = time.Time{}, ""
 	if !on {
-		a.dozeWiFi("on")
+		if z.wifiAsk {
+			z.wifiAsk = false
+			a.dozeWiFi("on")
+		}
 		return
 	}
 	z.since = time.Now()
 	if r.started && !r.discoverTo.IsZero() { // a scan would only stutter the music
 		r.discoverTo = time.Time{}
 		go r.bt.Discover(false)
-	}
-	if a.setting("doze-wifi") == "off" && !a.relayOn() {
-		a.dozeWiFi("off")
 	}
 }
 
@@ -98,6 +107,12 @@ func (a *bro) dozeWiFi(job string) {
 			off := false // we turned it off
 			progress := func(s string) { log.Printf("doze: wifi: %s", s) }
 			for job := range z.jobs {
+				for len(z.jobs) > 0 { // only the last counts: awake again before an off ran, say
+					if job == "forget" { // but sleep took it over, whatever comes after
+						off = false
+					}
+					job = <-z.jobs
+				}
 				switch {
 				case job == "off" && !off && wifi.Status().On:
 					if err := wifiOff(wifi, bt, progress); err != nil { // Bluetooth plays on
@@ -210,7 +225,7 @@ func (a *bro) DrawDoze() {
 	}
 
 	y = max(y, b.Max.Y-b.Dy()/6)
-	line(y, 44, a.F.Small, "Headphone buttons: play/pause, next, previous, volume.", kobo.Dark)
+	line(y, 44, a.F.Small, "Media keys: play/pause, next, previous, volume.", kobo.Dark)
 	wake := "Press the power button or a key to wake up."
 	switch {
 	case !a.PowerButton() && a.Keyboard == "":

@@ -107,7 +107,7 @@ hellobro has to be running for any of it.
 
 ## Using it
 
-**On the Kobo**, the PC: `home` in the switcher (Ctrl+Shift+Tab) or the
+**On the Kobo**, the PC: `home` in the switcher (Ctrl+Shift+P) or the
 SSH tab.
 
 **On the PC**, the Kobo (the pairing from home still holds):

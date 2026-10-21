@@ -312,7 +312,7 @@ func (a *bro) drawTermStatus() {
 
 func (a *bro) drawConnect(t *termSession) {
 	v := &a.tv
-	keys := "Ctrl+Shift+T: new session  ·  Ctrl+Shift+Tab: sessions  ·  Ctrl+Alt+1-4: tabs  ·  F11: fullscreen (or swipe in from the top or bottom edge to leave it)"
+	keys := "Ctrl+Shift+T: new session  ·  Ctrl+Tab: next session  ·  Ctrl+Shift+P: go to…  ·  Ctrl+Alt+1-4: tabs  ·  F11: fullscreen (or swipe in from the top or bottom edge to leave it)"
 	music := "Ctrl+Shift+Space: play/pause  ·  Ctrl+Shift+< >: previous/next track  ·  Ctrl+Shift+B: status bar"
 	var lines []string
 	if t.kind == kindShell {
@@ -944,6 +944,15 @@ func (a *bro) termKey(code uint16, value int32) bool {
 				a.newSession(true)
 				a.drawTerm()
 				a.MarkFlash(a.termP.Outer)
+			}
+			return true
+		case m.ctrl && code == kobo.KeyTab: // as a browser's tabs; Shift goes back
+			switch {
+			case len(g.sessions) < 2:
+			case m.shift:
+				a.switchSession((g.cur + len(g.sessions) - 1) % len(g.sessions))
+			default:
+				a.switchSession((g.cur + 1) % len(g.sessions))
 			}
 			return true
 		case m.ctrl && (code == keyPgUp || m.shift && code == keyLeft):

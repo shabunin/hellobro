@@ -39,7 +39,7 @@ var settingList = []setting{
 		shown:  []string{"light: the music plays on", "deep: the music stops"}},
 	{key: "doze-wifi", label: "Wi-Fi in light sleep",
 		values: []string{"off", "on"},
-		shown:  []string{"off (the battery lasts)", "stays on"}},
+		shown:  []string{"off after 3 min (the battery lasts)", "stays on"}},
 	{key: "doze-deep", label: "Music stopped in light sleep",
 		values: []string{"5", "10", "30", "off"},
 		shown:  []string{"deep sleep after 5 min", "deep sleep after 10 min", "deep sleep after 30 min", "stay in light sleep"}},

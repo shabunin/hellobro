@@ -1,10 +1,10 @@
 package main
 
 // The switcher, a fuzzy menu in the manner of rofi's combi mode:
-// Ctrl+Shift+Tab, on any tab, lists the terminal sessions, the tabs and
+// Ctrl+Shift+P (as VS Code's palette), on any tab, lists the terminal sessions, the tabs and
 // the saved SSH hosts (a new session to one). Typing narrows the list,
 // Up/Down (or Tab, Shift+Tab) move, Enter goes; with nothing typed, 1-9 go
-// straight to that row. Esc, Ctrl+Shift+Tab again or a tap outside close
+// straight to that row. Esc, Ctrl+Shift+P again or a tap outside close
 // it. The page under it holds still meanwhile. The Music tab puts up the
 // same menu to pick a playlist, with an entry for a new one, named as
 // typed.
@@ -287,7 +287,7 @@ func (a *bro) pickerKey(code uint16, value int32) {
 	}
 	ch, printable := kobo.KeyChar(code, m.shift, m.caps)
 	switch {
-	case code == kobo.KeyEsc || code == kobo.KeyTab && m.ctrl && m.shift:
+	case code == kobo.KeyEsc || code == keyP && m.ctrl && m.shift:
 		a.closePicker()
 		return
 	case code == kobo.KeyEnter:

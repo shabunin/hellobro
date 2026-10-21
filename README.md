@@ -57,7 +57,8 @@ Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
 | | |
 | --- | --- |
 | Ctrl+Alt+1–5 | tabs |
-| Ctrl+Shift+Tab | switcher: sessions, tabs, hosts |
+| Ctrl+Shift+P | go to: sessions, tabs, hosts |
+| Ctrl+Tab, Ctrl+Shift+Tab | next / previous session |
 | Ctrl+Shift+T | new session |
 | F11 | fullscreen (swipe in from the top or bottom edge to leave) |
 | Ctrl+Shift+Space | play / pause, on any tab |

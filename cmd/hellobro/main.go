@@ -42,7 +42,7 @@ var tabNames = []string{"SSH", "Shell", "Music", "Settings", "Files"}
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
 const termIdleTimeout = 20 * time.Minute // with a session up: reading a remote screen takes longer
-const relayIdle = 24 * time.Hour        // with the relay on: as good as never
+const relayIdle = 24 * time.Hour         // with the relay on: as good as never
 
 // bro is the app: the kobo.App, the terminal, the music player and the
 // radios.
@@ -224,7 +224,7 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 	case a.picker != nil:
 		a.pickerKey(m.Code, m.Value)
 		return true
-	case a.tv.mods.ctrl && a.tv.mods.shift && m.Code == kobo.KeyTab:
+	case a.tv.mods.ctrl && a.tv.mods.shift && m.Code == keyP: // as VS Code's palette
 		if m.Value == 1 {
 			a.openPicker()
 		}
@@ -254,6 +254,7 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 }
 
 const (
+	keyP     = 25
 	keyB     = 48
 	keyComma = 51
 	keyDot   = 52

@@ -43,7 +43,7 @@ pc("scp", *BASE, *JUMP, "-P", PORT, app, "root@127.0.0.1:" + os.path.join(OUT, "
 pc("ssh", *BASE, *JUMP, "-p", PORT, "root@127.0.0.1", "hellobro-update"); time.sleep(14)  # the restart, on trial
 key(K5, ctrl=True, alt=True); time.sleep(8)            # the relay back up, after it
 pc("ssh", *BASE, *JUMP, "-p", PORT, "root@127.0.0.1", "hellobro-version"); time.sleep(2)
-key(TAB, ctrl=True, shift=True); time.sleep(1.5)       # the switcher: home, via the "VPS"
+key(KEY_P, ctrl=True, shift=True); time.sleep(1.5)       # the switcher: home, via the "VPS"
 keys("home"); time.sleep(1)
 key(ENTER); time.sleep(10)
 key(K1, ctrl=True, alt=True); time.sleep(3)

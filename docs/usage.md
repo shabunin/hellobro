@@ -26,7 +26,8 @@ session too):
 
 ## The switcher
 
-Ctrl+Shift+Tab, anywhere, is a switcher in the manner of rofi: the
+Ctrl+Shift+P, anywhere, is a switcher in the manner of rofi (or VS
+Code's command palette): the
 sessions, the tabs, the saved hosts (a new session to one) and a new
 shell, narrowed by typing (fuzzy); Up/Down and Enter, or 1–9 before
 typing.
@@ -53,8 +54,11 @@ skip, and set the volume. The power button or
 any other key wakes it up, to the page as it was; touching the screen
 doesn't (unless there's no keyboard and no power button to be had). With music playing it comes
 after a while without input (5 minutes; Settings), and Ctrl+Alt+S dozes
-instead of sleeping (Settings: or not). Wi-Fi goes off meanwhile (or not),
-and comes back on waking; with Bluetooth on, the Wi-Fi chip keeps its
+instead of sleeping (Settings: or not). Wi-Fi goes off once the light
+sleep has lasted 3 minutes (Settings: or not), and comes back on waking.
+Not before: Wi-Fi coming back (a scan, joining, DHCP) takes the air from
+the music, which skips meanwhile, so a short light sleep leaves it be.
+With Bluetooth on, the Wi-Fi chip keeps its
 power (on the Elipsa it's Bluetooth's chip too: cutting it took the
 headphones with it). Once the music has stopped for a while (10
 minutes), the Kobo goes to sleep properly.
@@ -74,9 +78,10 @@ minutes), the Kobo goes to sleep properly.
 - Keepalives every 15 s notice a dead connection; a dropped one (not one the
   remote closed) is made again, after 2, 4, 8… up to 30 s, with the password
   typed earlier (kept in memory only). Esc stops it.
-- Sessions: Ctrl+Shift+T or the `+` button adds one, Ctrl+PgUp/PgDn (or
-  Ctrl+Shift+Left/Right) or the numbered buttons switch, Esc on an idle one
-  or `close` drops it.
+- Sessions: Ctrl+Shift+T or the `+` button adds one, Ctrl+Tab and
+  Ctrl+Shift+Tab (or Ctrl+PgUp/PgDn, Ctrl+Shift+Left/Right, or the
+  numbered buttons) go to the next and previous one, Esc on an idle one or
+  `close` drops it.
 - F11: fullscreen. Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
   edge: font size (remembered in `term-font`).
 - A status bar along the bottom, fullscreen too: what's playing, and the
