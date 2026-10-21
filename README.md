@@ -27,7 +27,7 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   reconnects by itself. tmux, htop, helix, Claude Code all work.
 - **Shell**: the same terminal on the Kobo itself.
 - **Music**: albums, folders and playlists, shuffle and repeat, to
-  Bluetooth headphones. Headphone buttons work.
+  Bluetooth headphones. Media keys work.
 - **Light sleep**: the screen shows what's playing, the light goes off,
   and the music keeps going.
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel.

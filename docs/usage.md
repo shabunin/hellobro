@@ -48,8 +48,8 @@ once).
 
 Light sleep is for listening: the light goes off and the screen shows
 what's playing (the cover, the track, the album), but the Kobo stays
-awake, so the music plays on and the headphones' buttons (or a keyboard's
-media keys) play and pause, skip, and set the volume. The power button or
+awake, so the music plays on and a keyboard's media keys play and pause,
+skip, and set the volume. The power button or
 any other key wakes it up, to the page as it was; touching the screen
 doesn't (unless there's no keyboard and no power button to be had). With music playing it comes
 after a while without input (5 minutes; Settings), and Ctrl+Alt+S dozes
@@ -96,10 +96,13 @@ minutes), the Kobo goes to sleep properly.
   one that isn't connected gets a "connect" button.
 - On any tab: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
   the previous and next track; so do media keys, and the volume keys (a
-  headset's, a keyboard's) set the volume. Headphones' buttons come as
-  keys, or, while Nickel has a media player registered with BlueZ, as
-  BlueZ's calls to it (Play, Next…), which hellobro watches the system bus
-  for: Nickel, frozen, would never answer them.
+  headset's, a keyboard's) set the volume.
+- Headphones' buttons work only when BlueZ sends them as keys, which it
+  does while no media player is registered with it. On the Kobo, Nickel
+  has one registered, so BlueZ sends the presses there as D-Bus calls,
+  and Nickel, frozen, never answers them. hellobro tries to watch the bus
+  for them, but the Elipsa's D-Bus (1.6.30) has no monitor mode and
+  doesn't allow eavesdropping, so on the Elipsa they're lost.
 - The library has three views (tap them, or Tab / v / 1-3):
   - **Albums**: every folder with tracks in it.
   - **Folders**: the folders as they are, from the one all the music is

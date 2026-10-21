@@ -92,9 +92,13 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 - Wi-Fi and Bluetooth share one RTL8821CS chip. `ntx_io 208 0` (chip
   power off) kills Bluetooth too: with BT on, Wi-Fi only goes `Down()`.
 - Nickel registers a BlueZ media player, so headphone buttons arrive as
-  D-Bus calls to it, which we watch as a bus monitor (`audio/avrcp.go`).
-  With godbus `Eavesdrop`, a method reply goes to the eavesdrop channel:
-  `Call` blocks forever, so use `Go`.
+  D-Bus calls to it, not as keys. `audio/avrcp.go` watches for them as a
+  bus monitor, but the Kobo's dbus-daemon is 1.6.30: no `BecomeMonitor`
+  (it's 1.9.10+), and its policy forbids `eavesdrop='true'`, even for
+  root. BlueZ 5.63 also always gives a connection the *first* registered
+  player (Nickel's), so a player of our own never gets presses. The user
+  chose to leave it (2026-10-21). With godbus `Eavesdrop`, a method reply
+  goes to the eavesdrop channel: `Call` blocks forever, so use `Go`.
 - e-ink: never overlap an update with one still in flight. Small changes
   use DU, then a GL16 cleanup; a GC16 flash now and then.
 - sshd's `permitopen` matches the host name as asked: `127.0.0.1` and
