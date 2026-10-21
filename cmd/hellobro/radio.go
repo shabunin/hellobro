@@ -99,11 +99,11 @@ func (a *bro) layoutRadio(K kobo.Layout) {
 	v := &a.rv
 	var wr, br, sr image.Rectangle
 	if K.Landscape { // the radios side by side, the settings under them
-		st := K.Stack(K.Body, 64)
+		st := K.Stack(K.Body, 56)
 		wr, br = K.Split(st[0], 0.5)
 		sr = st[1]
 	} else {
-		st := K.Stack(K.Body, 37, 74)
+		st := K.Stack(K.Body, 34, 68)
 		wr, br, sr = st[0], st[1], st[2]
 	}
 	a.layoutSettings(sr)
@@ -136,7 +136,7 @@ func (a *bro) enterRadio() {
 }
 
 func (a *bro) showingRadio() bool {
-	return a.Tab == tabRadio && !a.Calibrating() && a.picker == nil && !a.Dozing()
+	return a.Tab == tabRadio && !a.Calibrating() && !a.overlay() && !a.Dozing()
 }
 
 // radioPoll reads both radios' state, off the UI, and redraws what

@@ -10,13 +10,16 @@ KOBO_SRC = $(wildcard kobo/*.go) go.mod go.sum
 hellobro: $(wildcard cmd/hellobro/*.go)
 brotools: $(wildcard cmd/brotools/*.go)
 
+# The build's version: the commit, and when it was built (hellobro --version).
+VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)-$(shell date +%m%d.%H%M)
+
 # cgo + FBInk need an ARM C toolchain, so the build runs in a container (tools/Containerfile).
-$(APPS): $(KOBO_SRC) third_party/fbink/libfbink.a .cross-image
+$(APPS): $(KOBO_SRC) $(wildcard share/*.go radio/*.go audio/*.go) third_party/fbink/libfbink.a .cross-image
 	podman run --rm --security-opt label=disable -v $(CURDIR):/src -w /src \
 		-v $(shell go env GOMODCACHE):/go/pkg/mod -v hellobro-gocache:/root/.cache/go-build \
 		-e GOOS=linux -e GOARCH=arm -e GOARM=7 -e CGO_ENABLED=1 -e CC=arm-linux-gnueabihf-gcc -e GOFLAGS=-mod=mod \
 		$(CROSS) go build -trimpath -tags netgo,osusergo \
-		-ldflags='-s -w -linkmode external -extldflags "-static"' -o $@ ./cmd/$@
+		-ldflags='-s -w -X main.version=$(VERSION) -linkmode external -extldflags "-static"' -o $@ ./cmd/$@
 
 # Without cgo: no linked-in FBInk, every update runs bin/fbink (slow, but no container needed).
 %-nocgo: $(KOBO_SRC) $(wildcard cmd/*/*.go)
@@ -58,6 +61,23 @@ uninstall-tools:
 	rm -f $(ADDS)/brotools $(ADDS)/brotools.log $(ADDS)/brotools-old.log $(KOBO)/.adds/nm/brotools
 	sync
 
+# Over Wi-Fi, with file sharing on in hellobro (Settings) and this
+# computer paired: the new build goes next to the running one, which
+# checks it and restarts into it (keeping the old one as hellobro.old).
+KOBO_HOST ?= kobo.local
+push: hellobro
+	scp -P 2022 hellobro $(KOBO_HOST):/mnt/onboard/.adds/hellobro/hellobro.new
+	ssh -p 2022 $(KOBO_HOST) hellobro-update
+
+# The same, back to the build before.
+push-rollback:
+	ssh -p 2022 $(KOBO_HOST) 'cd /mnt/onboard/.adds/hellobro && cp hellobro.old hellobro.new' && \
+	ssh -p 2022 $(KOBO_HOST) hellobro-update
+
+# The log, over Wi-Fi.
+push-log:
+	ssh -p 2022 $(KOBO_HOST) cat /mnt/onboard/.adds/hellobro/hellobro.log
+
 log:
 	cat $(ADDS)/hellobro.log
 
@@ -77,4 +97,4 @@ test:
 clean:
 	rm -f $(APPS) $(APPS:=-nocgo)
 
-.PHONY: all install install-tools uninstall-tools log log-tools clean server test
+.PHONY: all install install-tools uninstall-tools log log-tools clean server test push push-rollback push-log

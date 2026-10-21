@@ -5,7 +5,8 @@ Nickel, draw their own e-ink UI through [FBInk](https://github.com/NiLuJe/FBInk)
 and give Nickel back when you leave. Each has its own NickelMenu entry.
 
 **hellobro** ("Hello Bro") is a terminal for a Bluetooth keyboard, with
-music and Kobo's wireless settings. Tabs (tap, or Ctrl+Alt+1–4, which work
+music, Kobo's wireless settings and a way in for a computer. Tabs (tap,
+or Ctrl+Alt+1–5, which work
 everywhere, fullscreen and in a session too):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
@@ -18,7 +19,11 @@ everywhere, fullscreen and in a session too):
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel: on and
   off, networks (join, with a password; leave; forget; one by name), and
   devices (scan, pair, connect, disconnect, forget); and hellobro's own
-  settings: light sleep, sleep with music on, the status bar.
+  settings: light sleep, sleep with music on, file sharing, mDNS, the
+  status bar.
+- **Files**: sharing with a computer over SFTP and SSH (how to reach the
+  Kobo, pairing, who's connected and sending what), and the Kobo's
+  storage: folders to open, files and folders to delete.
 
 Ctrl+Shift+Tab, anywhere, is a switcher in the manner of rofi: the
 sessions, the tabs, the saved hosts (a new session to one) and a new
@@ -74,9 +79,11 @@ with a session up, 6 hours while music plays).
 - `radio/`: Wi-Fi through wpa_supplicant and DHCP, turned on and off as
   Kobo does it (after KOReader's scripts); Bluetooth through BlueZ, with a
   pairing agent.
+- `share/`: the SSH server for a computer: SFTP, a shell, commands, and
+  pairing by a code on the screen; the mDNS responder that advertises it.
 - `cmd/hellobro/`: the terminal (the emulator view, SSH, the local shell),
-  the status bar, the switcher, the Music and Settings tabs, sleep and
-  light sleep.
+  the status bar, the switcher, the Music, Settings and Files tabs, sleep
+  and light sleep, updates over the air.
 - `cmd/brotools/`: the diagnostics pages.
 
 ## Terminal
@@ -152,6 +159,45 @@ use GL16, and after a few screenfuls of change the terminal gets one GC16
 flash. Updates never overlap a refresh still in flight (on sunxi that mixes
 both up).
 
+## Sharing with a computer
+
+With file sharing on (Settings, or `o` on the Files tab), hellobro is an
+SSH server on port 2022, and with mDNS on the Kobo is `kobo.local` and
+shows up as an SFTP server in a file manager's Network. Only paired
+computers get in, with their key; there are no passwords:
+
+1. Pair: `pair` on the Files tab (or Settings, `p`) shows a code for 5
+   minutes. On the computer, `ssh -p 2022 kobo.local`: once the computer
+   has shown it holds its key, it asks for the code, and that key is in.
+   (No key yet? `ssh-keygen` makes one.) Check the host key fingerprint
+   against the one the Files tab shows, the first time.
+2. Then, from that computer:
+   - a file manager: `sftp://kobo.local:2022/mnt/onboard` (Files on
+     Fedora: Other Locations, or Ctrl+L);
+   - `scp -P 2022 -r "Some Album" kobo.local:Music/` (relative paths are
+     under `/mnt/onboard`), `sftp -P 2022 kobo.local`;
+   - `sshfs -p 2022 kobo.local:/mnt/onboard ~/kobo`, to mount it;
+   - `ssh -p 2022 kobo.local`, a shell on the Kobo (as root: Kobo has no
+     other user), or a command.
+
+Music sent over is found without leaving: the Music tab looks again once
+a computer that sent files leaves. Paired keys are in
+`.adds/hellobro/authorized_keys` (`forget paired` empties it), the Kobo's
+host key in `ssh_host_ed25519_key` there. The server only runs while
+hellobro does, with sharing on, and Wi-Fi up: light sleep turns Wi-Fi off
+(Settings), so it doesn't come while a computer is connected, nor does
+the auto-exit.
+
+**Updating over the air**: `make push` (with this computer paired)
+sends the new build as `hellobro.new` and asks hellobro to take it
+(`hellobro-update`). It checks it's an ARM build that runs and says it's
+hellobro, keeps the running one as `hellobro.old`, and restarts into the
+new one: the same process, so Nickel stays frozen. `make push-rollback`
+goes back to `hellobro.old`, `make push-log` shows the log. A
+`hellobro.new` sent any other way gets a question on the screen instead.
+`make install` (USB) is still how `launch.sh`, `bin/fbink` and the menu
+entry get there. `KOBO_HOST=192.168.x.y` if `kobo.local` doesn't resolve.
+
 ## Building
 
 The build runs in a podman container with Go and an ARM toolchain
@@ -214,13 +260,16 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     MUSIC=~/Music harness/run.sh /tmp/hb 0 music      # the Music tab
     MUSIC=~/Music harness/run.sh /tmp/hb 0 statbar    # the status bar, the music hotkeys
     harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
+    harness/run.sh /tmp/hb 0 share                     # pairing, scp, make push's update and restart (ssh, scp on the PC)
     MUSIC=~/Music harness/run.sh /tmp/hb 0 doze        # settings, light sleep with music, media keys
 
 `MUSIC` is the music folder (default `harness/music`); the sound goes to
 `OUT/pcm.raw` (`HELLOBRO_FAKE_PCM`: 48 kHz, 16-bit stereo), at the pace it
 would play. Wi-Fi and Bluetooth are stand-ins (`HELLOBRO_FAKE_RADIO`;
 `FAKE_RADIO=` for the PC's own, careful), and sleeping is pretended
-(`HELLOBRO_FAKE_SLEEP`: never the PC's suspend). The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
+(`HELLOBRO_FAKE_SLEEP`: never the PC's suspend). File sharing listens on
+127.0.0.1 only, with a fixed pairing code, its storage in `OUT/onboard`
+and no mDNS (it would claim kobo.local on the real network). The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
 (`calls.txt` there lists every update with its waveform). The feeds live in
 `harness/feeds`, each with an `# app:` line naming the app it drives, and
 their shared helpers in `harness/feedlib.py`.

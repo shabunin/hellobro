@@ -170,6 +170,49 @@ func (a *bro) scanMusic(then func()) {
 	}()
 }
 
+// rescanMusic finds the albums again (a computer sent some), keeping
+// what's playing and what's open where they are.
+func (a *bro) rescanMusic() {
+	m := &a.mus
+	if !m.scanned || m.scanning {
+		return // a scan to come sees them anyway
+	}
+	m.scanning = true
+	go func() {
+		albums := scanLibrary(musicRoot)
+		a.Do(func() {
+			m.scanning = false
+			dirOf := func(i int) string {
+				if i >= 0 && i < len(m.albums) {
+					return m.albums[i].dir
+				}
+				return ""
+			}
+			find := func(dir string) int {
+				for i, al := range albums {
+					if dir != "" && al.dir == dir {
+						return i
+					}
+				}
+				return -1
+			}
+			playing, open, sel := dirOf(m.album), dirOf(m.open), dirOf(m.sel)
+			was := len(m.albums)
+			m.albums = albums
+			m.album, m.open = find(playing), find(open)
+			if m.open < 0 {
+				m.sel = max(0, find(sel))
+			}
+			if m.album < 0 && m.player != nil {
+				a.musicStop() // its album went
+				a.musicHeader()
+			}
+			log.Printf("music: rescanned: %d albums (%+d)", len(albums), len(albums)-was)
+			a.redrawMusic()
+		})
+	}()
+}
+
 // probeAudio looks for the Bluetooth device to play to.
 func (a *bro) probeAudio() {
 	m := &a.mus
@@ -271,7 +314,7 @@ func (a *bro) closeAlbum() {
 // --- drawing ---
 
 func (a *bro) showingMusic() bool {
-	return a.Tab == tabMusic && !a.Calibrating() && a.picker == nil && !a.Dozing()
+	return a.Tab == tabMusic && !a.Calibrating() && !a.overlay() && !a.Dozing()
 }
 
 func (a *bro) redrawMusic() {

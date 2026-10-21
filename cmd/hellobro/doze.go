@@ -43,7 +43,7 @@ func (a *bro) DozeInstead() bool {
 // dozeWhenIdle dozes once nothing's been touched a while with music on.
 func (a *bro) dozeWhenIdle() {
 	d := a.settingMinutes("doze-after")
-	if d == 0 || !a.musicPlaying() || a.IdleFor() < d || a.picker != nil || a.rs.prompt != nil || a.Calibrating() {
+	if d == 0 || !a.musicPlaying() || a.IdleFor() < d || a.overlay() || a.rs.prompt != nil || a.Calibrating() || a.shareBusy() {
 		return
 	}
 	log.Printf("doze: %v without input, the music playing", d)

@@ -169,6 +169,7 @@ type App struct {
 	panelC    Canvas       // while dozing, what's on the panel
 	dozeLight int          // the light's level before dozing
 	eatTouch  bool         // the contact that woke us from dozing isn't over
+	restart   string       // a binary to run in our place once we've quit
 	ctrl      [2]bool      // left and right Ctrl held, for Ctrl+Alt+N
 	alt       [2]bool      // and Alt
 }
@@ -236,17 +237,41 @@ func (a *App) Run() {
 	a.prog.Exit()
 	a.WaitBlit()
 	a.dirty = nil
-	a.drawBye()
+	if a.restart != "" {
+		a.drawRestart()
+	} else {
+		a.drawBye()
+	}
 	a.flush()
 	a.WaitBlit()
 	a.scr.close()
 	if a.light != nil {
 		a.light.close()
 	}
+	if a.restart != "" {
+		a.exec()
+		return // it didn't: launch.sh gives Kobo back
+	}
 	log.Print("bye")
 	if logFile != nil {
 		logFile.Sync()
 	}
+}
+
+// Restart quits, then runs exe in our place: the same process, so Nickel
+// stays frozen and launch.sh goes on waiting for us.
+func (a *App) Restart(exe string) {
+	log.Printf("restart into %s", exe)
+	a.restart, a.quit = exe, true
+}
+
+func (a *App) exec() {
+	log.Printf("restarting: exec %s", a.restart)
+	if logFile != nil {
+		logFile.Sync()
+	}
+	err := syscall.Exec(a.restart, []string{a.restart}, os.Environ())
+	log.Printf("restart: %v", err)
 }
 
 func openLog(name string) (*os.File, error) {

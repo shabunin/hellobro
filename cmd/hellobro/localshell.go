@@ -26,8 +26,9 @@ type localShell struct {
 	err  error         // how it went, once exit is closed
 }
 
-// startShell runs a login-ish shell on a new PTY of cols×rows.
-func startShell(cols, rows int) (*localShell, error) {
+// startShell runs a login-ish shell on a new PTY of cols×rows; or, given
+// a command, the shell runs that.
+func startShell(cols, rows int, command ...string) (*localShell, error) {
 	ptmx, err := ptyMaster()
 	if err != nil {
 		return nil, err
@@ -56,6 +57,9 @@ func startShell(cols, rows int) (*localShell, error) {
 
 	shell := "/bin/sh"
 	cmd := exec.Command(shell, "-l")
+	if len(command) > 0 && command[0] != "" {
+		cmd = exec.Command(shell, "-c", command[0])
+	}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
 	cmd.Env = shellEnv()

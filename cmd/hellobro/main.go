@@ -5,7 +5,10 @@
 //   - Shell: terminals with a shell on the Kobo itself;
 //   - Music: a player for the albums on the Kobo, over Bluetooth; it
 //     goes on playing on the other tabs;
-//   - Settings: Kobo's Wi-Fi and Bluetooth, and hellobro's sleep and status bar.
+//   - Settings: Kobo's Wi-Fi and Bluetooth, and hellobro's sleep, sharing
+//     and status bar;
+//   - Files: sharing with a computer (SFTP, ssh, mDNS), and the Kobo's
+//     storage.
 //
 // A swipe along the right edge sets the font size, F11 gives the
 // terminal the whole screen. The rest (the screen, touch, the frontlight
@@ -15,8 +18,10 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"log"
+	"os"
 	"strconv"
 	"time"
 
@@ -29,9 +34,10 @@ const (
 	tabShell
 	tabMusic
 	tabRadio
+	tabFiles
 )
 
-var tabNames = []string{"SSH", "Shell", "Music", "Settings"}
+var tabNames = []string{"SSH", "Shell", "Music", "Settings", "Files"}
 
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
@@ -49,12 +55,16 @@ type bro struct {
 	mus    musicState
 	stat   statBar // the terminal tabs' status bar
 	picker *picker // the switcher, while it's up
+	asking *askBox // a question, while it's up
 	rv     [2]radioPanelView
 	rs     radioState
 	slp    sleepState
 	sv     settingsView
 	set    settings
 	doze   dozeState
+	share  shareState
+	fv     filesView
+	upd    updateState
 	lay    kobo.Layout // the last layout, to lay out again
 }
 
@@ -67,6 +77,10 @@ type fontSwipe struct {
 const ownFont = 1 // a gesture that is a font swipe
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" { // hellobro-update asks a new build this, screen untouched
+		fmt.Println("hellobro", version)
+		return
+	}
 	a := &bro{mus: musicState{open: -1, album: -1, track: -1, gain: 40}}
 	if g, err := strconv.Atoi(readMusicState()["gain"]); err == nil {
 		a.mus.gain = max(0, min(gainMax, g))
@@ -75,7 +89,9 @@ func main() {
 	a.set = loadSettings()
 	radio.StateDir = kobo.AppFile("")
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames}, a)
+	log.Printf("hellobro %s", version)
 	a.tf.setSize(termFontDefault)
+	a.shareApply()
 	a.Run()
 }
 
@@ -92,6 +108,7 @@ func (a *bro) Layout(L kobo.Layout) {
 	}
 	a.layoutMusic(L)
 	a.layoutRadio(L)
+	a.layoutFiles(L)
 }
 
 func (a *bro) Draw() {
@@ -101,6 +118,8 @@ func (a *bro) Draw() {
 	case tabRadio:
 		a.rv[panelWiFi].shown, a.rv[panelBT].shown, a.sv.shown = "", "", ""
 		a.drawRadio()
+	case tabFiles:
+		a.drawFiles()
 	default:
 		a.drawTerm()
 	}
@@ -112,12 +131,18 @@ func (a *bro) Enter(tab int) {
 		a.enterMusic()
 	case tabRadio:
 		a.enterRadio()
+	case tabFiles:
+		a.enterFiles()
 	default:
 		a.enterTerm()
 	}
 }
 
 func (a *bro) Tap(p image.Point) {
+	if a.asking != nil {
+		a.askTap(p)
+		return
+	}
 	if a.picker != nil {
 		a.pickerTap(p)
 		return
@@ -131,6 +156,8 @@ func (a *bro) Tap(p image.Point) {
 		a.musicTap(p)
 	case tabRadio:
 		a.radioTap(p)
+	case tabFiles:
+		a.filesTap(p)
 	default:
 		a.termTap(p)
 	}
@@ -145,6 +172,9 @@ func (a *bro) Tick() {
 	a.termTick()
 	a.statTick()
 	a.radioTick()
+	a.shareTick()
+	a.filesTick()
+	a.updateTick()
 }
 
 func (a *bro) Exit() {
@@ -152,6 +182,7 @@ func (a *bro) Exit() {
 	a.saveMusicState()
 	a.musicStop()
 	a.radioExit()
+	a.shareExit()
 }
 
 func (a *bro) IdleTimeout() time.Duration {
@@ -161,7 +192,7 @@ func (a *bro) IdleTimeout() time.Duration {
 	if d, ok := a.musicIdleTimeout(); ok {
 		return d
 	}
-	if a.termLive() {
+	if a.termLive() || a.shareBusy() { // a computer sending music takes a while
 		return termIdleTimeout
 	}
 	return kobo.IdleTimeout
@@ -178,6 +209,9 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.Calibrating():
 		return false
+	case a.asking != nil:
+		a.askKey(m.Code, m.Value)
+		return true
 	case a.picker != nil:
 		a.pickerKey(m.Code, m.Value)
 		return true
@@ -201,6 +235,11 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 			return true
 		}
 		return a.radioKey(m.Code, m.Value)
+	case a.Tab == tabFiles:
+		if a.termMod(m.Code, m.Value) {
+			return true
+		}
+		return a.filesKey(m.Code, m.Value)
 	}
 	return a.termKey(m.Code, m.Value)
 }
@@ -261,7 +300,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		}
 	}
 	switch {
-	case g.Tap || g.Pen || a.picker != nil || a.Tab == tabRadio:
+	case g.Tap || g.Pen || a.overlay() || a.Tab == tabRadio || a.Tab == tabFiles:
 	case a.Tab == tabMusic:
 		a.musicSwipe(g.Start, g.Last)
 	default:

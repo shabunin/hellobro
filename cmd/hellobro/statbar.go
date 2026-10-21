@@ -75,7 +75,7 @@ func (a *bro) statTick() {
 // drawStat draws the bar if what it says changed, or anyway.
 func (a *bro) drawStat(force bool) {
 	s := &a.stat
-	if s.r.Empty() || !isTermTab(a.Tab) || a.Calibrating() || a.GaugeUp() || a.picker != nil {
+	if s.r.Empty() || !isTermTab(a.Tab) || a.Calibrating() || a.GaugeUp() || a.overlay() {
 		return
 	}
 	if s.at.IsZero() {

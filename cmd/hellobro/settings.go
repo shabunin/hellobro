@@ -18,7 +18,7 @@ import (
 
 const (
 	panelSet = 2 // the settings panel, after panelWiFi and panelBT
-	setRowH  = 56
+	setRowH  = 50
 	setTxt   = "settings"
 )
 
@@ -42,6 +42,12 @@ var settingList = []setting{
 	{key: "doze-deep", label: "Music stopped in light sleep",
 		values: []string{"5", "10", "30", "off"},
 		shown:  []string{"deep sleep after 5 min", "deep sleep after 10 min", "deep sleep after 30 min", "stay in light sleep"}},
+	{key: "share", label: "File sharing (SFTP, port 2022)",
+		values: []string{"off", "on", "pair"},
+		shown:  []string{"off", "on (Files tab)", "pair a computer"}},
+	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
+		values: []string{"on", "off"},
+		shown:  []string{"yes, while sharing", "no"}},
 	{key: "status-bar", label: "Status bar (Ctrl+Shift+B)",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
@@ -49,6 +55,15 @@ var settingList = []setting{
 
 // The defaults, by key: the index of a value.
 var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1}
+
+func settingIndex(key string) int {
+	for i, st := range settingList {
+		if st.key == key {
+			return i
+		}
+	}
+	return -1
+}
 
 type settingsView struct {
 	p     kobo.Panel
@@ -119,12 +134,27 @@ func (a *bro) settingMinutes(key string) time.Duration {
 // stepSetting moves setting i on (or back) a value.
 func (a *bro) stepSetting(i, d int) {
 	st := settingList[i]
-	if st.key == "status-bar" {
+	switch st.key {
+	case "status-bar":
 		a.toggleStat()
-	} else {
+	case "share": // off, on, pair: pairing turns it on and opens pairing, and stays "on"
+		was := a.set[st.key]
+		n := len(st.values)
+		next := (was + d + n) % n
+		if st.values[next] == "pair" {
+			a.sharePair()
+			break
+		}
+		a.set[st.key] = next
+		a.set.save()
+		a.shareApply()
+	default:
 		n := len(st.values)
 		a.set[st.key] = (a.set[st.key] + d + n) % n
 		a.set.save()
+		if st.key == "mdns" {
+			a.shareApply()
+		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))
 	a.drawSettings()
@@ -156,7 +186,7 @@ func (a *bro) drawSettings() {
 	for _, st := range settingList {
 		vals = append(vals, a.setting(st.key))
 	}
-	key := fmt.Sprint(vals, v.sel, focused)
+	key := fmt.Sprint(vals, v.sel, focused, a.share.code)
 	if key == v.shown {
 		return
 	}
@@ -180,7 +210,11 @@ func (a *bro) drawSettings() {
 		t := rr.Inset(4)
 		t.Min.X += 12
 		t.Max.X -= 12
-		value := "‹ " + st.shown[indexOf(st.values, vals[i])] + " ›"
+		shown := st.shown[indexOf(st.values, vals[i])]
+		if st.key == "share" && a.share.code != "" {
+			shown = "pairing: code " + a.share.code
+		}
+		value := "‹ " + shown + " ›"
 		vw := kobo.TextWidth(a.F.Small, value)
 		c.Text(a.F.Small, image.Rect(t.Max.X-vw, t.Min.Y, t.Max.X, t.Max.Y), value, dim, kobo.AlignRight)
 		t.Max.X -= vw + 20

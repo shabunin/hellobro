@@ -157,7 +157,7 @@ func (a *bro) term() *termSession {
 }
 
 func (a *bro) showing(t *termSession) bool {
-	return !a.Calibrating() && a.picker == nil && t != nil && a.term() == t
+	return !a.Calibrating() && !a.overlay() && t != nil && a.term() == t
 }
 
 // termLive says whether any session is connected, or about to be.
@@ -885,7 +885,7 @@ func (a *bro) termTick() {
 	if !t.connected() {
 		return
 	}
-	if a.GaugeUp() || a.picker != nil {
+	if a.GaugeUp() || a.overlay() {
 		return // something is up over the terminal: drawing under it would be undone when it goes
 	}
 	if t.dirty.Load() && time.Since(v.drawnAt) >= termFrame {
