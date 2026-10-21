@@ -31,24 +31,28 @@ sessions, the tabs, the saved hosts (a new session to one) and a new
 shell, narrowed by typing (fuzzy); Up/Down and Enter, or 1–9 before
 typing.
 
-**Sleep**: Ctrl+Alt+S, the header's `sleep`, or "sleep" in the switcher
-put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
+**Sleep**: the power button, Ctrl+Alt+S, the header's `sleep`, or "sleep"
+in the switcher put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
 screen, the light off, suspend to RAM); the power button wakes it, and
 it's all as it was. The music stops where it was (Bluetooth goes off),
 Wi-Fi and Bluetooth go off and come back on waking, and the SSH sessions
-reconnect once Wi-Fi is back. Nickel keeps the power button to itself
-while hellobro is up, so pressing it doesn't put the Kobo to sleep, and
-the presses that wake it may reach Nickel when hellobro quits (it may
-then go to sleep once).
+reconnect once Wi-Fi is back. Nickel holds the power button's input
+device (frozen, all the while hellobro is up), so hellobro reads the
+button's GPIO instead (`/sys/kernel/debug/gpio`); the presses still queue
+up for Nickel, which may see them when hellobro quits (and go to sleep
+once).
 
 **Light sleep** is for listening: the light goes off and the screen shows
 what's playing (the cover, the track, the album), but the Kobo stays
 awake, so the music plays on and the headphones' buttons (or a keyboard's
-media keys) play and pause, skip, and set the volume. A tap or any other
-key wakes it up, to the page as it was. With music playing it comes
+media keys) play and pause, skip, and set the volume. The power button or
+any other key wakes it up, to the page as it was; touching the screen
+doesn't (unless there's no keyboard and no power button to be had). With music playing it comes
 after a while without input (5 minutes; Settings), and Ctrl+Alt+S dozes
 instead of sleeping (Settings: or not). Wi-Fi goes off meanwhile (or not),
-and comes back on waking. Once the music has stopped for a while (10
+and comes back on waking; with Bluetooth on, the Wi-Fi chip keeps its
+power (on the Elipsa it's Bluetooth's chip too: cutting it took the
+headphones with it). Once the music has stopped for a while (10
 minutes), the Kobo goes to sleep properly.
 
 **brotools** ("Bro Tools") is diagnostics. Tabs (tap, or Ctrl+Alt+1–7):
@@ -64,8 +68,9 @@ minutes), the Kobo goes to sleep properly.
   servers, and which developer tools are installed (or busybox applets).
 - **Info**: screen, touch and input device details.
 
-In both: swipe the left edge for the frontlight. Esc, the exit button or
-the power button leave; they also leave after 3 minutes idle (hellobro: 20
+In both: swipe the left edge for the frontlight. Fullscreen (F11): swipe
+in from the top or bottom edge to leave it. Esc or the exit button leave;
+the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
 with a session up, 6 hours while music plays).
 
 ## Code
@@ -123,7 +128,10 @@ with a session up, 6 hours while music plays).
   one that isn't connected gets a "connect" button.
 - On any tab: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
   the previous and next track; so do media keys, and the volume keys (a
-  headset's, a keyboard's) set the volume.
+  headset's, a keyboard's) set the volume. Headphones' buttons come as
+  keys, or, while Nickel has a media player registered with BlueZ, as
+  BlueZ's calls to it (Play, Next…), which hellobro watches the system bus
+  for: Nickel, frozen, would never answer them.
 - The library has three views (tap them, or Tab / v / 1-3):
   - **Albums**: every folder with tracks in it.
   - **Folders**: the folders as they are, from the one all the music is

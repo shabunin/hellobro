@@ -835,14 +835,32 @@ func (a *bro) musicIdleTimeout() (time.Duration, bool) {
 
 // --- input ---
 
+// watchHeadphones takes the headphones' buttons that BlueZ sends Nickel's
+// media player (see audio.WatchPlayerCalls) as media keys.
+func (a *bro) watchHeadphones() {
+	if os.Getenv("HELLOBRO_FAKE_RADIO") != "" {
+		return // the PC's own bus: not ours to watch
+	}
+	keys := map[string]uint16{"Play": kobo.KeyPlayCD, "Pause": kobo.KeyPauseCD, "PlayPause": kobo.KeyPlayPause,
+		"Stop": kobo.KeyStopCD, "Next": kobo.KeyNextSong, "Previous": kobo.KeyPreviousSong}
+	err := audio.WatchPlayerCalls(func(member string) {
+		log.Printf("music: headphones: %s", member)
+		if code, ok := keys[member]; ok {
+			a.Do(func() { a.mediaKey(code) })
+		}
+	})
+	if err != nil {
+		log.Printf("music: headphones' buttons through BlueZ: %v", err)
+	}
+}
+
 // Media keys, whichever tab is up: headphones' and keyboards' buttons.
+// Headphones send play or pause as they think it's playing, and what they
+// think is Nickel's player's idea, which never changes: either toggles.
 func (a *bro) musicMediaKey(code uint16) {
 	log.Printf("music: media key %d", code)
 	switch code {
 	case kobo.KeyPlayPause, kobo.KeyPlayCD, kobo.KeyPauseCD:
-		if a.mus.player != nil && code == kobo.KeyPlayCD && !a.mus.player.Paused() {
-			return
-		}
 		a.musicToggle()
 	case kobo.KeyStopCD:
 		a.musicStop()

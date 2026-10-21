@@ -1,8 +1,8 @@
 I: Bus=0019 Vendor=0000 Product=0000 Version=0000
 N: Name="soc@03000000:gpio-keys"
-H: Handlers=kbd event0
-B: EV=3
-B: KEY=4000 0 0 0 0 0 100000
+H: Handlers=event0
+B: EV=13
+B: KEY=100000 0 8 0
 
 I: Bus=0018 Vendor=0000 Product=0000 Version=0000
 N: Name="kx122-accel"

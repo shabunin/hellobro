@@ -97,6 +97,15 @@ UP, DOWN, ENTER, ESC, TAB, BACKSPACE, SPACE, F11 = 103, 108, 28, 1, 15, 14, 57, 
 PGUP, PGDN, KEY_T, LEFT, RIGHT = 104, 109, 20, 105, 106
 F = lambda n: 58 + n                                  # F1..F10
 
+def power():
+    """Presses the power button: its GPIO (run.sh's stand-in for debugfs) low a moment."""
+    g = os.path.join(os.path.dirname(d), 'gpio')
+    line = open(g).read()
+    open(g, 'w').write(line.replace(') in  hi', ') in  lo'))
+    time.sleep(0.4)
+    open(g, 'w').write(line)
+    time.sleep(0.6)
+
 def exit_app():
     """Taps the header's exit button."""
     tap(W - 16 - 45, 38)

@@ -275,8 +275,9 @@ type KeyMsg struct {
 	Value     int32 // 1 press, 0 release, 2 autorepeat
 	Connected string
 	Gone      string
-	button    bool // from the device's own buttons (power, sleep cover), not a keyboard
-	ungrabbed bool // the buttons are someone else's: we won't see the power button
+	Dev       string // the keyboard (or headphones' buttons) it's from
+	button    bool   // from the device's own buttons (power, sleep cover), not a keyboard
+	ungrabbed bool   // the buttons are someone else's: we won't see the power button
 	at        time.Time
 }
 
@@ -321,7 +322,7 @@ func watchKeyboards(out chan<- KeyMsg) {
 				}
 				err = readEvents(f, func(typ, code uint16, val int32) {
 					if typ == evKey {
-						out <- KeyMsg{Code: code, Value: val, at: time.Now()}
+						out <- KeyMsg{Code: code, Value: val, Dev: name, at: time.Now()}
 					}
 				})
 				log.Printf("keyboard %s: %v", path, err)
@@ -337,13 +338,18 @@ func watchButtons(d inputDev, out chan<- KeyMsg) {
 	f, err := os.Open(d.path())
 	if err != nil {
 		log.Printf("open buttons %s: %v", d.path(), err)
+		if !watchPowerGPIO(out) {
+			out <- KeyMsg{button: true, ungrabbed: true}
+		}
 		return
 	}
 	defer f.Close()
 	if err := grab(f); err != nil {
-		// Someone (Nickel?) holds them, so their events never reach us.
-		log.Printf("EVIOCGRAB %s: %v: no power button for us", d.path(), err)
-		out <- KeyMsg{button: true, ungrabbed: true}
+		// Someone (Nickel) holds them, so their events never reach us.
+		log.Printf("EVIOCGRAB %s: %v: the power button is Nickel's", d.path(), err)
+		if !watchPowerGPIO(out) {
+			out <- KeyMsg{button: true, ungrabbed: true}
+		}
 		return
 	}
 	err = readEvents(f, func(typ, code uint16, val int32) {

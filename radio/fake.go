@@ -116,6 +116,8 @@ func (f *fakeWiFi) Forget(n Network) error {
 	return nil
 }
 
+func (f *fakeWiFi) Down(progress func(string)) error { return f.SetPower(false, progress) }
+
 func (f *fakeWiFi) SetPower(on bool, progress func(string)) error {
 	progress("turning Wi-Fi " + map[bool]string{true: "on", false: "off"}[on] + "…")
 	time.Sleep(2 * time.Second)

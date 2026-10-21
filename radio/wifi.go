@@ -78,6 +78,11 @@ type WiFi interface {
 	Disconnect() error
 	Forget(n Network) error
 	SetPower(on bool, progress func(string)) error
+	// Down turns Wi-Fi off but leaves the chip powered, its driver loaded:
+	// for while Bluetooth is on. The Elipsa's RTL8821CS is one chip for
+	// both, and cutting its power takes Bluetooth with it. SetPower(false)
+	// after it powers the chip off too.
+	Down(progress func(string)) error
 	// Restore puts the power back as it was before the first SetPower:
 	// what Nickel expects when it wakes.
 	Restore()
@@ -112,6 +117,7 @@ type wpaWiFi struct {
 	iface   string
 	ctrlDir string // wpa_supplicant's -C, if it said
 	initial *bool  // the power before we first changed it
+	kept    bool   // off, but Down left the chip powered
 }
 
 const ctrlDirDefault = "/var/run/wpa_supplicant"
@@ -547,13 +553,25 @@ func (w *wpaWiFi) SetPower(on bool, progress func(string)) error {
 		was := w.running()
 		w.initial = &was
 	}
-	if on == w.running() {
+	if on == w.running() && !(w.kept && !on) {
 		return nil
 	}
 	if on {
+		w.kept = false
 		return w.powerOn(progress)
 	}
-	return w.powerOff(progress)
+	return w.powerOff(progress, false)
+}
+
+func (w *wpaWiFi) Down(progress func(string)) error {
+	if w.initial == nil {
+		was := w.running()
+		w.initial = &was
+	}
+	if !w.running() {
+		return nil
+	}
+	return w.powerOff(progress, true)
 }
 
 func (w *wpaWiFi) Restore() {
@@ -680,9 +698,11 @@ func (w *wpaWiFi) powerOn(progress func(string)) error {
 	return errors.New("joined, but got no address (DHCP)")
 }
 
-func (w *wpaWiFi) powerOff(progress func(string)) error {
+// powerOff turns Wi-Fi off; keep leaves the chip powered and its driver
+// in, the interface down (Down).
+func (w *wpaWiFi) powerOff(progress func(string), keep bool) error {
 	c := kobChip()
-	log.Printf("wifi: turning off: module %q, power by %s", c.module, c.power)
+	log.Printf("wifi: turning off: module %q, power by %s, chip kept on %v", c.module, c.power, keep)
 	progress("turning Wi-Fi off…")
 	w.releaseIP()
 	w.cli("terminate")
@@ -693,6 +713,9 @@ func (w *wpaWiFi) powerOff(progress func(string)) error {
 		run("wlarm_le", "-i", w.iface, "down")
 	}
 	run("ifconfig", w.iface, "down")
+	if w.kept = keep; keep {
+		return nil
+	}
 	if c.power == "wmt" { // its modules stay; only the chip goes off
 		return os.WriteFile("/dev/wmtWifi", []byte("0"), 0)
 	}

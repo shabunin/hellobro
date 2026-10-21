@@ -386,15 +386,15 @@ func (a *App) drawFooter() {
 	c, L := a.C, a.L
 	c.Fill(L.footer, White)
 	c.Fill(image.Rect(0, L.footer.Min.Y, L.W, L.footer.Min.Y+2), Black)
-	quit := "Esc, exit or power button"
+	sleep := "power button or Ctrl+Alt+S"
 	if a.noPower {
-		quit = "Esc or exit"
+		sleep = "Ctrl+Alt+S"
 	}
 	hints := []string{fmt.Sprintf("tabs: tap or Ctrl+Alt+1–%d", len(a.cfg.Tabs))}
 	if a.light != nil {
 		hints = append(hints, "light: swipe the left edge")
 	}
-	hints = append(hints, "sleep: Ctrl+Alt+S", "quit: "+quit, fmt.Sprintf("auto-exit after %.0f min idle", IdleTimeout.Minutes()))
+	hints = append(hints, "sleep: "+sleep, "quit: Esc or exit", fmt.Sprintf("auto-exit after %.0f min idle", IdleTimeout.Minutes()))
 	c.Text(a.F.Small, image.Rect(Pad, L.footer.Min.Y+2, L.W-Pad, L.footer.Max.Y), strings.Join(hints, "   ·   "), Dark, AlignCenter)
 	a.Mark(L.footer, true)
 }

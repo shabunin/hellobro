@@ -68,7 +68,7 @@ func (a *bro) openPicker() {
 	}
 	p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }},
 		pickEntry{kind: "kobo", title: "sleep", detail: "Ctrl+Alt+S · the power button wakes it", do: a.App.Sleep},
-		pickEntry{kind: "kobo", title: "light sleep", detail: "the music plays on · a tap or a key wakes it", do: a.Doze})
+		pickEntry{kind: "kobo", title: "light sleep", detail: "the music plays on · a key or the power button wakes it", do: a.Doze})
 	p.title, p.hint = "Go to", "sessions, tabs, hosts…"
 	a.showPicker(p)
 }

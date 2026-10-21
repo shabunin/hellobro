@@ -123,12 +123,13 @@ func sysfsBrightness() (int, bool) {
 	return 0, false
 }
 
-// --- the swipe's gauge ---
+// --- the swipe's label ---
 
-// lightGaugeRect sits right of the finger, centered vertically.
-func (a *App) lightGaugeRect() image.Rectangle {
+// lightLabelRect sits right of the finger, centered vertically: the
+// percentage, no bar.
+func (a *App) lightLabelRect() image.Rectangle {
 	cy := a.C.Bounds().Dy() / 2
-	return image.Rect(EdgeWidth+20, cy-260, EdgeWidth+130, cy+260)
+	return image.Rect(EdgeWidth+20, cy-40, EdgeWidth+20+250, cy+40)
 }
 
 func (a *App) setLight(level int) {
@@ -139,7 +140,15 @@ func (a *App) setLight(level int) {
 	if err := a.light.set(level); err != nil {
 		log.Print(err)
 	}
-	a.drawGauge(&a.lightOverlay, a.lightGaugeRect(), a.light.level, 100, fmt.Sprintf("%d%%", a.light.level))
+	r := a.lightLabelRect()
+	if a.lightOverlay == nil {
+		a.lightOverlay = image.NewGray(r)
+		draw.Draw(a.lightOverlay, r, a.C.Gray, r.Min, draw.Src)
+	}
+	a.C.Fill(r, White)
+	a.C.Frame(r, 3, Black)
+	a.C.Text(a.F.Panel, r, fmt.Sprintf("light %d%%", a.light.level), Black, AlignCenter)
+	a.Mark(r, false) // black & white only, so the fast waveform is fine
 }
 
 // DrawGauge shows a gauge like the light's: a bar in r, filled n/of,

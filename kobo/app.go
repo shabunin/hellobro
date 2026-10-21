@@ -96,11 +96,15 @@ type Gesture struct {
 	lightZone bool // started on the left edge: may become a light swipe
 	light     bool // is a light swipe
 	lightFrom int  // light level when the swipe started
+	unfull    int  // fullscreen, started on the top (1) or bottom (-1) edge: in from it leaves fullscreen
+	unfulled  bool // it did
 }
 
 const (
 	EdgeWidth  = 110 // px from the left (light) or right edge where edge swipes start
 	SwipeStart = 40  // px of vertical travel before an edge swipe counts
+	unfullEdge = 80  // px from the top or bottom where a swipe in leaves fullscreen
+	unfullMove = 150 // px it takes
 )
 
 type calibState struct {
@@ -163,6 +167,7 @@ type App struct {
 	alive     atomic.Int64 // last loop tick, for the watchdog
 	blitAt    atomic.Int64 // start of the blit in flight, or 0
 	noPower   bool         // the power button doesn't reach us
+	wokeAt    time.Time    // from sleep: the power press that woke us comes after
 	asleep    bool         // the sleep screen is up: nothing else gets drawn
 	sleeping  atomic.Bool  // asleep, for the watchdog: the clock jumps
 	dozing    bool         // a light sleep: the doze screen on the panel, the page going on in C
@@ -551,6 +556,14 @@ func (a *App) onTouch(ev TouchEv) {
 		a.gestures[ev.slot] = g
 		a.prog.Touch(ev, p, g)
 		g.lightZone = a.light != nil && !ev.Pen && p.X < EdgeWidth && g.Owner == 0
+		if a.Full && !ev.Pen && !g.lightZone && g.Owner == 0 { // no F11 without a keyboard: a way out by touch
+			switch {
+			case p.Y < unfullEdge:
+				g.unfull = 1
+			case p.Y >= a.C.Bounds().Dy()-unfullEdge:
+				g.unfull = -1
+			}
+		}
 
 	case TouchMove:
 		g := a.gestures[ev.slot]
@@ -563,6 +576,15 @@ func (a *App) onTouch(ev TouchEv) {
 		if dy := g.Start.Y - p.Y; g.lightZone && !g.light && Abs(dy) > SwipeStart && Abs(dy) > 2*Abs(p.X-g.Start.X) {
 			g.light, g.lightFrom = true, a.light.level
 			log.Printf("light swipe from %d%%", g.lightFrom)
+		}
+		if dy := (p.Y - g.Start.Y) * g.unfull; g.unfull != 0 && !g.unfulled && dy > unfullMove && dy > 2*Abs(p.X-g.Start.X) {
+			g.unfulled = true
+			log.Printf("fullscreen: swiped in from the %s edge", map[int]string{1: "top", -1: "bottom"}[g.unfull])
+			a.SetFull(false)
+		}
+		if g.unfulled {
+			g.Last = p
+			return
 		}
 		if g.light {
 			// Half the screen height covers the whole range.
@@ -581,6 +603,9 @@ func (a *App) onTouch(ev TouchEv) {
 		if g.light {
 			log.Printf("light swipe: %d%% → %d%%", g.lightFrom, a.light.level)
 			a.hideGauge(&a.lightOverlay)
+			return
+		}
+		if g.unfulled {
 			return
 		}
 		g.Dur = ev.At.Sub(g.At)
@@ -694,8 +719,7 @@ func (a *App) onKey(m KeyMsg) {
 	case m.button:
 		log.Printf("button %d value %d", m.Code, m.Value)
 		if m.Code == keyPower && m.Value == 0 { // on release, so Nickel doesn't get a stray one
-			log.Print("power button pressed")
-			a.quit = true
+			a.powerPressed()
 		}
 		return
 	case m.Connected != "" || m.Gone != "":

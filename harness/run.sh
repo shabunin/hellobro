@@ -26,12 +26,12 @@ case $NAME in brotools*) TABS=7 ;; *) TABS=5 ;; esac
 IFACE=${INTERFACE:-$(ip route show default 2>/dev/null | awk '{print $5; exit}')}
 rm -rf "$OUT"; mkdir -p "$OUT/screen" "$OUT/input" "$OUT/app" "$OUT/onboard/Music"
 cp "$APP" "$OUT/app/$NAME"; cp "$H/ssh.conf" "$OUT/app/"
-touch "$OUT/ntx_io"; mkfifo "$OUT/input/event2" "$OUT/input/event4"
+touch "$OUT/ntx_io"; printf ' gpio-356 (                    |Power               ) in  hi    \n' > "$OUT/gpio"; mkfifo "$OUT/input/event2" "$OUT/input/event4"
 TABS=$TABS python3 -I "$H/feeds/$FEED.py" "$OUT/input" "$ROTA" &
 FEEDPID=$!
 FAKE_SNAP_AREA=40000 FAKE_SCREEN_DIR=$OUT/screen FAKE_GYRO=$ROTA HELLOBRO_FBINK=$H/fakefbink.py \
 	HELLOBRO_INPUT_DIR=$OUT/input HELLOBRO_DEVICES=$H/devices INTERFACE=$IFACE HELLOBRO_MUSIC_DIR=${MUSIC:-$H/music} HELLOBRO_FAKE_PCM=$OUT/pcm.raw HELLOBRO_FAKE_RADIO=${FAKE_RADIO-1} HELLOBRO_FAKE_SLEEP=1 \
-	HELLOBRO_NTX_IO=$OUT/ntx_io HELLOBRO_NICKEL_CONF=$H/nickel.conf \
+	HELLOBRO_NTX_IO=$OUT/ntx_io HELLOBRO_GPIO=$OUT/gpio HELLOBRO_NICKEL_CONF=$H/nickel.conf \
 	HELLOBRO_SHARE_ADDR=127.0.0.1:${SHARE_PORT:-2022} HELLOBRO_SHARE_ROOT=$OUT/onboard HELLOBRO_NO_MDNS=1 HELLOBRO_FAKE_PAIR_CODE=246810 \
 	timeout "${TIMEOUT:-170}" qemu-arm "$OUT/app/$NAME" > "$OUT/stdout.txt" 2>&1 || echo "app exit: $?"
 wait $FEEDPID || true

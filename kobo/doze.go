@@ -95,13 +95,17 @@ func (a *App) endDoze() {
 	a.dirty, a.flashR = nil, image.Rectangle{}
 }
 
-// dozeTouch takes the touch screen while dozing: a finger down wakes, and
-// the rest of that contact is nobody's.
+// dozeTouch takes the touch screen while dozing: it's nobody's, so a hand
+// on the screen doesn't wake it; a key or the power button does. With
+// neither, a finger down wakes it, and the rest of that contact is
+// nobody's.
 func (a *App) dozeTouch(ev TouchEv) {
 	switch {
 	case ev.Kind == TouchDown && a.dozing:
-		a.eatTouch = true
-		a.Undoze()
+		if a.noPower && a.Keyboard == "" {
+			a.eatTouch = true
+			a.Undoze()
+		}
 	case ev.Kind == TouchUp:
 		a.eatTouch = false
 	}

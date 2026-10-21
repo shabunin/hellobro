@@ -37,15 +37,15 @@ func (a *bro) Sleep() func() {
 	}
 	return func() {
 		s.wifiWas = wifi.Status().On || dozedOff // also notes how Kobo runs it, for turning it on again
+		bs, _ := bt.Status()
+		if s.btWas = bs.Powered; s.btWas { // first: Wi-Fi's chip may be Bluetooth's too
+			if err := bt.SetPower(false); err != nil {
+				log.Printf("sleep: bluetooth off: %v", err)
+			}
+		}
 		if s.wifiWas {
 			if err := wifi.SetPower(false, func(p string) { log.Printf("sleep: wifi: %s", p) }); err != nil {
 				log.Printf("sleep: wifi off: %v", err)
-			}
-		}
-		bs, _ := bt.Status()
-		if s.btWas = bs.Powered; s.btWas {
-			if err := bt.SetPower(false); err != nil {
-				log.Printf("sleep: bluetooth off: %v", err)
 			}
 		}
 		log.Printf("sleep: radios off (wifi was on %v, bluetooth %v)", s.wifiWas, s.btWas)

@@ -7,6 +7,7 @@ package audio
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -171,7 +172,19 @@ func openBluealsa(bus *dbus.Conn, pcm PCM) (output, error) {
 	return &bluealsaOut{data, ctrl}, nil
 }
 
-func (o *bluealsaOut) Write(b []byte) (int, error) { return o.data.Write(b) }
+// writeWait is how long bluealsa may leave a write waiting: it takes
+// sound as fast as it plays, so longer means the device is gone without
+// bluealsa noticing (its chip lost power, say), and it never will.
+const writeWait = 6 * time.Second
+
+func (o *bluealsaOut) Write(b []byte) (int, error) {
+	o.data.SetWriteDeadline(time.Now().Add(writeWait))
+	n, err := o.data.Write(b)
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		err = fmt.Errorf("the Bluetooth device took no sound for %v: gone?", writeWait)
+	}
+	return n, err
+}
 
 func (o *bluealsaOut) Close() error {
 	o.data.Close()

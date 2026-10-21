@@ -93,14 +93,14 @@ func (a *bro) dozeWiFi(job string) {
 	if z.jobs == nil {
 		a.radioStart()
 		z.jobs = make(chan string, 8)
-		wifi := a.rs.wifi
+		wifi, bt := a.rs.wifi, a.rs.bt
 		go func() {
 			off := false // we turned it off
 			progress := func(s string) { log.Printf("doze: wifi: %s", s) }
 			for job := range z.jobs {
 				switch {
 				case job == "off" && !off && wifi.Status().On:
-					if err := wifi.SetPower(false, progress); err != nil {
+					if err := wifiOff(wifi, bt, progress); err != nil { // Bluetooth plays on
 						log.Printf("doze: wifi off: %v", err)
 					} else {
 						off = true
@@ -211,7 +211,14 @@ func (a *bro) DrawDoze() {
 
 	y = max(y, b.Max.Y-b.Dy()/6)
 	line(y, 44, a.F.Small, "Headphone buttons: play/pause, next, previous, volume.", kobo.Dark)
-	line(y+48, 44, a.F.Small, "Tap the screen or press a key to wake up.", kobo.Dark)
+	wake := "Press the power button or a key to wake up."
+	switch {
+	case !a.PowerButton() && a.Keyboard == "":
+		wake = "Tap the screen to wake up."
+	case !a.PowerButton():
+		wake = "Press a key to wake up."
+	}
+	line(y+48, 44, a.F.Small, wake, kobo.Dark)
 	note := "since " + z.since.Format("15:04")
 	if bat, err := os.ReadFile("/sys/class/power_supply/battery/capacity"); err == nil {
 		note += fmt.Sprintf(" · battery %s%%", strings.TrimSpace(string(bat)))

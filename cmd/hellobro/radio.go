@@ -281,7 +281,22 @@ func (a *bro) radioRun(panel int, busy string, do func(progress func(string)) er
 func (a *bro) wifiPower() {
 	on := !a.rs.ws.On
 	what := map[bool]string{true: "turning Wi-Fi on…", false: "turning Wi-Fi off…"}[on]
-	a.radioRun(panelWiFi, what, func(p func(string)) error { return a.rs.wifi.SetPower(on, p) })
+	wifi, bt := a.rs.wifi, a.rs.bt
+	a.radioRun(panelWiFi, what, func(p func(string)) error {
+		if !on {
+			return wifiOff(wifi, bt, p)
+		}
+		return wifi.SetPower(true, p)
+	})
+}
+
+// wifiOff turns Wi-Fi off; with Bluetooth on, the chip keeps its power,
+// which on the Elipsa is Bluetooth's too. Off the loop: it blocks.
+func wifiOff(wifi radio.WiFi, bt radio.Bluetooth, progress func(string)) error {
+	if bs, _ := bt.Status(); bs.Powered {
+		return wifi.Down(progress)
+	}
+	return wifi.SetPower(false, progress)
 }
 
 func (a *bro) btPower() {

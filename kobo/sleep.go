@@ -74,6 +74,7 @@ func (a *App) wake(light int, why string) {
 	a.WaitBlit()
 	a.asleep = false
 	a.sleeping.Store(false)
+	a.wokeAt = time.Now()
 	a.inputAt = time.Now()
 	if a.light != nil && light > 0 {
 		a.light.set(light)
@@ -171,3 +172,21 @@ func exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
+
+// powerPressed is the power button: it wakes from light sleep, and
+// otherwise sleeps (lightly, if the Program says so: music playing).
+func (a *App) powerPressed() {
+	switch {
+	case a.asleep || a.calib != nil || time.Since(a.wokeAt) < 3*time.Second: // the press that woke it
+		log.Print("power button: pressed (nothing to do)")
+	case a.dozing:
+		log.Print("power button: waking up")
+		a.Undoze()
+	default:
+		log.Print("power button: sleeping")
+		a.Sleep()
+	}
+}
+
+// PowerButton says whether the power button reaches us.
+func (a *App) PowerButton() bool { return !a.noPower }

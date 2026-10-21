@@ -312,7 +312,7 @@ func (a *bro) drawTermStatus() {
 
 func (a *bro) drawConnect(t *termSession) {
 	v := &a.tv
-	keys := "Ctrl+Shift+T: new session  ·  Ctrl+Shift+Tab: sessions  ·  Ctrl+Alt+1-4: tabs  ·  F11: fullscreen"
+	keys := "Ctrl+Shift+T: new session  ·  Ctrl+Shift+Tab: sessions  ·  Ctrl+Alt+1-4: tabs  ·  F11: fullscreen (or swipe in from the top or bottom edge to leave it)"
 	music := "Ctrl+Shift+Space: play/pause  ·  Ctrl+Shift+< >: previous/next track  ·  Ctrl+Shift+B: status bar"
 	var lines []string
 	if t.kind == kindShell {

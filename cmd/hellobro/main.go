@@ -92,6 +92,7 @@ func main() {
 	log.Printf("hellobro %s", version)
 	a.tf.setSize(termFontDefault)
 	a.shareApply()
+	a.watchHeadphones()
 	a.Run()
 }
 
@@ -204,6 +205,7 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case kobo.IsMediaKey(m.Code): // the music's, on any tab, dozing too
 		if m.Value == 1 || m.Value == 2 && (m.Code == kobo.KeyVolumeUp || m.Code == kobo.KeyVolumeDown) {
+			log.Printf("media key %d from %s", m.Code, m.Dev)
 			a.mediaKey(m.Code)
 		}
 		return true
