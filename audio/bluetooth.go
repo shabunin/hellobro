@@ -1,4 +1,7 @@
-package main
+// Package audio plays sound on the Kobo: over Bluetooth, the only way it
+// has, through bluez-alsa. It finds the devices and the PCM to play into,
+// decodes MP3 and WAV, and runs a player with pause, seeking and volume.
+package audio
 
 // Bluetooth audio through the Kobo's own stack: BlueZ knows the devices,
 // bluez-alsa (bluealsa) turns a connected A2DP sink into a PCM that we
@@ -15,6 +18,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -24,44 +28,87 @@ const (
 	bluealsaPath  = "/org/bluealsa"
 )
 
-type btDevice struct {
-	path                       dbus.ObjectPath
-	name, addr                 string
-	paired, connected, isAudio bool
+// Device is a paired or connected Bluetooth device.
+type Device struct {
+	Path                       dbus.ObjectPath
+	Name, Addr                 string
+	Paired, Connected, IsAudio bool
 }
 
-type bluealsaPCM struct {
+// PCM is one of bluealsa's audio streams.
+type PCM struct {
 	service  string
-	path     dbus.ObjectPath
-	device   dbus.ObjectPath
-	mode     string // "sink": we play into it
-	codec    string
-	format   uint16
-	channels int
-	rate     int
+	Path     dbus.ObjectPath
+	Device   dbus.ObjectPath
+	Mode     string // "sink": we play into it
+	Codec    string
+	Format   uint16
+	Channels int
+	Rate     int
 	openArgs int // Open's input args: 0 (v3+), 1 (v2: a mode)
 }
 
-func (p bluealsaPCM) String() string {
-	return fmt.Sprintf("%s %s, %d Hz, %d ch, format %#04x", p.mode, p.codec, p.rate, p.channels, p.format)
+func (p PCM) String() string {
+	return fmt.Sprintf("%s %s, %d Hz, %d ch, format %#04x", p.Mode, p.Codec, p.Rate, p.Channels, p.Format)
 }
 
-// btReport is a snapshot of the Bluetooth side, for the Sound tab.
-type btReport struct {
-	lines   []string
-	devices []btDevice
-	pcms    []bluealsaPCM
-	bus     *dbus.Conn
+// Report is a snapshot of the Bluetooth side.
+type Report struct {
+	Lines   []string // for people: the adapter, bluealsa, what went wrong
+	Devices []Device
+	PCMs    []PCM
+	Bus     *dbus.Conn
 }
 
-// probeBluetooth finds the bus with BlueZ, the devices, and bluealsa's PCMs.
-func probeBluetooth() btReport {
-	var r btReport
-	add := func(format string, args ...any) { r.lines = append(r.lines, fmt.Sprintf(format, args...)) }
+// Sink is the PCM to play into: a playback PCM, of a connected device if
+// there is one.
+func (r Report) Sink() (PCM, bool) {
+	var found []PCM
+	for _, p := range r.PCMs {
+		if p.Mode == "sink" && (p.Format == 0x8210 || p.Format == 0) && p.Codec != "CVSD" { // 16-bit; not a headset's phone line
+			found = append(found, p)
+		}
+	}
+	for _, p := range found {
+		for _, d := range r.Devices {
+			if d.Path == p.Device && d.Connected {
+				return p, true
+			}
+		}
+	}
+	if len(found) > 0 {
+		return found[0], true
+	}
+	return PCM{}, false
+}
 
-	for _, pid := range pidsOf("bluetoothd", "bluealsa") {
-		cmd, _ := os.ReadFile(filepath.Join("/proc", pid, "cmdline"))
-		log.Printf("bluetooth: process %s: %s", pid, strings.ReplaceAll(strings.TrimRight(string(cmd), "\x00"), "\x00", " "))
+// DeviceOf is the device a PCM belongs to, if it's known.
+func (r Report) DeviceOf(p PCM) (Device, bool) {
+	for _, d := range r.Devices {
+		if d.Path == p.Device {
+			return d, true
+		}
+	}
+	return Device{}, false
+}
+
+var introspected sync.Once // the interfaces go to the log once
+
+// Probe finds the bus with BlueZ, the devices, and bluealsa's PCMs.
+func Probe() Report {
+	if r, ok := fakeReport(); ok {
+		return r
+	}
+	var r Report
+	add := func(format string, args ...any) { r.Lines = append(r.Lines, fmt.Sprintf(format, args...)) }
+
+	first := false
+	introspected.Do(func() { first = true })
+	if first {
+		for _, pid := range pidsOf("bluetoothd", "bluealsa") {
+			cmd, _ := os.ReadFile(filepath.Join("/proc", pid, "cmdline"))
+			log.Printf("bluetooth: process %s: %s", pid, strings.ReplaceAll(strings.TrimRight(string(cmd), "\x00"), "\x00", " "))
+		}
 	}
 	bus, which, names, err := btBus()
 	if err != nil {
@@ -69,8 +116,10 @@ func probeBluetooth() btReport {
 		add("Turn Bluetooth on in Kobo, and connect the device there.")
 		return r
 	}
-	r.bus = bus
-	log.Printf("bluetooth: %s bus names: %v", which, names)
+	r.Bus = bus
+	if first {
+		log.Printf("bluetooth: %s bus names: %v", which, names)
+	}
 
 	var objs map[dbus.ObjectPath]map[string]map[string]dbus.Variant
 	if err := bus.Object("org.bluez", "/").Call("org.freedesktop.DBus.ObjectManager.GetManagedObjects", 0).Store(&objs); err != nil {
@@ -92,13 +141,13 @@ func probeBluetooth() btReport {
 			add("adapter %s (%s): %s", prop[string](a, "Alias"), prop[string](a, "Address"), state)
 		}
 		if d, ok := ifs["org.bluez.Device1"]; ok {
-			dev := btDevice{path: dbus.ObjectPath(p), name: prop[string](d, "Alias"), addr: prop[string](d, "Address"),
-				paired: prop[bool](d, "Paired"), connected: prop[bool](d, "Connected")}
+			dev := Device{Path: dbus.ObjectPath(p), Name: prop[string](d, "Alias"), Addr: prop[string](d, "Address"),
+				Paired: prop[bool](d, "Paired"), Connected: prop[bool](d, "Connected")}
 			for _, u := range prop[[]string](d, "UUIDs") {
-				dev.isAudio = dev.isAudio || strings.EqualFold(u, uuidAudioSink)
+				dev.IsAudio = dev.IsAudio || strings.EqualFold(u, uuidAudioSink)
 			}
-			if dev.paired || dev.connected {
-				r.devices = append(r.devices, dev)
+			if dev.Paired || dev.Connected {
+				r.Devices = append(r.Devices, dev)
 			}
 		}
 	}
@@ -113,13 +162,13 @@ func probeBluetooth() btReport {
 		add("bluealsa isn't on the %s bus: no audio", which)
 	}
 	for _, svc := range services {
-		pcms, api, err := bluealsaPCMs(bus, svc)
+		pcms, api, err := bluealsaPCMs(bus, svc, first)
 		if err != nil {
 			add("%s: %v", svc, err)
 			continue
 		}
 		add("%s (%s API): %d PCMs", svc, api, len(pcms))
-		r.pcms = append(r.pcms, pcms...)
+		r.PCMs = append(r.PCMs, pcms...)
 	}
 	return r
 }
@@ -154,9 +203,9 @@ func btBus() (*dbus.Conn, string, []string, error) {
 }
 
 // bluealsaPCMs lists the PCMs, trying the v4 API, then v2/v3's.
-func bluealsaPCMs(bus *dbus.Conn, svc string) ([]bluealsaPCM, string, error) {
+func bluealsaPCMs(bus *dbus.Conn, svc string, verbose bool) ([]PCM, string, error) {
 	var xml string
-	if err := bus.Object(svc, bluealsaPath).Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml); err == nil {
+	if verbose && bus.Object(svc, bluealsaPath).Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml) == nil {
 		log.Printf("bluetooth: %s %s introspection:\n%s", svc, bluealsaPath, xml[:min(len(xml), 6000)])
 	}
 
@@ -180,33 +229,37 @@ func bluealsaPCMs(bus *dbus.Conn, svc string) ([]bluealsaPCM, string, error) {
 		}
 	}
 
-	var pcms []bluealsaPCM
+	var pcms []PCM
 	for p, props := range found {
-		log.Printf("bluetooth: PCM %s: %v", p, props)
-		pcm := bluealsaPCM{service: svc, path: p, device: prop[dbus.ObjectPath](props, "Device"),
-			mode: prop[string](props, "Mode"), codec: prop[string](props, "Codec"),
-			format: prop[uint16](props, "Format"), channels: int(prop[byte](props, "Channels")),
-			rate: int(prop[uint32](props, "Rate"))}
-		if pcm.rate == 0 {
-			pcm.rate = int(prop[uint32](props, "Sampling")) // v3's name
+		if verbose {
+			log.Printf("bluetooth: PCM %s: %v", p, props)
 		}
-		if pcm.mode == "" {
-			pcm.mode = "sink" // v2 PCMs have no mode; A2DP from the Kobo is playback
+		pcm := PCM{service: svc, Path: p, Device: prop[dbus.ObjectPath](props, "Device"),
+			Mode: prop[string](props, "Mode"), Codec: prop[string](props, "Codec"),
+			Format: prop[uint16](props, "Format"), Channels: int(prop[byte](props, "Channels")),
+			Rate: int(prop[uint32](props, "Rate"))}
+		if pcm.Rate == 0 {
+			pcm.Rate = int(prop[uint32](props, "Sampling")) // v3's name
 		}
-		pcm.openArgs = openArgCount(bus, svc, p)
+		if pcm.Mode == "" {
+			pcm.Mode = "sink" // v2 PCMs have no mode; A2DP from the Kobo is playback
+		}
+		pcm.openArgs = openArgCount(bus, svc, p, verbose)
 		pcms = append(pcms, pcm)
 	}
-	sort.Slice(pcms, func(i, j int) bool { return pcms[i].path < pcms[j].path })
+	sort.Slice(pcms, func(i, j int) bool { return pcms[i].Path < pcms[j].Path })
 	return pcms, api, nil
 }
 
 // openArgCount reads how many input arguments PCM1.Open takes.
-func openArgCount(bus *dbus.Conn, svc string, p dbus.ObjectPath) int {
+func openArgCount(bus *dbus.Conn, svc string, p dbus.ObjectPath, verbose bool) int {
 	var xml string
 	if bus.Object(svc, p).Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml) != nil {
 		return 0
 	}
-	log.Printf("bluetooth: %s introspection:\n%s", p, xml[:min(len(xml), 4000)])
+	if verbose {
+		log.Printf("bluetooth: %s introspection:\n%s", p, xml[:min(len(xml), 4000)])
+	}
 	_, open, ok := strings.Cut(xml, `<method name="Open">`)
 	if !ok {
 		return 0
@@ -216,20 +269,21 @@ func openArgCount(bus *dbus.Conn, svc string, p dbus.ObjectPath) int {
 }
 
 // openPCM asks bluealsa for the PCM's sample pipe and its control socket.
-func openPCM(bus *dbus.Conn, pcm bluealsaPCM) (data, ctrl *os.File, err error) {
+func openPCM(bus *dbus.Conn, pcm PCM) (data, ctrl *os.File, err error) {
 	var args []any
 	if pcm.openArgs > 0 {
 		args = append(args, "sink")
 	}
 	var dataFD, ctrlFD dbus.UnixFD
-	if err := bus.Object(pcm.service, pcm.path).Call("org.bluealsa.PCM1.Open", 0, args...).Store(&dataFD, &ctrlFD); err != nil {
+	if err := bus.Object(pcm.service, pcm.Path).Call("org.bluealsa.PCM1.Open", 0, args...).Store(&dataFD, &ctrlFD); err != nil {
 		return nil, nil, fmt.Errorf("PCM1.Open: %w", err)
 	}
-	return os.NewFile(uintptr(dataFD), "bluealsa-pcm"), os.NewFile(uintptr(ctrlFD), "bluealsa-ctrl"), nil
+	return pollable(int(dataFD), "bluealsa-pcm"), pollable(int(ctrlFD), "bluealsa-ctrl"), nil
 }
 
-func connectDevice(bus *dbus.Conn, d btDevice) error {
-	return bus.Object("org.bluez", d.path).Call("org.bluez.Device1.Connect", 0).Err
+// Connect asks BlueZ to connect a paired device.
+func Connect(bus *dbus.Conn, d Device) error {
+	return bus.Object("org.bluez", d.Path).Call("org.bluez.Device1.Connect", 0).Err
 }
 
 // prop reads a D-Bus property, or T's zero value.

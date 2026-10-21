@@ -151,7 +151,8 @@ type App struct {
 	inputAt time.Time   // last touch or key
 	call    chan func() // work from goroutines, run on the UI loop
 
-	status   string
+	status   string          // the header's status text, as drawn
+	note     string          // the Program's, left of it
 	dirty    []dirtyRect     // pending screen updates, blitted one at a time
 	flash    bool            // the next full-screen update should flash
 	flashR   image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
@@ -311,7 +312,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			a.drawStatus()
 		case <-idle.C:
 			if d := a.prog.IdleTimeout(); time.Since(a.inputAt) < d { // reading a remote screen takes longer
-				idle.Reset(d - time.Since(a.inputAt))
+				idle.Reset(min(d-time.Since(a.inputAt), IdleTimeout)) // and ask again: it may be shorter by then
 				continue
 			}
 			log.Print("idle timeout")

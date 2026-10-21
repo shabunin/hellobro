@@ -140,12 +140,17 @@ type termView struct {
 	fontPx int
 }
 
-// termGroup is the current tab's sessions.
-func (a *bro) termGroup() *termGroup { return &a.tv.groups[a.Tab] }
+// termGroup is the current tab's sessions, if it's a terminal tab.
+func (a *bro) termGroup() *termGroup {
+	if !isTermTab(a.Tab) {
+		return nil
+	}
+	return &a.tv.groups[a.Tab]
+}
 
 // term is the session on screen, if any.
 func (a *bro) term() *termSession {
-	if g := a.termGroup(); g.cur < len(g.sessions) {
+	if g := a.termGroup(); g != nil && g.cur < len(g.sessions) {
 		return g.sessions[g.cur]
 	}
 	return nil
@@ -246,6 +251,7 @@ func (a *bro) drawTerm() {
 	v.shownConnect = nil
 	a.DrawPanel(p, "")
 	a.drawTermTitle()
+	a.drawStat(true)
 	if t.connected() {
 		v.shown = nil
 		a.renderTerm(t)
@@ -304,10 +310,11 @@ func (a *bro) drawTermStatus() {
 
 func (a *bro) drawConnect(t *termSession) {
 	v := &a.tv
-	keys := "Ctrl+Shift+T: new session  ·  Ctrl+PgUp/PgDn: switch  ·  Alt+F1/F2: SSH/Shell  ·  F11: fullscreen"
+	keys := "Ctrl+Shift+T: new session  ·  Ctrl+PgUp/PgDn: switch  ·  Alt+F1-F3: tabs  ·  F11: fullscreen"
+	music := "Ctrl+Shift+Space: play/pause  ·  Ctrl+Shift+< >: previous/next track  ·  Ctrl+Shift+B: status bar"
 	var lines []string
 	if t.kind == kindShell {
-		lines = []string{"A shell on this Kobo (/bin/sh, as " + whoami() + "): Enter or tap here to start it.", keys}
+		lines = []string{"A shell on this Kobo (/bin/sh, as " + whoami() + "): Enter or tap here to start it.", keys, music}
 		if t.state == termIdle && len(a.termGroup().sessions) > 1 {
 			lines = append(lines, "Esc: close this session.")
 		}
@@ -319,7 +326,7 @@ func (a *bro) drawConnect(t *termSession) {
 		v.hostRows = nil
 		return
 	}
-	lines = []string{"Type user@host[:port] [command] and Enter, or tap / press 1-9 for a saved host.", keys}
+	lines = []string{"Type user@host[:port] [command] and Enter, or tap / press 1-9 for a saved host.", keys, music}
 	switch {
 	case t.prompt != nil && t.prompt.yesno:
 		lines = append(lines, t.prompt.question, "(Enter: yes, Esc: no)")
@@ -538,7 +545,7 @@ func (a *bro) enterTerm() {
 		}
 		a.termGeometry()
 	}
-	if g := a.termGroup(); len(g.sessions) == 0 {
+	if g := a.termGroup(); g != nil && len(g.sessions) == 0 {
 		a.newSession(true)
 	}
 }
@@ -547,7 +554,7 @@ func (a *bro) enterTerm() {
 // the Shell tab's shell.
 func (a *bro) newSession(start bool) {
 	g := a.termGroup()
-	if len(g.sessions) >= maxSessions {
+	if g == nil || len(g.sessions) >= maxSessions {
 		return
 	}
 	t := &termSession{kind: a.Tab}
@@ -562,7 +569,7 @@ func (a *bro) newSession(start bool) {
 // switchSession shows session i of the current tab.
 func (a *bro) switchSession(i int) {
 	g := a.termGroup()
-	if i < 0 || i >= len(g.sessions) || i == g.cur {
+	if g == nil || i < 0 || i >= len(g.sessions) || i == g.cur {
 		return
 	}
 	g.cur = i
@@ -909,27 +916,7 @@ func (a *bro) termTick() {
 func (a *bro) termKey(code uint16, value int32) bool {
 	t, g, v := a.term(), a.termGroup(), &a.tv
 	m := &v.mods
-	down := value != 0
-	switch code {
-	case kobo.KeyLeftShift, kobo.KeyRightShift:
-		m.shift = down
-		return true
-	case kobo.KeyLeftCtrl, kobo.KeyRightCtrl:
-		m.ctrl = down
-		return true
-	case keyLeftAlt, keyRightAlt:
-		m.alt = down
-		return true
-	case keyLeftMeta, keyRightMeta:
-		m.meta = down
-		return true
-	case kobo.KeyCapsLock:
-		if value == 1 {
-			m.caps = !m.caps
-			if !t.connected() {
-				a.updateTerm(t) // the prompt says so
-			}
-		}
+	if a.termMod(code, value) {
 		return true
 	}
 	// Ours, not the remote's: fullscreen, the font size, sessions and tabs.
@@ -1099,6 +1086,32 @@ var termSpecialKeys = map[uint16]rune{
 	108: uv.KeyDown, keyPgDn: uv.KeyPgDown, 110: uv.KeyInsert, 111: uv.KeyDelete,
 	59: uv.KeyF1, 60: uv.KeyF2, 61: uv.KeyF3, 62: uv.KeyF4, 63: uv.KeyF5, 64: uv.KeyF6,
 	65: uv.KeyF7, 66: uv.KeyF8, 67: uv.KeyF9, 68: uv.KeyF10, keyF11: uv.KeyF11, keyF12: uv.KeyF12,
+}
+
+// termMod keeps track of the modifier keys; true if code is one.
+func (a *bro) termMod(code uint16, value int32) bool {
+	m := &a.tv.mods
+	down := value != 0
+	switch code {
+	case kobo.KeyLeftShift, kobo.KeyRightShift:
+		m.shift = down
+	case kobo.KeyLeftCtrl, kobo.KeyRightCtrl:
+		m.ctrl = down
+	case keyLeftAlt, keyRightAlt:
+		m.alt = down
+	case keyLeftMeta, keyRightMeta:
+		m.meta = down
+	case kobo.KeyCapsLock:
+		if value == 1 {
+			m.caps = !m.caps
+			if t := a.term(); t != nil && !t.connected() {
+				a.updateTerm(t) // the prompt says so
+			}
+		}
+	default:
+		return false
+	}
+	return true
 }
 
 // termCell maps a screen point to a cell, if it's on the grid.

@@ -81,7 +81,7 @@ def start():
     time.sleep(1.5)
 
 tabs_y = 76 + 34
-TABS = int(os.environ.get('TABS', 2))  # hellobro: SSH Shell; brotools: Keys Finger Stylus Net Sound System Info
+TABS = int(os.environ.get('TABS', 3))  # hellobro: SSH Shell Music; brotools: Keys Finger Stylus Net Sound System Info
 tab_x = lambda i: (i + 0.5) * min(W // TABS, W // 4)
 land = W > H
 cx0, cy0 = (60, 200)
@@ -94,7 +94,7 @@ def key(code, shift=False, ctrl=False, alt=False):
     for m in reversed(mods): kbd.write(ev(1, m, 0) + SYN)
     time.sleep(0.15)
 UP, DOWN, ENTER, ESC, TAB, BACKSPACE, SPACE, F11 = 103, 108, 28, 1, 15, 14, 57, 87
-PGUP, PGDN, KEY_T = 104, 109, 20
+PGUP, PGDN, KEY_T, LEFT, RIGHT = 104, 109, 20, 105, 106
 F = lambda n: 58 + n                                  # F1..F10
 
 def exit_app():

@@ -306,15 +306,29 @@ func (a *App) drawHeader() {
 	a.Mark(L.header, true)
 }
 
-// drawStatus refreshes the battery & clock text, if it changed.
+// SetStatus puts a note in the header, left of the battery and clock
+// ("" for none): what's playing, say.
+func (a *App) SetStatus(note string) {
+	if note != a.note {
+		a.note = note
+		a.drawStatus()
+	}
+}
+
+// drawStatus refreshes the note, battery & clock text, if they changed.
 func (a *App) drawStatus() {
 	s := statusText(a.scr.info)
-	if s == a.status || a.calib != nil || a.Full {
+	if s+"\x00"+a.note == a.status || a.calib != nil || a.Full {
 		return
 	}
-	a.status = s
-	a.C.Fill(a.L.status, Black)
-	a.C.Text(a.F.Small, a.L.status, s, Light, AlignRight)
+	a.status = s + "\x00" + a.note
+	r := a.L.status
+	a.C.Fill(r, Black)
+	a.C.Text(a.F.Small, r, s, Light, AlignRight)
+	if a.note != "" {
+		r.Max.X -= TextWidth(a.F.Small, s) + 28
+		a.C.Text(a.F.Small, r, a.note, White, AlignRight)
+	}
 	a.Mark(a.L.status, true)
 }
 

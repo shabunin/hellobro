@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 def server():
+    os.makedirs(os.environ['SRV_DIR'], exist_ok=True)
     return subprocess.Popen([os.environ['SRV'], '-listen', ':2223', '-password', 'bro'], cwd=os.environ['SRV_DIR'],
                             stdout=open(os.path.join(os.environ['SRV_DIR'], 'log'), 'a'), stderr=subprocess.STDOUT)
 srv = server()

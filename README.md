@@ -4,13 +4,16 @@ Go apps for the Kobo Elipsa (N604, sunxi): they take over the screen from
 Nickel, draw their own e-ink UI through [FBInk](https://github.com/NiLuJe/FBInk),
 and give Nickel back when you leave. Each has its own NickelMenu entry.
 
-**hellobro** ("Hello Bro") is a terminal for a Bluetooth keyboard. Tabs
-(tap, or F1/F2; Alt+F1/F2 while a session is up):
+**hellobro** ("Hello Bro") is a terminal for a Bluetooth keyboard, with
+music. Tabs (tap, or F1–F3; Alt+F1–F3 while a session is up):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
   Claude Code…), mouse taps and scrolling; several sessions at once.
 - **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
   several too.
+- **Music**: a player for the albums on the Kobo (folders of MP3/WAV, with
+  their covers), to Bluetooth headphones or a DAC. It goes on playing on
+  the other tabs.
 
 **brotools** ("Bro Tools") is diagnostics. Tabs (tap, or F1–F7):
 
@@ -27,7 +30,7 @@ and give Nickel back when you leave. Each has its own NickelMenu entry.
 
 In both: swipe the left edge for the frontlight. Esc, the exit button or
 the power button leave; they also leave after 3 minutes idle (hellobro: 20
-with a session up).
+with a session up, 6 hours while music plays).
 
 ## Code
 
@@ -35,7 +38,11 @@ with a session up).
   and e-ink waveforms), touch with its calibration, keyboards and buttons,
   the frontlight, drawing, panels, and the app's frame (header, tabs,
   footer). An app is a `kobo.Program` that fills in the pages.
-- `cmd/hellobro/`: the terminal: the emulator view, SSH, the local shell.
+- `audio/`: Bluetooth audio through the Kobo's bluez-alsa: finding the
+  device and its PCM, MP3/WAV decoding, a player with pause, seeking and
+  volume.
+- `cmd/hellobro/`: the terminal (the emulator view, SSH, the local shell),
+  the status bar, and the Music tab.
 - `cmd/brotools/`: the diagnostics pages.
 
 ## Terminal
@@ -57,7 +64,27 @@ with a session up).
   or `close` drops it.
 - F11: fullscreen. Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
   edge: font size (remembered in `term-font`).
-- While connected, every other key goes to the remote, Esc included.
+- A status bar along the bottom, fullscreen too: what's playing, and the
+  battery (charge, temperature), CPU and memory use, every 5 s.
+  Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it
+  plays or pauses.
+- While connected, every other key goes to the remote, Esc included, but
+  for the music's keys below.
+
+## Music
+
+- Albums are folders with MP3 or WAV files, up to 5 levels under the Kobo's
+  storage (`/mnt/onboard`; hidden folders skipped), say
+  `Music/Artist/Album/`. The cover is `cover.jpg`, `folder.jpg` or another
+  image there (a "front" one before a "back").
+- It plays to the Bluetooth device connected in Kobo's settings; a paired
+  one that isn't connected gets a "connect" button.
+- On any tab: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
+  the previous and next track; so do media keys.
+- On the Music tab: Space or k play/pause, Left/Right (j/l) seek 10 s, n/p
+  next/previous, s stop, = and − volume, Up/Down/PgUp/PgDn/Home/End and
+  Enter pick, Esc or Backspace back to the albums; or tap.
+- The volume, and the track and where it was, are kept in `music-state`.
 
 E-ink notes: changed cells only are redrawn; small black & white changes use
 the fast DU waveform and get a GL16 cleanup within a few seconds, bigger ones
@@ -121,8 +148,12 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     harness/run.sh /tmp/hb 1 ssh            # hellobro: landscape, a session with the server
     SRV=$PWD/server/hellobro-server SRV_DIR=/tmp/srv harness/run.sh /tmp/hb 0 sessions
                                             # two sessions, password + key install, reconnect, shells
+    MUSIC=~/Music harness/run.sh /tmp/hb 0 music      # the Music tab
+    MUSIC=~/Music harness/run.sh /tmp/hb 0 statbar    # the status bar, the music hotkeys
 
-The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
+`MUSIC` is the music folder (default `harness/music`); the sound goes to
+`OUT/pcm.raw` (`HELLOBRO_FAKE_PCM`: 48 kHz, 16-bit stereo), at the pace it
+would play. The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
 (`calls.txt` there lists every update with its waveform). The feeds live in
 `harness/feeds`, each with an `# app:` line naming the app it drives, and
 their shared helpers in `harness/feedlib.py`.
