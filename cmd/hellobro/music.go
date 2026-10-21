@@ -99,14 +99,14 @@ type musicState struct {
 func (a *bro) layoutMusic(K kobo.Layout) {
 	v := &a.mv
 	fn, fl := a.folded("now"), a.folded("library")
-	var at []image.Rectangle
+	rows := []kobo.Row{{Height: 31, Folded: []bool{fn}}, {Height: 69, Folded: []bool{fl}}}
 	if K.Landscape {
-		at = K.Arrange(K.Body, kobo.Row{Height: 100, Widths: []int{42, 58}, Folded: []bool{fn, fl}})
-	} else {
-		at = K.Arrange(K.Body, kobo.Row{Height: 31, Folded: []bool{fn}}, kobo.Row{Height: 69, Folded: []bool{fl}})
+		rows = []kobo.Row{{Height: 100, Widths: []int{42, 58}, Folded: []bool{fn, fl}}}
 	}
-	v.nowP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Now playing", at[0], ""), fn)
-	v.libP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Library", at[1], ""), fl)
+	at, f := tile(K, map[bool]int{true: 0, false: 1}[v.nowFocus], rows...)
+	fn, fl = f[0], f[1]
+	v.nowP = a.pagePanel(K, "Now playing", at[0], fn)
+	v.libP = a.pagePanel(K, "Library", at[1], fl)
 	a.layoutLibrary()
 	if fn { // nothing in it to draw or tap
 		z := image.Rectangle{}

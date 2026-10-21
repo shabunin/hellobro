@@ -98,17 +98,15 @@ var factsOnce sync.Once
 func (a *bro) layoutRadio(K kobo.Layout) {
 	v := &a.rv
 	fw, fb, fs := a.folded("wifi"), a.folded("bluetooth"), a.folded("settings")
-	var at []image.Rectangle
+	rows := []kobo.Row{ // room for all the settings
+		{Height: 32, Folded: []bool{fw}}, {Height: 32, Folded: []bool{fb}}, {Height: 36, Folded: []bool{fs}}}
 	if K.Landscape { // the radios side by side, the settings under them
-		at = K.Arrange(K.Body, kobo.Row{Height: 52, Widths: []int{50, 50}, Folded: []bool{fw, fb}},
-			kobo.Row{Height: 48, Folded: []bool{fs}})
-	} else { // room for all the settings
-		at = K.Arrange(K.Body, kobo.Row{Height: 32, Folded: []bool{fw}},
-			kobo.Row{Height: 32, Folded: []bool{fb}}, kobo.Row{Height: 36, Folded: []bool{fs}})
+		rows = []kobo.Row{{Height: 52, Widths: []int{50, 50}, Folded: []bool{fw, fb}}, {Height: 48, Folded: []bool{fs}}}
 	}
-	a.layoutSettings(at[2], fs)
-	v[panelWiFi].p = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Wi-Fi", at[0], ""), fw)
-	v[panelBT].p = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Bluetooth", at[1], ""), fb)
+	at, f := tile(K, a.rs.focus, rows...)
+	a.layoutSettings(K, at[2], f[2])
+	v[panelWiFi].p = a.pagePanel(K, "Wi-Fi", at[0], f[0])
+	v[panelBT].p = a.pagePanel(K, "Bluetooth", at[1], f[1])
 	for i := range v {
 		pv := &v[i]
 		if pv.p.Folded { // nothing in it to draw or tap
@@ -499,7 +497,7 @@ func (a *bro) radioFolded(i int) bool {
 // folded or not.
 func (a *bro) radioStep(d int) {
 	a.rs.focus = (a.rs.focus + d + 3) % 3
-	a.drawRadio()
+	a.focusMoved()
 }
 
 // radioFocusOpen moves the focus off a folded panel, to an open one.

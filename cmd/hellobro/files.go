@@ -53,14 +53,14 @@ type filesView struct {
 func (a *bro) layoutFiles(K kobo.Layout) {
 	v := &a.fv
 	fs, fl := a.folded("sharing"), a.folded("files")
-	var at []image.Rectangle
+	rows := []kobo.Row{{Height: 31, Folded: []bool{fs}}, {Height: 69, Folded: []bool{fl}}}
 	if K.Landscape {
-		at = K.Arrange(K.Body, kobo.Row{Height: 100, Widths: []int{45, 55}, Folded: []bool{fs, fl}})
-	} else {
-		at = K.Arrange(K.Body, kobo.Row{Height: 31, Folded: []bool{fs}}, kobo.Row{Height: 69, Folded: []bool{fl}})
+		rows = []kobo.Row{{Height: 100, Widths: []int{45, 55}, Folded: []bool{fs, fl}}}
 	}
-	v.shareP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Sharing", at[0], ""), fs)
-	v.listP = kobo.WithFold(a.F, kobo.NewPanel(a.F, "On this Kobo", at[1], ""), fl)
+	at, f := tile(K, map[bool]int{true: 0, false: 1}[v.shareFocus], rows...)
+	fs, fl = f[0], f[1]
+	v.shareP = a.pagePanel(K, "Sharing", at[0], fs)
+	v.listP = a.pagePanel(K, "On this Kobo", at[1], fl)
 	v.shownShare, v.shownList = "", ""
 	v.text, v.shareBtns = image.Rectangle{}, v.shareBtns[:0]
 	if !fs {

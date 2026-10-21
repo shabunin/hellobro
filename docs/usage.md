@@ -48,7 +48,14 @@ One panel on a page has the focus, marked ►: the keys go to it.
 Ctrl+Tab moves it to the next panel, Ctrl+Shift+Tab back; a tap on a
 panel gives it the focus too. A folded one takes the focus as well, on
 its strip: there the keys wait, and Enter (or Ctrl+Shift+M) opens it.
-Folding the one in focus moves the focus to an open one. On Music, Now playing in focus takes
+Folding the one in focus moves the focus to an open one.
+
+Ctrl+Shift+F gives the panel in focus the whole screen, as a tiling
+window manager does, on any tab: Ctrl+Tab then goes on to the next
+panel, which has the screen in turn. Ctrl+Shift+F again, or a swipe in
+from the top or bottom edge, brings the others back. Like every key
+here, these are set in `keys.conf` (or Settings → Keys): `fullscreen`,
+`panel.next`, `panel.prev`, `panel.fold`. On Music, Now playing in focus takes
 ↑ ↓ for the volume and Enter to play or pause; the Library has them
 otherwise. On Files, the arrows are the list's. On Settings, Tab works
 as well.

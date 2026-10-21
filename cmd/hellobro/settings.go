@@ -178,9 +178,9 @@ func (a *bro) stepSetting(i, d int) {
 	a.drawSettings()
 }
 
-func (a *bro) layoutSettings(r image.Rectangle, folded bool) {
+func (a *bro) layoutSettings(K kobo.Layout, r image.Rectangle, folded bool) {
 	v := &a.sv
-	v.p = kobo.WithFold(a.F, kobo.NewPanel(a.F, "Settings", r, ""), folded)
+	v.p = a.pagePanel(K, "Settings", r, folded)
 	b := v.p.Body.Inset(kobo.Pad)
 	v.rows = v.rows[:0]
 	if folded {

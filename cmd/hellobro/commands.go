@@ -82,7 +82,7 @@ func makeCommands() []*command {
 		&command{id: "paste", title: "Paste", keys: []string{"ctrl+shift+v"}, run: func(a *bro) { a.paste(readClip(), "") }},
 		&command{id: "copy.key", title: "Copy the Kobo's SSH key", run: (*bro).copyKoboKey},
 		&command{id: "paste.key", title: "Paste the Kobo's SSH key", run: (*bro).pasteKoboKey},
-		&command{id: "fullscreen", title: "Fullscreen", keys: []string{"ctrl+shift+f"}, when: onTerm,
+		&command{id: "fullscreen", title: "Fullscreen: the panel in focus", keys: []string{"ctrl+shift+f"},
 			run: func(a *bro) { a.SetFull(!a.Full) }},
 		&command{id: "font.bigger", title: "Bigger font", keys: []string{"ctrl+="}, when: onTerm, repeat: true,
 			run: func(a *bro) { a.setTermFont(a.tv.fontPx + termFontStep) }},

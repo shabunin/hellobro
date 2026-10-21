@@ -162,7 +162,7 @@ func (a *bro) foldTap(p image.Point) bool {
 // A folded session opens as it's picked in the switcher.
 func foldCommands() []*command {
 	cs := []*command{{id: "panel.fold", title: "Panel in focus: minimize / open", keys: []string{"ctrl+shift+m"},
-		when: func(a *bro) bool { return !isTermTab(a.Tab) || a.term() != nil && !a.Full },
+		when: func(a *bro) bool { return !a.Full && (!isTermTab(a.Tab) || a.term() != nil) },
 		run:  (*bro).foldFocused}}
 	for _, f := range foldables {
 		cs = append(cs,
@@ -229,16 +229,68 @@ func (a *bro) stepPanel(d int) {
 	switch a.Tab {
 	case tabMusic:
 		a.mv.nowFocus = !a.mv.nowFocus
-		a.redrawMusic()
 	case tabFiles:
 		a.fv.shareFocus = !a.fv.shareFocus
+	case tabRadio:
+		a.radioStep(d)
+		return
+	default:
+		a.stepSession(d)
+		return
+	}
+	a.focusMoved()
+}
+
+// focusMoved shows the focus on a new panel: its mark, or fullscreen, the
+// whole page, which is its now.
+func (a *bro) focusMoved() {
+	if a.Full {
+		a.Layout(a.lay)
+		a.DrawPage()
+		a.MarkFlash(a.lay.Page)
+		return
+	}
+	switch a.Tab {
+	case tabMusic:
+		a.redrawMusic()
+	case tabFiles:
 		a.fv.shownShare, a.fv.shownList = "", ""
 		a.drawFiles()
 	case tabRadio:
-		a.radioStep(d)
-	default:
-		a.stepSession(d)
+		a.drawRadio()
 	}
+}
+
+// tile places a page's panels in rows, as Arrange does. Fullscreen, the
+// one in focus (its place in the rows) has it all, and the others are
+// folded out of sight: what's folded comes back with the rects.
+func tile(K kobo.Layout, focus int, rows ...kobo.Row) ([]image.Rectangle, []bool) {
+	var folded []bool
+	for _, r := range rows {
+		folded = append(folded, r.Folded...)
+	}
+	if !K.Full {
+		return K.Arrange(K.Body, rows...), folded
+	}
+	at := make([]image.Rectangle, len(folded))
+	for i := range folded {
+		folded[i] = i != focus
+	}
+	at[focus] = K.Body.Inset(kobo.Pad)
+	return at, folded
+}
+
+// pagePanel is a page's panel at r, foldable. Fullscreen, the one in focus
+// doesn't fold, and the others are nowhere: folded, with nothing to draw
+// or tap.
+func (a *bro) pagePanel(K kobo.Layout, name string, r image.Rectangle, folded bool) kobo.Panel {
+	switch {
+	case !K.Full:
+		return kobo.WithFold(a.F, kobo.NewPanel(a.F, name, r, ""), folded)
+	case folded:
+		return kobo.Panel{Folded: true}
+	}
+	return kobo.NewPanel(a.F, name, r, "")
 }
 
 // focusMark marks the name of the panel in focus.
@@ -264,6 +316,9 @@ func (a *bro) focusKey() string {
 
 // focusFolded says whether the panel in focus is folded to its strip.
 func (a *bro) focusFolded() bool {
+	if a.Full { // the one in focus has the screen
+		return false
+	}
 	if k := a.focusKey(); k != "" {
 		return a.folded(k)
 	}
@@ -273,9 +328,12 @@ func (a *bro) focusFolded() bool {
 
 // foldFocused folds the panel in focus, or opens it.
 func (a *bro) foldFocused() {
+	if a.Full {
+		return
+	}
 	if k := a.focusKey(); k != "" {
 		a.setFold(k, !a.folded(k))
-	} else if t := a.term(); t != nil && !a.Full {
+	} else if t := a.term(); t != nil {
 		a.setSessionFold(t, !t.folded)
 	}
 }
