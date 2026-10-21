@@ -153,6 +153,10 @@ func systemLines() []string {
 		model = ci["Processor"]
 	}
 	cpu := fmt.Sprintf("%d × %s", runtime.NumCPU(), model)
+	if on, err := os.ReadFile("/sys/devices/system/cpu/online"); err == nil {
+		all, _ := os.ReadFile("/sys/devices/system/cpu/present")
+		cpu += fmt.Sprintf(" (online %s of %s)", strings.TrimSpace(string(on)), strings.TrimSpace(string(all)))
+	}
 	if cur := readInt("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"); cur > 0 {
 		cpu += fmt.Sprintf(", %d MHz", cur/1000)
 		if mx := readInt("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"); mx > 0 {
@@ -322,7 +326,11 @@ func storageLines() []string {
 	for _, z := range zones {
 		t, _ := os.ReadFile(z + "/type")
 		if c := readInt(z + "/temp"); c != 0 {
-			temps = append(temps, fmt.Sprintf("%s %.0f °C", strings.TrimSpace(string(t)), float64(c)/1000))
+			deg := float64(c) / 1000
+			if c < 1000 { // some drivers report whole degrees
+				deg = float64(c)
+			}
+			temps = append(temps, fmt.Sprintf("%s %.0f °C", strings.TrimSpace(string(t)), deg))
 		}
 	}
 	if len(temps) > 0 {

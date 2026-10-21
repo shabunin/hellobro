@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -23,8 +24,12 @@ type localShell struct {
 
 // startShell runs a login-ish shell on a new PTY of cols×rows.
 func startShell(cols, rows int) (*localShell, error) {
+	ptmx, err := ptyMaster()
+	if err != nil {
+		return nil, err
+	}
 	// O_NOCTTY: the PTY becomes the shell's controlling terminal, not ours.
-	pty, err := os.OpenFile("/dev/ptmx", os.O_RDWR|syscall.O_NOCTTY, 0)
+	pty, err := os.OpenFile(ptmx, os.O_RDWR|syscall.O_NOCTTY, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +73,29 @@ func startShell(cols, rows int) (*localShell, error) {
 		close(s.exit)
 	}()
 	return s, nil
+}
+
+// ptyMaster finds the PTY multiplexer. The Kobo has neither /dev/ptmx nor
+// devpts mounted (Nickel needs no terminals), so we mount devpts at
+// /dev/pts, which has its own ptmx; it stays mounted until a reboot.
+func ptyMaster() (string, error) {
+	if _, err := os.Stat("/dev/pts/ptmx"); err != nil {
+		if err := os.MkdirAll("/dev/pts", 0o755); err != nil {
+			return "", err
+		}
+		if err := syscall.Mount("devpts", "/dev/pts", "devpts", syscall.MS_NOSUID|syscall.MS_NOEXEC, "mode=620,ptmxmode=666"); err != nil {
+			return "", fmt.Errorf("no PTYs here: mounting devpts on /dev/pts: %w", err)
+		}
+		log.Print("shell: mounted devpts on /dev/pts")
+	}
+	if _, err := os.Stat("/dev/ptmx"); err == nil {
+		return "/dev/ptmx", nil
+	}
+	// For other programs that look for it; ours does without.
+	if err := syscall.Mknod("/dev/ptmx", syscall.S_IFCHR|0o666, 5<<8|2); err != nil {
+		log.Printf("shell: no /dev/ptmx, and making it: %v", err)
+	}
+	return "/dev/pts/ptmx", nil
 }
 
 // shellEnv is ours, minus what's only for hellobro, plus what a terminal sets.
