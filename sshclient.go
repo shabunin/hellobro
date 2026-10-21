@@ -15,8 +15,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -25,9 +27,15 @@ import (
 
 type sshHost struct {
 	name, user, addr string // addr is host:port
+	cmd              string // run instead of a login shell, e.g. tmux new -A -s kobo
 }
 
 func (h sshHost) String() string { return h.user + "@" + h.addr }
+
+// line is h as a line of ssh.conf.
+func (h sshHost) line() string { return strings.TrimSpace(h.name + "  " + h.String() + "  " + h.cmd) }
+
+func (h sshHost) same(o sshHost) bool { return h.user == o.user && h.addr == o.addr && h.cmd == o.cmd }
 
 // appFile is a file next to the binary.
 func appFile(name string) string {
@@ -37,8 +45,11 @@ func appFile(name string) string {
 	return name
 }
 
-const sshConfExample = `# hellobro ssh hosts, one per line:  name  user@host[:port]
+const sshConfExample = `# hellobro ssh hosts, one per line:  name  user@host[:port]  [command]
+# The command, if any, runs instead of a login shell; with tmux, a dropped
+# connection comes back where it was:
 # hellobro-server  bro@192.168.1.10:2222
+# pc  me@192.168.1.10  tmux new -A -s kobo
 `
 
 // loadSSHHosts reads ssh.conf, creating an example if there's none.
@@ -61,25 +72,54 @@ func loadSSHHosts() []sshHost {
 			continue
 		}
 		if h, err := parseSSHTarget(fields[1]); err == nil {
-			h.name = fields[0]
+			h.name, h.cmd = fields[0], strings.Join(fields[2:], " ")
 			hosts = append(hosts, h)
 		}
 	}
 	return hosts
 }
 
+// saveSSHHost adds h to ssh.conf, under a name no other host has; it
+// returns that name.
+func saveSSHHost(hosts []sshHost, h sshHost) (string, error) {
+	base, _, _ := net.SplitHostPort(h.addr)
+	base = strings.Trim(base, "[]")
+	name := base
+	for n := 2; slices.ContainsFunc(hosts, func(o sshHost) bool { return o.name == name }); n++ {
+		name = fmt.Sprintf("%s-%d", base, n)
+	}
+	h.name = name
+	path := appFile("ssh.conf")
+	b, _ := os.ReadFile(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if len(b) > 0 && b[len(b)-1] != '\n' {
+		fmt.Fprintln(f)
+	}
+	_, err = fmt.Fprintln(f, h.line())
+	return name, err
+}
+
 // parseSSHTarget reads user@host[:port] (user defaults to root, port to
 // 22), or the same as an ssh command line, since that's what fingers type:
-// "ssh -p 2222 bro@host", "ssh -l bro host", "ssh://bro@host:2222".
+// "ssh -p 2222 bro@host", "ssh -l bro host", "ssh://bro@host:2222". As
+// with ssh, anything after the host is a command to run there.
 func parseSSHTarget(s string) (sshHost, error) {
 	fields := strings.Fields(s)
 	if len(fields) > 0 && fields[0] == "ssh" {
 		fields = fields[1:]
 	}
-	var target, user, port string
+	var target, user, port, cmd string
 	for i := 0; i < len(fields); i++ {
 		f := fields[i]
 		switch {
+		case target != "" && !strings.HasPrefix(f, "-"):
+			cmd = strings.Join(fields[i:], " ")
+			i = len(fields)
+		case f == "-t" || f == "-tt": // we always ask for a terminal
 		case (f == "-p" || f == "-l") && i+1 < len(fields):
 			i++
 			if f == "-p" {
@@ -93,10 +133,8 @@ func parseSSHTarget(s string) (sshHost, error) {
 			user = f[2:]
 		case strings.HasPrefix(f, "-"):
 			return sshHost{}, fmt.Errorf("only -p PORT and -l USER are understood, not %s", f)
-		case target == "":
-			target = strings.TrimSuffix(strings.TrimPrefix(f, "ssh://"), "/")
 		default:
-			return sshHost{}, fmt.Errorf("want user@host[:port], got %q", s)
+			target = strings.TrimSuffix(strings.TrimPrefix(f, "ssh://"), "/")
 		}
 	}
 	host := target
@@ -124,7 +162,7 @@ func parseSSHTarget(s string) (sshHost, error) {
 	if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
 		return sshHost{}, fmt.Errorf("bad port %q", port)
 	}
-	return sshHost{name: target, user: user, addr: net.JoinHostPort(host, port)}, nil
+	return sshHost{name: target, user: user, addr: net.JoinHostPort(host, port), cmd: cmd}, nil
 }
 
 // clientKey loads id_ed25519, or makes one (plus id_ed25519.pub, to copy
@@ -197,15 +235,38 @@ type sshSession struct {
 	session *ssh.Session
 	stdin   io.WriteCloser
 	stdout  io.Reader
+	lost    atomic.Bool // the keepalives went unanswered
+	done    chan struct{}
 }
 
 // prompter asks the user something; echo=false for passwords.
 type prompter func(question string, echo bool) (string, error)
 
-func dialSSH(h sshHost, cols, rows int, ask prompter, note func(string)) (*sshSession, error) {
+type dialOpts struct {
+	cols, rows int
+	password   string // tried first, if set: the one typed for the last connection
+	ask        prompter
+	confirm    func(question string) bool // nil: don't offer to install our key
+	note       func(string)
+}
+
+// dialSSH connects, and returns the session and the password typed for
+// it, if one was.
+func dialSSH(h sshHost, o dialOpts) (*sshSession, string, error) {
 	signer, err := clientKey()
 	if err != nil {
-		return nil, fmt.Errorf("client key: %w", err)
+		return nil, "", fmt.Errorf("client key: %w", err)
+	}
+	saved, typed := o.password, ""
+	password := func(q string) (string, error) {
+		if saved != "" {
+			p := saved
+			saved = ""
+			return p, nil
+		}
+		p, err := o.ask(q, false)
+		typed = p
+		return p, err
 	}
 	cfg := &ssh.ClientConfig{
 		User: h.user,
@@ -213,11 +274,17 @@ func dialSSH(h sshHost, cols, rows int, ask prompter, note func(string)) (*sshSe
 			ssh.PublicKeys(signer),
 			ssh.KeyboardInteractive(func(name, instruction string, questions []string, echos []bool) ([]string, error) {
 				if instruction != "" {
-					note(instruction)
+					o.note(instruction)
 				}
 				answers := make([]string, len(questions))
 				for i, q := range questions {
-					a, err := ask(q, echos[i])
+					var a string
+					var err error
+					if echos[i] {
+						a, err = o.ask(q, true)
+					} else {
+						a, err = password(q)
+					}
 					if err != nil {
 						return nil, err
 					}
@@ -226,32 +293,40 @@ func dialSSH(h sshHost, cols, rows int, ask prompter, note func(string)) (*sshSe
 				return answers, nil
 			}),
 			ssh.RetryableAuthMethod(ssh.PasswordCallback(func() (string, error) {
-				return ask(fmt.Sprintf("%s's password: ", h), false)
+				return password(fmt.Sprintf("%s's password: ", h))
 			}), 3),
 		},
-		HostKeyCallback: tofuHostKeys(note),
+		HostKeyCallback: tofuHostKeys(o.note),
 		Timeout:         10 * time.Second,
 	}
 	client, err := ssh.Dial("tcp", h.addr, cfg)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	if typed != "" && o.confirm != nil &&
+		o.confirm(fmt.Sprintf("Put this Kobo's key in %s's ~/.ssh/authorized_keys, so no password next time?", h)) {
+		if err := installKey(client, authorizedKey(signer)); err != nil {
+			o.note("couldn't install the key: " + err.Error())
+		} else {
+			o.note("key installed: next time needs no password")
+		}
 	}
 	sess, err := client.NewSession()
 	if err != nil {
 		client.Close()
-		return nil, err
+		return nil, "", err
 	}
-	fail := func(err error) (*sshSession, error) {
+	fail := func(err error) (*sshSession, string, error) {
 		sess.Close()
 		client.Close()
-		return nil, err
+		return nil, "", err
 	}
 	modes := ssh.TerminalModes{ssh.ECHO: 1, ssh.TTY_OP_ISPEED: 115200, ssh.TTY_OP_OSPEED: 115200}
-	if err := sess.RequestPty("xterm-256color", rows, cols, modes); err != nil {
+	if err := sess.RequestPty("xterm-256color", o.rows, o.cols, modes); err != nil {
 		return fail(fmt.Errorf("pty: %w", err))
 	}
 	sess.Setenv("LANG", "C.UTF-8") // most servers refuse it; harmless
-	s := &sshSession{client: client, session: sess}
+	s := &sshSession{client: client, session: sess, done: make(chan struct{})}
 	if s.stdin, err = sess.StdinPipe(); err != nil {
 		return fail(err)
 	}
@@ -259,15 +334,99 @@ func dialSSH(h sshHost, cols, rows int, ask prompter, note func(string)) (*sshSe
 		return fail(err)
 	}
 	sess.Stderr = nil // with a PTY, stderr comes through stdout
-	if err := sess.Shell(); err != nil {
+	if h.cmd != "" {
+		err = sess.Start(h.cmd)
+	} else {
+		err = sess.Shell()
+	}
+	if err != nil {
 		return fail(fmt.Errorf("shell: %w", err))
 	}
-	return s, nil
+	go s.keepalive()
+	return s, typed, nil
 }
 
-func (s *sshSession) resize(cols, rows int) { s.session.WindowChange(rows, cols) }
+// installKey appends key to the remote's authorized_keys, unless it's
+// there already.
+func installKey(client *ssh.Client, key string) error {
+	sess, err := client.NewSession()
+	if err != nil {
+		return err
+	}
+	defer sess.Close()
+	sess.Stdin = strings.NewReader(key + "\n")
+	const script = `sh -c 'umask 077; mkdir -p ~/.ssh && f=~/.ssh/authorized_keys && touch $f && read -r k &&
+{ grep -qxF "$k" $f || { [ -s $f ] && [ -n "$(tail -c 1 $f)" ] && echo >>$f; printf "%s\n" "$k" >>$f; }; }'`
+	if out, err := sess.CombinedOutput(script); err != nil {
+		if msg := strings.TrimSpace(string(out)); msg != "" {
+			return fmt.Errorf("%w: %s", err, msg)
+		}
+		return err
+	}
+	return nil
+}
+
+// keepalive asks the server for a reply now and then: a connection that
+// died quietly (Wi-Fi gone to sleep, a laptop lid closed) gets closed, so
+// it can be noticed and made again, instead of hanging there.
+func (s *sshSession) keepalive() {
+	t := time.NewTicker(15 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-t.C:
+		}
+		reply := make(chan error, 1)
+		go func() {
+			_, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil)
+			reply <- err
+		}()
+		select {
+		case <-s.done:
+			return
+		case err := <-reply:
+			if err == nil {
+				continue
+			}
+		case <-time.After(10 * time.Second):
+		}
+		s.lost.Store(true)
+		s.client.Close()
+		return
+	}
+}
+
+func (s *sshSession) Read(p []byte) (int, error)  { return s.stdout.Read(p) }
+func (s *sshSession) Write(p []byte) (int, error) { return s.stdin.Write(p) }
+func (s *sshSession) resize(cols, rows int)       { s.session.WindowChange(rows, cols) }
 
 func (s *sshSession) close() {
+	select {
+	case <-s.done:
+	default:
+		close(s.done)
+	}
 	s.session.Close()
 	s.client.Close()
+}
+
+// ended says how the session ended, once its output did: a remote that
+// exits sends its exit status, a connection that drops can't.
+func (s *sshSession) ended() (lost bool, how string) {
+	err := s.session.Wait()
+	var exit *ssh.ExitError
+	var missing *ssh.ExitMissingError
+	switch {
+	case s.lost.Load():
+		return true, "the server stopped answering"
+	case err == nil:
+		return false, ""
+	case errors.As(err, &exit):
+		return false, fmt.Sprintf("exit status %d", exit.ExitStatus())
+	case errors.As(err, &missing):
+		return true, "connection lost"
+	}
+	return true, err.Error()
 }

@@ -69,6 +69,7 @@ func (l *fbinkLib) setRota(rota int) (screenInfo, error) {
 		swap:      bool(st.touch_swap_axes), mirX: bool(st.touch_mirror_x), mirY: bool(st.touch_mirror_y),
 		version:  C.GoString(C.fbink_version()) + " (linked in)",
 		codename: C.GoString(&st.device_codename[0]),
+		device:   fmt.Sprintf("Kobo %s (%s, ID %d)", C.GoString(&st.device_name[0]), C.GoString(&st.device_platform[0]), int(st.device_id)),
 	}, nil
 }
 

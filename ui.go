@@ -175,12 +175,14 @@ const (
 	tabStylus
 	tabNet
 	tabSound
-	tabTerm
+	tabSSH
+	tabShell
+	tabSystem
 	tabInfo
 	numTabs
 )
 
-var tabNames = [numTabs]string{"Keys", "Finger", "Stylus", "Net", "Sound", "SSH", "Info"}
+var tabNames = [numTabs]string{"Keys", "Finger", "Stylus", "Net", "Sound", "SSH", "Shell", "System", "Info"}
 
 type panel struct {
 	name               string
@@ -203,6 +205,7 @@ type layout struct {
 	net                      [numNetPanels]panel
 	btP, playerP             panel
 	termP                    panel
+	sys                      [numSysPanels]panel
 }
 
 const (
@@ -315,8 +318,22 @@ func makeLayout(w, h int, f fonts, full bool) layout {
 	L.btP = newPanel(f, "Bluetooth", br, "refresh")
 	L.playerP = newPanel(f, "Player", pr, "stop")
 
-	// SSH: one big terminal.
-	L.termP = newPanel(f, "Terminal", body, "disconnect")
+	// System: device, system, storage & power, software & tools.
+	var sr []image.Rectangle
+	if landscape {
+		left, right := split(body, 0.5)
+		l, r := stack(left, 30), stack(right, 30)
+		sr = []image.Rectangle{l[0], l[1], r[0], r[1]}
+	} else {
+		sr = stack(body, 15, 39, 56)
+	}
+	L.sys[sysDevice] = newPanel(f, "Device", sr[0], "refresh")
+	L.sys[sysSystem] = newPanel(f, "System", sr[1], "")
+	L.sys[sysStorage] = newPanel(f, "Storage & power", sr[2], "")
+	L.sys[sysSoftware] = newPanel(f, "Software & tools", sr[3], "")
+
+	// SSH and Shell: one big terminal.
+	L.termP = newPanel(f, "Terminal", body, "")
 	if full { // no header, tabs, footer or frame: nothing else to draw or tap
 		whole := image.Rect(0, 0, w, h)
 		L = layout{w: w, h: h, page: whole, termP: panel{name: "Terminal", outer: whole, body: whole}}
@@ -325,11 +342,17 @@ func makeLayout(w, h int, f fonts, full bool) layout {
 }
 
 func newPanel(f fonts, name string, outer image.Rectangle, buttonLabel string) panel {
-	p := panel{name: name, outer: outer, buttonLabel: buttonLabel}
+	p := panel{name: name, outer: outer}
 	p.title = image.Rect(outer.Min.X+border, outer.Min.Y+border, outer.Max.X-border, outer.Min.Y+border+titleH)
 	p.body = image.Rect(outer.Min.X+border, p.title.Max.Y, outer.Max.X-border, outer.Max.Y-border)
-	if buttonLabel != "" {
-		bw := textWidth(f.small, buttonLabel) + 36
+	return withButton(f, p, buttonLabel)
+}
+
+// withButton is p with a button labeled label in its title strip, or none.
+func withButton(f fonts, p panel, label string) panel {
+	p.buttonLabel, p.button = label, image.Rectangle{}
+	if label != "" {
+		bw := textWidth(f.small, label) + 36
 		p.button = image.Rect(p.title.Max.X-10-bw, p.title.Min.Y+6, p.title.Max.X-10, p.title.Max.Y-8)
 	}
 	return p
@@ -435,7 +458,7 @@ func (a *app) drawFooter() {
 	if a.noPower {
 		quit = "Esc or exit"
 	}
-	hints := []string{"tabs: tap or F1-F7"}
+	hints := []string{fmt.Sprintf("tabs: tap or F1-F%d", numTabs)}
 	if a.light != nil {
 		hints = append(hints, "light: swipe the left edge")
 	}
@@ -472,8 +495,10 @@ func (a *app) drawPage() {
 	case tabSound:
 		a.drawBluetooth()
 		a.drawPlayer()
-	case tabTerm:
+	case tabSSH, tabShell:
 		a.drawTerm()
+	case tabSystem:
+		a.drawSystem()
 	case tabInfo:
 		a.drawInfo()
 	}

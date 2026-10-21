@@ -10,7 +10,7 @@ with open(os.path.join(d, 'calls.txt'), 'a') as f:
     f.write(' '.join(args) + (f'  [rota={rota}]' if 'FBINK_FORCE_ROTA' in os.environ else '  [gyro]') + '\n')
 if '-e' in args:
     print(f"FBINK_VERSION='fake';viewWidth={W};viewHeight={H};screenWidth={W};screenHeight={H};"
-          f"viewHoriOrigin=0;viewVertOrigin=0;deviceCodename='europa';rotationMap='{{ 0, 1, 2, 3 }}';"
+          f"viewHoriOrigin=0;viewVertOrigin=0;deviceName='Elipsa';deviceId=389;deviceCodename='europa';devicePlatform='Mark 8';rotationMap='{{ 0, 1, 2, 3 }}';"
           f"touchSwapAxes=1;touchMirrorX=1;touchMirrorY=0;currentRota={rota};", end='')
     sys.exit(0)
 g = args[args.index('-g') + 1]

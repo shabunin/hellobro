@@ -29,6 +29,7 @@ type screenInfo struct {
 	canonical         int // FB_ROTATE_* as the device is physically held: 0 UR, 1 CW, 2 UD, 3 CCW
 	swap, mirX, mirY  bool
 	version, codename string
+	device            string // name, platform and ID, as FBInk knows the device
 }
 
 func (s screenInfo) landscape() bool { return s.viewW > s.viewH }
@@ -190,6 +191,7 @@ func parseFbinkState(dump string) (screenInfo, error) {
 		mirX:    kv["touchMirrorX"] == "1",
 		mirY:    kv["touchMirrorY"] == "1",
 		version: kv["FBINK_VERSION"], codename: kv["deviceCodename"],
+		device: fmt.Sprintf("Kobo %s (%s, ID %s)", kv["deviceName"], kv["devicePlatform"], kv["deviceId"]),
 	}
 	if s.viewW == 0 || s.viewH == 0 {
 		return s, fmt.Errorf("unexpected fbink -e output: %q", dump)

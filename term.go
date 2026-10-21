@@ -1,6 +1,7 @@
 package main
 
-// The Terminal tab: an SSH client with a real PTY. The remote's output
+// The terminal tabs: SSH, with a real PTY on the remote, and Shell, a
+// shell on the Kobo itself. Each tab holds several sessions. Their output
 // goes through an xterm emulator (charmbracelet/x/vt) into a grid of
 // cells, which we draw ourselves, redrawing only the cells that changed.
 // Keys and touches go back as xterm key sequences and mouse events.
@@ -14,6 +15,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -22,17 +24,24 @@ import (
 
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/vt"
-	"golang.org/x/image/font"
-	"golang.org/x/image/math/fixed"
 )
 
 const (
 	termIdle = iota
 	termConnecting
+	termWaiting // to connect again, after the connection dropped
 	termConnected
 )
 
-const termFrame = 60 * time.Millisecond // at most this often we redraw from the emulator
+const (
+	kindSSH = iota
+	kindShell
+)
+
+const (
+	termFrame   = 60 * time.Millisecond // at most this often we redraw from the emulator
+	maxSessions = 9
+)
 
 // The terminal's font size in pixels: Ctrl+= and Ctrl+- step it, Ctrl+0
 // resets it, and it's remembered in term-font next to the binary.
@@ -45,6 +54,7 @@ const (
 type termPrompt struct {
 	question string
 	echo     bool
+	yesno    bool // Enter: yes, Esc: no
 	reveal   bool // Tab: show the password being typed
 	answer   string
 	reply    chan string // closed: canceled
@@ -60,29 +70,63 @@ type cellKey struct {
 
 type termMods struct{ shift, ctrl, alt, meta, caps bool }
 
-type termState struct {
-	hosts        []sshHost
-	hostRows     []image.Rectangle // where the saved hosts are listed, for taps
-	input        string            // the ssh> line
-	notes        []string
-	state        int
-	shownConnect []string // the connect screen's rows as drawn, nil: draw it all
-	shownStatus  string
-	target       sshHost
-	prompt       *termPrompt
-	gen          int // bumps per connection, so late messages from an old one are ignored
+// termBackend is what a session talks to: an SSH session or a local shell.
+type termBackend interface {
+	io.Reader // output
+	io.Writer // input
+	resize(cols, rows int)
+	close()
+	// ended says, once the output has ended, whether the connection was
+	// lost (rather than the remote exiting), and how it ended.
+	ended() (lost bool, how string)
+}
 
-	sess  *sshSession
+// termSession is one terminal: an SSH connection or a shell.
+type termSession struct {
+	kind   int
+	input  string // the ssh> line
+	notes  []string
+	state  int
+	target sshHost
+	typed  bool // the target was typed in: saved to ssh.conf once it works
+	prompt *termPrompt
+	gen    int // bumps per connection, so late messages from an old one are ignored
+
+	back  termBackend
 	emu   *vt.SafeEmulator
 	dirty atomic.Bool
 	title string
+
+	password string    // typed for this connection, for connecting again (only kept in memory)
+	retries  int       // connection attempts since it dropped
+	retryAt  time.Time // when the next one starts
+}
+
+func (t *termSession) connected() bool { return t.state == termConnected }
+
+type termGroup struct {
+	sessions []*termSession
+	cur      int
+}
+
+// termView is the terminal on screen. Only one session shows at a time,
+// so they share the grid, the font and the glyph cache.
+type termView struct {
+	groups   [2]termGroup // the SSH tab's sessions, the Shell tab's
+	hosts    []sshHost
+	keyAsked map[string]bool // hosts we offered to install our key on
+
+	hostRows     []image.Rectangle // where the saved hosts are listed, for taps
+	chips        []image.Rectangle // the session buttons in the title strip; the last may be "+"
+	shownConnect []string          // the connect screen's rows as drawn, nil: draw it all
+	shownStatus  string
 
 	grid       image.Rectangle // the cells' area
 	cw, ch     int             // cell size
 	cols, rows int
 	shown      [][]cellKey // what's drawn
 	drawnAt    time.Time
-	outAt      time.Time       // last output from the remote
+	outAt      time.Time       // last output drawn
 	fastArea   image.Rectangle // drawn with the fast (DU) waveform since the last clean refresh
 	fastAt     time.Time       // when fastArea got its first update
 	churn      int             // pixels changed since the last flash
@@ -93,64 +137,199 @@ type termState struct {
 	fontPx int
 }
 
-func (t *termState) connected() bool { return t.state == termConnected }
+func isTermTab(t tabID) bool { return t == tabSSH || t == tabShell }
+
+// termGroup is the current tab's sessions, if it's a terminal tab.
+func (a *app) termGroup() *termGroup {
+	switch a.tab {
+	case tabSSH:
+		return &a.tv.groups[kindSSH]
+	case tabShell:
+		return &a.tv.groups[kindShell]
+	}
+	return nil
+}
+
+// term is the session on screen, if any.
+func (a *app) term() *termSession {
+	if g := a.termGroup(); g != nil && g.cur < len(g.sessions) {
+		return g.sessions[g.cur]
+	}
+	return nil
+}
+
+func (a *app) showing(t *termSession) bool { return a.calib == nil && t != nil && a.term() == t }
+
+// termLive says whether any session is connected, or about to be.
+func (a *app) termLive() bool {
+	for _, g := range a.tv.groups {
+		for _, t := range g.sessions {
+			if t.state != termIdle {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // --- layout & geometry ---
 
 func (a *app) termGeometry() {
-	t := &a.trm
-	t.grid = a.L.termP.body.Inset(6)
-	t.cw = textWidth(a.f.term, "M")
+	v := &a.tv
+	v.grid = a.L.termP.body.Inset(6)
+	v.cw = textWidth(a.f.term, "M")
 	m := a.f.term.Metrics()
-	t.ch = m.Ascent.Ceil() + m.Descent.Ceil() + 2
-	t.cols, t.rows = max(20, t.grid.Dx()/t.cw), max(5, t.grid.Dy()/t.ch)
+	v.ch = m.Ascent.Ceil() + m.Descent.Ceil() + 2
+	v.cols, v.rows = max(20, v.grid.Dx()/v.cw), max(5, v.grid.Dy()/v.ch)
 	// Center the grid in the body.
-	gw, gh := t.cols*t.cw, t.rows*t.ch
-	min := image.Pt(t.grid.Min.X+(t.grid.Dx()-gw)/2, t.grid.Min.Y+(t.grid.Dy()-gh)/2)
-	t.grid = image.Rectangle{min, min.Add(image.Pt(gw, gh))}
-	t.shown = nil
-	if t.connected() {
-		t.emu.Resize(t.cols, t.rows)
-		t.sess.resize(t.cols, t.rows)
+	gw, gh := v.cols*v.cw, v.rows*v.ch
+	min := image.Pt(v.grid.Min.X+(v.grid.Dx()-gw)/2, v.grid.Min.Y+(v.grid.Dy()-gh)/2)
+	v.grid = image.Rectangle{min, min.Add(image.Pt(gw, gh))}
+	v.shown = nil
+	for _, g := range v.groups {
+		for _, t := range g.sessions {
+			if t.connected() {
+				t.emu.Resize(v.cols, v.rows)
+				t.back.resize(v.cols, v.rows)
+			}
+		}
 	}
+}
+
+// termPanel is the terminal panel as the current session has it: named
+// after the tab, with a button that fits what the session is doing.
+func (a *app) termPanel() panel {
+	p := a.L.termP
+	t := a.term()
+	if p.title.Empty() || t == nil {
+		return p
+	}
+	label := ""
+	switch {
+	case t.state != termIdle && t.kind == kindShell:
+		label = "kill"
+	case t.state != termIdle:
+		label = "disconnect"
+	case len(a.termGroup().sessions) > 1:
+		label = "close"
+	}
+	p.name = tabNames[a.tab]
+	return withButton(a.f, p, label)
 }
 
 // --- drawing ---
 
-func (t *termState) status() string {
+func (t *termSession) status(v *termView) string {
 	switch t.state {
 	case termConnecting:
 		return "connecting to " + t.target.String() + "…"
+	case termWaiting:
+		return fmt.Sprintf("reconnecting to %s in %.0f s", t.target, max(0, time.Until(t.retryAt).Seconds()))
 	case termConnected:
-		s := fmt.Sprintf("%s · %d×%d · %d px", t.target, t.cols, t.rows, t.fontPx)
+		where := t.target.String()
+		if t.kind == kindShell {
+			where = "sh on this Kobo"
+		}
+		s := fmt.Sprintf("%s · %d×%d · %d px", where, v.cols, v.rows, v.fontPx)
 		if t.title != "" {
 			s = t.title + " · " + s
 		}
 		return s
 	}
+	if t.kind == kindShell {
+		return "not running"
+	}
 	return "not connected"
 }
 
-// drawTerm draws the whole Terminal panel.
+// drawTerm draws the whole terminal panel.
 func (a *app) drawTerm() {
-	if a.tab != tabTerm || a.calib != nil {
+	t := a.term()
+	if t == nil || a.calib != nil {
 		return
 	}
-	t := &a.trm
-	t.shownStatus, t.shownConnect = t.status(), nil
-	a.drawPanel(a.L.termP, t.shownStatus)
+	v := &a.tv
+	p := a.termPanel()
+	v.shownConnect = nil
+	a.drawPanel(p, "")
+	a.drawTermTitle()
 	if t.connected() {
-		t.shown = nil
-		a.renderTerm()
+		v.shown = nil
+		a.renderTerm(t)
 		return
 	}
-	a.drawConnect()
+	a.drawConnect(t)
 }
 
-func (a *app) drawConnect() {
-	t := &a.trm
-	lines := []string{"Type user@host[:port] and Enter, or tap / press 1-9 for a saved host.  F11: fullscreen."}
+// drawTermTitle draws the title strip: the name, a button per session
+// (and "+" for another one), and the session's status.
+func (a *app) drawTermTitle() {
+	t, g := a.term(), a.termGroup()
+	p := a.termPanel()
+	v := &a.tv
+	v.shownStatus = t.status(v)
+	v.chips = nil
+	if p.title.Empty() {
+		return
+	}
+	a.drawPanelTitle(p, "")
+	x := p.title.Min.X + 16 + textWidth(a.f.panel, p.name) + 24
+	n := len(g.sessions)
+	if n < maxSessions {
+		n++
+	}
+	for i := range n {
+		r := image.Rect(x, p.title.Min.Y+6, x+44, p.title.Max.Y-8)
+		label := strconv.Itoa(i + 1)
+		if i == len(g.sessions) {
+			label = "+"
+		}
+		if i == g.cur {
+			a.c.fill(r, black)
+			a.c.text(a.f.small, r, label, white, alignCenter)
+		} else {
+			a.c.fill(r, white)
+			a.c.frame(r, 2, black)
+			a.c.text(a.f.small, r, label, black, alignCenter)
+		}
+		v.chips = append(v.chips, r)
+		x = r.Max.X + 8
+	}
+	end := p.title.Max.X - 16
+	if !p.button.Empty() {
+		end = p.button.Min.X - 16
+	}
+	a.c.text(a.f.small, image.Rect(x+16, p.title.Min.Y, end, p.title.Max.Y-2), v.shownStatus, dark, alignRight)
+}
+
+// drawTermStatus redraws the title strip if the status changed.
+func (a *app) drawTermStatus() {
+	if t := a.term(); t != nil && a.calib == nil && t.status(&a.tv) != a.tv.shownStatus {
+		a.drawTermTitle()
+	}
+}
+
+func (a *app) drawConnect(t *termSession) {
+	v := &a.tv
+	keys := "Ctrl+Shift+T: new session  ·  Ctrl+PgUp/PgDn: switch  ·  Alt+F1-F9: tabs  ·  F11: fullscreen"
+	var lines []string
+	if t.kind == kindShell {
+		lines = []string{"A shell on this Kobo (/bin/sh, as " + whoami() + "): Enter or tap here to start it.", keys}
+		if t.state == termIdle && len(a.termGroup().sessions) > 1 {
+			lines = append(lines, "Esc: close this session.")
+		}
+		if len(t.notes) > 0 {
+			lines = append(lines, "")
+			lines = append(lines, t.notes...)
+		}
+		a.drawTextRows(a.termPanel(), a.f.body, lines, &v.shownConnect)
+		v.hostRows = nil
+		return
+	}
+	lines = []string{"Type user@host[:port] [command] and Enter, or tap / press 1-9 for a saved host.", keys}
 	switch {
+	case t.prompt != nil && t.prompt.yesno:
+		lines = append(lines, t.prompt.question, "(Enter: yes, Esc: no)")
 	case t.prompt != nil:
 		shown, help := t.prompt.answer, "(Enter to send, Esc to cancel)"
 		if !t.prompt.echo {
@@ -159,22 +338,28 @@ func (a *app) drawConnect() {
 			}
 			help = "(Enter to send, Tab to show/hide, Esc to cancel)"
 		}
-		if t.mods.caps {
+		if v.mods.caps {
 			help += "   CAPS LOCK is on"
 		}
 		lines = append(lines, t.prompt.question+shown+"█", help)
 	case t.state == termIdle:
 		lines = append(lines, "ssh> "+t.input+"█")
+	case t.state == termWaiting:
+		lines = append(lines, "ssh> "+t.input, "(Esc: stop reconnecting)")
 	default:
 		lines = append(lines, "ssh> "+t.input)
 	}
 	lines = append(lines, "", fmt.Sprintf("saved hosts (%s):", appFile("ssh.conf")))
 	firstHost := len(lines)
-	for i, h := range t.hosts {
-		lines = append(lines, fmt.Sprintf("   %d   %s   %s", i+1, h.name, h))
+	for i, h := range v.hosts {
+		line := fmt.Sprintf("   %d   %s   %s", i+1, h.name, h)
+		if h.cmd != "" {
+			line += "   ▸ " + h.cmd
+		}
+		lines = append(lines, line)
 	}
-	if len(t.hosts) == 0 {
-		lines = append(lines, "   none yet: add lines like  myserver  bro@192.168.1.10:2222")
+	if len(v.hosts) == 0 {
+		lines = append(lines, "   none yet: add lines like  myserver  bro@192.168.1.10:2222  [command]")
 	}
 	lines = append(lines, "", "This Kobo's key, for ~/.ssh/authorized_keys (also in id_ed25519.pub next to hellobro):")
 	if s, err := clientKey(); err == nil {
@@ -191,44 +376,42 @@ func (a *app) drawConnect() {
 		lines = append(lines, "")
 		lines = append(lines, t.notes...)
 	}
-	rows := a.drawTextRows(a.L.termP, a.f.body, lines, &t.shownConnect)
-	t.hostRows = nil
-	if len(t.hosts) > 0 {
-		t.hostRows = rows[firstHost : firstHost+len(t.hosts)]
+	rows := a.drawTextRows(a.termPanel(), a.f.body, lines, &v.shownConnect)
+	v.hostRows = nil
+	if len(v.hosts) > 0 {
+		v.hostRows = rows[firstHost : firstHost+len(v.hosts)]
 	}
 }
 
-// updateTerm redraws what changed on the connect screen: a key typed into
-// a line shouldn't repaint the whole panel (in fullscreen, the whole screen).
-func (a *app) updateTerm() {
-	t := &a.trm
-	if a.tab != tabTerm || a.calib != nil {
+// updateTerm redraws what changed on t's connect screen, if it's on
+// screen: a key typed into a line shouldn't repaint the whole panel (in
+// fullscreen, the whole screen).
+func (a *app) updateTerm(t *termSession) {
+	if !a.showing(t) {
 		return
 	}
-	if t.connected() || t.shownConnect == nil {
+	if t.connected() || a.tv.shownConnect == nil {
 		a.drawTerm()
 		return
 	}
-	if s := t.status(); s != t.shownStatus {
-		t.shownStatus = s
-		a.drawPanelTitle(a.L.termP, s)
-	}
-	a.drawConnect()
+	a.drawTermStatus()
+	a.drawConnect(t)
 }
 
 // renderTerm redraws the cells that changed since the last time.
-func (a *app) renderTerm() {
-	t := &a.trm
+func (a *app) renderTerm(t *termSession) {
+	v := &a.tv
 	if t.emu == nil {
 		return
 	}
-	t.drawnAt = time.Now()
-	if len(t.shown) != t.rows || (t.rows > 0 && len(t.shown[0]) != t.cols) {
-		t.shown = make([][]cellKey, t.rows)
-		for y := range t.shown {
-			t.shown[y] = make([]cellKey, t.cols)
-			for x := range t.shown[y] {
-				t.shown[y][x].width = -1 // never matches
+	t.dirty.Store(false)
+	v.drawnAt = time.Now()
+	if len(v.shown) != v.rows || (v.rows > 0 && len(v.shown[0]) != v.cols) {
+		v.shown = make([][]cellKey, v.rows)
+		for y := range v.shown {
+			v.shown[y] = make([]cellKey, v.cols)
+			for x := range v.shown[y] {
+				v.shown[y][x].width = -1 // never matches
 			}
 		}
 	}
@@ -239,14 +422,14 @@ func (a *app) renderTerm() {
 		gray bool
 	}
 	var rows []changed
-	for y := 0; y < t.rows; y++ {
+	for y := 0; y < v.rows; y++ {
 		from, to, gray := -1, -1, false
-		for x := 0; x < t.cols; x++ {
+		for x := 0; x < v.cols; x++ {
 			k := t.cellKeyAt(x, y, showCursor && cur.X == x && cur.Y == y)
-			if k == t.shown[y][x] {
+			if k == v.shown[y][x] {
 				continue
 			}
-			t.shown[y][x] = k
+			v.shown[y][x] = k
 			a.drawCell(x, y, k)
 			if from < 0 {
 				from = x
@@ -255,8 +438,8 @@ func (a *app) renderTerm() {
 			gray = gray || !bw(k.fg) || !bw(k.bg)
 		}
 		if from >= 0 {
-			r := image.Rect(t.grid.Min.X+from*t.cw, t.grid.Min.Y+y*t.ch, t.grid.Min.X+(to+1)*t.cw, t.grid.Min.Y+(y+1)*t.ch)
-			rows = append(rows, changed{r.Inset(-1).Intersect(t.grid), gray})
+			r := image.Rect(v.grid.Min.X+from*v.cw, v.grid.Min.Y+y*v.ch, v.grid.Min.X+(to+1)*v.cw, v.grid.Min.Y+(y+1)*v.ch)
+			rows = append(rows, changed{r.Inset(-1).Intersect(v.grid), gray})
 		}
 	}
 	// Black & white changes to a row or three (typing, a spinner) take the
@@ -264,15 +447,15 @@ func (a *app) renderTerm() {
 	// moment more doesn't matter, get the clean grayscale one.
 	big := len(rows) > 3
 	if big {
-		t.bigAt = time.Now()
+		v.bigAt = time.Now()
 	}
 	for _, c := range rows {
-		t.churn += area(c.r)
+		v.churn += area(c.r)
 		if !c.gray && !big {
-			if t.fastArea.Empty() {
-				t.fastAt = time.Now()
+			if v.fastArea.Empty() {
+				v.fastAt = time.Now()
 			}
-			t.fastArea = t.fastArea.Union(c.r)
+			v.fastArea = v.fastArea.Union(c.r)
 		}
 		a.mark(c.r, c.gray || big)
 	}
@@ -280,7 +463,7 @@ func (a *app) renderTerm() {
 
 func bw(g uint8) bool { return g == 0 || g == 255 }
 
-func (t *termState) cellKeyAt(x, y int, cursor bool) cellKey {
+func (t *termSession) cellKeyAt(x, y int, cursor bool) cellKey {
 	c := t.emu.CellAt(x, y)
 	k := cellKey{fg: black, bg: white, width: 1, cursor: cursor}
 	if c == nil {
@@ -320,12 +503,12 @@ func gray(c color.Color) uint8 {
 }
 
 func (a *app) drawCell(x, y int, k cellKey) {
-	t := &a.trm
+	v := &a.tv
 	if k.width == 0 {
 		return // the right half of a wide character, drawn with it
 	}
 	w := max(1, k.width)
-	r := image.Rect(t.grid.Min.X+x*t.cw, t.grid.Min.Y+y*t.ch, t.grid.Min.X+(x+w)*t.cw, t.grid.Min.Y+(y+1)*t.ch).Intersect(t.grid)
+	r := image.Rect(v.grid.Min.X+x*v.cw, v.grid.Min.Y+y*v.ch, v.grid.Min.X+(x+w)*v.cw, v.grid.Min.Y+(y+1)*v.ch).Intersect(v.grid)
 	fg, bg := k.fg, k.bg
 	if k.cursor {
 		fg, bg = bg, fg
@@ -339,210 +522,76 @@ func (a *app) drawCell(x, y int, k cellKey) {
 		a.c.fill(image.Rect(r.Min.X, r.Max.Y-3, r.Max.X, r.Max.Y-1), fg)
 	}
 	if k.attrs&uv.AttrStrikethrough != 0 {
-		a.c.fill(image.Rect(r.Min.X, r.Min.Y+t.ch/2, r.Max.X, r.Min.Y+t.ch/2+2), fg)
+		a.c.fill(image.Rect(r.Min.X, r.Min.Y+v.ch/2, r.Max.X, r.Min.Y+v.ch/2+2), fg)
 	}
 }
 
-// --- glyphs ---
+// --- sessions ---
 
-type glyphKey struct {
-	s     string
-	bold  bool
-	width int
-}
-
-func (a *app) glyph(s string, bold bool, width int) *image.Alpha {
-	t := &a.trm
-	k := glyphKey{s, bold, width}
-	if g, ok := t.glyphs[k]; ok {
-		return g
-	}
-	if t.glyphs == nil || len(t.glyphs) > 4000 {
-		t.glyphs = map[glyphKey]*image.Alpha{}
-	}
-	m := image.NewAlpha(image.Rect(0, 0, t.cw*width, t.ch))
-	r, _ := utf8.DecodeRuneInString(s)
-	if !drawSpecial(m, r) {
-		f := a.f.term
-		if bold {
-			f = a.f.termBold
-		}
-		if _, ok := f.GlyphAdvance(r); !ok {
-			f = a.f.termFallback // Go Mono lacks it: try the proportional Go font, centered
-		}
-		x := 0
-		if f == a.f.termFallback {
-			if _, ok := f.GlyphAdvance(r); !ok {
-				drawMissing(m)
-				t.glyphs[k] = m
-				return m
-			}
-			x = (t.cw*width - textWidth(f, s)) / 2
-		}
-		d := font.Drawer{Dst: m, Src: image.Opaque, Face: f, Dot: fixed.P(x, 1+a.f.term.Metrics().Ascent.Ceil())}
-		d.DrawString(s)
-	}
-	t.glyphs[k] = m
-	return m
-}
-
-// box-drawing segments: up, right, down, left; 1 light, 2 heavy, 3 double.
-var boxChars = map[rune][4]uint8{
-	'─': {0, 1, 0, 1}, '│': {1, 0, 1, 0}, '┌': {0, 1, 1, 0}, '┐': {0, 0, 1, 1}, '└': {1, 1, 0, 0}, '┘': {1, 0, 0, 1},
-	'├': {1, 1, 1, 0}, '┤': {1, 0, 1, 1}, '┬': {0, 1, 1, 1}, '┴': {1, 1, 0, 1}, '┼': {1, 1, 1, 1},
-	'━': {0, 2, 0, 2}, '┃': {2, 0, 2, 0}, '┏': {0, 2, 2, 0}, '┓': {0, 0, 2, 2}, '┗': {2, 2, 0, 0}, '┛': {2, 0, 0, 2},
-	'┣': {2, 2, 2, 0}, '┫': {2, 0, 2, 2}, '┳': {0, 2, 2, 2}, '┻': {2, 2, 0, 2}, '╋': {2, 2, 2, 2},
-	'═': {0, 3, 0, 3}, '║': {3, 0, 3, 0}, '╔': {0, 3, 3, 0}, '╗': {0, 0, 3, 3}, '╚': {3, 3, 0, 0}, '╝': {3, 0, 0, 3},
-	'╠': {3, 3, 3, 0}, '╣': {3, 0, 3, 3}, '╦': {0, 3, 3, 3}, '╩': {3, 3, 0, 3}, '╬': {3, 3, 3, 3},
-	'╭': {0, 1, 1, 0}, '╮': {0, 0, 1, 1}, '╯': {1, 0, 0, 1}, '╰': {1, 1, 0, 0},
-	'╴': {0, 0, 0, 1}, '╵': {1, 0, 0, 0}, '╶': {0, 1, 0, 0}, '╷': {0, 0, 1, 0},
-	'┄': {0, 1, 0, 1}, '┈': {0, 1, 0, 1}, '╌': {0, 1, 0, 1}, '┅': {0, 2, 0, 2}, '┉': {0, 2, 0, 2}, '╍': {0, 2, 0, 2},
-	'┆': {1, 0, 1, 0}, '┊': {1, 0, 1, 0}, '╎': {1, 0, 1, 0}, '┇': {2, 0, 2, 0}, '┋': {2, 0, 2, 0}, '╏': {2, 0, 2, 0},
-}
-
-// drawSpecial draws box-drawing, block and braille characters to fill the
-// cell exactly, so lines and blocks join up across cells (font glyphs don't).
-func drawSpecial(m *image.Alpha, r rune) bool {
-	b := m.Bounds()
-	w, h := b.Dx(), b.Dy()
-	fill := func(x0, y0, x1, y1 int, a uint8) {
-		draw.Draw(m, image.Rect(x0, y0, x1, y1).Intersect(b), image.NewUniform(color.Alpha{a}), image.Point{}, draw.Src)
-	}
-	if seg, ok := boxChars[r]; ok {
-		t := max(2, w/8)
-		cx, cy := w/2, h/2
-		line := func(dir int, weight uint8) {
-			th := t
-			if weight == 2 {
-				th = 2 * t
-			}
-			offs := []int{0}
-			if weight == 3 {
-				offs = []int{-t, t}
-			}
-			for _, o := range offs {
-				switch dir {
-				case 0: // up
-					fill(cx-th/2+o, 0, cx-th/2+o+th, cy+th/2, 255)
-				case 1: // right
-					fill(cx-th/2, cy-th/2+o, w, cy-th/2+o+th, 255)
-				case 2: // down
-					fill(cx-th/2+o, cy-th/2, cx-th/2+o+th, h, 255)
-				case 3: // left
-					fill(0, cy-th/2+o, cx+th/2, cy-th/2+o+th, 255)
-				}
-			}
-		}
-		for dir, weight := range seg {
-			if weight > 0 {
-				line(dir, weight)
-			}
-		}
-		return true
-	}
-	tri := func(dir int) { // a filled triangle pointing right, left, up or down
-		for y := 0; y < h; y++ {
-			for x := 0; x < w; x++ {
-				u, v := float64(x)/float64(w), float64(y)/float64(h) // 0..1
-				var in bool
-				switch dir {
-				case 0:
-					in = u >= 0.2 && u <= 0.85 && abs(int((v-0.5)*1000)) <= int((0.85-u)/0.65*0.3*1000)
-				case 1:
-					in = u >= 0.15 && u <= 0.8 && abs(int((v-0.5)*1000)) <= int((u-0.15)/0.65*0.3*1000)
-				case 2:
-					in = v >= 0.3 && v <= 0.7 && abs(int((u-0.5)*1000)) <= int((v-0.3)/0.4*0.4*1000)
-				case 3:
-					in = v >= 0.3 && v <= 0.7 && abs(int((u-0.5)*1000)) <= int((0.7-v)/0.4*0.4*1000)
-				}
-				if in {
-					m.SetAlpha(x, y, color.Alpha{255})
-				}
-			}
-		}
-	}
-	stroke := func(x0, y0, x1, y1 float64) { // a thick line, in cell fractions
-		steps := 2 * max(w, h)
-		th := max(1, w/7)
-		for i := 0; i <= steps; i++ {
-			f := float64(i) / float64(steps)
-			cx, cy := int((x0+(x1-x0)*f)*float64(w)), int((y0+(y1-y0)*f)*float64(h))
-			fill(cx-th/2, cy-th/2, cx-th/2+th, cy-th/2+th, 255)
-		}
-	}
-	switch {
-	case r == '▶' || r == '►' || r == '▸':
-		tri(0)
-	case r == '◀' || r == '◄' || r == '◂':
-		tri(1)
-	case r == '▲' || r == '▴':
-		tri(2)
-	case r == '▼' || r == '▾':
-		tri(3)
-	case r == '✓' || r == '✔':
-		stroke(0.15, 0.55, 0.4, 0.75)
-		stroke(0.4, 0.75, 0.88, 0.25)
-	case r == '✗' || r == '✘':
-		stroke(0.2, 0.3, 0.8, 0.75)
-		stroke(0.8, 0.3, 0.2, 0.75)
-	case r == '█':
-		fill(0, 0, w, h, 255)
-	case r == '▀':
-		fill(0, 0, w, h/2, 255)
-	case r == '▔':
-		fill(0, 0, w, h/8, 255)
-	case r >= '▁' && r <= '▇': // lower eighths
-		fill(0, h-h*int(r-'▁'+1)/8, w, h, 255)
-	case r >= '▉' && r <= '▏': // left eighths, 7/8 down to 1/8
-		fill(0, 0, w*int('▏'-r+1)/8, h, 255)
-	case r == '▐':
-		fill(w/2, 0, w, h, 255)
-	case r == '▕':
-		fill(w-w/8, 0, w, h, 255)
-	case r >= '░' && r <= '▓':
-		fill(0, 0, w, h, uint8(64*int(r-'░'+1)))
-	case r >= '▖' && r <= '▟':
-		// quadrants: bits UL, UR, LL, LR
-		q := map[rune]int{'▖': 4, '▗': 8, '▘': 1, '▙': 1 | 4 | 8, '▚': 1 | 8, '▛': 1 | 2 | 4, '▜': 1 | 2 | 8, '▝': 2, '▞': 2 | 4, '▟': 2 | 4 | 8}[r]
-		for i, rr := range []image.Rectangle{image.Rect(0, 0, w/2, h/2), image.Rect(w/2, 0, w, h/2), image.Rect(0, h/2, w/2, h), image.Rect(w/2, h/2, w, h)} {
-			if q&(1<<i) != 0 {
-				fill(rr.Min.X, rr.Min.Y, rr.Max.X, rr.Max.Y, 255)
-			}
-		}
-	case r >= 0x2800 && r <= 0x28FF: // braille: 2×4 dots
-		bits := int(r - 0x2800)
-		dots := [8][2]int{{0, 0}, {0, 1}, {0, 2}, {1, 0}, {1, 1}, {1, 2}, {0, 3}, {1, 3}}
-		dw, dh := w/2, h/4
-		s := max(2, min(dw, dh)*2/3)
-		for i, d := range dots {
-			if bits&(1<<i) != 0 {
-				x0, y0 := d[0]*dw+(dw-s)/2, d[1]*dh+(dh-s)/2
-				fill(x0, y0, x0+s, y0+s, 255)
-			}
-		}
-	default:
-		return false
-	}
-	return true
-}
-
-// --- connecting ---
-
+// enterTerm gets a terminal tab ready: the font, the geometry, and a
+// first session (the Shell tab's starts its shell right away).
 func (a *app) enterTerm() {
-	t := &a.trm
-	if t.hosts == nil {
-		t.hosts = loadSSHHosts()
+	v := &a.tv
+	if v.hosts == nil {
+		v.hosts = loadSSHHosts()
 	}
-	if t.cw == 0 {
-		t.fontPx = termFontDefault
+	if v.cw == 0 {
+		v.fontPx = termFontDefault
 		if b, err := os.ReadFile(appFile("term-font")); err == nil {
-			if px, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && px != t.fontPx {
-				t.fontPx = max(termFontMin, min(termFontMax, px))
-				a.f.setTermSize(t.fontPx)
+			if px, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && px != v.fontPx {
+				v.fontPx = max(termFontMin, min(termFontMax, px))
+				a.f.setTermSize(v.fontPx)
 			}
 		}
 		a.termGeometry()
 	}
+	if g := a.termGroup(); g != nil && len(g.sessions) == 0 {
+		a.newSession(true)
+	}
+}
+
+// newSession adds a session to the current tab and shows it; start runs
+// the Shell tab's shell.
+func (a *app) newSession(start bool) {
+	g := a.termGroup()
+	if g == nil || len(g.sessions) >= maxSessions {
+		return
+	}
+	t := &termSession{kind: kindSSH}
+	if a.tab == tabShell {
+		t.kind = kindShell
+	}
+	g.sessions = append(g.sessions, t)
+	g.cur = len(g.sessions) - 1
+	log.Printf("terminal: session %d on the %s tab", g.cur+1, tabNames[a.tab])
+	if t.kind == kindShell && start {
+		a.termStartShell(t)
+	}
+}
+
+// switchSession shows session i of the current tab.
+func (a *app) switchSession(i int) {
+	g := a.termGroup()
+	if g == nil || i < 0 || i >= len(g.sessions) || i == g.cur {
+		return
+	}
+	g.cur = i
+	a.drawTerm()
+	a.markFlash(a.L.termP.outer) // a whole new screen: clean, not ghosted
+}
+
+// closeSession ends the session on screen and drops it, unless it's the
+// tab's only one.
+func (a *app) closeSession() {
+	g, t := a.termGroup(), a.term()
+	if t == nil || len(g.sessions) < 2 {
+		return
+	}
+	a.termClose(t)
+	g.sessions = slices.Delete(g.sessions, g.cur, g.cur+1)
+	g.cur = min(g.cur, len(g.sessions)-1)
+	a.drawTerm()
+	a.markFlash(a.L.termP.outer)
 }
 
 // termFontSwipe follows a swipe along the right edge, dy pixels up so
@@ -563,52 +612,67 @@ func (a *app) termFontSwipe(g *gesture, dy int) {
 	a.drawGauge(&a.fontOverlay, r, px-termFontMin, termFontMax-termFontMin, fmt.Sprintf("%d px", px))
 }
 
-// setTermFont changes the terminal's font size; the remote gets the new
+// setTermFont changes the terminal's font size; the remotes get the new
 // cell count, as when a terminal window is resized.
 func (a *app) setTermFont(px int) {
-	t := &a.trm
+	v := &a.tv
 	px = max(termFontMin, min(termFontMax, px))
-	if px == t.fontPx {
+	if px == v.fontPx {
 		return
 	}
 	log.Printf("terminal font: %d px", px)
-	t.fontPx = px
+	v.fontPx = px
 	a.f.setTermSize(px)
-	t.glyphs = nil
+	v.glyphs = nil
 	a.termGeometry()
 	os.WriteFile(appFile("term-font"), []byte(strconv.Itoa(px)+"\n"), 0o644)
-	a.drawTerm()
-	a.markFlash(a.L.termP.body) // every glyph changed: clean, not ghosted
+	if a.term() != nil {
+		a.drawTerm()
+		a.markFlash(a.L.termP.body) // every glyph changed: clean, not ghosted
+	}
 }
 
-func (a *app) termNote(s string) {
-	t := &a.trm
-	log.Printf("ssh: %s", s)
+func (a *app) termNote(t *termSession, s string) {
+	log.Printf("terminal: %s", s)
 	t.notes = append(t.notes, s)
 	if len(t.notes) > 6 {
 		t.notes = t.notes[len(t.notes)-6:]
 	}
 	if !t.connected() {
-		a.updateTerm()
+		a.updateTerm(t)
 	}
 }
 
-func (a *app) termConnect(h sshHost) {
-	t := &a.trm
-	if t.state != termIdle {
+// reconnectDelay is how long to wait before attempt n to connect again.
+func reconnectDelay(n int) time.Duration {
+	return min(30*time.Second, 2*time.Second<<min(n-1, 5))
+}
+
+// waitToReconnect schedules the next attempt to connect again.
+func (a *app) waitToReconnect(t *termSession) {
+	t.retries++
+	t.state, t.retryAt = termWaiting, time.Now().Add(reconnectDelay(t.retries))
+	a.termNote(t, fmt.Sprintf("reconnecting in %.0f s (Esc: stop)", reconnectDelay(t.retries).Seconds()))
+}
+
+func (a *app) termConnect(t *termSession, h sshHost) {
+	if t.state != termIdle && t.state != termWaiting {
 		return
 	}
-	t.state, t.target, t.notes, t.title = termConnecting, h, nil, ""
+	retry := t.state == termWaiting
+	if !retry {
+		t.notes, t.retries = nil, 0
+	}
+	t.state, t.target, t.title = termConnecting, h, ""
 	t.gen++
 	gen := t.gen
-	a.termNote("connecting to " + h.String() + "…")
-	cols, rows := t.cols, t.rows
-	ask := func(q string, echo bool) (string, error) {
+	a.termNote(t, "connecting to "+h.String()+"…")
+	ask := func(q string, echo, yesno bool) (string, error) {
 		reply := make(chan string, 1)
 		a.call <- func() {
 			if t.gen == gen {
-				t.prompt = &termPrompt{question: q, echo: echo, reply: reply}
-				a.updateTerm()
+				t.prompt = &termPrompt{question: q, echo: echo, yesno: yesno, reply: reply}
+				a.updateTerm(t)
 			} else {
 				close(reply)
 			}
@@ -619,9 +683,23 @@ func (a *app) termConnect(h sshHost) {
 		}
 		return ans, nil
 	}
-	note := func(s string) { a.call <- func() { a.termNote(s) } }
+	o := dialOpts{
+		cols: a.tv.cols, rows: a.tv.rows, password: t.password,
+		ask:  func(q string, echo bool) (string, error) { return ask(q, echo, false) },
+		note: func(s string) { a.call <- func() { a.termNote(t, s) } },
+	}
+	if a.tv.keyAsked == nil {
+		a.tv.keyAsked = map[string]bool{}
+	}
+	if !a.tv.keyAsked[h.String()] {
+		o.confirm = func(q string) bool {
+			a.call <- func() { a.tv.keyAsked[h.String()] = true }
+			ans, err := ask(q, true, true)
+			return err == nil && ans == "y"
+		}
+	}
 	go func() {
-		s, err := dialSSH(h, cols, rows, ask, note)
+		s, typed, err := dialSSH(h, o)
 		a.call <- func() {
 			if t.gen != gen { // canceled meanwhile
 				if s != nil {
@@ -632,36 +710,80 @@ func (a *app) termConnect(h sshHost) {
 			t.prompt = nil
 			if err != nil {
 				t.state = termIdle
-				a.termNote("failed: " + err.Error())
-				if strings.Contains(err.Error(), "unable to authenticate") {
-					a.termNote(fmt.Sprintf("the server refused user %q: check the user name and password", h.user))
+				a.termNote(t, "failed: "+err.Error())
+				refused := strings.Contains(err.Error(), "unable to authenticate")
+				if refused {
+					a.termNote(t, fmt.Sprintf("the server refused user %q: check the user name and password", h.user))
+					t.password = ""
+				}
+				if retry && !refused && !strings.Contains(err.Error(), "host key") {
+					a.waitToReconnect(t)
 				}
 				return
 			}
-			a.termStart(s, gen)
+			if typed != "" {
+				t.password = typed
+			}
+			t.retries = 0
+			if t.typed && !slices.ContainsFunc(a.tv.hosts, h.same) {
+				if name, err := saveSSHHost(a.tv.hosts, h); err != nil {
+					a.termNote(t, "couldn't save the host: "+err.Error())
+				} else {
+					h.name = name
+					a.tv.hosts = append(a.tv.hosts, h)
+					log.Printf("ssh: saved %s as %s", h, name)
+				}
+			}
+			t.typed, t.input = false, ""
+			a.termStart(t, s, gen)
 		}
 	}()
 }
 
-func (a *app) termStart(s *sshSession, gen int) {
-	t := &a.trm
-	t.sess, t.state = s, termConnected
-	t.emu = vt.NewSafeEmulator(t.cols, t.rows)
+func (a *app) termStartShell(t *termSession) {
+	if t.state != termIdle {
+		return
+	}
+	t.notes, t.title = nil, ""
+	s, err := startShell(a.tv.cols, a.tv.rows)
+	if err != nil {
+		a.termNote(t, "couldn't start a shell: "+err.Error())
+		return
+	}
+	t.gen++
+	a.termStart(t, s, t.gen)
+}
+
+func (a *app) termStart(t *termSession, back termBackend, gen int) {
+	v := &a.tv
+	t.back, t.state = back, termConnected
+	t.emu = vt.NewSafeEmulator(v.cols, v.rows)
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
 	t.emu.SetDefaultBackgroundColor(color.White)
 	t.emu.SetScrollbackSize(1000) // not shown; the default 10000 costs a big copy per line once full
 	t.emu.SetCallbacks(vt.Callbacks{
-		Title: func(s string) { a.call <- func() { t.title = s; a.drawTermStatus() } },
+		Title: func(s string) {
+			a.call <- func() {
+				t.title = s
+				if a.showing(t) {
+					a.drawTermStatus()
+				}
+			}
+		},
 	})
-	t.sess.resize(t.cols, t.rows)
-	log.Printf("ssh: connected to %s, %d×%d", t.target, t.cols, t.rows)
+	back.resize(v.cols, v.rows)
+	if t.kind == kindShell {
+		log.Printf("shell: started, %d×%d", v.cols, v.rows)
+	} else {
+		log.Printf("ssh: connected to %s, %d×%d", t.target, v.cols, v.rows)
+	}
 	emu := t.emu
 	go func() { // remote → emulator
 		buf := make([]byte, 32<<10)
 		var err error
 		for {
 			var n int
-			n, err = s.stdout.Read(buf)
+			n, err = back.Read(buf)
 			if n > 0 {
 				emu.Write(buf[:n])
 				t.dirty.Store(true)
@@ -670,14 +792,15 @@ func (a *app) termStart(s *sshSession, gen int) {
 				break
 			}
 		}
-		a.call <- func() { a.termEnded(gen, err) }
+		lost, how := back.ended()
+		a.call <- func() { a.termEnded(t, gen, err, lost, how) }
 	}()
 	go func() { // emulator (keys, mouse, replies to queries) → remote
 		buf := make([]byte, 4096)
 		for {
 			n, err := emu.Read(buf)
 			if n > 0 {
-				if _, werr := s.stdin.Write(buf[:n]); werr != nil {
+				if _, werr := back.Write(buf[:n]); werr != nil {
 					return
 				}
 			}
@@ -686,88 +809,116 @@ func (a *app) termStart(s *sshSession, gen int) {
 			}
 		}
 	}()
-	a.drawTerm()
+	if a.showing(t) {
+		a.drawTerm()
+	}
 }
 
-func (a *app) termEnded(gen int, err error) {
-	t := &a.trm
+func (a *app) termEnded(t *termSession, gen int, err error, lost bool, how string) {
 	if t.gen != gen || t.state != termConnected {
 		return
 	}
-	a.termClose()
+	a.termClose(t)
 	msg := "connection closed"
-	if err != nil && !errors.Is(err, io.EOF) {
-		msg += ": " + err.Error()
+	if t.kind == kindShell {
+		msg = "the shell exited"
 	}
-	a.termNote(msg)
-	a.drawTerm()
+	if how == "" && err != nil && !errors.Is(err, io.EOF) {
+		how = err.Error()
+	}
+	if how != "" {
+		msg += ": " + how
+	}
+	if t.kind == kindShell {
+		msg += "  (Enter: start another)"
+	}
+	a.termNote(t, msg)
+	if lost && t.kind == kindSSH {
+		a.waitToReconnect(t)
+	}
 }
 
-// termClose drops the session, or cancels a connection in progress.
-func (a *app) termClose() {
-	t := &a.trm
+// termClose drops the session's connection, or cancels one in progress.
+func (a *app) termClose(t *termSession) {
 	if t.prompt != nil {
 		close(t.prompt.reply)
 		t.prompt = nil
 	}
-	if t.sess != nil {
-		t.sess.close()
+	if t.back != nil {
+		t.back.close()
 		t.emu.Close()
-		t.sess, t.emu = nil, nil
+		t.back, t.emu = nil, nil
 	}
 	t.gen++
 	t.state = termIdle
-	t.shown = nil
-}
-
-func (a *app) drawTermStatus() {
-	if t := &a.trm; a.tab == tabTerm && a.calib == nil && t.connected() && t.status() != t.shownStatus {
-		t.shownStatus = t.status()
-		a.drawPanelTitle(a.L.termP, t.shownStatus)
+	if a.showing(t) {
+		a.tv.shown = nil
 	}
 }
 
-// termTick redraws from the emulator now and then, and gives the screen a
-// clean grayscale refresh once output settles after fast updates.
+// termCloseAll ends every session, when we quit.
+func (a *app) termCloseAll() {
+	for _, g := range a.tv.groups {
+		for _, t := range g.sessions {
+			a.termClose(t)
+		}
+	}
+}
+
+// termTick starts the reconnections that are due, redraws from the
+// emulator now and then, and gives the screen a clean grayscale refresh
+// once output settles after fast updates.
 func (a *app) termTick() {
-	t := &a.trm
-	if !t.connected() || a.tab != tabTerm || a.calib != nil {
+	for _, g := range a.tv.groups {
+		for _, t := range g.sessions {
+			if t.state == termWaiting && time.Now().After(t.retryAt) {
+				a.termConnect(t, t.target)
+			}
+		}
+	}
+	t, v := a.term(), &a.tv
+	if t == nil || a.calib != nil {
+		return
+	}
+	if t.state == termWaiting {
+		a.drawTermStatus() // the countdown
+	}
+	if !t.connected() {
 		return
 	}
 	if a.lightOverlay != nil || a.fontOverlay != nil {
 		return // a gauge is up: drawing under it would be undone when it goes
 	}
-	if t.dirty.Load() && time.Since(t.drawnAt) >= termFrame {
-		t.dirty.Store(false)
-		t.outAt = time.Now()
-		a.renderTerm()
+	if t.dirty.Load() && time.Since(v.drawnAt) >= termFrame {
+		v.outAt = time.Now()
+		a.renderTerm(t)
 	}
 	if a.blitting {
 		return
 	}
 	// Clean up after the fast waveform once output pauses, or every few
 	// seconds if it doesn't (a spinner never stops while its app works).
-	if !t.fastArea.Empty() && (time.Since(t.outAt) > 1200*time.Millisecond || time.Since(t.fastAt) > 4*time.Second) {
-		a.mark(t.fastArea, true)
-		t.fastArea = image.Rectangle{}
+	if !v.fastArea.Empty() && (time.Since(v.outAt) > 1200*time.Millisecond || time.Since(v.fastAt) > 4*time.Second) {
+		a.mark(v.fastArea, true)
+		v.fastArea = image.Rectangle{}
 	}
 	// Grayscale updates leave ghosts too, slowly: after a few screenfuls
 	// of change, flash the terminal clean once it settles (a clock or a
 	// spinner may still tick), as e-readers do every few pages.
-	if t.churn > 4*area(t.grid) && time.Since(t.bigAt) > 2500*time.Millisecond {
-		t.churn, t.fastArea = 0, image.Rectangle{}
-		a.markFlash(t.grid)
+	if v.churn > 4*area(v.grid) && time.Since(v.bigAt) > 2500*time.Millisecond {
+		v.churn, v.fastArea = 0, image.Rectangle{}
+		a.markFlash(v.grid)
 	}
 }
 
 // --- input ---
 
-// termKey takes a key event while the Terminal tab is up. It returns false
+// termKey takes a key event while a terminal tab is up. It returns false
 // for keys the rest of the app should handle (tab switching, quitting)
 // when there's no session to send them to.
 func (a *app) termKey(code uint16, value int32) bool {
-	t := &a.trm
-	m := &t.mods
+	t, g, v := a.term(), a.termGroup(), &a.tv
+	m := &v.mods
 	down := value != 0
 	switch code {
 	case keyLeftShift, keyRightShift:
@@ -782,34 +933,52 @@ func (a *app) termKey(code uint16, value int32) bool {
 	case keyLeftMeta, keyRightMeta:
 		m.meta = down
 		return true
-	case keyF11: // ours, not the remote's: fullscreen on and off
-		if value == 1 {
-			a.setFull(!a.full)
-		}
-		return true
-	case keyEqual, keyMinus, key0: // with Ctrl, ours too: the font size
-		if !m.ctrl {
-			break
-		}
-		if value != 0 {
-			switch code {
-			case keyEqual:
-				a.setTermFont(t.fontPx + termFontStep)
-			case keyMinus:
-				a.setTermFont(t.fontPx - termFontStep)
-			default:
-				a.setTermFont(termFontDefault)
-			}
-		}
-		return true
 	case keyCapsLock:
 		if value == 1 {
 			m.caps = !m.caps
 			if !t.connected() {
-				a.updateTerm() // the prompt says so
+				a.updateTerm(t) // the prompt says so
 			}
 		}
 		return true
+	}
+	// Ours, not the remote's: fullscreen, the font size, sessions and tabs.
+	if value != 0 {
+		switch {
+		case code == keyF11:
+			if value == 1 {
+				a.setFull(!a.full)
+			}
+			return true
+		case m.ctrl && !m.shift && (code == keyEqual || code == keyMinus || code == key0):
+			switch code {
+			case keyEqual:
+				a.setTermFont(v.fontPx + termFontStep)
+			case keyMinus:
+				a.setTermFont(v.fontPx - termFontStep)
+			default:
+				a.setTermFont(termFontDefault)
+			}
+			return true
+		case m.ctrl && m.shift && code == keyT:
+			if value == 1 {
+				a.newSession(true)
+				a.drawTerm()
+				a.markFlash(a.L.termP.outer)
+			}
+			return true
+		case m.ctrl && (code == keyPgUp || m.shift && code == keyLeft):
+			a.switchSession((g.cur + len(g.sessions) - 1) % len(g.sessions))
+			return true
+		case m.ctrl && (code == keyPgDn || m.shift && code == keyRight):
+			a.switchSession((g.cur + 1) % len(g.sessions))
+			return true
+		case m.alt && code >= keyF1 && code < keyF1+uint16(numTabs):
+			if value == 1 {
+				a.switchTab(tabID(code - keyF1))
+			}
+			return true
+		}
 	}
 	if value == 0 {
 		return true
@@ -819,12 +988,20 @@ func (a *app) termKey(code uint16, value int32) bool {
 	if t.prompt != nil {
 		p := t.prompt
 		switch {
+		case p.yesno && (code == keyEnter || ch == "y" || ch == "Y"):
+			p.reply <- "y"
+			t.prompt = nil
+		case p.yesno && (code == keyEsc || ch == "n" || ch == "N"):
+			p.reply <- "n"
+			t.prompt = nil
+		case p.yesno:
 		case code == keyEnter:
 			p.reply <- p.answer
 			t.prompt = nil
 		case code == keyEsc:
-			a.termClose()
-			a.termNote("canceled")
+			a.termClose(t)
+			t.retries = 0
+			a.termNote(t, "canceled")
 		case code == keyBackspace:
 			if r := []rune(p.answer); len(r) > 0 {
 				p.answer = string(r[:len(r)-1])
@@ -834,39 +1011,49 @@ func (a *app) termKey(code uint16, value int32) bool {
 		case printable:
 			p.answer += ch
 		}
-		a.updateTerm()
+		a.updateTerm(t)
 		return true
 	}
 
 	if !t.connected() {
 		switch {
-		case t.state == termConnecting && code == keyEsc:
-			a.termClose()
-			a.termNote("canceled")
+		case (t.state == termConnecting || t.state == termWaiting) && code == keyEsc:
+			a.termClose(t)
+			t.retries = 0
+			a.termNote(t, "canceled")
 		case t.state != termIdle:
+		case code == keyEsc && len(g.sessions) > 1:
+			a.closeSession()
+			return true
+		case t.kind == kindShell && code == keyEnter:
+			a.termStartShell(t)
+			return true
+		case t.kind == kindShell:
+			return code != keyEsc && !(code >= keyF1 && code < keyF1+uint16(numTabs))
 		case code == keyEnter:
 			in := strings.TrimSpace(t.input)
-			if in == "" && len(t.hosts) > 0 {
-				a.termConnect(t.hosts[0])
+			if in == "" && len(v.hosts) > 0 {
+				a.termConnect(t, v.hosts[0])
 			} else if h, err := parseSSHTarget(in); err == nil {
-				a.termConnect(h)
+				t.typed = true
+				a.termConnect(t, h)
 			} else {
-				a.termNote(err.Error())
+				a.termNote(t, err.Error())
 			}
 		case code == keyBackspace:
 			if r := []rune(t.input); len(r) > 0 {
 				t.input = string(r[:len(r)-1])
 			}
 		case printable && t.input == "" && ch >= "1" && ch <= "9":
-			if i := int(ch[0] - '1'); i < len(t.hosts) {
-				a.termConnect(t.hosts[i])
+			if i := int(ch[0] - '1'); i < len(v.hosts) {
+				a.termConnect(t, v.hosts[i])
 			}
 		case printable && !m.ctrl:
 			t.input += ch
 		default:
 			return false // Esc, F-keys: the app's
 		}
-		a.updateTerm()
+		a.updateTerm(t)
 		return true
 	}
 
@@ -906,58 +1093,94 @@ const (
 	key0         = 11
 	keyMinus     = 12
 	keyEqual     = 13
+	keyT         = 20
 	keyF11       = 87
 	keyF12       = 88
+	keyPgUp      = 104
+	keyLeft      = 105
+	keyRight     = 106
+	keyPgDn      = 109
 )
 
 var termSpecialKeys = map[uint16]rune{
 	keyEsc: uv.KeyEscape, keyBackspace: uv.KeyBackspace, keyTab: uv.KeyTab, keyEnter: uv.KeyEnter, 96: uv.KeyEnter,
-	102: uv.KeyHome, 103: uv.KeyUp, 104: uv.KeyPgUp, 105: uv.KeyLeft, 106: uv.KeyRight, 107: uv.KeyEnd,
-	108: uv.KeyDown, 109: uv.KeyPgDown, 110: uv.KeyInsert, 111: uv.KeyDelete,
+	102: uv.KeyHome, 103: uv.KeyUp, keyPgUp: uv.KeyPgUp, keyLeft: uv.KeyLeft, keyRight: uv.KeyRight, 107: uv.KeyEnd,
+	108: uv.KeyDown, keyPgDn: uv.KeyPgDown, 110: uv.KeyInsert, 111: uv.KeyDelete,
 	59: uv.KeyF1, 60: uv.KeyF2, 61: uv.KeyF3, 62: uv.KeyF4, 63: uv.KeyF5, 64: uv.KeyF6,
 	65: uv.KeyF7, 66: uv.KeyF8, 67: uv.KeyF9, 68: uv.KeyF10, keyF11: uv.KeyF11, keyF12: uv.KeyF12,
 }
 
 // termCell maps a screen point to a cell, if it's on the grid.
 func (a *app) termCell(p image.Point) (int, int, bool) {
-	t := &a.trm
-	if !p.In(t.grid) || t.cw == 0 {
+	v := &a.tv
+	if !p.In(v.grid) || v.cw == 0 {
 		return 0, 0, false
 	}
-	return (p.X - t.grid.Min.X) / t.cw, (p.Y - t.grid.Min.Y) / t.ch, true
+	return (p.X - v.grid.Min.X) / v.cw, (p.Y - v.grid.Min.Y) / v.ch, true
 }
 
-// termTap clicks, if the remote app listens to the mouse.
-func (a *app) termTap(p image.Point) bool {
-	t := &a.trm
+// termTap handles a tap on a terminal tab: the panel's button, the
+// session buttons, a saved host, or a click for the remote app.
+func (a *app) termTap(p image.Point) {
+	t, v := a.term(), &a.tv
+	if t == nil {
+		return
+	}
+	if hit(p, a.termPanel().button) {
+		switch {
+		case t.state != termIdle:
+			a.termClose(t)
+			t.retries = 0
+			a.termNote(t, "disconnected")
+			a.drawTerm()
+		default:
+			a.closeSession()
+		}
+		return
+	}
+	for i, r := range v.chips {
+		if p.In(r.Inset(-4)) {
+			if g := a.termGroup(); i == len(g.sessions) {
+				a.newSession(true)
+				a.drawTerm()
+				a.markFlash(a.L.termP.outer)
+			} else {
+				a.switchSession(i)
+			}
+			return
+		}
+	}
 	if !t.connected() {
-		for i, r := range t.hostRows {
-			if p.In(r) {
-				a.termConnect(t.hosts[i])
-				return true
+		if t.kind == kindShell && p.In(a.L.termP.body) && t.state == termIdle {
+			a.termStartShell(t)
+			return
+		}
+		for i, r := range v.hostRows {
+			if p.In(r) && t.state == termIdle {
+				a.termConnect(t, v.hosts[i])
+				return
 			}
 		}
-		return false
+		return
 	}
 	x, y, ok := a.termCell(p)
 	if !ok {
-		return false
+		return
 	}
 	m := uv.Mouse{X: x, Y: y, Button: uv.MouseLeft}
 	t.emu.SendMouse(uv.MouseClickEvent(m))
 	t.emu.SendMouse(uv.MouseReleaseEvent(m))
-	return true
 }
 
 // termSwipe turns a vertical swipe into mouse wheel steps, one per row moved.
 func (a *app) termSwipe(from, to image.Point) bool {
-	t := &a.trm
+	t, v := a.term(), &a.tv
 	x, y, ok := a.termCell(from)
-	if !t.connected() || !ok {
+	if t == nil || !t.connected() || !ok {
 		return false
 	}
 	dy := to.Y - from.Y
-	steps := min(20, abs(dy)/t.ch)
+	steps := min(20, abs(dy)/v.ch)
 	if steps == 0 || abs(dy) < 2*abs(to.X-from.X) {
 		return false
 	}
@@ -969,18 +1192,4 @@ func (a *app) termSwipe(from, to image.Point) bool {
 		t.emu.SendMouse(uv.MouseWheelEvent(uv.Mouse{X: x, Y: y, Button: button}))
 	}
 	return true
-}
-
-// drawMissing marks a character we have no glyph for: a small hollow box.
-func drawMissing(m *image.Alpha) {
-	b := m.Bounds()
-	r := image.Rect(b.Dx()/4, b.Dy()/4, b.Dx()*3/4, b.Dy()*3/4)
-	for x := r.Min.X; x < r.Max.X; x++ {
-		m.SetAlpha(x, r.Min.Y, color.Alpha{160})
-		m.SetAlpha(x, r.Max.Y-1, color.Alpha{160})
-	}
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		m.SetAlpha(r.Min.X, y, color.Alpha{160})
-		m.SetAlpha(r.Max.X-1, y, color.Alpha{160})
-	}
 }

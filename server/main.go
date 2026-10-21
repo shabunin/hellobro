@@ -4,11 +4,16 @@
 // connected, and a showcase of borders, colors and text attributes.
 //
 // Anyone who can reach it gets in (any key, any password): keep it on the LAN.
+// With -password, only that password gets in, or a key listed in
+// .ssh/authorized_keys; there, a command (no PTY) that mentions
+// authorized_keys adds the key it's given on stdin, as hellobro's offer to
+// install its key would on a real server.
 //
-//	go run . [-listen :2222]
+//	go run . [-listen :2222] [-password bro]
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -33,16 +38,24 @@ import (
 
 func main() {
 	listen := flag.String("listen", ":2222", "address to listen on")
+	password := flag.String("password", "", "accept only this password, or keys in "+authorizedKeys)
 	flag.Parse()
 
+	keyOK := func(ssh.Context, ssh.PublicKey) bool { return true }
+	passwordOK := func(ssh.Context, string) bool { return true }
+	if *password != "" {
+		keyOK = func(_ ssh.Context, k ssh.PublicKey) bool { return knownKey(k) }
+		passwordOK = func(_ ssh.Context, p string) bool { return p == *password }
+	}
 	s, err := wish.NewServer(
 		wish.WithAddress(*listen),
 		wish.WithHostKeyPath(".ssh/hellobro_server_ed25519"),
-		wish.WithPublicKeyAuth(func(ssh.Context, ssh.PublicKey) bool { return true }),
-		wish.WithPasswordAuth(func(ssh.Context, string) bool { return true }),
+		wish.WithPublicKeyAuth(keyOK),
+		wish.WithPasswordAuth(passwordOK),
 		wish.WithMiddleware(
 			bubbletea.MiddlewareWithProgramHandler(newProgram),
 			activeterm.Middleware(), // a PTY is required
+			addKeyMiddleware,
 			logging.Middleware(),
 		),
 	)
@@ -61,6 +74,56 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	s.Shutdown(ctx)
+}
+
+// --- authorized keys ---
+
+const authorizedKeys = ".ssh/authorized_keys"
+
+func knownKey(k ssh.PublicKey) bool {
+	b, _ := os.ReadFile(authorizedKeys)
+	for len(b) > 0 {
+		known, _, _, rest, err := ssh.ParseAuthorizedKey(b)
+		if err != nil {
+			return false
+		}
+		if ssh.KeysEqual(k, known) {
+			return true
+		}
+		b = rest
+	}
+	return false
+}
+
+// addKeyMiddleware takes a command that installs a key, like the one
+// hellobro sends, and adds the key from stdin to authorized_keys.
+func addKeyMiddleware(next ssh.Handler) ssh.Handler {
+	return func(sess ssh.Session) {
+		_, _, isPty := sess.Pty()
+		if isPty || !strings.Contains(sess.RawCommand(), "authorized_keys") {
+			next(sess)
+			return
+		}
+		line, _ := bufio.NewReader(sess).ReadString('\n')
+		k, _, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
+		if err != nil {
+			fmt.Fprintln(sess.Stderr(), "not a key:", err)
+			sess.Exit(1)
+			return
+		}
+		if !knownKey(k) {
+			f, err := os.OpenFile(authorizedKeys, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+			if err != nil {
+				fmt.Fprintln(sess.Stderr(), err)
+				sess.Exit(1)
+				return
+			}
+			fmt.Fprint(f, strings.TrimSpace(line)+"\n")
+			f.Close()
+			log.Printf("added %s's key to %s", sess.User(), authorizedKeys)
+		}
+		sess.Exit(0)
+	}
 }
 
 // --- the chat, shared by all sessions ---

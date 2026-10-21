@@ -81,19 +81,20 @@ def start():
     time.sleep(1.5)
 
 tabs_y = 76 + 34
-tab_x = lambda i: (i + 0.5) * W / 7
+tab_x = lambda i: (i + 0.5) * W / 9   # Keys Finger Stylus Net Sound SSH Shell System Info
 land = W > H
 cx0, cy0 = (60, 200)
 cw, ch = ((W - 32) * 0.66 - 60, H - 76 - 68 - 46 - 32 - 100) if land else (W - 120, (H - 76 - 68 - 46 - 32) * 0.66 - 110)
 
-def key(code, shift=False, ctrl=False):
-    if ctrl: kbd.write(ev(1, 29, 1) + SYN)
-    if shift: kbd.write(ev(1, 42, 1) + SYN)
+def key(code, shift=False, ctrl=False, alt=False):
+    mods = [m for m, on in ((29, ctrl), (42, shift), (56, alt)) if on]
+    for m in mods: kbd.write(ev(1, m, 1) + SYN)
     kbd.write(ev(1, code, 1) + SYN + ev(1, code, 0) + SYN)
-    if shift: kbd.write(ev(1, 42, 0) + SYN)
-    if ctrl: kbd.write(ev(1, 29, 0) + SYN)
+    for m in reversed(mods): kbd.write(ev(1, m, 0) + SYN)
     time.sleep(0.15)
 UP, DOWN, ENTER, ESC, TAB, BACKSPACE, SPACE, F11 = 103, 108, 28, 1, 15, 14, 57, 87
+PGUP, PGDN, KEY_T = 104, 109, 20
+F = lambda n: 58 + n                                  # F1..F10
 
 def exit_app():
     """Taps the header's exit button."""

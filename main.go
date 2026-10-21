@@ -8,7 +8,9 @@
 //   - Network: Wi-Fi status, a scan (access points, hosts on the local
 //     network) and an HTTPS request;
 //   - Sound: Bluetooth audio devices, and a player (test tone, MP3, WAV);
-//   - SSH: a terminal (xterm emulation, PTY) over SSH;
+//   - SSH: terminals (xterm emulation, PTY) over SSH, several at once;
+//   - Shell: terminals with a shell on the Kobo itself;
+//   - System: the device, kernel, memory, storage, battery, tools;
 //   - Info: input devices, screen and touch mapping details.
 //
 // The UI follows the orientation the Kobo is held in at launch, and the
@@ -133,7 +135,8 @@ type app struct {
 	netState [numNetPanels]netPanelState
 	netc     chan netMsg
 	snd      soundState
-	trm      termState
+	tv       termView
+	sys      sysState
 	inputAt  time.Time   // last touch or key
 	call     chan func() // work from goroutines, run on the UI loop
 
@@ -208,7 +211,7 @@ func main() {
 	a.loop(touches, keys)
 
 	a.stopPlayback("")
-	a.termClose()
+	a.termCloseAll()
 	a.waitBlit()
 	a.dirty = nil
 	a.drawBye()
@@ -276,7 +279,7 @@ func (a *app) loop(touches <-chan touchEv, keys <-chan kbdMsg) {
 			a.stats.event("clock", 0)
 			a.drawStatus()
 		case <-idle.C:
-			if a.trm.connected() && time.Since(a.inputAt) < sshIdleTimeout { // reading a remote screen takes longer
+			if a.termLive() && time.Since(a.inputAt) < sshIdleTimeout { // reading a remote screen takes longer
 				idle.Reset(sshIdleTimeout - time.Since(a.inputAt))
 				continue
 			}
@@ -379,7 +382,7 @@ func (a *app) relayout() {
 	s := a.scr.info
 	a.c = canvas{image.NewGray(image.Rect(0, 0, s.viewW, s.viewH))}
 	a.L = makeLayout(s.viewW, s.viewH, a.f, a.full)
-	if a.trm.cw != 0 {
+	if a.tv.cw != 0 {
 		a.termGeometry() // the terminal follows the new size
 	}
 	// New canvases when their size changes; F11 and back keeps the drawings.
@@ -441,8 +444,11 @@ func (a *app) switchTab(t tabID) {
 	if t == tabSound {
 		a.enterSound()
 	}
-	if t == tabTerm {
+	if isTermTab(t) {
 		a.enterTerm()
+	}
+	if t == tabSystem && a.sys.at.IsZero() {
+		a.startSys()
 	}
 	if a.full {
 		a.setFull(false)
@@ -499,7 +505,7 @@ func (a *app) onTouch(ev touchEv) {
 		}
 		g.lightZone = a.light != nil && !ev.pen && p.X < lightEdge && g.canvas < 0 &&
 			!(a.tab == tabFinger && p.In(a.L.fingerCanvas.body))
-		g.fontZone = a.tab == tabTerm && !ev.pen && p.X >= a.c.Bounds().Dx()-lightEdge
+		g.fontZone = isTermTab(a.tab) && !ev.pen && p.X >= a.c.Bounds().Dx()-lightEdge
 		a.gestures[ev.slot] = g
 		if g.canvas >= 0 {
 			a.ink(g.canvas, p, p, ev.pressure)
@@ -525,7 +531,7 @@ func (a *app) onTouch(ev touchEv) {
 			a.setLight(g.lightFrom + (g.start.Y-p.Y)*100/(a.c.Bounds().Dy()/2))
 		}
 		if dy := g.start.Y - p.Y; g.fontZone && !g.font && abs(dy) > lightStart && abs(dy) > 2*abs(p.X-g.start.X) {
-			g.font, g.fontFrom = true, a.trm.fontPx
+			g.font, g.fontFrom = true, a.tv.fontPx
 			log.Printf("font swipe from %d px", g.fontFrom)
 		}
 		if g.font {
@@ -559,7 +565,7 @@ func (a *app) onTouch(ev touchEv) {
 		tap := g.moved < tapSlop && dur < tapTime
 		if tap && g.canvas < 0 && g.ignored == "" {
 			a.tapAt(g.start)
-		} else if !tap && !g.pen && a.tab == tabTerm && a.calib == nil {
+		} else if !tap && !g.pen && isTermTab(a.tab) && a.calib == nil {
 			a.termSwipe(g.start, g.last)
 		}
 		a.logGesture(g, tap, dur)
@@ -601,13 +607,10 @@ func (a *app) tapAt(p image.Point) {
 		}
 	case a.tab == tabSound:
 		a.tapSound(p)
-	case a.tab == tabTerm && hit(p, a.L.termP.button):
-		if a.trm.state != termIdle {
-			a.termClose()
-			a.termNote("disconnected")
-		}
-	case a.tab == tabTerm:
+	case isTermTab(a.tab):
 		a.termTap(p)
+	case a.tab == tabSystem && hit(p, a.L.sys[sysDevice].button):
+		a.startSys()
 	}
 }
 
@@ -741,7 +744,7 @@ func (a *app) calibTap(ev touchEv) {
 // --- keyboard ---
 
 func (a *app) onKey(m kbdMsg) {
-	if a.tab == tabTerm && a.calib == nil && !m.button && m.connected == "" && m.gone == "" && a.termKey(m.code, m.value) {
+	if isTermTab(a.tab) && a.calib == nil && !m.button && m.connected == "" && m.gone == "" && a.termKey(m.code, m.value) {
 		return
 	}
 	switch {
