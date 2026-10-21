@@ -312,8 +312,9 @@ func (a *bro) drawTermStatus() {
 
 func (a *bro) drawConnect(t *termSession) {
 	v := &a.tv
-	keys := "Ctrl+Shift+T: new session  ·  Ctrl+Tab: next session  ·  Ctrl+Shift+P: go to…  ·  Ctrl+Alt+1-4: tabs  ·  F11: fullscreen (or swipe in from the top or bottom edge to leave it)"
-	music := "Ctrl+Shift+Space: play/pause  ·  Ctrl+Shift+< >: previous/next track  ·  Ctrl+Shift+B: status bar"
+	keys := a.keyHints("session.new", "new session", "session.next", "next session", "palette", "go to…",
+		"fullscreen", "fullscreen (or swipe in from the top or bottom edge to leave it)")
+	music := a.keyHints("music.play", "play/pause", "music.prev", "previous track", "music.next", "next track", "statusbar", "status bar")
 	var lines []string
 	if t.kind == kindShell {
 		lines = []string{"A shell on this Kobo (/bin/sh, as " + whoami() + "): Enter or tap here to start it.", keys, music}
@@ -920,48 +921,6 @@ func (a *bro) termKey(code uint16, value int32) bool {
 	m := &v.mods
 	if a.termMod(code, value) {
 		return true
-	}
-	// Ours, not the remote's: fullscreen, the font size, sessions and tabs.
-	if value != 0 {
-		switch {
-		case code == keyF11:
-			if value == 1 {
-				a.SetFull(!a.Full)
-			}
-			return true
-		case m.ctrl && !m.shift && (code == keyEqual || code == keyMinus || code == key0):
-			switch code {
-			case keyEqual:
-				a.setTermFont(v.fontPx + termFontStep)
-			case keyMinus:
-				a.setTermFont(v.fontPx - termFontStep)
-			default:
-				a.setTermFont(termFontDefault)
-			}
-			return true
-		case m.ctrl && m.shift && code == keyT:
-			if value == 1 {
-				a.newSession(true)
-				a.drawTerm()
-				a.MarkFlash(a.termP.Outer)
-			}
-			return true
-		case m.ctrl && code == kobo.KeyTab: // as a browser's tabs; Shift goes back
-			switch {
-			case len(g.sessions) < 2:
-			case m.shift:
-				a.switchSession((g.cur + len(g.sessions) - 1) % len(g.sessions))
-			default:
-				a.switchSession((g.cur + 1) % len(g.sessions))
-			}
-			return true
-		case m.ctrl && (code == keyPgUp || m.shift && code == keyLeft):
-			a.switchSession((g.cur + len(g.sessions) - 1) % len(g.sessions))
-			return true
-		case m.ctrl && (code == keyPgDn || m.shift && code == keyRight):
-			a.switchSession((g.cur + 1) % len(g.sessions))
-			return true
-		}
 	}
 	if value == 0 {
 		return true

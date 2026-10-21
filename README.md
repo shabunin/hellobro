@@ -25,7 +25,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 
 - **SSH**: an xterm-256color terminal, several sessions, mouse,
   reconnects by itself. tmux, htop, helix, Claude Code all work.
-- **Shell**: the same terminal on the Kobo itself.
+- **Shell**: the same terminal on the Kobo itself (turn it on in
+  Settings, Tabs).
 - **Music**: albums, folders and playlists, shuffle and repeat, to
   Bluetooth headphones. Media keys work.
 - **Light sleep**: the screen shows what's playing, the light goes off,
@@ -56,8 +57,8 @@ Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
 
 | | |
 | --- | --- |
-| Ctrl+Alt+1–5 | tabs |
-| Ctrl+Shift+P | go to: sessions, tabs, hosts |
+| Ctrl+Alt+1–4 | tabs |
+| Ctrl+Shift+P | go to: sessions, tabs, hosts, commands |
 | Ctrl+Tab, Ctrl+Shift+Tab | next / previous session |
 | Ctrl+Shift+T | new session |
 | F11 | fullscreen (swipe in from the top or bottom edge to leave) |
@@ -66,6 +67,10 @@ Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
 | Ctrl+Alt+S, power button | sleep |
 | swipe the left edge | frontlight |
 | Esc, `exit` | back to Nickel |
+
+Every key can be changed in `keys.conf`, and which tabs show (Shell
+starts hidden), and in what order, in Settings. See
+[Keys](docs/usage.md#keys).
 
 ## Docs
 

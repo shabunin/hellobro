@@ -188,7 +188,7 @@ const (
 )
 
 // makeLayout places the frame; full gives the whole screen to the page.
-func makeLayout(w, h int, f Fonts, cfg Config, full bool) Layout {
+func makeLayout(w, h int, f Fonts, title string, tabs int, full bool) Layout {
 	L := Layout{W: w, H: h, Landscape: w > h, Full: full}
 	if full { // no header, tabs or footer: nothing else to draw or tap
 		L.Page = image.Rect(0, 0, w, h)
@@ -201,7 +201,7 @@ func makeLayout(w, h int, f Fonts, cfg Config, full bool) Layout {
 	L.Page = image.Rect(0, L.tabBar.Max.Y, w, L.footer.Min.Y)
 	L.Body = L.Page.Inset(Pad)
 
-	n := len(cfg.Tabs)
+	n := max(1, tabs)
 	tw := min(w/n, w/4) // a few tabs needn't stretch across
 	for i := range n {
 		L.tabs = append(L.tabs, image.Rect(i*tw, L.tabBar.Min.Y, (i+1)*tw, L.tabBar.Max.Y))
@@ -219,7 +219,7 @@ func makeLayout(w, h int, f Fonts, cfg Config, full bool) Layout {
 	L.btnSleep = button("sleep")
 	L.btnCalib = button("touch cal")
 	L.btnRotate = button("rotate")
-	titleEnd := 24 + TextWidth(f.Title, cfg.Title) + 24
+	titleEnd := 24 + TextWidth(f.Title, title) + 24
 	L.titleText = image.Rect(24, 0, titleEnd, headerH)
 	L.status = image.Rect(titleEnd, 0, x-12, headerH)
 	return L
@@ -357,9 +357,10 @@ func (a *App) drawTabs() {
 	}
 	c, L := a.C, a.L
 	c.Fill(L.tabBar, Light)
+	order := a.Tabs()
 	for i, r := range L.tabs {
-		label := a.cfg.Tabs[i]
-		if i == a.Tab {
+		label := a.cfg.Tabs[order[i]]
+		if order[i] == a.Tab {
 			c.Fill(r, White)
 			c.Frame(r, border, Black)
 			c.Fill(image.Rect(r.Min.X+border, r.Max.Y-border, r.Max.X-border, r.Max.Y), White) // open into the page
@@ -371,7 +372,14 @@ func (a *App) drawTabs() {
 			}
 			c.Text(a.F.Tab, r, label, Dark, AlignCenter)
 		}
-		c.Text(a.F.Small, image.Rect(r.Max.X-60, r.Min.Y+4, r.Max.X-10, r.Min.Y+30), strconv.Itoa(i+1), Mid, AlignRight) // Ctrl+Alt+N
+		hint := strconv.Itoa(i + 1) // Ctrl+Alt+N
+		if a.hints != nil {
+			hint = ""
+			if i < len(a.hints) {
+				hint = a.hints[i]
+			}
+		}
+		c.Text(a.F.Small, image.Rect(r.Max.X-90, r.Min.Y+4, r.Max.X-10, r.Min.Y+30), hint, Mid, AlignRight)
 	}
 	if end := L.tabs[len(L.tabs)-1].Max.X; end < L.W { // the bar's line goes on past the tabs
 		c.Fill(image.Rect(end, L.tabBar.Max.Y-border, L.W, L.tabBar.Max.Y), Black)
@@ -393,11 +401,26 @@ func (a *App) drawFooter() {
 	c, L := a.C, a.L
 	c.Fill(L.footer, White)
 	c.Fill(image.Rect(0, L.footer.Min.Y, L.W, L.footer.Min.Y+2), Black)
-	sleep := "power button or Ctrl+Alt+S"
-	if a.noPower {
-		sleep = "Ctrl+Alt+S"
+	var ways []string
+	if !a.noPower {
+		ways = append(ways, "power button")
 	}
-	hints := []string{fmt.Sprintf("tabs: tap or Ctrl+Alt+1–%d", len(a.cfg.Tabs))}
+	switch a.footerSleep {
+	case "":
+		ways = append(ways, "Ctrl+Alt+S")
+	case "-": // no key for it
+	default:
+		ways = append(ways, a.footerSleep)
+	}
+	sleep := "the header's button"
+	if len(ways) > 0 {
+		sleep = strings.Join(ways, " or ")
+	}
+	tabs := fmt.Sprintf("tabs: tap or Ctrl+Alt+1–%d", len(a.Tabs()))
+	if a.footerTabs != "" {
+		tabs = a.footerTabs
+	}
+	hints := []string{tabs}
 	if a.light != nil {
 		hints = append(hints, "light: swipe the left edge")
 	}

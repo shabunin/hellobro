@@ -11,8 +11,10 @@
 //     storage.
 //
 // A swipe along the right edge sets the font size, F11 gives the
-// terminal the whole screen. The rest (the screen, touch, the frontlight
-// on the left edge, quitting) is the kobo package's.
+// terminal the whole screen. Which tabs show, and in what order, is up
+// to the user (tabs.go), and so are the keys (commands.go). The rest
+// (the screen, touch, the frontlight on the left edge, quitting) is the
+// kobo package's.
 //
 // Launch it through launch.sh, which keeps Nickel from drawing over us.
 package main
@@ -54,9 +56,12 @@ type bro struct {
 	font   *fontSwipe // a contact along the right edge, which may become a font swipe
 	mv     musicView
 	mus    musicState
-	stat   statBar // the terminal tabs' status bar
-	picker *picker // the switcher, while it's up
-	asking *askBox // a question, while it's up
+	stat   statBar     // the terminal tabs' status bar
+	picker *picker     // the switcher, while it's up
+	asking *askBox     // a question, while it's up
+	tabsEd *tabsEditor // the Tabs dialog, while it's up
+	tabs   tabsConf
+	keys   keyMap
 	rv     [2]radioPanelView
 	rs     radioState
 	slp    sleepState
@@ -91,8 +96,11 @@ func main() {
 	a.loadStatBar()
 	a.set = loadSettings()
 	radio.StateDir = kobo.AppFile("")
-	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames}, a)
+	a.tabs = loadTabs()
+	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames, OwnKeys: true}, a)
 	log.Printf("hellobro %s", version)
+	a.keys = loadKeys()
+	a.applyTabs()
 	a.tf.setSize(termFontDefault)
 	a.shareApply()
 	go a.watchHeadphones() // the bus may be slow: never in the way of starting
@@ -147,12 +155,16 @@ func (a *bro) Tap(p image.Point) {
 		a.askTap(p)
 		return
 	}
+	if a.tabsEd != nil {
+		a.tabsTap(p)
+		return
+	}
 	if a.picker != nil {
 		a.pickerTap(p)
 		return
 	}
 	if isTermTab(a.Tab) && p.In(a.stat.r) {
-		a.hotkey(kobo.KeySpace)
+		a.mediaKey(kobo.KeyPlayPause)
 		return
 	}
 	switch a.Tab {
@@ -173,6 +185,7 @@ func (a *bro) Tick() {
 		return
 	}
 	a.dozeWhenIdle()
+	a.keysTick()
 	a.termTick()
 	a.statTick()
 	a.radioTick()
@@ -221,56 +234,24 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 	case a.asking != nil:
 		a.askKey(m.Code, m.Value)
 		return true
+	case a.tabsEd != nil:
+		a.tabsKey(m.Code, m.Value)
+		return true
 	case a.picker != nil:
 		a.pickerKey(m.Code, m.Value)
 		return true
-	case a.tv.mods.ctrl && a.tv.mods.shift && m.Code == keyP: // as VS Code's palette
-		if m.Value == 1 {
-			a.openPicker()
-		}
+	case a.termMod(m.Code, m.Value): // kept track of on every tab, for the terminals
 		return true
-	case a.tv.mods.ctrl && a.tv.mods.shift && hotkeys[m.Code]: // ours on every tab, never the remote's
-		if m.Value == 1 {
-			a.hotkey(m.Code)
-		}
+	case a.runKey(m.Code, m.Value): // ours, never the remote's
 		return true
 	case a.Tab == tabMusic:
-		if a.termMod(m.Code, m.Value) { // kept track of on every tab, for the terminals
-			return true
-		}
 		return a.musicKey(m.Code, m.Value)
 	case a.Tab == tabRadio:
-		if a.termMod(m.Code, m.Value) {
-			return true
-		}
 		return a.radioKey(m.Code, m.Value)
 	case a.Tab == tabFiles:
-		if a.termMod(m.Code, m.Value) {
-			return true
-		}
 		return a.filesKey(m.Code, m.Value)
 	}
 	return a.termKey(m.Code, m.Value)
-}
-
-const (
-	keyP     = 25
-	keyB     = 48
-	keyComma = 51
-	keyDot   = 52
-)
-
-// hotkeys are Ctrl+Shift+key, the same on every tab: the music's
-// (Space: play/pause, < and >: the previous and next track) and the
-// status bar's (B: show or hide).
-var hotkeys = map[uint16]bool{kobo.KeySpace: true, keyComma: true, keyDot: true, keyB: true}
-
-func (a *bro) hotkey(code uint16) {
-	if code == keyB {
-		a.toggleStat()
-		return
-	}
-	a.mediaKey(map[uint16]uint16{kobo.KeySpace: kobo.KeyPlayPause, keyComma: kobo.KeyPreviousSong, keyDot: kobo.KeyNextSong}[code])
 }
 
 func (a *bro) mediaKey(code uint16) {

@@ -1,11 +1,11 @@
 package main
 
 // The switcher, a fuzzy menu in the manner of rofi's combi mode:
-// Ctrl+Shift+P (as VS Code's palette), on any tab, lists the terminal sessions, the tabs and
-// the saved SSH hosts (a new session to one). Typing narrows the list,
-// Up/Down (or Tab, Shift+Tab) move, Enter goes; with nothing typed, 1-9 go
-// straight to that row. Esc, Ctrl+Shift+P again or a tap outside close
-// it. The page under it holds still meanwhile. The Music tab puts up the
+// Ctrl+Shift+P (as VS Code's palette), on any tab, lists the terminal
+// sessions, the tabs, the saved SSH hosts (a new session to one) and the
+// commands (commands.go). Typing narrows the list, Up/Down (or Tab,
+// Shift+Tab) move, Enter goes; with nothing typed, 1-9 go straight to
+// that row. Esc, its key again or a tap outside close it. The page under it holds still meanwhile. The Music tab puts up the
 // same menu to pick a playlist, with an entry for a new one, named as
 // typed.
 
@@ -44,7 +44,11 @@ type picker struct {
 
 func (a *bro) openPicker() {
 	p := &picker{}
+	shown := a.Tabs()
 	for tab := range a.tv.groups {
+		if !slices.Contains(shown, tab) {
+			continue
+		}
 		for i, t := range a.tv.groups[tab].sessions {
 			p.all = append(p.all, pickEntry{
 				kind: "session", title: fmt.Sprintf("%s %d", tabNames[tab], i+1), detail: t.status(&a.tv),
@@ -53,8 +57,9 @@ func (a *bro) openPicker() {
 			})
 		}
 	}
-	for tab, name := range tabNames {
-		p.all = append(p.all, pickEntry{kind: "tab", title: name, current: a.Tab == tab, do: func() { a.SwitchTab(tab) }})
+	for _, tab := range shown {
+		p.all = append(p.all, pickEntry{kind: "tab", title: tabNames[tab], detail: a.keyLabels("tab." + tabKey(tab)),
+			current: a.Tab == tab, do: func() { a.SwitchTab(tab) }})
 	}
 	if a.tv.hosts == nil {
 		a.tv.hosts = loadSSHHosts()
@@ -66,10 +71,16 @@ func (a *bro) openPicker() {
 		}
 		p.all = append(p.all, pickEntry{kind: "ssh", title: h.name, detail: h.String() + cmd, do: func() { a.goHost(h) }})
 	}
-	p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }},
-		pickEntry{kind: "kobo", title: "sleep", detail: "Ctrl+Alt+S · the power button wakes it", do: a.App.Sleep},
-		pickEntry{kind: "kobo", title: "light sleep", detail: "the music plays on · a key or the power button wakes it", do: a.Doze})
-	p.title, p.hint = "Go to", "sessions, tabs, hosts…"
+	if slices.Contains(shown, tabShell) {
+		p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }})
+	}
+	for _, c := range commands {
+		if c.hidden || c.when != nil && !c.when(a) {
+			continue
+		}
+		p.all = append(p.all, pickEntry{kind: "command", title: c.title, detail: a.keyLabels(c.id), do: func() { c.run(a) }})
+	}
+	p.title, p.hint = "Go to", "sessions, tabs, hosts, commands…"
 	a.showPicker(p)
 }
 
@@ -287,7 +298,7 @@ func (a *bro) pickerKey(code uint16, value int32) {
 	}
 	ch, printable := kobo.KeyChar(code, m.shift, m.caps)
 	switch {
-	case code == kobo.KeyEsc || code == keyP && m.ctrl && m.shift:
+	case code == kobo.KeyEsc || a.keyCommand(code) == commandByID("palette"):
 		a.closePicker()
 		return
 	case code == kobo.KeyEnter:

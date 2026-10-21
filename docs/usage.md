@@ -4,13 +4,13 @@ Back to the [README](../README.md). From afar: [relay.md](relay.md).
 
 ## Tabs
 
-Tap a tab, or Ctrl+Alt+1–5 (works everywhere, fullscreen and in a
-session too):
+Tap a tab, or Ctrl+Alt+1–4 (by place; works everywhere, fullscreen and
+in a session too):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
   Claude Code…), mouse taps and scrolling; several sessions at once.
 - **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
-  several too.
+  several too. Hidden at first: turn it on in Settings, Tabs.
 - **Music**: a player for the music on the Kobo (folders of MP3/WAV, with
   their covers), to Bluetooth headphones or a DAC: by album, by folder
   (subfolders and all) or by playlist, in order or shuffled. It goes on
@@ -19,22 +19,51 @@ session too):
   off, networks (join, with a password; leave; forget; one by name), and
   devices (scan, pair, connect, disconnect, forget); and hellobro's own
   settings: light sleep, sleep with music on, file sharing, the relay,
-  mDNS, the status bar.
+  mDNS, the status bar, the tabs.
 - **Files**: sharing with a computer over SFTP and SSH (how to reach the
   Kobo, pairing, who's connected and sending what), and the Kobo's
   storage: folders to open, files and folders to delete.
 
+Which tabs show, and in what order, is up to you: Settings, the last
+row, **Tabs** (or "tabs" in the switcher) opens a list of them. A tap on
+one, or Space, shows or hides it; the arrows, or Shift+Up/Down, move it.
+Settings itself can't be hidden. It's kept in `tabs`
+(`ssh -shell music settings files`: a `-` hides one).
+
 ## The switcher
 
 Ctrl+Shift+P, anywhere, is a switcher in the manner of rofi (or VS
-Code's command palette): the
-sessions, the tabs, the saved hosts (a new session to one) and a new
-shell, narrowed by typing (fuzzy); Up/Down and Enter, or 1–9 before
-typing.
+Code's command palette): the sessions, the tabs, the saved hosts (a new
+session to one), a new shell, and the commands (Wi-Fi or Bluetooth on
+and off, sharing, pairing, the relay, showing or hiding a tab, light
+sleep, rotating…), each with its keys. Typing narrows it (fuzzy);
+Up/Down and Enter, or 1–9 before typing.
+
+## Keys
+
+The keys are hellobro's commands', and `keys.conf` changes them. It's
+written the first time hellobro runs, every command in it with its
+default keys, commented out. A line is a key and a command:
+
+```
+ctrl+alt+m   tab.music        # a tab of its own
+f1           tab.1            # the first tab, whichever it is
+ctrl+shift+n session.new
+f11          -                # not ours: the terminal gets F11
+```
+
+A command named there loses its default keys; the others keep theirs.
+`KEY -` frees a key, so it goes on to the terminal (or the page). Keys
+are a-z, 0-9, f1-f12, tab, space, enter, esc, backspace, up, down,
+left, right, pgup, pgdn, home, end, insert, delete and the marks
+(`- = [ ] ; ' , . /`), with any of ctrl, shift, alt and meta. Saved (over
+SFTP, say), it takes effect at once; the log says what it didn't
+understand. The tabs' corners, the footer and the hints show the keys as
+they are.
 
 ## Sleep
 
-The power button, Ctrl+Alt+S, the header's `sleep`, or "sleep"
+The power button, Ctrl+Alt+S, the header's `sleep`, or "Sleep"
 in the switcher put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
 screen, the light off, suspend to RAM); the power button wakes it, and
 it's all as it was. The music stops where it was (Bluetooth goes off),
@@ -250,7 +279,8 @@ Kobo's storage:
 | `known_hosts` | host keys trusted on first use |
 | `authorized_keys` | computers paired for file sharing |
 | `ssh_host_ed25519_key` | the Kobo's host key, for file sharing |
-| `settings`, `status-bar`, `term-font` | settings |
+| `settings`, `status-bar`, `term-font`, `tabs` | settings |
+| `keys.conf` | the keys ([Keys](#keys)) |
 | `music-state` | volume, shuffle, repeat, what was playing |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |

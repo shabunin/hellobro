@@ -2,8 +2,8 @@ package main
 
 // The terminal tabs' status bar, along the bottom, fullscreen too: what's
 // playing on the left; the battery, its temperature, CPU and memory use
-// on the right. Ctrl+Shift+B shows or hides it (remembered in
-// status-bar), a tap on it plays or pauses.
+// on the right. Ctrl+Shift+B (or its key in keys.conf) shows or hides it
+// (remembered in status-bar), a tap on it plays or pauses.
 
 import (
 	"fmt"
@@ -83,7 +83,10 @@ func (a *bro) drawStat(force bool) {
 	}
 	left := a.nowPlaying()
 	if left == "" {
-		left = "♪  Ctrl+Shift+Space: play"
+		left = "♪"
+		if k := a.keyLabel("music.play"); k != "" {
+			left += "  " + k + ": play"
+		}
 	}
 	if text := left + "\x00" + s.sys; text != s.shown || force {
 		s.shown = text

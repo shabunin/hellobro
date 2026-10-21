@@ -8,7 +8,9 @@ How to work on this repo as a coding agent. People start at the
 Go apps for a Kobo Elipsa (N604, sunxi B300, firmware 4.38). While they
 run they freeze Nickel and draw an e-ink UI through FBInk.
 
-- `cmd/hellobro/`: the main app (terminal, music, settings, files, relay)
+- `cmd/hellobro/`: the main app (terminal, music, settings, files, relay).
+  Its keys are commands (`commands.go`, changed in `keys.conf`); which
+  tabs show is `tabs.go`
 - `cmd/brotools/`: diagnostics, only installed when asked for
 - `kobo/`: screen, input, frame, sleep: what the apps share
 - `audio/`, `radio/`, `share/`: Bluetooth audio, Wi-Fi/BT, the SSH/SFTP server
@@ -56,7 +58,11 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
 - Snapshots: `OUT/screen/snap-NNNN-b-after.png`. Look at them, don't guess.
 - Log: `OUT/stdout.txt`. App files: `OUT/app`.
 - `APP_EXTRA=dir` copies files into the app's dir first (settings,
-  relay.conf, keys). `SHARE_PORT` moves file sharing off 2022.
+  relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
+- The harness shows all five tabs, as the feeds' Ctrl+Alt+N count on
+  (the app hides Shell by default). `HB_TABS="ssh -shell music settings
+  files"` sets the tabs file as you like: `harness/feeds/tabs.py` wants
+  that one.
 - Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`,
   `fontswipe` and `relay` need the test server: `cd server && go run .`
   (port 2222).
@@ -110,6 +116,9 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 
 - gofmt. Match the surrounding code: short names, plain comments written
   as prose ("we", "it"), about why more than what.
+- A new key is a command in `commands.go` (with its default keys), not
+  a case in a Key function: then keys.conf, the switcher and the hints
+  know of it.
 - Tests sit next to the code (`*_test.go`). Parsers and logic get table
   tests.
 - User-facing text is short and lower-key, like the rest of the UI.

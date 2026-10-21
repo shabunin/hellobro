@@ -15,7 +15,9 @@
 #      INTERFACE (for the Net tab, default: the one with the default route),
 #      FAKE_RADIO (default 1: stand-in Wi-Fi and Bluetooth; empty: the real ones),
 #      APP_EXTRA (a directory copied into the app's, over what's there:
-#      settings, relay.conf, keys)
+#      settings, relay.conf, keys, keys.conf),
+#      HB_TABS (hellobro's tabs file; default all five shown, as the
+#      feeds' Ctrl+Alt+N and tab taps count on)
 #
 # The ssh, fullscreen, stress, connect, flash, zoom and fontswipe feeds want
 # the server running: (cd server && go run .); the relay feed wants
@@ -25,10 +27,11 @@ H=$(cd "$(dirname "$0")" && pwd); OUT=$1; ROTA=$2; FEED=${3:-demo}
 NAME=$(sed -n 's/^# app: //p' "$H/feeds/$FEED.py" | head -n 1)
 APP=${APP:-$H/../${NAME:-hellobro}}
 NAME=$(basename "$APP")
-case $NAME in brotools*) TABS=7 ;; *) TABS=5 ;; esac
+case $NAME in brotools*) TABS=7 ;; *) TABS=$(echo "${HB_TABS:-x x x x x}" | tr ' ' '\n' | grep -vc '^-') ;; esac
 IFACE=${INTERFACE:-$(ip route show default 2>/dev/null | awk '{print $5; exit}')}
 rm -rf "$OUT"; mkdir -p "$OUT/screen" "$OUT/input" "$OUT/app" "$OUT/onboard/Music"
 cp "$APP" "$OUT/app/$NAME"; cp "$H/ssh.conf" "$OUT/app/"
+case $NAME in brotools*) ;; *) echo "${HB_TABS:-ssh shell music settings files}" > "$OUT/app/tabs" ;; esac
 [ -z "${APP_EXTRA:-}" ] || cp -r "$APP_EXTRA/." "$OUT/app/"
 touch "$OUT/ntx_io"; printf ' gpio-356 (                    |Power               ) in  hi    \n' > "$OUT/gpio"; mkfifo "$OUT/input/event2" "$OUT/input/event4"
 TABS=$TABS python3 -I "$H/feeds/$FEED.py" "$OUT/input" "$ROTA" &

@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -78,6 +79,9 @@ type Config struct {
 	Name  string   // the binary's, for the log: Name.log next to it
 	Title string   // in the header
 	Tabs  []string // Ctrl+Alt+1, 2, …
+	// OwnKeys leaves Ctrl+Alt+1–9 (tabs) and Ctrl+Alt+S (sleep) to the
+	// Program's Key, for an app with keys of its own making.
+	OwnKeys bool
 }
 
 // Gesture is one contact, from down to up.
@@ -150,6 +154,10 @@ type App struct {
 
 	light        *frontlight
 	lightOverlay *image.Gray // what the light gauge covers, while it's shown
+	order        []int       // the tabs shown, in order; nil: all
+	hints        []string    // in the tabs' corners, by place; nil: numbers
+	footerTabs   string      // the footer's word on the tabs; "": Ctrl+Alt+N
+	footerSleep  string      // and on sleep's key; "": Ctrl+Alt+S
 	gaugeOverlay *image.Gray // the same for the Program's gauge
 
 	inputAt time.Time   // last touch or key
@@ -305,6 +313,54 @@ func (a *App) Blitting() bool { return a.blitting }
 
 // TabName is the current tab's.
 func (a *App) TabName() string { return a.cfg.Tabs[a.Tab] }
+
+// Tabs are the tabs shown, in their order (indices into Config.Tabs).
+func (a *App) Tabs() []int {
+	if a.order == nil {
+		order := make([]int, len(a.cfg.Tabs))
+		for i := range order {
+			order[i] = i
+		}
+		return order
+	}
+	return a.order
+}
+
+// SetTabs shows the tabs in order, with hints in their corners (as
+// many; nil: their numbers, for Ctrl+Alt+N). The tab up, if hidden,
+// gives way to the first.
+func (a *App) SetTabs(order []int, hints []string) {
+	order = slices.DeleteFunc(slices.Clone(order), func(t int) bool { return t < 0 || t >= len(a.cfg.Tabs) })
+	if len(order) == 0 {
+		return
+	}
+	a.order, a.hints = order, hints
+	if a.C.Gray == nil { // not up yet
+		if !slices.Contains(order, a.Tab) {
+			a.Tab = order[0]
+		}
+		return
+	}
+	a.L = makeLayout(a.scr.info.ViewW, a.scr.info.ViewH, a.F, a.cfg.Title, len(order), a.Full)
+	a.prog.Layout(a.L)
+	if !slices.Contains(order, a.Tab) {
+		a.Tab = order[0]
+		a.prog.Enter(a.Tab)
+	}
+	if a.calib == nil {
+		a.drawAll(false)
+	}
+}
+
+// SetFooter has the footer say tabs on the tabs' keys ("tabs: tap or
+// Ctrl+Alt+1–4"), and sleep for sleep's key ("-": there's none); "" for
+// the defaults, which are the keys without Config.OwnKeys.
+func (a *App) SetFooter(tabs, sleep string) {
+	a.footerTabs, a.footerSleep = tabs, sleep
+	if a.C.Gray != nil && a.calib == nil {
+		a.drawFooter()
+	}
+}
 
 func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 	go a.watchdog()
@@ -464,7 +520,7 @@ func bail(why string) {
 func (a *App) relayout() {
 	s := a.scr.info
 	a.C = Canvas{image.NewGray(image.Rect(0, 0, s.ViewW, s.ViewH))}
-	a.L = makeLayout(s.ViewW, s.ViewH, a.F, a.cfg, a.Full)
+	a.L = makeLayout(s.ViewW, s.ViewH, a.F, a.cfg.Title, len(a.Tabs()), a.Full)
 	a.prog.Layout(a.L)
 	if !a.entered {
 		a.entered = true
@@ -502,6 +558,18 @@ func (a *App) relayout() {
 	a.drawAll(true)
 }
 
+// Rotate turns the screen a quarter, as the header's button does.
+func (a *App) Rotate() { a.rotate() }
+
+// Calibrate starts the touch calibration, as the header's button does.
+func (a *App) Calibrate() { a.startCalib("") }
+
+// Quit leaves, back to Nickel.
+func (a *App) Quit() {
+	log.Print("quit")
+	a.quit = true
+}
+
 func (a *App) rotate() {
 	a.WaitBlit()
 	if err := a.scr.setRotation((a.scr.info.Rota + 1) % 4); err != nil {
@@ -510,9 +578,9 @@ func (a *App) rotate() {
 	a.relayout()
 }
 
-// SwitchTab shows tab t.
+// SwitchTab shows tab t, if it's shown.
 func (a *App) SwitchTab(t int) {
-	if t == a.Tab || t < 0 || t >= len(a.cfg.Tabs) || a.calib != nil {
+	if t == a.Tab || !slices.Contains(a.Tabs(), t) || a.calib != nil {
 		return
 	}
 	a.Tab = t
@@ -643,7 +711,7 @@ func (a *App) tapAt(p image.Point) {
 	}
 	for i, r := range a.L.tabs {
 		if p.In(r) {
-			a.SwitchTab(i)
+			a.SwitchTab(a.Tabs()[i])
 			return
 		}
 	}
@@ -754,13 +822,13 @@ func (a *App) onKey(m KeyMsg) {
 		}
 		return
 	}
-	if n := int(m.Code) - Key1; (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) && n >= 0 && n < min(9, len(a.cfg.Tabs)) {
+	if n := int(m.Code) - Key1; !a.cfg.OwnKeys && (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) && n >= 0 && n < min(9, len(a.Tabs())) {
 		if m.Value == 1 {
-			a.SwitchTab(n)
+			a.SwitchTab(a.Tabs()[n])
 		}
 		return
 	}
-	if m.Code == keyS && (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) { // Ctrl+Alt+S: sleep
+	if m.Code == keyS && !a.cfg.OwnKeys && (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) { // Ctrl+Alt+S: sleep
 		if m.Value == 1 {
 			a.Sleep()
 		}

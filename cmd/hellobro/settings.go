@@ -1,7 +1,7 @@
 package main
 
 // The Settings tab's third panel, under Wi-Fi and Bluetooth: how hellobro
-// sleeps, and the status bar. A tap on a setting (or Enter, ←/→) steps
+// sleeps, sharing, the status bar and the tabs. A tap on a setting (or Enter, ←/→) steps
 // through its values; they're kept in the settings file.
 
 import (
@@ -24,17 +24,18 @@ const (
 )
 
 // setting is one line of the panel: its values as saved, and as shown.
+// A label with a %s gets the key of command cmd there.
 type setting struct {
-	key, label string
-	values     []string
-	shown      []string
+	key, label, cmd string
+	values          []string
+	shown           []string
 }
 
 var settingList = []setting{
 	{key: "doze-after", label: "Light sleep while music plays",
 		values: []string{"off", "1", "2", "5", "10", "20"},
 		shown:  []string{"never by itself", "after 1 min idle", "after 2 min idle", "after 5 min idle", "after 10 min idle", "after 20 min idle"}},
-	{key: "sleep-music", label: "Sleep (Ctrl+Alt+S) with music on",
+	{key: "sleep-music", label: "Sleep%s with music on", cmd: "sleep",
 		values: []string{"light", "deep"},
 		shown:  []string{"light: the music plays on", "deep: the music stops"}},
 	{key: "doze-wifi", label: "Wi-Fi in light sleep",
@@ -52,9 +53,10 @@ var settingList = []setting{
 	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
 		values: []string{"on", "off"},
 		shown:  []string{"yes, while sharing", "no"}},
-	{key: "status-bar", label: "Status bar (Ctrl+Shift+B)",
+	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
+	{key: "tabs", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
 }
 
 // The defaults, by key: the index of a value.
@@ -107,7 +109,7 @@ func loadSettings() settings {
 func (s settings) save() {
 	var b strings.Builder
 	for _, st := range settingList {
-		if st.key != "status-bar" { // kept in status-bar, as before
+		if st.key != "status-bar" && st.key != "tabs" { // kept in their own files
 			fmt.Fprintf(&b, "%s=%s\n", st.key, st.values[s[st.key]])
 		}
 	}
@@ -120,8 +122,11 @@ func (s settings) save() {
 func (a *bro) setting(key string) string {
 	for _, st := range settingList {
 		if st.key == key {
-			if key == "status-bar" {
+			switch key {
+			case "status-bar":
 				return map[bool]string{false: "on", true: "off"}[a.stat.off]
+			case "tabs":
+				return a.tabs.String()
 			}
 			return st.values[a.set[key]]
 		}
@@ -139,6 +144,9 @@ func (a *bro) settingMinutes(key string) time.Duration {
 func (a *bro) stepSetting(i, d int) {
 	st := settingList[i]
 	switch st.key {
+	case "tabs":
+		a.openTabs()
+		return
 	case "status-bar":
 		a.toggleStat()
 	case "share": // off, on, pair: pairing turns it on and opens pairing, and stays "on"
@@ -216,17 +224,32 @@ func (a *bro) drawSettings() {
 		t.Min.X += 12
 		t.Max.X -= 12
 		shown := st.shown[indexOf(st.values, vals[i])]
-		if st.key == "share" && a.share.code != "" {
+		switch {
+		case st.key == "share" && a.share.code != "":
 			shown = "pairing: code " + a.share.code
+		case st.key == "tabs":
+			shown = a.tabsSummary()
 		}
 		value := "‹ " + shown + " ›"
 		vw := kobo.TextWidth(a.F.Small, value)
 		c.Text(a.F.Small, image.Rect(t.Max.X-vw, t.Min.Y, t.Max.X, t.Max.Y), value, dim, kobo.AlignRight)
 		t.Max.X -= vw + 20
-		c.Text(a.F.Body, t, st.label, fg, kobo.AlignLeft)
+		c.Text(a.F.Body, t, a.settingLabel(st), fg, kobo.AlignLeft)
 	}
 	c.Text(a.F.Small, v.hint, "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Tab: the next panel.", kobo.Dark, kobo.AlignLeft)
 	a.Mark(p.Outer, true)
+}
+
+// settingLabel is st's label, with its key in.
+func (a *bro) settingLabel(st setting) string {
+	if st.cmd == "" {
+		return st.label
+	}
+	k := a.keyLabel(st.cmd)
+	if k != "" {
+		k = " (" + k + ")"
+	}
+	return fmt.Sprintf(st.label, k)
 }
 
 func indexOf(vs []string, v string) int {
