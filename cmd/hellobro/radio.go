@@ -122,14 +122,8 @@ func (a *bro) layoutRadio(K kobo.Layout) {
 }
 
 func (a *bro) enterRadio() {
-	r := &a.rs
-	if !r.started {
-		r.started = true
-		r.wifi = radio.NewWiFi()
-		r.bt = radio.NewBluetooth(radioAgent{a})
-		factsOnce.Do(func() { go radio.LogFacts() })
-	}
-	a.radioPoll(!r.scanned)
+	a.radioStart()
+	a.radioPoll(!a.rs.scanned)
 }
 
 func (a *bro) showingRadio() bool { return a.Tab == tabRadio && !a.Calibrating() && a.picker == nil }
@@ -547,6 +541,8 @@ func (a *bro) drawRadioPanel(i int) {
 		switch {
 		case !bs.Running:
 			status, line1 = "off", bs.Err
+		case !bs.Powered && bs.Addr == "": // no adapter: the chip itself is off
+			status, line1 = "off", "Bluetooth is off. Turning it on takes a few seconds."
 		case !bs.Powered:
 			status, line1 = "off", fmt.Sprintf("Bluetooth is off (%s, %s).", bs.Name, bs.Addr)
 		default:

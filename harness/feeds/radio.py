@@ -1,13 +1,14 @@
 # The Wi-Fi/BT tab with the stand-in radios (HELLOBRO_FAKE_RADIO, which
 # run.sh sets): a network with a wrong password and then the right one,
 # a Bluetooth scan, pairing with a code to confirm, Wi-Fi off and on; then
-# the switcher (Ctrl+Shift+Tab, typed into) and Ctrl+Alt+N tabs.
+# the switcher (Ctrl+Shift+Tab, typed into) and Ctrl+Alt+N tabs; then
+# sleep (Ctrl+Alt+S, pretended: HELLOBRO_FAKE_SLEEP) and waking.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K1, K4 = 2, 5
+K1, K4, KS = 2, 5, 31
 
 start()
 key(K4, ctrl=True, alt=True); time.sleep(5)           # the tab: status, then the scan
@@ -33,4 +34,6 @@ key(F11); time.sleep(2)
 key(TAB, ctrl=True, shift=True); time.sleep(2)        # the switcher, fullscreen
 key(ESC); time.sleep(2)
 key(K4, ctrl=True, alt=True); time.sleep(3)           # out of fullscreen, to Wi-Fi/BT
+key(KS, ctrl=True, alt=True); time.sleep(1)           # sleep: the screen, the radios off
+keys("o"); time.sleep(8)                              # ignored while asleep; awake, radios back on
 exit_app()

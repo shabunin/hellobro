@@ -24,6 +24,16 @@ sessions, the tabs, the saved hosts (a new session to one) and a new
 shell, narrowed by typing (fuzzy); Up/Down and Enter, or 1–9 before
 typing.
 
+**Sleep**: Ctrl+Alt+S, the header's `sleep`, or "sleep" in the switcher
+put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
+screen, the light off, suspend to RAM); the power button wakes it, and
+it's all as it was. The music stops where it was (Bluetooth goes off),
+Wi-Fi and Bluetooth go off and come back on waking, and the SSH sessions
+reconnect once Wi-Fi is back. Nickel keeps the power button to itself
+while hellobro is up, so pressing it doesn't put the Kobo to sleep, and
+the presses that wake it may reach Nickel when hellobro quits (it may
+then go to sleep once).
+
 **brotools** ("Bro Tools") is diagnostics. Tabs (tap, or Ctrl+Alt+1–7):
 
 - **Keys**: a text box for a Bluetooth keyboard, plus the last key's code.
@@ -105,10 +115,17 @@ with a session up, 6 hours while music plays).
   "other network…" (or n) joins a hidden one by name. Networks are saved
   when wpa_supplicant's file allows it. `turn off`/`turn on` (or o) unload
   and load the driver and power the chip, as Kobo does; s scans, f forgets.
+  Turning it on starts wpa_supplicant and the DHCP client the way Kobo ran
+  them, as seen while Wi-Fi was on (kept in `wifi-recipe`).
 - Bluetooth: `scan` (s) looks for 40 s; a new device pairs (with a code to
   confirm, or to type on a keyboard, shown in the panel), then gets trusted
   and connected. Paired ones connect, disconnect, and are forgotten with f.
   Pairing goes through hellobro's own agent while Nickel is frozen.
+  Kobo turns the Bluetooth chip itself off, not only the adapter; turning
+  it on powers the chip (rfkill), attaches it (`rtk_hciattach`, the
+  Realtek UART chip), and starts bluetoothd and bluealsa if they aren't
+  running, as [bluetooth.koplugin](https://github.com/Tharavol/bluetooth.koplugin)
+  does on the Sage; off undoes it.
 - Tab moves between the two panels.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
   since Nickel wakes up thinking so; networks and devices added stay. On
@@ -182,12 +199,13 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
                                             # two sessions, password + key install, reconnect, shells
     MUSIC=~/Music harness/run.sh /tmp/hb 0 music      # the Music tab
     MUSIC=~/Music harness/run.sh /tmp/hb 0 statbar    # the status bar, the music hotkeys
-    harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N
+    harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
 
 `MUSIC` is the music folder (default `harness/music`); the sound goes to
 `OUT/pcm.raw` (`HELLOBRO_FAKE_PCM`: 48 kHz, 16-bit stereo), at the pace it
 would play. Wi-Fi and Bluetooth are stand-ins (`HELLOBRO_FAKE_RADIO`;
-`FAKE_RADIO=` for the PC's own, careful). The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
+`FAKE_RADIO=` for the PC's own, careful), and sleeping is pretended
+(`HELLOBRO_FAKE_SLEEP`: never the PC's suspend). The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
 (`calls.txt` there lists every update with its waveform). The feeds live in
 `harness/feeds`, each with an `# app:` line naming the app it drives, and
 their shared helpers in `harness/feedlib.py`.

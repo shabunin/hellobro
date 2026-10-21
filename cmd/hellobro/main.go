@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"hellobro/kobo"
+	"hellobro/radio"
 )
 
 const (
@@ -50,6 +51,7 @@ type bro struct {
 	picker *picker // the switcher, while it's up
 	rv     [2]radioPanelView
 	rs     radioState
+	slp    sleepState
 	lay    kobo.Layout // the last layout, to lay out again
 }
 
@@ -67,6 +69,7 @@ func main() {
 		a.mus.gain = max(0, min(gainMax, g))
 	}
 	a.loadStatBar()
+	radio.StateDir = kobo.AppFile("")
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames}, a)
 	a.tf.setSize(termFontDefault)
 	a.Run()

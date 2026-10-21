@@ -62,7 +62,8 @@ func (a *bro) openPicker() {
 		}
 		p.all = append(p.all, pickEntry{kind: "ssh", title: h.name, detail: h.String() + cmd, do: func() { a.goHost(h) }})
 	}
-	p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }})
+	p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }},
+		pickEntry{kind: "kobo", title: "sleep", detail: "Ctrl+Alt+S · the power button wakes it", do: a.App.Sleep})
 	b := a.C.Bounds()
 	w := min(1100, b.Dx()-80)
 	h := 136 + min(len(p.all), pickRowsMax)*pickRowH + 16

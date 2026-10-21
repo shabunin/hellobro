@@ -22,6 +22,7 @@ const (
 	KeyCapsLock   = 58
 	KeyRightCtrl  = 97
 	KeyF1         = 59
+	keyS          = 31
 	keyLeftAlt    = 56
 	keyRightAlt   = 100
 )

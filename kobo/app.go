@@ -163,6 +163,8 @@ type App struct {
 	alive    atomic.Int64 // last loop tick, for the watchdog
 	blitAt   atomic.Int64 // start of the blit in flight, or 0
 	noPower  bool         // the power button doesn't reach us
+	asleep   bool         // the sleep screen is up: nothing else gets drawn
+	sleeping atomic.Bool  // asleep, for the watchdog: the clock jumps
 	ctrl     [2]bool      // left and right Ctrl held, for Ctrl+Alt+N
 	alt      [2]bool      // and Alt
 }
@@ -280,6 +282,9 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 		select {
 		case ev := <-touches:
 			a.stats.event("touch", time.Since(ev.At))
+			if a.asleep {
+				continue
+			}
 			a.onTouch(ev)
 			idle.Reset(IdleTimeout)
 			a.inputAt = time.Now()
@@ -307,13 +312,15 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 		case <-tick.C:
 			a.stats.event("tick", 0)
 			a.alive.Store(time.Now().UnixNano())
-			a.prog.Tick()
+			if !a.asleep {
+				a.prog.Tick()
+			}
 			a.flush()
 		case <-clock.C:
 			a.stats.event("clock", 0)
 			a.drawStatus()
 		case <-idle.C:
-			if d := a.prog.IdleTimeout(); time.Since(a.inputAt) < d { // reading a remote screen takes longer
+			if d := a.prog.IdleTimeout(); a.asleep || time.Since(a.inputAt) < d { // reading a remote screen takes longer
 				idle.Reset(min(d-time.Since(a.inputAt), IdleTimeout)) // and ask again: it may be shorter by then
 				continue
 			}
@@ -384,6 +391,10 @@ func (s *loopStats) done() {
 func (a *App) watchdog() {
 	a.alive.Store(time.Now().UnixNano())
 	for range time.Tick(2 * time.Second) {
+		if a.sleeping.Load() { // the clock leaps over the sleep
+			a.alive.Store(time.Now().UnixNano())
+			continue
+		}
 		if stuck := time.Since(time.Unix(0, a.alive.Load())); stuck > 30*time.Second {
 			bail(fmt.Sprintf("main loop stuck for %v", stuck.Round(time.Second)))
 		}
@@ -582,6 +593,8 @@ func (a *App) tapAt(p image.Point) {
 	case Hit(p, a.L.btnExit):
 		log.Print("exit tapped")
 		a.quit = true
+	case Hit(p, a.L.btnSleep):
+		a.Sleep()
 	case Hit(p, a.L.btnRotate):
 		a.rotate()
 	case Hit(p, a.L.btnCalib):
@@ -673,9 +686,18 @@ func (a *App) onKey(m KeyMsg) {
 	}
 	// Ctrl+Alt+N: tab N, whatever the page does with keys (a terminal
 	// would send it on), fullscreen too.
+	if a.asleep {
+		return
+	}
 	if n := int(m.Code) - Key1; (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) && n >= 0 && n < min(9, len(a.cfg.Tabs)) {
 		if m.Value == 1 {
 			a.SwitchTab(n)
+		}
+		return
+	}
+	if m.Code == keyS && (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) { // Ctrl+Alt+S: sleep
+		if m.Value == 1 {
+			a.Sleep()
 		}
 		return
 	}
@@ -733,7 +755,7 @@ func (a *App) markAll(flash bool) {
 // If they pile up anyway, everything of a kind goes at once, so the
 // screen can't fall further and further behind.
 func (a *App) flush() {
-	if a.blitting || len(a.dirty) == 0 {
+	if a.blitting || a.asleep || len(a.dirty) == 0 {
 		return
 	}
 	d := a.dirty[0]

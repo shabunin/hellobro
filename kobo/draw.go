@@ -174,7 +174,7 @@ type Layout struct {
 
 	header, tabBar, footer, status, titleText image.Rectangle
 	tabs                                      []image.Rectangle
-	btnRotate, btnCalib, btnExit              image.Rectangle
+	btnRotate, btnCalib, btnExit, btnSleep    image.Rectangle
 }
 
 const (
@@ -216,6 +216,7 @@ func makeLayout(w, h int, f Fonts, cfg Config, full bool) Layout {
 		return r
 	}
 	L.btnExit = button("exit")
+	L.btnSleep = button("sleep")
 	L.btnCalib = button("touch cal")
 	L.btnRotate = button("rotate")
 	titleEnd := 24 + TextWidth(f.Title, cfg.Title) + 24
@@ -298,7 +299,7 @@ func (a *App) drawHeader() {
 	for _, b := range []struct {
 		r     image.Rectangle
 		label string
-	}{{L.btnRotate, "rotate"}, {L.btnCalib, "touch cal"}, {L.btnExit, "exit"}} {
+	}{{L.btnRotate, "rotate"}, {L.btnCalib, "touch cal"}, {L.btnSleep, "sleep"}, {L.btnExit, "exit"}} {
 		c.Frame(b.r, 2, White)
 		c.Text(a.F.Small, b.r, b.label, White, AlignCenter)
 	}
@@ -393,7 +394,7 @@ func (a *App) drawFooter() {
 	if a.light != nil {
 		hints = append(hints, "light: swipe the left edge")
 	}
-	hints = append(hints, "quit: "+quit, fmt.Sprintf("auto-exit after %.0f min idle", IdleTimeout.Minutes()))
+	hints = append(hints, "sleep: Ctrl+Alt+S", "quit: "+quit, fmt.Sprintf("auto-exit after %.0f min idle", IdleTimeout.Minutes()))
 	c.Text(a.F.Small, image.Rect(Pad, L.footer.Min.Y+2, L.W-Pad, L.footer.Max.Y), strings.Join(hints, "   ·   "), Dark, AlignCenter)
 	a.Mark(L.footer, true)
 }

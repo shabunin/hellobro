@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -115,24 +116,50 @@ type wpaWiFi struct {
 
 const ctrlDirDefault = "/var/run/wpa_supplicant"
 
-// cli runs wpa_cli; the output, or an error.
+// cli asks wpa_supplicant, through its control socket (what wpa_cli
+// does; the Kobo has no wpa_cli): args as wpa_cli takes them, the reply,
+// or an error.
 func (w *wpaWiFi) cli(args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	a := []string{"-i", w.iface}
-	if d := w.ctrl(); d != "" {
-		a = append(a, "-p", d)
+	cmd := strings.ToUpper(args[0])
+	if len(args) > 1 {
+		cmd += " " + strings.Join(args[1:], " ")
 	}
-	out, err := exec.CommandContext(ctx, "wpa_cli", append(a, args...)...).CombinedOutput()
-	s := strings.TrimSpace(string(out))
+	dir := w.ctrl()
+	if dir == "" {
+		dir = ctrlDirDefault
+	}
+	local := fmt.Sprintf("/tmp/hellobro-wpa-%d-%d", os.Getpid(), ctrlSeq.Add(1))
+	os.Remove(local)
+	defer os.Remove(local)
+	conn, err := net.DialUnix("unixgram", &net.UnixAddr{Name: local, Net: "unixgram"},
+		&net.UnixAddr{Name: filepath.Join(dir, w.iface), Net: "unixgram"})
 	if err != nil {
-		return s, fmt.Errorf("wpa_cli %s: %v %s", args[0], err, s)
+		return "", fmt.Errorf("wpa_supplicant: %v", err)
 	}
-	if s == "FAIL" || strings.HasPrefix(s, "FAIL") {
-		return s, fmt.Errorf("wpa_cli %s: FAIL", strings.Join(args, " "))
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(8 * time.Second))
+	if _, err := conn.Write([]byte(cmd)); err != nil {
+		return "", fmt.Errorf("wpa_supplicant %s: %v", args[0], err)
 	}
-	return s, nil
+	buf := make([]byte, 64<<10)
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			return "", fmt.Errorf("wpa_supplicant %s: %v", args[0], err)
+		}
+		reply := string(buf[:n])
+		if strings.HasPrefix(reply, "<") { // an event, not our reply
+			continue
+		}
+		s := strings.TrimSpace(reply)
+		if strings.HasPrefix(s, "FAIL") || s == "UNKNOWN COMMAND" {
+			return s, fmt.Errorf("wpa_supplicant %s: %s", strings.Join(args, " "), s)
+		}
+		return s, nil
+	}
 }
+
+var ctrlSeq atomic.Int64
 
 // ctrl is wpa_supplicant's control folder, from its command line.
 func (w *wpaWiFi) ctrl() string {
@@ -174,6 +201,7 @@ func (w *wpaWiFi) Status() WiFiStatus {
 		st.IP = ipv4Of(w.iface)
 	}
 	st.Gateway = defaultGateway(w.iface)
+	remember()
 	st.Saving = w.saving()
 	return st
 }
@@ -476,8 +504,15 @@ func (w *wpaWiFi) renewIP() (string, error) {
 
 // obtainIP starts the DHCP client, as KOReader's obtain-ip.sh does.
 func (w *wpaWiFi) obtainIP() {
+	rec := recipe()
+	for _, n := range []string{"dhcpcd", "udhcpc"} {
+		if argv := rec[n]; argv != nil { // as Kobo starts it
+			start(argv...)
+			return
+		}
+	}
 	if _, err := os.Stat("/sbin/dhcpcd"); err == nil {
-		go run("dhcpcd", "-d", "-t", "30", "-w", w.iface) // it waits for the lease, then stays
+		start("dhcpcd", "-d", "-t", "30", "-w", w.iface) // it waits for the lease, then stays
 		return
 	}
 	hn, _ := os.Hostname()
@@ -543,6 +578,8 @@ func kobChip() chip {
 	switch c.module {
 	case "moal":
 		c.power, c.driver = "ntx_io", "nl80211"
+	case "8821cs":
+		c.driver = "nl80211" // what Kobo runs on the Elipsa and Sage
 	case "wlan_drv_gen4m":
 		c.power, c.driver = "wmt", "nl80211"
 		c.kmodPath = "/drivers/" + c.platform + "/mt66xx"
@@ -610,16 +647,22 @@ func (w *wpaWiFi) powerOn(progress func(string)) error {
 		run("wlarm_le", "-i", w.iface, "up")
 	}
 	progress("starting wpa_supplicant…")
-	conf, extra := "/etc/wpa_supplicant/wpa_supplicant.conf", []string{"-s"}
-	if exists("/mnt/onboard/.kobo/wpa_supplicant.conf") { // firmware 5
-		conf, extra = "/mnt/onboard/.kobo/wpa_supplicant.conf", nil
+	argv := recipe()["wpa_supplicant"] // as Kobo started it, if we saw that
+	if argv == nil {
+		conf, extra := "/etc/wpa_supplicant/wpa_supplicant.conf", []string{"-s"}
+		if exists("/mnt/onboard/.kobo/wpa_supplicant.conf") { // firmware 5
+			conf, extra = "/mnt/onboard/.kobo/wpa_supplicant.conf", nil
+		}
+		argv = append([]string{"wpa_supplicant", "-D", c.driver}, extra...)
+		argv = append(argv, "-i", w.iface, "-c", conf, "-C", ctrlDirDefault, "-B")
 	}
-	args := append([]string{"-D", c.driver}, extra...)
-	args = append(args, "-i", w.iface, "-c", conf, "-C", ctrlDirDefault, "-B")
-	if err := run("wpa_supplicant", args...); err != nil {
+	if !slices.Contains(argv, "-B") {
+		argv = append(argv, "-B")
+	}
+	if err := run(argv[0], argv[1:]...); err != nil {
 		return err
 	}
-	w.ctrlDir = ctrlDirDefault
+	w.ctrlDir = ""
 	progress("looking for a known network…")
 	if err := w.waitFor("COMPLETED", 15*time.Second); err != nil {
 		return errors.New("Wi-Fi is on, no known network around: pick one")
@@ -700,6 +743,76 @@ func kobConf(key string) string {
 		}
 	}
 	return ""
+}
+
+// --- how Kobo does it ---
+
+// StateDir is where what's learned of the device is kept: the app's
+// folder. "" keeps nothing.
+var StateDir string
+
+const recipeFile = "wifi-recipe"
+
+// remember keeps the command lines Kobo started wpa_supplicant and the
+// DHCP client with, to start them the same way after turning Wi-Fi off.
+func remember() {
+	if StateDir == "" {
+		return
+	}
+	rec := recipe()
+	changed := false
+	for _, n := range []string{"wpa_supplicant", "dhcpcd", "udhcpc"} {
+		for _, argv := range cmdlines(n) {
+			if !slices.Equal(rec[n], argv) {
+				rec[n], changed = argv, true
+			}
+			break
+		}
+	}
+	if rec["dhcpcd"] != nil && rec["udhcpc"] != nil {
+		if len(pidsOf("dhcpcd")) > 0 {
+			delete(rec, "udhcpc")
+		} else if len(pidsOf("udhcpc")) > 0 {
+			delete(rec, "dhcpcd")
+		}
+	}
+	if !changed {
+		return
+	}
+	var b strings.Builder
+	for _, argv := range rec {
+		b.WriteString(strings.Join(argv, "\x1f") + "\n")
+	}
+	log.Printf("wifi: remembering how Kobo starts it: %v", rec)
+	os.WriteFile(filepath.Join(StateDir, recipeFile), []byte(b.String()), 0o644)
+}
+
+// recipe is what remember kept, by program name.
+func recipe() map[string][]string {
+	rec := map[string][]string{}
+	if StateDir == "" {
+		return rec
+	}
+	b, _ := os.ReadFile(filepath.Join(StateDir, recipeFile))
+	for _, line := range strings.Split(string(b), "\n") {
+		if argv := strings.Split(line, "\x1f"); line != "" {
+			rec[filepath.Base(argv[0])] = argv
+		}
+	}
+	return rec
+}
+
+// start runs a daemon that goes off on its own: not waited for (but
+// reaped), its output dropped, out of our session so it outlives us.
+func start(argv ...string) {
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Dir = "/" // nothing of ours, nor /mnt/onboard (USB storage wants it free)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	err := cmd.Start()
+	log.Printf("radio: started %s: %v", strings.Join(argv, " "), err)
+	if err == nil {
+		go cmd.Wait()
+	}
 }
 
 // --- helpers ---

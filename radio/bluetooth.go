@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -153,9 +155,10 @@ func (b *bluez) Status() (BTStatus, []BTDevice) {
 		paths = append(paths, string(p))
 	}
 	slices.Sort(paths)
+	b.adapter = "" // found again each time: it goes when the chip goes off
 	for _, p := range paths {
 		ifs := objs[dbus.ObjectPath(p)]
-		if a, ok := ifs["org.bluez.Adapter1"]; ok && b.adapter == "" || ok && b.adapter == dbus.ObjectPath(p) {
+		if a, ok := ifs["org.bluez.Adapter1"]; ok && b.adapter == "" {
 			b.adapter = dbus.ObjectPath(p)
 			st.Powered, st.Discovering = prop[bool](a, "Powered"), prop[bool](a, "Discovering")
 			st.Name, st.Addr = prop[string](a, "Alias"), prop[string](a, "Address")
@@ -170,8 +173,8 @@ func (b *bluez) Status() (BTStatus, []BTDevice) {
 			devs = append(devs, dev)
 		}
 	}
-	if b.adapter == "" {
-		st.Err = "no Bluetooth adapter"
+	if b.adapter == "" { // the chip is off: Kobo leaves bluetoothd running without it
+		st.Powered, st.Err = false, ""
 	}
 	sortDevices(devs)
 	return st, devs
@@ -218,15 +221,108 @@ func (b *bluez) setAdapter(name string, v any) error {
 
 func (b *bluez) SetPower(on bool) error {
 	st, _ := b.Status()
-	if !st.Running {
-		return errors.New(st.Err)
-	}
 	if b.initial == nil {
 		was := st.Powered
 		b.initial = &was
 	}
 	log.Printf("bluetooth: power %v", on)
-	return b.setAdapter("Powered", on)
+	if !on {
+		if b.adapter != "" {
+			b.setAdapter("Powered", false)
+		}
+		b.adapter = ""
+		return chipOff()
+	}
+	if b.adapter == "" {
+		if err := chipOn(); err != nil {
+			return err
+		}
+		if len(pidsOf("bluetoothd")) == 0 {
+			start("/libexec/bluetooth/bluetoothd", "-n")
+		}
+		end := time.Now().Add(10 * time.Second) // bluetoothd finds the new adapter
+		for b.adapter == "" && time.Now().Before(end) {
+			time.Sleep(500 * time.Millisecond)
+			b.Status()
+		}
+		if b.adapter == "" {
+			return errors.New("the chip is on, but bluetoothd doesn't see it")
+		}
+		if len(pidsOf("bluealsa")) == 0 {
+			start("/bin/bluealsa", "-S", "-i", "hci0")
+		}
+	}
+	return b.setAdapter("Powered", true)
+}
+
+// The Elipsa's and Sage's Realtek chip hangs off a serial line: rfkill
+// powers it, rtk_hciattach loads its firmware and makes it hci0, as
+// Kobo does it (and bluetooth.koplugin's on.sh, which found out how).
+const (
+	rtkAttach = "/sbin/rtk_hciattach"
+	hci0      = "/sys/class/bluetooth/hci0"
+)
+
+// btRfkill is the Bluetooth chip's power switch.
+func btRfkill() string {
+	rf, _ := filepath.Glob("/sys/class/rfkill/rfkill*")
+	for _, r := range rf {
+		if t, _ := os.ReadFile(r + "/type"); strings.TrimSpace(string(t)) == "bluetooth" {
+			return r + "/state"
+		}
+	}
+	return ""
+}
+
+func chipOn() error {
+	rf := btRfkill()
+	if rf == "" {
+		return errors.New("no Bluetooth power switch (rfkill)")
+	}
+	if exists(hci0) && len(pidsOf("rtk_hciattach")) > 0 {
+		return nil // it's there; only bluetoothd hadn't caught up
+	}
+	was, _ := os.ReadFile(rf)
+	stopAttach()
+	// A chip that was running needs a few seconds off to reset; from off,
+	// a second does.
+	os.WriteFile(rf, []byte("0"), 0)
+	if strings.TrimSpace(string(was)) == "1" {
+		time.Sleep(4 * time.Second)
+	} else {
+		time.Sleep(time.Second)
+	}
+	if err := os.WriteFile(rf, []byte("1"), 0); err != nil {
+		return fmt.Errorf("powering the chip: %v", err)
+	}
+	log.Print("bluetooth: chip powered, attaching it")
+	start(rtkAttach, "-n", "-s", "115200", "/dev/ttyS1", "rtk_h5")
+	end := time.Now().Add(15 * time.Second) // it syncs, loads firmware, speeds up
+	for !exists(hci0) {
+		if time.Now().After(end) {
+			return errors.New("the chip didn't come up (rtk_hciattach)")
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	log.Print("bluetooth: hci0 is there")
+	return nil
+}
+
+func chipOff() error {
+	stopAttach()
+	if rf := btRfkill(); rf != "" {
+		return os.WriteFile(rf, []byte("0"), 0)
+	}
+	return nil
+}
+
+// stopAttach ends rtk_hciattach and waits for it to be gone: on its way
+// out it puts the serial line back, which would undo a new one's attach.
+func stopAttach() {
+	killAll(syscall.SIGTERM, "rtk_hciattach")
+	for i := 0; i < 20 && len(pidsOf("rtk_hciattach")) > 0; i++ {
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 func (b *bluez) Discover(on bool) error {
@@ -236,6 +332,9 @@ func (b *bluez) Discover(on bool) error {
 	}
 	if b.adapter == "" {
 		b.Status()
+	}
+	if b.adapter == "" {
+		return errors.New("Bluetooth is off")
 	}
 	if on {
 		b.ensureAgent()
@@ -308,7 +407,9 @@ func (b *bluez) Restore() {
 		st, _ := b.Status()
 		if st.Powered != *b.initial {
 			log.Printf("bluetooth: putting the power back as Kobo had it: %v", *b.initial)
-			b.setAdapter("Powered", *b.initial)
+			if err := b.SetPower(*b.initial); err != nil {
+				log.Printf("bluetooth: %v", err)
+			}
 		}
 	}
 	bus.Close()
