@@ -86,6 +86,7 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
     harness/run.sh /tmp/hb 0 share                     # pairing, scp, make push's update and restart (ssh, scp on the PC)
     MUSIC=~/Music harness/run.sh /tmp/hb 0 doze        # settings, light sleep with music, media keys
+    APP_EXTRA=dir harness/run.sh /tmp/hb 1 tmux       # saved host 1 (dir/ssh.conf, dir/id_ed25519): tmux attach, framed and fullscreen
     harness/relay.sh /tmp/hb                           # the relay: sshd as the VPS, both ways through it, an update (with the server)
 
 `MUSIC` is the music folder (default `harness/music`); the sound goes to

@@ -4,6 +4,9 @@ A terminal, a music player and a way in for your computer, on a Kobo
 e-reader. Bring a Bluetooth keyboard.
 
 <p align="center">
+  <img src="docs/screenshots/tmux.png" alt="Claude Code in tmux on the PC, over SSH, in landscape">
+</p>
+<p align="center">
   <img src="docs/screenshots/ssh.png" width="32%" alt="An SSH session">
   <img src="docs/screenshots/music.png" width="32%" alt="The music player">
   <img src="docs/screenshots/light-sleep.png" width="32%" alt="Light sleep, the music playing on">
