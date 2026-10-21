@@ -132,12 +132,12 @@ func (a *bro) relayApply() {
 			log.Printf("relay: %v", err)
 			break
 		}
-		_, port, _ := net.SplitHostPort(a.share.srv.Addr().String())
+		srv := a.share.srv
 		r.conf, r.err, r.status, r.up = c, "", "connecting…", false
 		r.stop = make(chan struct{})
 		log.Printf("relay: on, through %s", c)
 		a.DrawFooter() // no auto-exit
-		go runRelay(c, net.JoinHostPort("127.0.0.1", port), r.stop, func(up bool, s string) {
+		go runRelay(c, srv.ServeConn, r.stop, func(up bool, s string) {
 			a.Do(func() {
 				if r.stop != nil {
 					r.up, r.status = up, s
@@ -160,11 +160,12 @@ func (a *bro) relayApply() {
 func (a *bro) relayOn() bool { return a.relay.stop != nil }
 
 // runRelay keeps the relay up till stop closes, telling status how it is.
-func runRelay(c relayConf, local string, stop <-chan struct{}, status func(up bool, s string)) {
+// serve takes each connection that comes through it.
+func runRelay(c relayConf, serve func(net.Conn), stop <-chan struct{}, status func(up bool, s string)) {
 	wait := relayRetryMin
 	for {
 		start := time.Now()
-		err := relayOnce(c, local, stop, func() { status(true, "up") })
+		err := relayOnce(c, serve, stop, func() { status(true, "up") })
 		select {
 		case <-stop:
 			return
@@ -184,9 +185,10 @@ func runRelay(c relayConf, local string, stop <-chan struct{}, status func(up bo
 	}
 }
 
-// relayOnce connects to the server, has it listen for us and carries
-// what comes to local, till the connection goes or stop closes.
-func relayOnce(c relayConf, local string, stop <-chan struct{}, up func()) error {
+// relayOnce connects to the server, has it listen for us and hands what
+// comes to serve, till the connection goes or stop closes. Not through
+// 127.0.0.1: the Kobo leaves its loopback down.
+func relayOnce(c relayConf, serve func(net.Conn), stop <-chan struct{}, up func()) error {
 	signer, err := clientKey()
 	if err != nil {
 		return fmt.Errorf("client key: %w", err)
@@ -205,7 +207,7 @@ func relayOnce(c relayConf, local string, stop <-chan struct{}, up func()) error
 	if err != nil {
 		return fmt.Errorf("listening on the server's port %d: %w", c.port, err)
 	}
-	log.Printf("relay: up, %s port %d comes to %s", c.host.addr, c.port, local)
+	log.Printf("relay: up, %s port %d comes to file sharing", c.host.addr, c.port)
 	up()
 
 	done := make(chan error, 2)
@@ -247,7 +249,7 @@ func relayOnce(c relayConf, local string, stop <-chan struct{}, up func()) error
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				relayPipe(rc, local)
+				serve(rc)
 			}()
 		}
 	}()
@@ -258,24 +260,4 @@ func relayOnce(c relayConf, local string, stop <-chan struct{}, up func()) error
 		err = errors.New("the connection closed")
 	}
 	return err
-}
-
-// relayPipe carries rc to local and back.
-func relayPipe(rc net.Conn, local string) {
-	defer rc.Close()
-	lc, err := net.DialTimeout("tcp", local, 5*time.Second)
-	if err != nil {
-		log.Printf("relay: to %s: %v", local, err)
-		return
-	}
-	defer lc.Close()
-	both := make(chan struct{}, 2)
-	go func() {
-		io.Copy(lc, rc)
-		lc.(*net.TCPConn).CloseWrite()
-		both <- struct{}{}
-	}()
-	io.Copy(rc, lc)
-	rc.Close() // the far end hears we're done
-	<-both
 }

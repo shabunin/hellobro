@@ -380,6 +380,13 @@ func (s *Server) serve() {
 	}
 }
 
+// ServeConn serves a connection that came another way (the relay's),
+// till it's over.
+func (s *Server) ServeConn(nc net.Conn) {
+	defer nc.Close()
+	s.handle(nc)
+}
+
 func (s *Server) handle(nc net.Conn) {
 	s.mu.Lock()
 	full := len(s.conns) >= maxConns
