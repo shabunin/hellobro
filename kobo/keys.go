@@ -9,6 +9,7 @@ import (
 
 const (
 	KeyEsc        = 1
+	Key1          = 2 // to 9 (10), then 0 (11)
 	KeyBackspace  = 14
 	KeyTab        = 15
 	KeyEnter      = 28
@@ -21,6 +22,8 @@ const (
 	KeyCapsLock   = 58
 	KeyRightCtrl  = 97
 	KeyF1         = 59
+	keyLeftAlt    = 56
+	keyRightAlt   = 100
 )
 
 var (

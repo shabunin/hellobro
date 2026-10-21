@@ -270,7 +270,7 @@ func (a *bro) closeAlbum() {
 
 // --- drawing ---
 
-func (a *bro) showingMusic() bool { return a.Tab == tabMusic && !a.Calibrating() }
+func (a *bro) showingMusic() bool { return a.Tab == tabMusic && !a.Calibrating() && a.picker == nil }
 
 func (a *bro) redrawMusic() {
 	if a.showingMusic() {
@@ -802,7 +802,7 @@ const (
 )
 
 // musicKey takes a key on the Music tab; false leaves it to the app
-// (Esc quits, F1-F3 switch tabs).
+// (Esc quits).
 func (a *bro) musicKey(code uint16, value int32) bool {
 	if value == 0 {
 		return true

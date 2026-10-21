@@ -1,0 +1,303 @@
+package main
+
+// The switcher, a fuzzy menu in the manner of rofi's combi mode:
+// Ctrl+Shift+Tab, on any tab, lists the terminal sessions, the tabs and
+// the saved SSH hosts (a new session to one). Typing narrows the list,
+// Up/Down (or Tab, Shift+Tab) move, Enter goes; with nothing typed, 1-9 go
+// straight to that row. Esc, Ctrl+Shift+Tab again or a tap outside close
+// it. The page under it holds still meanwhile.
+
+import (
+	"fmt"
+	"image"
+	"slices"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"hellobro/kobo"
+)
+
+const (
+	pickRowH    = 58
+	pickRowsMax = 10
+)
+
+type pickEntry struct {
+	kind, title, detail string
+	current             bool
+	do                  func()
+	score               int
+}
+
+type picker struct {
+	all, shown []pickEntry
+	query      string
+	sel, top   int
+	box        image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
+	rows       []image.Rectangle
+}
+
+func (a *bro) openPicker() {
+	p := &picker{}
+	for tab := range a.tv.groups {
+		for i, t := range a.tv.groups[tab].sessions {
+			p.all = append(p.all, pickEntry{
+				kind: "session", title: fmt.Sprintf("%s %d", tabNames[tab], i+1), detail: t.status(&a.tv),
+				current: a.Tab == tab && a.tv.groups[tab].cur == i,
+				do:      func() { a.goSession(tab, i) },
+			})
+		}
+	}
+	for tab, name := range tabNames {
+		p.all = append(p.all, pickEntry{kind: "tab", title: name, current: a.Tab == tab, do: func() { a.SwitchTab(tab) }})
+	}
+	if a.tv.hosts == nil {
+		a.tv.hosts = loadSSHHosts()
+	}
+	for _, h := range a.tv.hosts {
+		cmd := ""
+		if h.cmd != "" {
+			cmd = " · " + h.cmd
+		}
+		p.all = append(p.all, pickEntry{kind: "ssh", title: h.name, detail: h.String() + cmd, do: func() { a.goHost(h) }})
+	}
+	p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }})
+	b := a.C.Bounds()
+	w := min(1100, b.Dx()-80)
+	h := 136 + min(len(p.all), pickRowsMax)*pickRowH + 16
+	top := b.Min.Y + max(40, b.Dy()/8)
+	p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
+	a.picker = p
+	a.filterPicker()
+	a.drawPicker()
+}
+
+// closePicker takes the menu down; the page comes back.
+func (a *bro) closePicker() {
+	a.picker = nil
+	a.DrawPage()
+	a.drawStat(true)
+}
+
+// pick runs the entry shown at n.
+func (a *bro) pick(n int) {
+	p := a.picker
+	if n < 0 || n >= len(p.shown) {
+		return
+	}
+	e := p.shown[n]
+	if e.current {
+		a.closePicker()
+		return
+	}
+	a.picker = nil
+	a.DrawPage() // what's under the menu, whatever comes next draws over it
+	e.do()
+}
+
+func (a *bro) goSession(tab, i int) {
+	if a.Tab != tab {
+		a.tv.groups[tab].cur = i // shown as the tab comes up
+		a.SwitchTab(tab)
+		return
+	}
+	a.switchSession(i)
+}
+
+// goHost connects to h: in the SSH tab's session on screen if it's doing
+// nothing, else in a new one.
+func (a *bro) goHost(h sshHost) {
+	a.SwitchTab(tabSSH)
+	t := a.term()
+	if t == nil || t.state != termIdle || t.emu != nil {
+		a.newSession(false)
+		a.drawTerm()
+		a.MarkFlash(a.termP.Outer)
+		t = a.term()
+	}
+	if t != nil && t.state == termIdle {
+		a.termConnect(t, h)
+	}
+}
+
+func (a *bro) goNewShell() {
+	a.SwitchTab(tabShell)
+	if t := a.term(); t != nil && t.state == termIdle {
+		a.termStartShell(t)
+		return
+	}
+	a.newSession(true)
+	a.drawTerm()
+	a.MarkFlash(a.termP.Outer)
+}
+
+// filterPicker narrows the list to what matches the query, best first.
+func (a *bro) filterPicker() {
+	p := a.picker
+	p.shown = p.shown[:0]
+	for _, e := range p.all {
+		if e.score = fuzzy(p.query, e.title+" "+e.detail+" "+e.kind); e.score >= 0 {
+			p.shown = append(p.shown, e)
+		}
+	}
+	if p.query != "" {
+		slices.SortStableFunc(p.shown, func(x, y pickEntry) int { return y.score - x.score })
+	}
+	p.sel, p.top = 0, 0
+	if p.query == "" {
+		for i, e := range p.shown {
+			if e.current && e.kind == "session" {
+				p.sel = i
+			}
+		}
+	}
+}
+
+// fuzzy scores how well text matches q, its letters in order with gaps
+// allowed; -1 if it doesn't. Runs and word starts count for more.
+func fuzzy(q, text string) int {
+	if q == "" {
+		return 0
+	}
+	t := []rune(strings.ToLower(text))
+	score, run, j := 0, 0, 0
+	for _, c := range strings.ToLower(q) {
+		if unicode.IsSpace(c) {
+			continue
+		}
+		found := false
+		for ; j < len(t); j++ {
+			if t[j] != c {
+				run = 0
+				score--
+				continue
+			}
+			bonus := 1
+			if j == 0 || !unicode.IsLetter(t[j-1]) && !unicode.IsDigit(t[j-1]) {
+				bonus += 8 // a word's start
+			}
+			run++
+			score += bonus + 4*(run-1)
+			j++
+			found = true
+			break
+		}
+		if !found {
+			return -1
+		}
+	}
+	return max(0, score+100)
+}
+
+func (a *bro) drawPicker() {
+	p, c := a.picker, a.C
+	rows := (p.box.Dy() - 152) / pickRowH
+	if p.sel < p.top {
+		p.top = p.sel
+	}
+	if p.sel >= p.top+rows {
+		p.top = p.sel - rows + 1
+	}
+	c.Fill(p.box, kobo.White)
+	c.Frame(p.box, 4, kobo.Black)
+	head := image.Rect(p.box.Min.X+24, p.box.Min.Y+10, p.box.Max.X-24, p.box.Min.Y+60)
+	c.Text(a.F.Panel, head, "Go to", kobo.Black, kobo.AlignLeft)
+	c.Text(a.F.Small, head, "type to narrow · ↑ ↓ Enter · Esc closes", kobo.Dark, kobo.AlignRight)
+	in := image.Rect(p.box.Min.X+20, head.Max.Y+6, p.box.Max.X-20, head.Max.Y+64)
+	c.Frame(in, 2, kobo.Black)
+	q := "› " + p.query
+	tr := in.Inset(4)
+	tr.Min.X += 12
+	c.Text(a.F.Body, tr, q, kobo.Black, kobo.AlignLeft)
+	cx := tr.Min.X + kobo.TextWidth(a.F.Body, q) + 3
+	c.Fill(image.Rect(cx, in.Min.Y+12, cx+3, in.Max.Y-12), kobo.Black) // the cursor
+	if p.query == "" {
+		c.Text(a.F.Small, tr, "sessions, tabs, hosts…", kobo.Mid, kobo.AlignRight)
+	}
+
+	p.rows = p.rows[:0]
+	y := in.Max.Y + 10
+	if len(p.shown) == 0 {
+		c.Text(a.F.Body, image.Rect(in.Min.X+16, y, in.Max.X, y+pickRowH), "nothing matches", kobo.Dark, kobo.AlignLeft)
+	}
+	for n := p.top; n < min(len(p.shown), p.top+rows); n++ {
+		e := p.shown[n]
+		r := image.Rect(p.box.Min.X+12, y, p.box.Max.X-12, y+pickRowH)
+		y += pickRowH
+		p.rows = append(p.rows, r)
+		fg, dim := uint8(kobo.Black), uint8(kobo.Dark)
+		if n == p.sel {
+			c.Fill(r, kobo.Black)
+			fg, dim = kobo.White, kobo.Light
+		}
+		text := r.Inset(4)
+		text.Min.X += 12
+		if p.query == "" && n < 9 {
+			c.Text(a.F.Panel, image.Rect(text.Min.X, text.Min.Y, text.Min.X+40, text.Max.Y), strconv.Itoa(n+1), fg, kobo.AlignLeft)
+		}
+		text.Min.X += 48
+		kw := 110
+		c.Text(a.F.Small, image.Rect(text.Max.X-kw, text.Min.Y, text.Max.X, text.Max.Y), e.kind, dim, kobo.AlignRight)
+		text.Max.X -= kw + 16
+		title := e.title
+		if e.current {
+			title += "  ●"
+		}
+		c.Text(a.F.Body, text, title, fg, kobo.AlignLeft)
+		text.Min.X += kobo.TextWidth(a.F.Body, title) + 28
+		c.Text(a.F.Small, text, e.detail, dim, kobo.AlignLeft)
+	}
+	a.Mark(p.box, true)
+}
+
+// pickerKey takes every key while the menu is up.
+func (a *bro) pickerKey(code uint16, value int32) {
+	p, m := a.picker, &a.tv.mods
+	if a.termMod(code, value) || value == 0 { // releases too: a Ctrl let go of
+		return
+	}
+	ch, printable := kobo.KeyChar(code, m.shift, m.caps)
+	switch {
+	case code == kobo.KeyEsc || code == kobo.KeyTab && m.ctrl && m.shift:
+		a.closePicker()
+		return
+	case code == kobo.KeyEnter:
+		a.pick(p.sel)
+		return
+	case p.query == "" && ch >= "1" && ch <= "9" && !m.ctrl:
+		a.pick(int(ch[0] - '1'))
+		return
+	case code == keyUp || code == kobo.KeyTab && m.shift:
+		p.sel = (p.sel + len(p.shown) - 1) % max(1, len(p.shown))
+	case code == keyDown || code == kobo.KeyTab:
+		p.sel = (p.sel + 1) % max(1, len(p.shown))
+	case code == kobo.KeyBackspace && m.ctrl, m.ctrl && ch == "u":
+		p.query = ""
+		a.filterPicker()
+	case code == kobo.KeyBackspace:
+		if r := []rune(p.query); len(r) > 0 {
+			p.query = string(r[:len(r)-1])
+			a.filterPicker()
+		}
+	case printable && !m.ctrl && !m.alt:
+		p.query += ch
+		a.filterPicker()
+	default:
+		return
+	}
+	a.drawPicker()
+}
+
+// pickerTap goes to the row tapped; a tap outside closes.
+func (a *bro) pickerTap(pt image.Point) {
+	for n, r := range a.picker.rows {
+		if pt.In(r) {
+			a.pick(a.picker.top + n)
+			return
+		}
+	}
+	if !pt.In(a.picker.box) {
+		a.closePicker()
+	}
+}

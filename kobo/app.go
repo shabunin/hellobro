@@ -51,8 +51,8 @@ type Program interface {
 	// Enter is called when tab becomes the current one (the first tab too,
 	// at the start), before it's drawn.
 	Enter(tab int)
-	// Key sees every key event first, and true takes it: the App doesn't
-	// quit on Esc or switch tabs on F1-F9 then. It also hears of
+	// Key sees every key event first, but Ctrl+Alt+1…9 (tabs), and true
+	// takes it: the App doesn't quit on Esc then. It also hears of
 	// keyboards coming and going (m.Connected, m.Gone).
 	Key(m KeyMsg) bool
 	// Touch sees a touch event at p: a contact starting, moving (g.Last is
@@ -77,7 +77,7 @@ type Program interface {
 type Config struct {
 	Name  string   // the binary's, for the log: Name.log next to it
 	Title string   // in the header
-	Tabs  []string // F1, F2, …
+	Tabs  []string // Ctrl+Alt+1, 2, …
 }
 
 // Gesture is one contact, from down to up.
@@ -163,6 +163,8 @@ type App struct {
 	alive    atomic.Int64 // last loop tick, for the watchdog
 	blitAt   atomic.Int64 // start of the blit in flight, or 0
 	noPower  bool         // the power button doesn't reach us
+	ctrl     [2]bool      // left and right Ctrl held, for Ctrl+Alt+N
+	alt      [2]bool      // and Alt
 }
 
 // New opens the log and the screen. The Program, which embeds the App, is
@@ -663,15 +665,26 @@ func (a *App) onKey(m KeyMsg) {
 		a.prog.Key(m)
 		return
 	}
+	switch m.Code {
+	case KeyLeftCtrl, KeyRightCtrl:
+		a.ctrl[b2i(m.Code == KeyRightCtrl)] = m.Value != 0
+	case keyLeftAlt, keyRightAlt:
+		a.alt[b2i(m.Code == keyRightAlt)] = m.Value != 0
+	}
+	// Ctrl+Alt+N: tab N, whatever the page does with keys (a terminal
+	// would send it on), fullscreen too.
+	if n := int(m.Code) - Key1; (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) && n >= 0 && n < min(9, len(a.cfg.Tabs)) {
+		if m.Value == 1 {
+			a.SwitchTab(n)
+		}
+		return
+	}
 	if a.prog.Key(m) {
 		return
 	}
-	switch {
-	case m.Code == KeyEsc && m.Value == 1:
+	if m.Code == KeyEsc && m.Value == 1 {
 		log.Print("Esc pressed")
 		a.quit = true
-	case m.Code >= KeyF1 && m.Code < KeyF1+uint16(len(a.cfg.Tabs)) && m.Value == 1:
-		a.SwitchTab(int(m.Code - KeyF1))
 	}
 }
 

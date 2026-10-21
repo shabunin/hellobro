@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -369,7 +370,7 @@ func (a *App) drawTabs() {
 			}
 			c.Text(a.F.Tab, r, label, Dark, AlignCenter)
 		}
-		c.Text(a.F.Small, image.Rect(r.Max.X-60, r.Min.Y+4, r.Max.X-10, r.Min.Y+30), fmt.Sprintf("F%d", i+1), Mid, AlignRight)
+		c.Text(a.F.Small, image.Rect(r.Max.X-60, r.Min.Y+4, r.Max.X-10, r.Min.Y+30), strconv.Itoa(i+1), Mid, AlignRight) // Ctrl+Alt+N
 	}
 	if end := L.tabs[len(L.tabs)-1].Max.X; end < L.W { // the bar's line goes on past the tabs
 		c.Fill(image.Rect(end, L.tabBar.Max.Y-border, L.W, L.tabBar.Max.Y), Black)
@@ -388,7 +389,7 @@ func (a *App) drawFooter() {
 	if a.noPower {
 		quit = "Esc or exit"
 	}
-	hints := []string{fmt.Sprintf("tabs: tap or F1-F%d", len(a.cfg.Tabs))}
+	hints := []string{fmt.Sprintf("tabs: tap or Ctrl+Alt+1–%d", len(a.cfg.Tabs))}
 	if a.light != nil {
 		hints = append(hints, "light: swipe the left edge")
 	}

@@ -26,7 +26,7 @@ key(PGDN, ctrl=True); time.sleep(2)                  # and 2
 srv.send_signal(signal.SIGKILL); srv.wait()          # the connection drops
 time.sleep(8)                                        # a reconnect or two fails
 srv = server(); time.sleep(12)                       # it comes back, by key
-key(F(2), alt=True); time.sleep(3)                   # Shell tab: a shell starts
+key(3, ctrl=True, alt=True); time.sleep(3)             # Ctrl+Alt+2, the Shell tab: a shell starts
 keys("echo hello from $(whoami); tty; stty size\n"); time.sleep(2)
 key(KEY_T, shift=True, ctrl=True); time.sleep(2)     # shell 2
 keys("exit\n"); time.sleep(2)                        # exits: Enter starts another

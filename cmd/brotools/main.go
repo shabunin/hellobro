@@ -339,8 +339,8 @@ func (a *tools) Key(m kobo.KeyMsg) bool {
 			a.mediaKey(m.Code)
 		}
 		return true
-	case m.Value == 1 && (m.Code == kobo.KeyEsc || m.Code >= kobo.KeyF1 && m.Code < kobo.KeyF1+uint16(len(tabNames))):
-		return false // quitting, tabs
+	case m.Value == 1 && m.Code == kobo.KeyEsc:
+		return false // quitting
 	}
 	desc, changed := a.ed.key(m.Code, m.Value)
 	if desc != "" {

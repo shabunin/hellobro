@@ -4,7 +4,8 @@
 //   - SSH: terminals (xterm emulation, PTY) over SSH, several at once;
 //   - Shell: terminals with a shell on the Kobo itself;
 //   - Music: a player for the albums on the Kobo, over Bluetooth; it
-//     goes on playing on the other tabs.
+//     goes on playing on the other tabs;
+//   - Wi-Fi/BT: Kobo's Wi-Fi and Bluetooth settings.
 //
 // A swipe along the right edge sets the font size, F11 gives the
 // terminal the whole screen. The rest (the screen, touch, the frontlight
@@ -26,25 +27,30 @@ const (
 	tabSSH = iota
 	tabShell
 	tabMusic
+	tabRadio
 )
 
-var tabNames = []string{"SSH", "Shell", "Music"}
+var tabNames = []string{"SSH", "Shell", "Music", "Wi-Fi/BT"}
 
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
 const termIdleTimeout = 20 * time.Minute // with a session up: reading a remote screen takes longer
 
-// bro is the app: the kobo.App, the terminal and the music player.
+// bro is the app: the kobo.App, the terminal, the music player and the
+// radios.
 type bro struct {
 	*kobo.App
-	tf    termFonts
-	termP kobo.Panel
-	tv    termView
-	font  *fontSwipe // a contact along the right edge, which may become a font swipe
-	mv    musicView
-	mus   musicState
-	stat  statBar     // the terminal tabs' status bar
-	lay   kobo.Layout // the last layout, to lay out again
+	tf     termFonts
+	termP  kobo.Panel
+	tv     termView
+	font   *fontSwipe // a contact along the right edge, which may become a font swipe
+	mv     musicView
+	mus    musicState
+	stat   statBar // the terminal tabs' status bar
+	picker *picker // the switcher, while it's up
+	rv     [2]radioPanelView
+	rs     radioState
+	lay    kobo.Layout // the last layout, to lay out again
 }
 
 // fontSwipe is a contact that started on the right edge.
@@ -78,32 +84,47 @@ func (a *bro) Layout(L kobo.Layout) {
 		a.termGeometry() // the terminal follows the new size
 	}
 	a.layoutMusic(L)
+	a.layoutRadio(L)
 }
 
 func (a *bro) Draw() {
-	if a.Tab == tabMusic {
+	switch a.Tab {
+	case tabMusic:
 		a.drawMusic()
-	} else {
+	case tabRadio:
+		a.rv[panelWiFi].shown, a.rv[panelBT].shown = "", ""
+		a.drawRadio()
+	default:
 		a.drawTerm()
 	}
 }
 
 func (a *bro) Enter(tab int) {
-	if tab == tabMusic {
+	switch tab {
+	case tabMusic:
 		a.enterMusic()
-	} else {
+	case tabRadio:
+		a.enterRadio()
+	default:
 		a.enterTerm()
 	}
 }
 
 func (a *bro) Tap(p image.Point) {
+	if a.picker != nil {
+		a.pickerTap(p)
+		return
+	}
 	if isTermTab(a.Tab) && p.In(a.stat.r) {
 		a.hotkey(kobo.KeySpace)
 		return
 	}
-	if a.Tab == tabMusic {
+	switch a.Tab {
+	case tabMusic:
 		a.musicTap(p)
-	} else {
+	case tabRadio:
+		a.radioTap(p)
+	default:
 		a.termTap(p)
 	}
 }
@@ -111,12 +132,14 @@ func (a *bro) Tap(p image.Point) {
 func (a *bro) Tick() {
 	a.termTick()
 	a.statTick()
+	a.radioTick()
 }
 
 func (a *bro) Exit() {
 	a.termCloseAll()
 	a.saveMusicState()
 	a.musicStop()
+	a.radioExit()
 }
 
 func (a *bro) IdleTimeout() time.Duration {
@@ -140,6 +163,14 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.Calibrating():
 		return false
+	case a.picker != nil:
+		a.pickerKey(m.Code, m.Value)
+		return true
+	case a.tv.mods.ctrl && a.tv.mods.shift && m.Code == kobo.KeyTab:
+		if m.Value == 1 {
+			a.openPicker()
+		}
+		return true
 	case a.tv.mods.ctrl && a.tv.mods.shift && hotkeys[m.Code]: // ours on every tab, never the remote's
 		if m.Value == 1 {
 			a.hotkey(m.Code)
@@ -150,6 +181,11 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 			return true
 		}
 		return a.musicKey(m.Code, m.Value)
+	case a.Tab == tabRadio:
+		if a.termMod(m.Code, m.Value) {
+			return true
+		}
+		return a.radioKey(m.Code, m.Value)
 	}
 	return a.termKey(m.Code, m.Value)
 }
@@ -207,7 +243,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		}
 	}
 	switch {
-	case g.Tap || g.Pen:
+	case g.Tap || g.Pen || a.picker != nil || a.Tab == tabRadio:
 	case a.Tab == tabMusic:
 		a.musicSwipe(g.Start, g.Last)
 	default:

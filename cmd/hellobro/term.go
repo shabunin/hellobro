@@ -156,7 +156,9 @@ func (a *bro) term() *termSession {
 	return nil
 }
 
-func (a *bro) showing(t *termSession) bool { return !a.Calibrating() && t != nil && a.term() == t }
+func (a *bro) showing(t *termSession) bool {
+	return !a.Calibrating() && a.picker == nil && t != nil && a.term() == t
+}
 
 // termLive says whether any session is connected, or about to be.
 func (a *bro) termLive() bool {
@@ -310,7 +312,7 @@ func (a *bro) drawTermStatus() {
 
 func (a *bro) drawConnect(t *termSession) {
 	v := &a.tv
-	keys := "Ctrl+Shift+T: new session  ·  Ctrl+PgUp/PgDn: switch  ·  Alt+F1-F3: tabs  ·  F11: fullscreen"
+	keys := "Ctrl+Shift+T: new session  ·  Ctrl+Shift+Tab: sessions  ·  Ctrl+Alt+1-4: tabs  ·  F11: fullscreen"
 	music := "Ctrl+Shift+Space: play/pause  ·  Ctrl+Shift+< >: previous/next track  ·  Ctrl+Shift+B: status bar"
 	var lines []string
 	if t.kind == kindShell {
@@ -883,8 +885,8 @@ func (a *bro) termTick() {
 	if !t.connected() {
 		return
 	}
-	if a.GaugeUp() {
-		return // a gauge is up: drawing under it would be undone when it goes
+	if a.GaugeUp() || a.picker != nil {
+		return // something is up over the terminal: drawing under it would be undone when it goes
 	}
 	if t.dirty.Load() && time.Since(v.drawnAt) >= termFrame {
 		v.outAt = time.Now()
@@ -950,11 +952,6 @@ func (a *bro) termKey(code uint16, value int32) bool {
 		case m.ctrl && (code == keyPgDn || m.shift && code == keyRight):
 			a.switchSession((g.cur + 1) % len(g.sessions))
 			return true
-		case m.alt && code >= kobo.KeyF1 && code < kobo.KeyF1+uint16(len(tabNames)):
-			if value == 1 {
-				a.SwitchTab(int(code - kobo.KeyF1))
-			}
-			return true
 		}
 	}
 	if value == 0 {
@@ -1006,7 +1003,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 			a.termStartShell(t)
 			return true
 		case t.kind == kindShell:
-			return code != kobo.KeyEsc && !(code >= kobo.KeyF1 && code < kobo.KeyF1+uint16(len(tabNames)))
+			return code != kobo.KeyEsc
 		case code == kobo.KeyEnter:
 			in := strings.TrimSpace(t.input)
 			if in == "" && len(v.hosts) > 0 {

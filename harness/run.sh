@@ -12,7 +12,8 @@
 # env: APP (the binary, default the feed's app, built in the repo),
 #      TIMEOUT (seconds, default 170), MUSIC (where the music is, default
 #      harness/music; it "plays" to a fake speaker, into OUT/pcm.raw),
-#      INTERFACE (for the Net tab, default: the one with the default route)
+#      INTERFACE (for the Net tab, default: the one with the default route),
+#      FAKE_RADIO (default 1: stand-in Wi-Fi and Bluetooth; empty: the real ones)
 #
 # The ssh, fullscreen, stress, connect, flash, zoom and fontswipe feeds want
 # the server running: (cd server && go run .)
@@ -21,7 +22,7 @@ H=$(cd "$(dirname "$0")" && pwd); OUT=$1; ROTA=$2; FEED=${3:-demo}
 NAME=$(sed -n 's/^# app: //p' "$H/feeds/$FEED.py" | head -n 1)
 APP=${APP:-$H/../${NAME:-hellobro}}
 NAME=$(basename "$APP")
-case $NAME in brotools*) TABS=7 ;; *) TABS=3 ;; esac
+case $NAME in brotools*) TABS=7 ;; *) TABS=4 ;; esac
 IFACE=${INTERFACE:-$(ip route show default 2>/dev/null | awk '{print $5; exit}')}
 rm -rf "$OUT"; mkdir -p "$OUT/screen" "$OUT/input" "$OUT/app"
 cp "$APP" "$OUT/app/$NAME"; cp "$H/ssh.conf" "$OUT/app/"
@@ -29,7 +30,7 @@ touch "$OUT/ntx_io"; mkfifo "$OUT/input/event2" "$OUT/input/event4"
 TABS=$TABS python3 -I "$H/feeds/$FEED.py" "$OUT/input" "$ROTA" &
 FEEDPID=$!
 FAKE_SNAP_AREA=40000 FAKE_SCREEN_DIR=$OUT/screen FAKE_GYRO=$ROTA HELLOBRO_FBINK=$H/fakefbink.py \
-	HELLOBRO_INPUT_DIR=$OUT/input HELLOBRO_DEVICES=$H/devices INTERFACE=$IFACE HELLOBRO_MUSIC_DIR=${MUSIC:-$H/music} HELLOBRO_FAKE_PCM=$OUT/pcm.raw \
+	HELLOBRO_INPUT_DIR=$OUT/input HELLOBRO_DEVICES=$H/devices INTERFACE=$IFACE HELLOBRO_MUSIC_DIR=${MUSIC:-$H/music} HELLOBRO_FAKE_PCM=$OUT/pcm.raw HELLOBRO_FAKE_RADIO=${FAKE_RADIO-1} \
 	HELLOBRO_NTX_IO=$OUT/ntx_io HELLOBRO_NICKEL_CONF=$H/nickel.conf \
 	timeout "${TIMEOUT:-170}" qemu-arm "$OUT/app/$NAME" > "$OUT/stdout.txt" 2>&1 || echo "app exit: $?"
 wait $FEEDPID || true

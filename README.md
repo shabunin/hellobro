@@ -5,7 +5,8 @@ Nickel, draw their own e-ink UI through [FBInk](https://github.com/NiLuJe/FBInk)
 and give Nickel back when you leave. Each has its own NickelMenu entry.
 
 **hellobro** ("Hello Bro") is a terminal for a Bluetooth keyboard, with
-music. Tabs (tap, or F1–F3; Alt+F1–F3 while a session is up):
+music and Kobo's wireless settings. Tabs (tap, or Ctrl+Alt+1–4, which work
+everywhere, fullscreen and in a session too):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
   Claude Code…), mouse taps and scrolling; several sessions at once.
@@ -14,8 +15,16 @@ music. Tabs (tap, or F1–F3; Alt+F1–F3 while a session is up):
 - **Music**: a player for the albums on the Kobo (folders of MP3/WAV, with
   their covers), to Bluetooth headphones or a DAC. It goes on playing on
   the other tabs.
+- **Wi-Fi/BT**: Wi-Fi and Bluetooth without going back to Nickel: on and
+  off, networks (join, with a password; leave; forget; one by name), and
+  devices (scan, pair, connect, disconnect, forget).
 
-**brotools** ("Bro Tools") is diagnostics. Tabs (tap, or F1–F7):
+Ctrl+Shift+Tab, anywhere, is a switcher in the manner of rofi: the
+sessions, the tabs, the saved hosts (a new session to one) and a new
+shell, narrowed by typing (fuzzy); Up/Down and Enter, or 1–9 before
+typing.
+
+**brotools** ("Bro Tools") is diagnostics. Tabs (tap, or Ctrl+Alt+1–7):
 
 - **Keys**: a text box for a Bluetooth keyboard, plus the last key's code.
 - **Finger** / **Stylus**: drawing canvases; the stylus draws with pressure.
@@ -41,8 +50,11 @@ with a session up, 6 hours while music plays).
 - `audio/`: Bluetooth audio through the Kobo's bluez-alsa: finding the
   device and its PCM, MP3/WAV decoding, a player with pause, seeking and
   volume.
+- `radio/`: Wi-Fi through wpa_supplicant and DHCP, turned on and off as
+  Kobo does it (after KOReader's scripts); Bluetooth through BlueZ, with a
+  pairing agent.
 - `cmd/hellobro/`: the terminal (the emulator view, SSH, the local shell),
-  the status bar, and the Music tab.
+  the status bar, the switcher, the Music and Wi-Fi/BT tabs.
 - `cmd/brotools/`: the diagnostics pages.
 
 ## Terminal
@@ -85,6 +97,23 @@ with a session up, 6 hours while music plays).
   next/previous, s stop, = and − volume, Up/Down/PgUp/PgDn/Home/End and
   Enter pick, Esc or Backspace back to the albums; or tap.
 - The volume, and the track and where it was, are kept in `music-state`.
+
+## Wi-Fi and Bluetooth
+
+- Wi-Fi: tap a network to pick it, again (or Enter) to join or leave it;
+  a new secured one asks for its password (Tab or `show` reveals it).
+  "other network…" (or n) joins a hidden one by name. Networks are saved
+  when wpa_supplicant's file allows it. `turn off`/`turn on` (or o) unload
+  and load the driver and power the chip, as Kobo does; s scans, f forgets.
+- Bluetooth: `scan` (s) looks for 40 s; a new device pairs (with a code to
+  confirm, or to type on a keyboard, shown in the panel), then gets trusted
+  and connected. Paired ones connect, disconnect, and are forgotten with f.
+  Pairing goes through hellobro's own agent while Nickel is frozen.
+- Tab moves between the two panels.
+- When hellobro quits, the radios' power goes back to how Kobo had it,
+  since Nickel wakes up thinking so; networks and devices added stay. On
+  the first visit to the tab, what's found of the setup (Kobo's variables,
+  processes, modules, rfkill) goes to `hellobro.log`.
 
 E-ink notes: changed cells only are redrawn; small black & white changes use
 the fast DU waveform and get a GL16 cleanup within a few seconds, bigger ones
@@ -150,10 +179,12 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
                                             # two sessions, password + key install, reconnect, shells
     MUSIC=~/Music harness/run.sh /tmp/hb 0 music      # the Music tab
     MUSIC=~/Music harness/run.sh /tmp/hb 0 statbar    # the status bar, the music hotkeys
+    harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N
 
 `MUSIC` is the music folder (default `harness/music`); the sound goes to
 `OUT/pcm.raw` (`HELLOBRO_FAKE_PCM`: 48 kHz, 16-bit stereo), at the pace it
-would play. The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
+would play. Wi-Fi and Bluetooth are stand-ins (`HELLOBRO_FAKE_RADIO`;
+`FAKE_RADIO=` for the PC's own, careful). The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
 (`calls.txt` there lists every update with its waveform). The feeds live in
 `harness/feeds`, each with an `# app:` line naming the app it drives, and
 their shared helpers in `harness/feedlib.py`.
