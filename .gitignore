@@ -1,0 +1,13 @@
+# build outputs (make hellobro / make hellobro-nocgo)
+/hellobro
+/hellobro-nocgo
+# stamp: the cross-build image exists
+/.cross-image
+# things the app writes next to itself, should it ever run from here
+*.log
+/ssh.conf
+/id_ed25519
+/id_ed25519.pub
+/known_hosts
+/term-font
+/touch-calibration.conf
