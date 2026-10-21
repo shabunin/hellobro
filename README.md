@@ -77,5 +77,12 @@ Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
 system), lives here too. It's only installed on request:
 `make install-tools`.
 
+## License
+
+[GPL-3.0-or-later](LICENSE). hellobro links in
+[FBInk](https://github.com/NiLuJe/FBInk) by NiLuJe, also GPL-3.0-or-later.
+Its prebuilt files and their source are described in
+[third_party/fbink](third_party/fbink/README.md).
+
 <sub>The screenshots come from the test harness on a PC (`harness/`),
 with the app's own rendering.</sub>
