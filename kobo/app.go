@@ -189,6 +189,10 @@ type App struct {
 	ctrl      [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
 	alt       [2]bool         // and Alt
 	ring      image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
+
+	blinks     []blinking // notice.go
+	toast      *toast
+	lightOffAt time.Time // FlashLight's light goes off
 }
 
 // New opens the log and the screen. The Program, which embeds the App, is
@@ -432,6 +436,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			}
 			if !a.asleep {
 				a.prog.Tick()
+				a.noticeTick()
 			}
 			a.flush()
 		case <-clock.C:
@@ -914,6 +919,7 @@ func (a *App) MarkFlash(r image.Rectangle) {
 
 func (a *App) markAll(flash bool) {
 	a.ring = image.Rectangle{} // a card, or a new layout: the Program puts it back if it's still wanted
+	a.blinks, a.toast = nil, nil
 	a.dirty = []dirtyRect{{a.C.Bounds(), true}}
 	a.flash = a.flash || flash
 }
@@ -946,8 +952,11 @@ func (a *App) flush() {
 		src = a.panelC
 	}
 	CopyGray(img, d.r, src.Gray, d.r.Min)
-	if !a.dozing && d.r.Overlaps(a.ring) {
-		stampRing(img, a.ring)
+	if !a.dozing {
+		a.stampNotices(img)
+		if d.r.Overlaps(a.ring) {
+			stampRing(img, a.ring)
+		}
 	}
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {

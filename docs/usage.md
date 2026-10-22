@@ -23,7 +23,7 @@ in a session too):
   off, networks (join, with a password; leave; forget; one by name), and
   devices (scan, pair, connect, disconnect, forget); and hellobro's own
   settings: light sleep, sleep with music on, file sharing, the relay,
-  mDNS, CPU profiles, the status bar, the tabs.
+  mDNS, terminal notifications, CPU profiles, the status bar, the tabs.
 - **Files**: sharing with a computer over SFTP and SSH (how to reach the
   Kobo, pairing, who's connected and sending what), and the Kobo's
   storage: folders to open, files and folders to delete.
@@ -207,6 +207,16 @@ minutes), the Kobo goes to sleep properly.
   plays or pauses.
 - While connected, every other key goes to the remote, Esc included, but
   for the music's keys below.
+- A session calls out with the bell, or with a message as programs send a
+  desktop notification (OSC 9 or 777: `make; printf '\e]9;make done\a'`).
+  The light comes on a moment if it's off; the session's title strip
+  blinks if it shows, and if not, a note in the lower right corner says
+  which and what (`SSH 2: make done`). A bell within 2 s of a key typed
+  into it doesn't count (that's the shell's answer to the key), and a
+  session calls out at most every 5 s. Settings, **Terminal
+  notifications** and the three under it: the bell too or messages only,
+  how long the light stays on, how often the strip blinks, how long the
+  note stays (each can be off).
 
 ## Music
 

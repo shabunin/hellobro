@@ -133,6 +133,7 @@ func (a *App) lightLabelRect() image.Rectangle {
 }
 
 func (a *App) setLight(level int) {
+	a.lightOffAt = time.Time{} // a hand on it: FlashLight's off is off
 	level = max(0, min(100, level))
 	if level == a.light.level && a.lightOverlay != nil {
 		return

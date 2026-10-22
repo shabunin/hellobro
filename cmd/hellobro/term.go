@@ -97,11 +97,13 @@ type termSession struct {
 	prompt *termPrompt
 	gen    int // bumps per connection, so late messages from an old one are ignored
 
-	back  termBackend
-	emu   *vt.SafeEmulator
-	mu    sync.Mutex // held while the emulator changes (write): its touched lines are read and cleared under it
-	dirty atomic.Bool
-	title string
+	back     termBackend
+	emu      *vt.SafeEmulator
+	mu       sync.Mutex // held while the emulator changes (write): its touched lines are read and cleared under it
+	dirty    atomic.Bool
+	title    string
+	keyAt    time.Time // a key last went to it
+	notifyAt time.Time // its last notice
 
 	password string    // typed for this connection, for connecting again (only kept in memory)
 	retries  int       // connection attempts since it dropped
@@ -961,18 +963,21 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	t.emu = vt.NewSafeEmulator(cols, rows)
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
 	t.emu.SetDefaultBackgroundColor(color.White)
-	t.emu.SetScrollbackSize(1000) // not shown; the default 10000 costs a big copy per line once full
-	t.emu.SetCallbacks(vt.Callbacks{
+	t.emu.SetScrollbackSize(1000)    // not shown; the default 10000 costs a big copy per line once full
+	t.emu.SetCallbacks(vt.Callbacks{ // they're called under t.mu, which the loop may want: not a.Do there
 		Title: func(s string) {
-			a.Do(func() {
+			go a.Do(func() {
 				t.title = s
 				if a.onScreen(t) {
 					a.drawTermStatus()
 				}
 			})
 		},
+		Bell: func() { go a.Do(func() { a.termNotify(t, "") }) },
 	})
 	t.emu.RegisterOscHandler(52, a.osc52(t))
+	t.emu.RegisterOscHandler(9, a.oscNotify(t))
+	t.emu.RegisterOscHandler(777, a.oscNotify(t))
 	back.resize(cols, rows)
 	if t.kind == kindShell {
 		log.Printf("shell: started, %d×%d", cols, rows)
@@ -1203,6 +1208,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 
 	if k, ok := termKeyEvent(code, *m); ok {
 		t.emu.SendKey(k)
+		t.keyAt = time.Now()
 	}
 	return true
 }
