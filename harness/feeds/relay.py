@@ -17,7 +17,7 @@ import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K1, K4 = 2, 5  # SSH, Files
+K1, K4 = 2, 4  # SSH, Settings
 OUT = os.path.dirname(os.path.abspath(sys.argv[1]))
 VPS, PORT, KEY = os.environ["RELAY_VPS"], os.environ["RELAY_PORT"], os.environ["PC_KEY"]
 log = open(os.path.join(OUT, "pc.log"), "w")
@@ -33,7 +33,7 @@ def pc(*cmd):
     return r
 
 start()
-key(K4, ctrl=True, alt=True); time.sleep(8)            # Files: sharing on, the relay up
+key(K4, ctrl=True, alt=True); time.sleep(8)            # Settings: sharing on, the relay up
 pc("ssh", *BASE, *JUMP, "-p", PORT, "root@127.0.0.1", "hellobro-version"); time.sleep(2)
 with open(os.path.join(OUT, "hello.txt"), "w") as f:
     f.write("through the relay\n")

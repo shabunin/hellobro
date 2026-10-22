@@ -83,7 +83,9 @@ shows how it is, `journalctl --user -u hellobro-tunnel` why it isn't.
 Two files next to hellobro, in `.adds/hellobro/` (send them over SFTP,
 or edit them in the Shell tab):
 
-- `ssh.conf`, a host for the PC:
+- a saved host for the PC (type it at the SSH tab's prompt, or a
+  saved host's **edit**; or an `ssh.conf` with this line, which
+  hellobro takes in at start):
 
   ```
   home  bobalus@127.0.0.1:2222  via relay@VPS  tmux new -A -s kobo
@@ -96,8 +98,8 @@ or edit them in the Shell tab):
   relay@VPS  2023
   ```
 
-Then in Settings turn **Relay** on. File sharing has to be on too. The
-Files tab shows whether it's up. It reconnects by itself: after 5 s, then
+Then in Settings turn **Relay** on. File sharing has to be on too.
+Settings, Sharing shows whether it's up. It reconnects by itself: after 5 s, then
 up to a minute between tries.
 
 While the relay is on, the Kobo stays reachable, and that costs battery:
@@ -153,9 +155,9 @@ push can't leave the Kobo out of reach.
 
 | What you see | Look at |
 | --- | --- |
-| Files tab: `Relay down (… permission denied …)` | The Kobo's key isn't in `~relay/.ssh/authorized_keys`, or the file's mode/owner is wrong (sshd's log: `journalctl -u sshd` on the VPS). |
+| Sharing: `Relay down (… permission denied …)` | The Kobo's key isn't in `~relay/.ssh/authorized_keys`, or the file's mode/owner is wrong (sshd's log: `journalctl -u sshd` on the VPS). |
 | `Relay down (listening on the server's port 2023: …)` | A dead connection still holds the port. Wait 90 s (`ClientAliveInterval`), or check `ss -ltnp` on the VPS. A connection made before the keepalives were set up is never let go: kill its `sshd: relay` process (the one as old as the Kobo's last good relay). |
-| PC: `ssh kobo-afar` hangs (`timed out during banner exchange`) | The VPS's port 2023 is held by a dead connection, so ours can't take it (the Files tab says `Relay down`). As above. On the VPS, `ps -o pid,lstart,args -u relay \| grep sshd` shows the sessions with their start times. |
+| PC: `ssh kobo-afar` hangs (`timed out during banner exchange`) | The VPS's port 2023 is held by a dead connection, so ours can't take it (Sharing says `Relay down`). As above. On the VPS, `ps -o pid,lstart,args -u relay \| grep sshd` shows the sessions with their start times. |
 | PC: `stdio forwarding failed` | Nothing listens on the VPS's 2023: the relay is off or down on the Kobo, or the port asked for isn't 2023. |
 | `Relay: say where in relay.conf` | `relay.conf` is still the example. |
 | PC: `administratively prohibited: open failed` | `localhost` instead of `127.0.0.1`, or a port that doesn't match `permitopen`. |

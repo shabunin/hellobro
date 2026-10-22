@@ -101,14 +101,15 @@ var factsOnce sync.Once
 
 func (a *bro) layoutRadio(K kobo.Layout) {
 	v := &a.rv
-	fw, fb, fs := a.folded("wifi"), a.folded("bluetooth"), a.folded("settings")
-	rows := []kobo.Row{ // room for all the settings
-		{Height: 32, Folded: []bool{fw}}, {Height: 32, Folded: []bool{fb}}, {Height: 36, Folded: []bool{fs}}}
-	if K.Landscape { // the radios side by side, the settings under them
-		rows = []kobo.Row{{Height: 52, Widths: []int{50, 50}, Folded: []bool{fw, fb}}, {Height: 48, Folded: []bool{fs}}}
+	fw, fb, fh, fs := a.folded("wifi"), a.folded("bluetooth"), a.folded("sharing"), a.folded("settings")
+	rows := []kobo.Row{ // Bluetooth and sharing side by side: room for most of the settings
+		{Height: 30, Folded: []bool{fw}}, {Height: 34, Widths: []int{50, 50}, Folded: []bool{fb, fh}}, {Height: 36, Folded: []bool{fs}}}
+	if K.Landscape { // the radios side by side, sharing and the settings under them
+		rows = []kobo.Row{{Height: 50, Widths: []int{50, 50}, Folded: []bool{fw, fb}}, {Height: 50, Widths: []int{45, 55}, Folded: []bool{fh, fs}}}
 	}
 	at, f := tile(K, a.rs.focus, rows...)
-	a.layoutSettings(K, at[2], f[2])
+	a.layoutShare(K, at[panelShare], f[panelShare])
+	a.layoutSettings(K, at[panelSet], f[panelSet])
 	v[panelWiFi].p = a.pagePanel(K, "Wi-Fi", at[0], f[0])
 	v[panelBT].p = a.pagePanel(K, "Bluetooth", at[1], f[1])
 	for i := range v {
@@ -140,6 +141,7 @@ func (a *bro) layoutRadio(K kobo.Layout) {
 func (a *bro) enterRadio() {
 	a.radioStart()
 	a.radioPoll(!a.rs.scanned)
+	a.sharePoll()
 }
 
 func (a *bro) showingRadio() bool {
@@ -561,12 +563,16 @@ func (g radioAgent) Cancel() {
 func (a *bro) drawRadio() {
 	a.drawRadioPanel(panelWiFi)
 	a.drawRadioPanel(panelBT)
+	a.drawShare()
 	a.drawSettings()
 }
 
 func (a *bro) radioFolded(i int) bool {
-	if i == panelSet {
+	switch i {
+	case panelSet:
 		return a.sv.p.Folded
+	case panelShare:
+		return a.shp.p.Folded
 	}
 	return a.rv[i].p.Folded
 }
@@ -574,18 +580,18 @@ func (a *bro) radioFolded(i int) bool {
 // radioStep moves the focus to the next panel (d -1: the one before),
 // folded or not.
 func (a *bro) radioStep(d int) {
-	a.rs.focus = (a.rs.focus + d + 3) % 3
+	a.rs.focus = (a.rs.focus + d + 4) % 4
 	a.focusMoved()
 }
 
 // radioFocusOpen moves the focus off a folded panel, to an open one.
 func (a *bro) radioFocusOpen() {
 	r := &a.rs
-	for range 3 {
+	for range 4 {
 		if !a.radioFolded(r.focus) {
 			return
 		}
-		r.focus = (r.focus + 1) % 3
+		r.focus = (r.focus + 1) % 4
 	}
 }
 
@@ -964,6 +970,14 @@ func (a *bro) radioTap(pt image.Point) {
 		a.settingsTap(pt)
 		return
 	}
+	if pt.In(a.shp.p.Outer) && r.prompt == nil {
+		if r.focus != panelShare {
+			r.focus = panelShare
+			defer a.drawRadio()
+		}
+		a.shareTap(pt)
+		return
+	}
 	for i := range a.rv {
 		pv := &a.rv[i]
 		if !pt.In(pv.p.Outer) {
@@ -1064,6 +1078,9 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 		}
 		a.settingsKey(code)
 		return true
+	}
+	if r.focus == panelShare {
+		return a.shareKey(code)
 	}
 	sel, n := &r.wSel, len(r.nets)
 	if r.focus == panelBT {

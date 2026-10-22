@@ -80,17 +80,11 @@ func (a *bro) controls() []control {
 			add(key, key+".list", pv.list, true)
 			buttons(key, pv.buttons)
 		}
+		if !panel("sharing") {
+			buttons("sharing", a.shp.btns)
+		}
 		if !panel("settings") && len(a.sv.rows) > 0 {
 			add("settings", "settings.list", a.sv.rows[0].Union(a.sv.rows[len(a.sv.rows)-1]), true)
-		}
-	case tabFiles:
-		v := &a.fv
-		if !panel("sharing") {
-			buttons("sharing", v.shareBtns)
-		}
-		if !panel("files") {
-			add("files", "files.list", v.list, true)
-			buttons("files", v.listBtns)
 		}
 	case tabPower:
 		panel("battery")
@@ -130,8 +124,6 @@ func (a *bro) focusTo(c control) {
 		return
 	}
 	switch c.panel {
-	case "sharing", "files":
-		a.fv.shareFocus = c.panel == "sharing"
 	case "battery", "usage":
 		a.pv.useFocus = c.panel == "usage"
 	default:

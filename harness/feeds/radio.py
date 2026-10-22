@@ -27,8 +27,8 @@ key(DOWN); key(ENTER); time.sleep(3)                  # the FiiO (paired, below 
 key(TAB); key(TAB); keys("o"); time.sleep(4)          # past the settings to Wi-Fi: off
 keys("o"); time.sleep(6)                              # and on
 key(KEY_P, ctrl=True, shift=True); time.sleep(2)        # the switcher
-keys("files"); time.sleep(1)
-key(ENTER); time.sleep(3)                             # the Files tab
+keys("power"); time.sleep(1)
+key(ENTER); time.sleep(3)                             # the Power tab
 key(K1, ctrl=True, alt=True); time.sleep(3)           # the SSH tab
 fullscreen(); time.sleep(2)
 key(KEY_P, ctrl=True, shift=True); time.sleep(2)        # the switcher, fullscreen

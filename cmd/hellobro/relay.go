@@ -60,7 +60,7 @@ type relayConf struct {
 type relayState struct {
 	stop   chan struct{} // closed to end it
 	conf   relayConf
-	status string // how it is, for the Files tab
+	status string // how it is, for the Sharing panel
 	up     bool
 	err    string // why it isn't running at all
 }

@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	panelSet  = 2 // the settings panel, after panelWiFi and panelBT
+	panelSet  = 3 // the settings panel, after Wi-Fi, Bluetooth and Sharing
 	setRowH   = 50
 	setRowMin = 40
 	setTxt    = "settings"
@@ -59,7 +59,7 @@ var settingList = []setting{
 		shown:  []string{"as Kobo had them, and put back so", "turned on, and left on"}},
 	{key: "share", label: "File sharing (SFTP, port 2022)",
 		values: []string{"off", "on", "pair"},
-		shown:  []string{"off", "on (Files tab)", "pair a computer"}},
+		shown:  []string{"off", "on (Sharing, above)", "pair a computer"}},
 	{key: "relay", label: "Relay, a way in from afar (relay.conf)",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on, while sharing: no auto-exit"}},

@@ -1,13 +1,13 @@
 # Folding from the keys: Ctrl+Shift+M folds the panel in focus (the
 # focus goes to an open one) or opens it; Ctrl+Tab lands on a folded
-# strip too, where keys wait and Enter opens it. On Settings, Files and
-# two SSH sessions (the test server, :2222).
+# strip too, where keys wait and Enter opens it. On Settings (Wi-Fi,
+# then Sharing) and two SSH sessions (the test server, :2222).
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K3, K4 = 4, 5  # Settings, Files
+K3 = 4  # Settings
 
 start(); time.sleep(3)
 key(K3, ctrl=True, alt=True); time.sleep(5)           # Settings, Wi-Fi in focus
@@ -15,10 +15,9 @@ key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # Wi-Fi folded, Bluetooth 
 key(TAB, ctrl=True, shift=True); time.sleep(2)        # back on Wi-Fi's strip
 keys("n"); time.sleep(2)                              # waits: nothing
 key(ENTER); time.sleep(3)                             # Wi-Fi open, in focus
-key(K4, ctrl=True, alt=True); time.sleep(3)           # Files, the list in focus
-key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # the list folded: Sharing has it
-key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # Sharing folded too
-key(TAB, ctrl=True); time.sleep(2)                    # Sharing's strip
+key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # Sharing in focus
+key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # folded: the settings in focus
+key(TAB, ctrl=True, shift=True); time.sleep(2)        # Sharing's strip
 key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # opened
 tap(tab_x(0), tabs_y); time.sleep(2)                  # SSH tab
 keys("1"); key(ENTER); time.sleep(5)

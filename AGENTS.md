@@ -8,8 +8,8 @@ How to work on this repo as a coding agent. People start at the
 Go apps for a Kobo Elipsa (N604, sunxi B300, firmware 4.38). While they
 run they freeze Nickel and draw an e-ink UI through FBInk.
 
-- `cmd/hellobro/`: the main app (terminal, Alpine, settings, files, relay,
-  the Linux players' remote control).
+- `cmd/hellobro/`: the main app (terminal, Alpine, settings, sharing,
+  relay, the Linux players' remote control, hosts' files mounted).
   Its keys are commands (`commands.go`, changed in `keys.conf`); which
   tabs show is `tabs.go`
 - `cmd/brotools/`: diagnostics, only installed when asked for
@@ -60,9 +60,9 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
 - Log: `OUT/stdout.txt`. App files: `OUT/app`.
 - `APP_EXTRA=dir` copies files into the app's dir first (settings,
   relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
-- The harness shows all five tabs, as the feeds' Ctrl+Alt+N count on
-  (the app hides Shell by default). `HB_TABS="ssh -shell settings
-  files"` sets the tabs file as you like: `harness/feeds/tabs.py` wants
+- The harness shows all four tabs, as the feeds' Ctrl+Alt+N count on
+  (the app hides Shell by default). `HB_TABS="ssh -shell settings"`
+  sets the tabs file as you like: `harness/feeds/tabs.py` wants
   that one.
 - Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`,
   `panes`, `foldkeys`, `fontswipe` and `relay` need the test server:
@@ -161,6 +161,14 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   is safe, but `rtk_hciattach` is Nickel's child. Wi-Fi's daemons are
   init's. `/tmp/nickel-hardware-status` must go while Nickel's away
   (writers hang on the FIFO) and come back before it starts.
+- Host files (`mount.go`, `sftpfs.go`): the jail can't mount, so
+  hellobro does, from a child (`hellobro --mount`) serving FUSE over
+  an SFTP stream hellobro's SSH login carries. They're under
+  `/tmp/hellobro-hosts`, a tmpfs made shared; the jails' mounts are
+  slaves (not private), so they follow it in at `/mnt/hosts`, bound
+  read-only so nothing in the jail can put a symlink where hellobro
+  mounts. hellobro must never read a mount itself (a quiet host hangs
+  the reader). go-fuse 2.12 doesn't build for 32-bit ARM: stay on 2.11.
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 

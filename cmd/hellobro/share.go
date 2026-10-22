@@ -146,9 +146,6 @@ func (a *bro) shareEvent(e share.Event) {
 		s.note = fmt.Sprintf("%s@%s connected", c.User, c.Addr)
 	case "closed":
 		s.note = fmt.Sprintf("%s@%s left (%s in, %s out)", c.User, c.Addr, humanBytes(c.In), humanBytes(c.Out))
-		if c.WroteSFTP {
-			a.fv.listAt = time.Time{} // look again
-		}
 	case "paired":
 		s.note, s.code = "paired: "+e.Note, ""
 		if s.srv != nil {

@@ -34,9 +34,8 @@ type foldable struct {
 var foldables = []foldable{
 	{"wifi", "Wi-Fi", tabRadio},
 	{"bluetooth", "Bluetooth", tabRadio},
+	{"sharing", "Sharing", tabRadio},
 	{"settings", "Settings", tabRadio},
-	{"sharing", "Sharing", tabFiles},
-	{"files", "On this Kobo", tabFiles},
 	{"battery", "Battery", tabPower},
 	{"usage", "What uses it", tabPower},
 }
@@ -94,9 +93,6 @@ func (a *bro) setFold(key string, on bool) {
 		} else {
 			a.rs.focus = radioPanelOf(key)
 		}
-	case tabFiles:
-		a.fv.shareFocus = (key == "sharing") != on
-		a.layoutFiles(a.lay)
 	case tabPower:
 		a.pv.useFocus = (key == "usage") != on
 		a.layoutPower(a.lay)
@@ -117,9 +113,7 @@ func (a *bro) foldPanel(key string) kobo.Panel {
 	case "settings":
 		return a.sv.p
 	case "sharing":
-		return a.fv.shareP
-	case "files":
-		return a.fv.listP
+		return a.shp.p
 	case "battery":
 		return a.pv.batP
 	case "usage":
@@ -134,6 +128,8 @@ func radioPanelOf(key string) int {
 		return panelWiFi
 	case "bluetooth":
 		return panelBT
+	case "sharing":
+		return panelShare
 	}
 	return panelSet
 }
@@ -229,8 +225,6 @@ func netText(ws radio.WiFiStatus) string {
 func (a *bro) stepPanel(d int) {
 	delete(a.fs.at, a.Tab) // to the new panel's list, or its first control
 	switch a.Tab {
-	case tabFiles:
-		a.fv.shareFocus = !a.fv.shareFocus
 	case tabPower:
 		a.pv.useFocus = !a.pv.useFocus
 	case tabRadio:
@@ -253,9 +247,6 @@ func (a *bro) focusMoved() {
 		return
 	}
 	switch a.Tab {
-	case tabFiles:
-		a.fv.shownShare, a.fv.shownList = "", ""
-		a.drawFiles()
 	case tabRadio:
 		a.drawRadio()
 	case tabPower:
@@ -307,10 +298,8 @@ func focusMark(p kobo.Panel, focused bool) kobo.Panel {
 // focusKey is the foldable panel in focus; "" on a terminal tab.
 func (a *bro) focusKey() string {
 	switch a.Tab {
-	case tabFiles:
-		return map[bool]string{true: "sharing", false: "files"}[a.fv.shareFocus]
 	case tabRadio:
-		return []string{"wifi", "bluetooth", "settings"}[a.rs.focus]
+		return []string{"wifi", "bluetooth", "sharing", "settings"}[a.rs.focus]
 	case tabPower:
 		return map[bool]string{false: "battery", true: "usage"}[a.pv.useFocus]
 	}

@@ -12,7 +12,7 @@ key(ENTER); time.sleep(3)                             # a shell
 if os.environ.get('QUIET') != '1':
     keys("while :; do printf '\\rA: %s ' $(date +%S.%N | cut -c1-5); sleep 0.05; done\n")
 time.sleep(4)
-key(6, ctrl=True, alt=True)                           # the Power tab
+key(5, ctrl=True, alt=True)                           # the Power tab
 time.sleep(int(os.environ.get('HOLD', '60')))
 key(3, ctrl=True, alt=True); time.sleep(3)            # back: the line is as new as ever
 exit_app()

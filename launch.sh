@@ -139,6 +139,11 @@ for pid in $(pidof hellobro); do
 		kill -KILL "$pid"
 	fi
 done
+# The hosts' files (mount.go), if hellobro didn't get to unmount them.
+for m in $(awk '$2 ~ "^/tmp/hellobro-hosts" {print $2}' /proc/mounts | sort -r); do
+	say "unmounting $m"
+	umount -l "$m"
+done
 if grep -q " /tmp/hellobro-alpine " /proc/mounts; then
 	say "unmounting the Alpine image"
 	umount -l /tmp/hellobro-alpine

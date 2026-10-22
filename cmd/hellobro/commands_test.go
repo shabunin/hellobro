@@ -107,28 +107,28 @@ func TestParseTabs(t *testing.T) {
 	for in, want := range map[string]string{
 		"":                                    tabsDefault,
 		tabsDefault:                           tabsDefault,
-		"music ssh":                           "ssh -shell settings files power", // the Music tab is gone
-		"-settings -music files ssh shell":    "settings files ssh shell power",
-		"SSH SSH bogus -Files":                "ssh -files -shell settings power",
-		"files settings music shell ssh more": "files settings shell ssh power",
+		"music ssh":                           "ssh -shell settings power", // the Music tab is gone
+		"-settings -music files ssh shell":    "settings ssh shell power",  // and Files
+		"SSH SSH bogus -Files":                "ssh -shell settings power",
+		"files settings music shell ssh more": "settings shell ssh power",
 	} {
 		if got := parseTabs(in).String(); got != want {
 			t.Errorf("%q: %q, want %q", in, got, want)
 		}
 	}
-	if got := parseTabs(tabsDefault).shown(); !slices.Equal(got, []int{tabSSH, tabRadio, tabFiles, tabPower}) {
+	if got := parseTabs(tabsDefault).shown(); !slices.Equal(got, []int{tabSSH, tabRadio, tabPower}) {
 		t.Errorf("shown: %v", got)
 	}
 }
 
 func TestTabHints(t *testing.T) {
-	four := "ssh shell settings -files power"
+	four := "ssh shell settings power"
 	for _, c := range []struct {
 		conf, tabs string
 		hints      []string
 		footer     string
 	}{
-		{"", tabsDefault, []string{"1", "2", "3", "4"}, "tabs: tap or Ctrl+Alt+1–4"},
+		{"", tabsDefault, []string{"1", "2", "3"}, "tabs: tap or Ctrl+Alt+1–3"},
 		{"", four, []string{"1", "2", "3", "4"}, "tabs: tap or Ctrl+Alt+1–4"},
 		{"alt+1 tab.1\nalt+2 tab.2\nalt+3 tab.3\nalt+4 tab.4", four, []string{"1", "2", "3", "4"}, "tabs: tap or Alt+1–4"},
 		{"f1 tab.shell", four, []string{"1", "F1", "3", "4"}, "tabs: tap or Ctrl+Alt+corner key"},

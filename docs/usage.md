@@ -12,18 +12,18 @@ in a session too):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
   Claude Code…), mouse taps and scrolling; several sessions at once, side
-  by side.
+  by side. A saved host's files can be mounted too, for Alpine
+  ([Host files](#host-files)).
 - **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
   several too. Hidden at first: turn it on in Settings, Tabs. Or Alpine
   Linux in a jail instead ([The Alpine shell](#the-alpine-shell)).
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel: on and
   off, networks (join, with a password; leave; forget; one by name), and
-  devices (scan, pair, connect, disconnect, forget); and hellobro's own
-  settings: the light off when idle, light sleep, sleep with music on, file sharing, the relay,
-  mDNS, terminal notifications, CPU profiles, the status bar, the tabs.
-- **Files**: sharing with a computer over SFTP and SSH (how to reach the
-  Kobo, pairing, who's connected and sending what), and the Kobo's
-  storage: folders to open, files and folders to delete.
+  devices (scan, pair, connect, disconnect, forget); **Sharing** with a
+  computer over SFTP and SSH (how to reach the Kobo, pairing, who's
+  connected and sending what); and hellobro's own settings: the light,
+  light sleep, sleep with music on, file sharing, the relay, mDNS,
+  terminal notifications, CPU profiles, the status bar, the tabs.
 - **Power**: a powertop of sorts. **Battery**: the charge, the current
   it gives (mA, W), the gauge's time left, temperature, how fast it
   went down lately (measured from its history, a sample a minute while
@@ -37,7 +37,7 @@ Which tabs show, and in what order, is up to you: Settings, the last
 row, **Tabs** (or "tabs" in the switcher) opens a list of them. A tap on
 one, or Space, shows or hides it; the arrows, or Shift+Up/Down, move it.
 Settings itself can't be hidden. It's kept in `tabs`
-(`ssh -shell settings files power`: a `-` hides one).
+(`ssh -shell settings power`: a `-` hides one).
 
 ## The header and the panels
 
@@ -63,8 +63,7 @@ window manager does, on any tab: Ctrl+Tab then goes on to the next
 panel, which has the screen in turn. Ctrl+Shift+F again, or a swipe in
 from the top or bottom edge, brings the others back. Like every key
 here, these are set in `keys.conf` (or Settings → Keys): `fullscreen`,
-`panel.next`, `panel.prev`, `panel.fold`. On Files, the arrows are the
-list's.
+`panel.next`, `panel.prev`, `panel.fold`.
 
 Tab moves the keys' focus through the page's controls, as on a desktop:
 the tab strip, the buttons and the lists, panel by panel; Shift+Tab goes
@@ -83,8 +82,7 @@ everything hellobro does on a key, a button or a page's letter. Among
 them: disconnecting or closing the session in focus; the player's play,
 pause, stop, tracks and volume; Wi-Fi or Bluetooth on and off, looking
 for networks or devices, joining a network by name, its details;
-sharing, pairing, the relay; showing or hiding a tab; hidden files on
-Files; light sleep, the light, the screen's way round; and every
+sharing, pairing, the relay; showing or hiding a tab; light sleep, the light, the screen's way round; and every
 setting ("Setting: …", with its value now: Enter steps it, as a tap on
 its row does). Typing narrows it (fuzzy); Up/Down and Enter, or 1–9
 before typing.
@@ -192,12 +190,19 @@ minutes), the Kobo goes to sleep properly.
 
 ## Terminal
 
-- `ssh.conf` next to hellobro lists saved hosts, one per line:
-  `name  user@host[:port]  [via user@jumphost[:port]]  [command]`; the
-  command (say `tmux new -A -s kobo`) runs instead of a login shell, and
-  `via` goes through a jump host, as `ssh -J` does ([relay.md](relay.md)). The
-  prompt also takes `ssh -p PORT [-J user@jumphost] user@host [command]`,
-  and a host typed there is added to `ssh.conf` once it connects.
+- Type `user@host[:port] [command]` and Enter; the prompt also takes
+  `ssh -p PORT [-J user@jumphost] user@host [command]`. A host typed
+  there is saved once it connects (in `hellobro.json`), and listed under
+  the prompt.
+- A tap on a saved host, or its number, opens its menu: **connect**
+  (Enter), **mount its files** ([Host files](#host-files)), **edit**,
+  **forget**. Edit puts its line in the prompt, to change and save with
+  Enter: `name  user@host[:port]  [via user@jumphost[:port]]
+  [command]`; the command (say `tmux new -A -s kobo`) runs instead of a
+  login shell, and `via` goes through a jump host, as `ssh -J` does
+  ([relay.md](relay.md)). An `ssh.conf` next to hellobro, with lines
+  like that, is taken in at start (the names it doesn't have yet) and
+  kept as `ssh.conf.old`.
 - The Kobo's key is made on first use; `id_ed25519.pub` next to the binary
   goes in a server's `~/.ssh/authorized_keys`. Otherwise it asks for a
   password (Tab shows it while typing), and then offers to install the key
@@ -235,6 +240,37 @@ minutes), the Kobo goes to sleep properly.
   how long the light stays on, how often the strip blinks, how long the
   note stays (each can be off).
 
+## Host files
+
+A saved host's menu (the SSH tab) has **mount its files**: it asks
+**read-only** or **read-write** each time, logs in as connecting does
+(the Kobo's key, or a password asked on the page), and the host's home
+is then a folder:
+
+- `/mnt/hosts/NAME` in the Alpine sessions ([The Alpine shell](#the-alpine-shell)),
+  NAME being the host's;
+- `/tmp/hellobro-hosts/NAME` on the Kobo itself (the Kobo shell).
+
+```sh
+ls /mnt/hosts/pc/Music
+cp -r /mnt/hosts/pc/books/new /mnt/onboard/books/
+rsync -av --progress /mnt/hosts/pc/Music/Heroes/ /mnt/onboard/Music/Heroes/
+mpv /mnt/hosts/pc/Music/song.flac      # plays straight from the host
+```
+
+The host needs nothing but its sshd (SFTP). Files show as root's, as
+you are in Alpine; what may be done is the host user's to say.
+Read-only, nothing can change on the host. The saved hosts list says
+which are mounted; the menu unmounts.
+
+The mount is hellobro's (a process of its own, `hellobro --mount`), as
+the jail can't mount; it goes away before the Kobo sleeps and comes back
+on waking, and goes when hellobro does. Light sleep keeps Wi-Fi on while
+a host is mounted, as the music may be coming from it. If the host goes
+quiet (keepalives, as for sessions), it's unmounted, and says so: what
+was using it gets an error, not a hang. Sessions started before an
+update see `/mnt/hosts` from their next start.
+
 ## The Alpine shell
 
 Settings, **Shell tab runs**: the Kobo's own `/bin/sh`, as root (the
@@ -252,6 +288,9 @@ away from the Kobo's system.
   - `/mnt/onboard` is the Kobo's storage, writable, but its `.adds` and
     `.kobo` are read-only: what's there runs as root outside (the
     launcher, NickelMenu, `KoboRoot.tgz`).
+  - `/mnt/hosts` has the hosts mounted from the SSH tab ([Host
+    files](#host-files)); it's read-only itself, the mounts in it are as
+    they were mounted.
   - Its own processes only (no Nickel, no hellobro), its own `/dev` (no
     screen, keys, frontlight or disks), its own `/tmp`; `/sys` and
     `/proc/sys` read-only.
@@ -353,16 +392,16 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
 
 ## Sharing with a computer
 
-With file sharing on (Settings, or `o` on the Files tab), hellobro is an
+With file sharing on (Settings: **Sharing**, `o` or `turn on`), hellobro is an
 SSH server on port 2022, and with mDNS on the Kobo is `kobo.local` and
 shows up as an SFTP server in a file manager's Network. Only paired
 computers get in, with their key; there are no passwords:
 
-1. Pair: `pair` on the Files tab (or Settings, `p`) shows a code for 5
+1. Pair: `pair` in Settings, Sharing (or `p`) shows a code for 5
    minutes. On the computer, `ssh -p 2022 kobo.local`: once the computer
    has shown it holds its key, it asks for the code, and that key is in.
    (No key yet? `ssh-keygen` makes one.) Check the host key fingerprint
-   against the one the Files tab shows, the first time.
+   against the one Sharing shows, the first time.
 2. Then, from that computer:
    - a file manager: `sftp://kobo.local:2022/mnt/onboard` (Files on
      Fedora: Other Locations, or Ctrl+L);
@@ -459,14 +498,14 @@ Kobo's storage:
 
 | File | What it is |
 | --- | --- |
-| `ssh.conf` | saved SSH hosts |
 | `relay.conf` | where the relay goes ([relay.md](relay.md)) |
 | `id_ed25519`, `id_ed25519.pub` | the Kobo's own key, for SSH and the relay |
 | `known_hosts` | host keys trusted on first use |
 | `authorized_keys` | computers paired for file sharing |
 | `ssh_host_ed25519_key` | the Kobo's host key, for file sharing |
 | `settings`, `status-bar`, `tabs`, `folded` | settings |
-| `hellobro.json` | how it was left: the light, the font size |
+| `hellobro.json` | the saved SSH hosts, and how it was left: the light, the font size |
+| `ssh.conf.old` | the hosts as kept before, taken in once |
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |

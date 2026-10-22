@@ -1,15 +1,14 @@
 # File sharing with a computer, the computer played by OpenSSH on this
 # PC (on 127.0.0.1, and with the pairing code the harness fixes:
-# HELLOBRO_FAKE_PAIR_CODE): the Files tab, sharing on, pairing, an album
-# sent with scp (it shows up in the list), a
-# command, then make push's way: hellobro.new, hellobro-update, and the
+# HELLOBRO_FAKE_PAIR_CODE): the Settings tab's Sharing, on, pairing, an
+# album sent with scp, a command, then make push's way: hellobro.new, hellobro-update, and the
 # restart into it. Wants ssh, scp and ssh-keygen.
 # app: hellobro
 import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K4 = 5  # Files
+K3 = 4  # Settings
 OUT = os.path.dirname(os.path.abspath(sys.argv[1]))
 PC = os.path.join(OUT, "pc")
 os.makedirs(PC, exist_ok=True)
@@ -33,7 +32,8 @@ def pc(*cmd, ask=False):
     return r
 
 start()
-key(K4, ctrl=True, alt=True); time.sleep(4)            # Files: sharing off
+key(K3, ctrl=True, alt=True); time.sleep(4)            # Settings: sharing off
+key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # Sharing in focus
 keys("o"); time.sleep(3)                               # on
 keys("p"); time.sleep(3)                               # pairing: the code
 pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "echo paired; uname -m", ask=True); time.sleep(3)
@@ -42,14 +42,11 @@ os.makedirs(album, exist_ok=True)
 for i in range(1, 4):
     with open(os.path.join(album, "%02d. Song.mp3" % i), "wb") as f:
         f.write(os.urandom(400000))
-pc("scp", *OPTS, "-P", "2022", "-r", album, "bro@127.0.0.1:Music/"); time.sleep(5)  # the list has it
-key(DOWN); time.sleep(2)
-key(ENTER); time.sleep(3)                              # into it
-key(BACKSPACE); time.sleep(2)
+pc("scp", *OPTS, "-P", "2022", "-r", album, "bro@127.0.0.1:Music/"); time.sleep(5)
 pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "hellobro-version"); time.sleep(1)
 app = os.path.join(OUT, "app")
 pc("scp", *OPTS, "-P", "2022", os.path.join(app, "hellobro"), "bro@127.0.0.1:" + os.path.join(app, "hellobro.new"))
 pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "hellobro-update"); time.sleep(12)   # restarted into it
-key(K4, ctrl=True, alt=True); time.sleep(4)            # sharing is on again, after the restart
+key(K3, ctrl=True, alt=True); time.sleep(4)            # sharing is on again, after the restart
 pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "hellobro-version"); time.sleep(2)
 exit_app()

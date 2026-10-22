@@ -32,9 +32,11 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   and the header shows what plays.
 - **Light sleep**: the screen shows what's playing, the light goes off,
   and the music keeps going.
-- **Settings**: Wi-Fi and Bluetooth without going back to Nickel.
-- **Files**: SFTP and SSH for a paired computer (`kobo.local`). Updates
-  go over the air.
+- **Host files**: a saved host's home mounted for Alpine, read-only or
+  read-write: copy, rsync, or play music straight from the PC.
+- **Settings**: Wi-Fi and Bluetooth without going back to Nickel, and
+  sharing: SFTP and SSH for a paired computer (`kobo.local`). Updates go
+  over the air.
 - **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
   what's using it, powertop style.
 - **From afar**: a relay through a VPS, so the Kobo and your PC reach
@@ -64,7 +66,8 @@ installed. hellobro is built and tested on the Elipsa (N604, firmware
 
 Pair the computer once:
 
-1. In hellobro, open Files and press `pair` (it turns file sharing on).
+1. In hellobro, open Settings and press `pair` under Sharing (it turns
+   file sharing on).
    It shows a code.
 2. On the computer, run `ssh -p 2022 kobo.local` and type the code.
 
@@ -94,7 +97,7 @@ make dist            # a release's files, in dist/
 
 | | |
 | --- | --- |
-| Ctrl+Alt+1–5 | tabs |
+| Ctrl+Alt+1–4 | tabs |
 | Ctrl+Shift+P | go to: sessions, tabs, hosts, commands |
 | Ctrl+Tab, Ctrl+Shift+Tab | next / previous panel (or session) |
 | Ctrl+Shift+M | minimize / open the panel in focus (Enter opens it too) |

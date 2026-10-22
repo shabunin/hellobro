@@ -1,12 +1,12 @@
 // hellobro is a terminal for the Kobo Elipsa, for a Bluetooth keyboard.
 //
 // Tabs:
-//   - SSH: terminals (xterm emulation, PTY) over SSH, several at once;
+//   - SSH: terminals (xterm emulation, PTY) over SSH, several at once,
+//     and the saved hosts' files, mounted (mount.go);
 //   - Shell: terminals with a shell on the Kobo itself;
-//   - Settings: Kobo's Wi-Fi and Bluetooth, and hellobro's sleep, sharing
-//     and status bar;
-//   - Files: sharing with a computer (SFTP, ssh, mDNS), and the Kobo's
-//     storage.
+//   - Settings: Kobo's Wi-Fi and Bluetooth, sharing with a computer
+//     (SFTP, ssh, mDNS), and hellobro's sleep, status bar and the rest;
+//   - Power: the battery, and what uses it.
 //
 // A swipe along the right edge sets the font size, Ctrl+Shift+F gives
 // the session in focus the whole screen. Which tabs show, and in what order, is up
@@ -33,11 +33,10 @@ const (
 	tabSSH = iota
 	tabShell
 	tabRadio
-	tabFiles
 	tabPower
 )
 
-var tabNames = []string{"SSH", "Shell", "Settings", "Files", "Power"}
+var tabNames = []string{"SSH", "Shell", "Settings", "Power"}
 
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
@@ -65,6 +64,7 @@ type bro struct {
 	rs     radioState
 	slp    sleepState
 	sv     settingsView
+	shp    sharePanel // the Settings tab's Sharing
 	fs     focusState // the keys' focus: focus.go
 	set    settings
 	mem    remembered // hellobro.json
@@ -72,7 +72,6 @@ type bro struct {
 	doze   dozeState
 	share  shareState
 	relay  relayState
-	fv     filesView
 	upd    updateState
 	folds  map[string]bool // the panels folded, by key (fold.go)
 	net    netState        // the header's network
@@ -139,17 +138,14 @@ func (a *bro) Layout(L kobo.Layout) {
 		a.termGeometry() // the terminal follows the new size
 	}
 	a.layoutRadio(L)
-	a.layoutFiles(L)
 	a.layoutPower(L)
 }
 
 func (a *bro) Draw() {
 	switch a.Tab {
 	case tabRadio:
-		a.rv[panelWiFi].shown, a.rv[panelBT].shown, a.sv.shown = "", "", ""
+		a.rv[panelWiFi].shown, a.rv[panelBT].shown, a.sv.shown, a.shp.shown = "", "", "", ""
 		a.drawRadio()
-	case tabFiles:
-		a.drawFiles()
 	case tabPower:
 		a.pv.shownBat, a.pv.shownUse = "", ""
 		a.drawPower()
@@ -162,8 +158,6 @@ func (a *bro) Enter(tab int) {
 	switch tab {
 	case tabRadio:
 		a.enterRadio()
-	case tabFiles:
-		a.enterFiles()
 	case tabPower:
 		a.enterPower()
 	default:
@@ -202,8 +196,6 @@ func (a *bro) Tap(p image.Point) {
 	switch a.Tab {
 	case tabRadio:
 		a.radioTap(p)
-	case tabFiles:
-		a.filesTap(p)
 	case tabPower:
 		a.powerTap(p)
 	default:
@@ -223,7 +215,6 @@ func (a *bro) Tick() {
 	a.statTick()
 	a.radioTick()
 	a.shareTick()
-	a.filesTick()
 	a.powerTick()
 	a.updateTick()
 	a.trialTick()
@@ -295,8 +286,6 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.Tab == tabRadio:
 		return a.radioKey(m.Code, m.Value)
-	case a.Tab == tabFiles:
-		return a.filesKey(m.Code, m.Value)
 	case a.Tab == tabPower:
 		return false
 	}
@@ -342,7 +331,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		}
 	}
 	switch {
-	case g.Tap || g.Pen || a.overlay() || a.Tab == tabRadio || a.Tab == tabFiles || a.Tab == tabPower:
+	case g.Tap || g.Pen || a.overlay() || a.Tab == tabRadio || a.Tab == tabPower:
 	default:
 		a.termSwipe(g.Start, g.Last)
 	}

@@ -17,8 +17,9 @@ Back to the [README](../README.md). Agents: [AGENTS.md](../AGENTS.md).
 - `share/`: the SSH server for a computer: SFTP, a shell, commands, and
   pairing by a code on the screen; the mDNS responder that advertises it.
 - `cmd/hellobro/`: the terminal (the emulator view, SSH, the local shell),
-  the status bar, the switcher, the Settings, Files and Power tabs, sleep
-  and light sleep, the Linux players' remote control (MPRIS), updates over the air.
+  the status bar, the switcher, the Settings and Power tabs, sleep
+  and light sleep, the Linux players' remote control (MPRIS), the hosts'
+  files mounted (FUSE over SFTP), updates over the air.
 - `cmd/brotools/`: the diagnostics pages.
 
 ## Building

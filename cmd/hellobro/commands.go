@@ -120,11 +120,6 @@ func makeCommands() []*command {
 		&command{id: "relay", title: "Relay on / off", run: func(a *bro) { a.stepSetting(settingIndex("relay"), 1) }},
 		&command{id: "tabs", title: "Tabs: show, hide, order", run: (*bro).openTabs},
 		&command{id: "keys", title: "Keys: set a command's", run: func(a *bro) { a.openKeys(nil) }},
-		&command{id: "files.hidden", title: "Files: show / hide hidden files", when: func(a *bro) bool { return a.Tab == tabFiles },
-			run: func(a *bro) {
-				a.fv.hidden = !a.fv.hidden
-				a.listFiles()
-			}},
 	)
 	cs = append(cs, settingCommands()...)
 	cs = append(cs, foldCommands()...)

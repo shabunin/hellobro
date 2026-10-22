@@ -30,7 +30,7 @@ H=$(cd "$(dirname "$0")" && pwd); OUT=$1; ROTA=$2; FEED=${3:-demo}
 NAME=$(sed -n 's/^# app: //p' "$H/feeds/$FEED.py" | head -n 1)
 APP=${APP:-$H/../${NAME:-hellobro}}
 NAME=$(basename "$APP")
-HB_TABS=${HB_TABS:-ssh shell settings files power}
+HB_TABS=${HB_TABS:-ssh shell settings power}
 case " $HB_TABS " in *" power "* | *" -power "*) ;; *) HB_TABS="$HB_TABS power" ;; esac
 case $NAME in brotools*) TABS=7 ;; *) TABS=$(echo "$HB_TABS" | tr ' ' '\n' | grep -vc '^-') ;; esac
 IFACE=${INTERFACE:-$(ip route show default 2>/dev/null | awk '{print $5; exit}')}
