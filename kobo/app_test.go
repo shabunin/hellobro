@@ -41,3 +41,42 @@ func TestFastTabs(t *testing.T) {
 		t.Errorf("cleaned twice: %v", a.dirty)
 	}
 }
+
+// The DU of a fast tab goes out in black and white only, and the GL16
+// after it with the grays.
+func TestFastTabsBlackAndWhite(t *testing.T) {
+	scr := image.Rect(0, 0, 200, 300)
+	a := &App{C: Canvas{image.NewGray(scr)}, jobs: make(chan blitJob, 4)}
+	for i := range a.C.Pix {
+		a.C.Pix[i] = uint8(i) // all the grays
+	}
+	page := image.Rect(0, 50, 200, 300)
+	a.fast = true
+	a.Mark(page, true)
+	a.fast = false
+	a.flush()
+	j := <-a.jobs
+	if j.wf != "DU" || j.img.Rect != page {
+		t.Fatalf("%s %v", j.wf, j.img.Rect)
+	}
+	for i, v := range j.img.Pix {
+		if want := map[bool]uint8{true: Black, false: White}[a.C.Pix[a.C.PixOffset(0, 50)+i] < 0x80]; v != want {
+			t.Fatalf("DU pixel %d: %#x, want %#x", i, v, want)
+		}
+	}
+	a.blitting = false
+	a.fastClean = time.Now()
+	a.cleanFast()
+	a.flush()
+	j = <-a.jobs
+	if j.wf != "GL16" || j.img.Rect != page || j.img.Pix[3] != a.C.Pix[a.C.PixOffset(3, 50)] {
+		t.Fatalf("cleanup: %s %v", j.wf, j.img.Rect)
+	}
+	// Later DU updates (the terminal's) are as drawn.
+	a.blitting = false
+	a.Mark(image.Rect(0, 60, 100, 70), false)
+	a.flush()
+	if j = <-a.jobs; j.img.Pix[5] != a.C.Pix[a.C.PixOffset(5, 60)] {
+		t.Errorf("a DU after: %#x", j.img.Pix[5])
+	}
+}

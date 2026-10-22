@@ -975,6 +975,19 @@ func (a *App) flush() {
 		src = a.panelC
 	}
 	CopyGray(img, d.r, src.Gray, d.r.Min)
+	if !d.ui && d.r.Overlaps(a.fastArea) {
+		// DU only drives the pixels going to black or white: one going
+		// to a gray keeps what it showed (the old tab), but the controller
+		// takes it as done, and the GL16 after it then passes it by. So DU
+		// gets black and white only, and every gray is new to the GL16.
+		for i, v := range img.Pix {
+			if v < 0x80 {
+				img.Pix[i] = Black
+			} else {
+				img.Pix[i] = White
+			}
+		}
+	}
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {
 		flash, a.flashR = true, image.Rectangle{}
