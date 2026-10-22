@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"io"
 	"log"
 	"os"
@@ -617,7 +616,7 @@ func (a *bro) drawCell(pn *termPane, x, y int, k cellKey) {
 	a.C.Fill(r, bg)
 	if k.content != "" && k.content != " " {
 		mask := a.glyph(k.content, k.attrs&uv.AttrBold != 0, w)
-		draw.DrawMask(a.C.Gray, r, image.NewUniform(color.Gray{fg}), image.Point{}, mask, image.Point{}, draw.Over)
+		a.C.Mask(r, fg, mask, image.Point{})
 	}
 	if k.ul != 0 {
 		a.C.Fill(image.Rect(r.Min.X, r.Max.Y-3, r.Max.X, r.Max.Y-1), fg)

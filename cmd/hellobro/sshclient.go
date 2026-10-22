@@ -262,6 +262,11 @@ func tofuHostKeys(note func(string)) ssh.HostKeyCallback {
 	}
 }
 
+// sshCiphers are x/crypto's, ChaCha20 first: on the Kobo's 32-bit ARM,
+// with no AES instructions for Go, it's 3× AES-GCM's speed.
+var sshCiphers = append([]string{ssh.CipherChaCha20Poly1305},
+	slices.DeleteFunc(ssh.SupportedAlgorithms().Ciphers, func(c string) bool { return c == ssh.CipherChaCha20Poly1305 })...)
+
 // sshDial connects to h, through its jump host if it has one, as ssh -J
 // does: we log in to the jump host with our key, and it only carries the
 // connection to h, end to end.
@@ -273,7 +278,8 @@ func sshDial(h sshHost, cfg *ssh.ClientConfig, signer ssh.Signer) (*ssh.Client, 
 		conn, err = net.DialTimeout("tcp", h.addr, cfg.Timeout)
 	} else {
 		jump, err = sshDial(*h.via, &ssh.ClientConfig{
-			User: h.via.user, Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+			Config: ssh.Config{Ciphers: sshCiphers},
+			User:   h.via.user, Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 			HostKeyCallback: cfg.HostKeyCallback, Timeout: cfg.Timeout,
 		}, signer)
 		if err != nil {
@@ -349,7 +355,8 @@ func dialSSH(h sshHost, o dialOpts) (*sshSession, string, error) {
 		return p, err
 	}
 	cfg := &ssh.ClientConfig{
-		User: h.user,
+		Config: ssh.Config{Ciphers: sshCiphers},
+		User:   h.user,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 			ssh.KeyboardInteractive(func(name, instruction string, questions []string, echos []bool) ([]string, error) {

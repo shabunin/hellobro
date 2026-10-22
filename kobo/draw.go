@@ -69,8 +69,50 @@ func Blank(size image.Point) *image.Gray {
 	return img
 }
 
+// Fill paints r gray g: a row, then copies of it. (draw.Draw has no fast
+// way for a Gray image: a pixel at a time, 30× slower on the Kobo.)
 func (c Canvas) Fill(r image.Rectangle, g uint8) {
-	draw.Draw(c.Gray, r, image.NewUniform(color.Gray{g}), image.Point{}, draw.Src)
+	r = r.Intersect(c.Rect)
+	if r.Empty() {
+		return
+	}
+	row := c.Pix[c.PixOffset(r.Min.X, r.Min.Y):][:r.Dx()]
+	for i := range row {
+		row[i] = g
+	}
+	for y := r.Min.Y + 1; y < r.Max.Y; y++ {
+		copy(c.Pix[c.PixOffset(r.Min.X, y):], row)
+	}
+}
+
+// Mask paints gray g into r through mask (at mp), as draw.DrawMask with
+// draw.Over does, but fast for the glyphs' *image.Alpha.
+func (c Canvas) Mask(r image.Rectangle, g uint8, mask image.Image, mp image.Point) {
+	m, ok := mask.(*image.Alpha)
+	if !ok {
+		draw.DrawMask(c.Gray, r, image.NewUniform(color.Gray{g}), image.Point{}, mask, mp, draw.Over)
+		return
+	}
+	clipped := r.Intersect(c.Rect).Intersect(m.Rect.Sub(mp).Add(r.Min))
+	if clipped.Empty() {
+		return
+	}
+	mp = mp.Add(clipped.Min.Sub(r.Min))
+	src := int(g)
+	for y := 0; y < clipped.Dy(); y++ {
+		dst := c.Pix[c.PixOffset(clipped.Min.X, clipped.Min.Y+y):][:clipped.Dx()]
+		as := m.Pix[m.PixOffset(mp.X, mp.Y+y):][:len(dst)]
+		for i, a := range as {
+			switch a {
+			case 0:
+			case 0xff:
+				dst[i] = g
+			default:
+				d := int(dst[i])
+				dst[i] = uint8(d + (src-d)*int(a)/0xff)
+			}
+		}
+	}
 }
 
 // Frame draws a t pixels thick border just inside r.
@@ -104,8 +146,21 @@ func (c Canvas) Text(f font.Face, r image.Rectangle, s string, g uint8, align in
 	}
 	m := f.Metrics()
 	baseline := r.Min.Y + (r.Dy()+m.Ascent.Ceil()-m.Descent.Ceil())/2
-	d := font.Drawer{Dst: c.SubImage(r).(*image.Gray), Src: image.NewUniform(color.Gray{g}), Face: f, Dot: fixed.P(x, baseline)}
-	d.DrawString(s)
+	// font.Drawer's DrawString, with our Mask for its draw.DrawMask.
+	dot, prev := fixed.P(x, baseline), rune(-1)
+	for _, ch := range s {
+		if prev >= 0 {
+			dot.X += f.Kern(prev, ch)
+		}
+		dr, mask, mp, advance, ok := f.Glyph(dot, ch)
+		if ok {
+			if clip := dr.Intersect(r); !clip.Empty() {
+				c.Mask(clip, g, mask, mp.Add(clip.Min.Sub(dr.Min)))
+			}
+		}
+		dot.X += advance
+		prev = ch
+	}
 }
 
 func fit(f font.Face, s string, w int) string {

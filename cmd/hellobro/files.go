@@ -184,8 +184,11 @@ func (a *bro) drawShare() {
 			if r := s.rate[cn.ID]; r > 1024 {
 				rate = fmt.Sprintf(" (%s/s)", humanBytes(int64(r)))
 			}
-			add(kobo.Black, "● %s@%s · %s · ↓ %s%s ↑ %s · %s", cn.User, cn.Addr, what, humanBytes(cn.In), rate, humanBytes(cn.Out),
-				time.Since(cn.Since).Round(time.Second))
+			since := "just now" // by the minute: the panel isn't drawn again every second
+			if d := time.Since(cn.Since); d >= time.Minute {
+				since = hoursMins(d)
+			}
+			add(kobo.Black, "● %s@%s · %s · ↓ %s%s ↑ %s · %s", cn.User, cn.Addr, what, humanBytes(cn.In), rate, humanBytes(cn.Out), since)
 		}
 	}
 	if s.note != "" {

@@ -194,7 +194,8 @@ func relayOnce(c relayConf, serve func(net.Conn), stop <-chan struct{}, up func(
 		return fmt.Errorf("client key: %w", err)
 	}
 	cfg := &ssh.ClientConfig{
-		User: c.host.user, Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		Config: ssh.Config{Ciphers: sshCiphers},
+		User:   c.host.user, Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: tofuHostKeys(func(s string) { log.Printf("relay: %s: %s", c.host.addr, s) }),
 		Timeout:         20 * time.Second,
 	}
