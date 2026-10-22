@@ -913,15 +913,20 @@ func (a *App) drawCalib() {
 }
 
 // drawCard fills the screen with a word and a line under it: hello as
-// we start, bye as we go.
-func (a *App) drawCard(big, small string) {
+// we start, bye as we go; about, if any, at its foot.
+func (a *App) drawCard(big, small, about string) {
 	c := a.C
 	b := c.Bounds()
 	c.Fill(b, White)
 	c.Text(a.F.Huge, image.Rect(0, b.Dy()/2-130, b.Dx(), b.Dy()/2+30), big, Black, AlignCenter)
 	c.Text(a.F.Body, image.Rect(0, b.Dy()/2+60, b.Dx(), b.Dy()/2+110), small, Dark, AlignCenter)
+	if about != "" {
+		c.Text(a.F.Small, image.Rect(0, b.Dy()-140, b.Dx(), b.Dy()-90), about, Dark, AlignCenter)
+	}
 	a.markAll(true)
 }
 
-func (a *App) drawRestart() { a.drawCard(a.cfg.Title, "starting the new "+a.cfg.Name+"…") }
-func (a *App) drawBye()     { a.drawCard("bye bro!", "back to Kobo…") }
+func (a *App) drawRestart() {
+	a.drawCard(a.cfg.Title, "starting the new "+a.cfg.Name+"…", a.cfg.About)
+}
+func (a *App) drawBye() { a.drawCard("bye bro!", "back to Kobo…", "") }

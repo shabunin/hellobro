@@ -13,7 +13,7 @@ K3, KJ, KA, KL = 4, 36, 30, 38
 start(); time.sleep(3)
 key(K3, ctrl=True, alt=True); time.sleep(4)           # Settings
 key(TAB); key(TAB); time.sleep(1)                     # the settings panel
-for _ in range(9): key(DOWN)
+key(END)
 time.sleep(1)                                         # its last row: Keys
 key(ENTER); time.sleep(3)                             # the commands, with their keys
 keys("dimmer"); time.sleep(2)

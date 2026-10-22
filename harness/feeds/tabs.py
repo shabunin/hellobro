@@ -13,8 +13,8 @@ app = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'app')
 start(); time.sleep(3)                                # SSH, three tabs
 key(K2, ctrl=True, alt=True); time.sleep(4)           # Settings, second now
 key(TAB); key(TAB); time.sleep(1)                     # the settings panel
-for _ in range(8): key(DOWN)
-time.sleep(1)                                         # its last row: Tabs
+key(END); key(UP)
+time.sleep(1)                                         # the row before the last: Tabs
 key(ENTER); time.sleep(3)                             # the dialog
 key(UP); key(UP); time.sleep(1)                       # Shell
 key(SPACE); time.sleep(4)                             # shown: four tabs

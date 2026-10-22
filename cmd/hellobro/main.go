@@ -110,7 +110,7 @@ func main() {
 	radio.StateDir = kobo.AppFile("")
 	a.tabs = loadTabs()
 	a.folds = loadFolds()
-	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames, OwnKeys: true}, a)
+	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: version + " · github.com/shabunin/hellobro", Tabs: tabNames, OwnKeys: true}, a)
 	profileOn.Store(a.setting("profile") == "on")
 	alpineBus.Store(a.setting("alpine-bus") == "on")
 	a.applyLightIdle()

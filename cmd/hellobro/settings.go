@@ -28,18 +28,19 @@ const (
 type setting struct {
 	key, label, cmd string
 	title           string // in the switcher, if not the label
+	group           string // a heading in the panel, before the first of each
 	values          []string
 	shown           []string
 }
 
 var settingList = []setting{
-	{key: "light-idle", label: "Light off when idle",
+	{key: "light-idle", group: "Light", label: "Light off when idle",
 		values: []string{"10", "30", "60", "300", "off"},
 		shown:  []string{"after 10 s untouched", "after 30 s untouched", "after 1 min untouched", "after 5 min untouched", "stays on"}},
 	{key: "light-start", label: "Light at start",
 		values: []string{"last", "nickel"},
 		shown:  []string{"as you last set it", "as Nickel had it"}},
-	{key: "doze-after", label: "Light sleep while music plays",
+	{key: "doze-after", group: "Sleep and music", label: "Light sleep while music plays",
 		values: []string{"off", "1", "2", "5", "10", "20"},
 		shown:  []string{"never by itself", "after 1 min idle", "after 2 min idle", "after 5 min idle", "after 10 min idle", "after 20 min idle"}},
 	{key: "sleep-music", label: "Sleep%s with music on", cmd: "sleep",
@@ -51,13 +52,13 @@ var settingList = []setting{
 	{key: "doze-deep", label: "Music stopped in light sleep",
 		values: []string{"5", "10", "30", "off"},
 		shown:  []string{"deep sleep after 5 min", "deep sleep after 10 min", "deep sleep after 30 min", "stay in light sleep"}},
-	{key: "nickel", label: "Nickel while hellobro runs",
+	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
 		values: []string{"frozen", "closed"},
 		shown:  []string{"frozen: back to it at once", "closed, as KOReader does (from the next start)"}},
 	{key: "radios", label: "Wi-Fi and Bluetooth at start",
 		values: []string{"kobo", "on"},
 		shown:  []string{"as Kobo had them, and put back so", "turned on, and left on"}},
-	{key: "share", label: "File sharing (SFTP, port 2022)",
+	{key: "share", group: "Sharing", label: "File sharing (SFTP, port 2022)",
 		values: []string{"off", "on", "pair"},
 		shown:  []string{"off", "on (Sharing, above)", "pair a computer"}},
 	{key: "relay", label: "Relay, a way in from afar (relay.conf)",
@@ -66,7 +67,10 @@ var settingList = []setting{
 	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
 		values: []string{"on", "off"},
 		shown:  []string{"yes, while sharing", "no"}},
-	{key: "notify", label: "Terminal notifications",
+	{key: "profile", label: "CPU profiles (make push-profile)",
+		values: []string{"off", "on"},
+		shown:  []string{"off", "on, for a paired computer"}},
+	{key: "notify", group: "Terminal", label: "Terminal notifications",
 		values: []string{"all", "messages", "off"},
 		shown:  []string{"the bell and messages", "messages only (OSC 9, 777)", "off"}},
 	{key: "notify-light", label: "… the light, if it's off", title: "Notifications: the light, if it's off",
@@ -78,10 +82,10 @@ var settingList = []setting{
 	{key: "notify-note", label: "… a note in the corner, if it doesn't", title: "Notifications: a note in the corner, if it doesn't",
 		values: []string{"3", "5", "10", "off"},
 		shown:  []string{"for 3 s", "for 5 s", "for 10 s", "none"}},
-	{key: "profile", label: "CPU profiles (make push-profile)",
-		values: []string{"off", "on"},
-		shown:  []string{"off", "on, for a paired computer"}},
-	{key: "shell", label: "Shell tab runs",
+	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
+		values: []string{"on", "off"},
+		shown:  []string{"shown on the terminals", "hidden"}},
+	{key: "shell", group: "Shell", label: "Shell tab runs",
 		values: []string{"kobo", "alpine"},
 		shown:  []string{"the Kobo's /bin/sh, as root", "Alpine Linux, in a jail"}},
 	{key: "alpine-bus", label: "… Alpine: system bus access", title: "Alpine: system bus access",
@@ -89,11 +93,37 @@ var settingList = []setting{
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
 	{key: "alpine-remove", label: "… Alpine: remove it", title: "Alpine: remove it",
 		values: []string{""}, shown: []string{""}}, // the question: alpine.go
-	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
-		values: []string{"on", "off"},
-		shown:  []string{"shown on the terminals", "hidden"}},
-	{key: "tabs", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
-	{key: "keys", label: "Keys", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
+	{key: "tabs", group: "Tabs and keys", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
+	{key: "keys", label: "Keys", values: []string{""}, shown: []string{""}},                         // the Keys menu: keyset.go
+}
+
+// setLine is a line of the panel: a group's heading, or setting i.
+type setLine struct {
+	head string
+	i    int
+}
+
+// settingLines are the panel's lines: each group's heading, then its
+// settings.
+var settingLines = func() []setLine {
+	var ls []setLine
+	for i, st := range settingList {
+		if st.group != "" {
+			ls = append(ls, setLine{head: st.group, i: -1})
+		}
+		ls = append(ls, setLine{i: i})
+	}
+	return ls
+}()
+
+// settingLine is the line setting i is on.
+func settingLine(i int) int {
+	for l, sl := range settingLines {
+		if sl.head == "" && sl.i == i {
+			return l
+		}
+	}
+	return 0
 }
 
 // settingRenamed are keys as they were once, by what they are now.
@@ -270,8 +300,8 @@ func (a *bro) layoutSettings(K kobo.Layout, r image.Rectangle, folded bool) {
 		v.hint, v.shown = image.Rectangle{}, ""
 		return
 	}
-	h := max(setRowMin, min(setRowH, (b.Dy()-40)/len(settingList))) // closer, if that makes room for all
-	for i := range settingList {
+	h := max(setRowMin, min(setRowH, (b.Dy()-40)/len(settingLines))) // closer, if that makes room for all
+	for i := range settingLines {
 		y := b.Min.Y + i*h
 		if y+h > b.Max.Y-40 {
 			break // no room: a short screen
@@ -292,14 +322,18 @@ func (a *bro) drawSettings() {
 	for _, st := range settingList {
 		vals = append(vals, a.setting(st.key))
 	}
-	n := len(v.rows)
-	if v.sel < v.top {
-		v.top = v.sel
+	n, sl := len(v.rows), settingLine(v.sel)
+	top := sl // the selected one in sight, and its group's heading if that's right above
+	if sl > 0 && settingLines[sl-1].head != "" {
+		top--
 	}
-	if v.sel >= v.top+n {
-		v.top = v.sel - n + 1
+	if top < v.top {
+		v.top = top
 	}
-	v.top = max(0, min(v.top, len(settingList)-n))
+	if sl >= v.top+n {
+		v.top = sl - n + 1
+	}
+	v.top = max(0, min(v.top, len(settingLines)-n))
 	key := fmt.Sprint(vals, v.sel, v.top, n, focused, a.share.code)
 	if key == v.shown {
 		return
@@ -311,7 +345,14 @@ func (a *bro) drawSettings() {
 	}
 	a.DrawPanel(p, "")
 	for k, rr := range v.rows {
-		i := v.top + k
+		if l := settingLines[v.top+k]; l.head != "" {
+			t := rr.Inset(4)
+			t.Min.X += 12
+			c.Text(a.F.Small, t, l.head, kobo.Dark, kobo.AlignLeft)
+			c.Fill(image.Rect(t.Min.X, rr.Max.Y-6, t.Max.X, rr.Max.Y-4), kobo.Mid)
+			continue
+		}
+		i := settingLines[v.top+k].i
 		st := settingList[i]
 		fg, dim := uint8(kobo.Black), uint8(kobo.Dark)
 		if i == v.sel {
@@ -346,8 +387,8 @@ func (a *bro) drawSettings() {
 	}
 	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Ctrl+Tab: the next panel."
 	switch {
-	case v.top+n < len(settingList): // a short screen
-		hint = fmt.Sprintf("▼ %d more: tap here, or ↓", len(settingList)-v.top-n)
+	case v.top+n < len(settingLines): // a short screen
+		hint = fmt.Sprintf("▼ %d more: tap here, or ↓", len(settingLines)-v.top-n)
 	case v.top > 0:
 		hint = "▲ back to the top: tap here, or ↑"
 	}
@@ -379,19 +420,23 @@ func indexOf(vs []string, v string) int {
 // settingsTap changes the setting tapped.
 func (a *bro) settingsTap(pt image.Point) {
 	v := &a.sv
-	if pt.In(v.hint) && len(v.rows) < len(settingList) { // the rest of a list that doesn't fit, or back
-		if v.top+len(v.rows) < len(settingList) {
-			v.top = len(settingList) - len(v.rows)
+	if pt.In(v.hint) && len(v.rows) < len(settingLines) { // the rest of a list that doesn't fit, or back
+		if v.top+len(v.rows) < len(settingLines) {
+			v.top = len(settingLines) - len(v.rows)
 		} else {
 			v.top = 0
 		}
-		v.sel = v.top
+		l := v.top
+		for settingLines[l].head != "" {
+			l++
+		}
+		v.sel = settingLines[l].i
 		a.drawSettings()
 		return
 	}
 	for k, rr := range v.rows {
-		if pt.In(rr) {
-			v.sel = v.top + k
+		if l := settingLines[v.top+k]; pt.In(rr) && l.head == "" {
+			v.sel = l.i
 			a.stepSetting(v.sel, 1)
 			return
 		}

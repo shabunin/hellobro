@@ -77,6 +77,7 @@ type Program interface {
 type Config struct {
 	Name  string   // the binary's, for the log: Name.log next to it
 	Title string   // in the header
+	About string   // at the foot of the start card: the version, where it's from
 	Tabs  []string // Ctrl+Alt+1, 2, …
 	// OwnKeys leaves Ctrl+Alt+1–9 (tabs) and Ctrl+Alt+S (sleep) to the
 	// Program's Key, for an app with keys of its own making, and Esc
@@ -241,7 +242,7 @@ func (a *App) Run() {
 	if os.Getenv(restartedEnv) == "" {
 		s := a.scr.info
 		a.C = Canvas{image.NewGray(image.Rect(0, 0, s.ViewW, s.ViewH))}
-		a.drawCard(a.cfg.Title, "starting…")
+		a.drawCard(a.cfg.Title, "starting…", a.cfg.About)
 		a.flush()
 	}
 	os.Unsetenv(restartedEnv)

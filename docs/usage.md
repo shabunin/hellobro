@@ -2,8 +2,9 @@
 
 Back to the [README](../README.md). From afar: [relay.md](relay.md).
 
-It starts on a "hello bro" screen while it gets going, and says "bye
-bro!" as it hands the Kobo back.
+It starts on a "hello bro" screen while it gets going, with its version
+and where it's from at the foot, and says "bye bro!" as it hands the
+Kobo back.
 
 ## Tabs
 
@@ -21,9 +22,10 @@ in a session too):
   off, networks (join, with a password; leave; forget; one by name), and
   devices (scan, pair, connect, disconnect, forget); **Sharing** with a
   computer over SFTP and SSH (how to reach the Kobo, pairing, who's
-  connected and sending what); and hellobro's own settings: the light,
-  light sleep, sleep with music on, file sharing, the relay, mDNS,
-  terminal notifications, CPU profiles, the status bar, the tabs.
+  connected and sending what); and hellobro's own settings, in groups:
+  Light; Sleep and music; At start (Nickel, the radios); Sharing (file
+  sharing, the relay, mDNS, CPU profiles); Terminal (notifications, the
+  status bar); Shell (Alpine); Tabs and keys.
 - **Power**: a powertop of sorts. **Battery**: the charge, the current
   it gives (mA, W), the gauge's time left, temperature, how fast it
   went down lately (measured from its history, a sample a minute while

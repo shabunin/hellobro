@@ -1,5 +1,5 @@
 # The Alpine shell, as far as a PC shows it: Settings, "Shell tab runs"
-# to Alpine (the 14th row), system bus access on (the next), then the
+# to Alpine (the 18th setting), system bus access on (the next), then the
 # Shell tab says so, and Enter starts
 # a session, which can't be a jail here (no root): it says why and ends.
 # On the Kobo: ssh -t -p 2022 kobo.local hellobro-alpine.
@@ -10,8 +10,8 @@ from feedlib import *
 
 start()
 key(4, ctrl=True, alt=True); time.sleep(3)            # Settings
-key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # the settings panel
-for _ in range(13):
+key(TAB, ctrl=True); key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # the settings panel
+for _ in range(17):
     key(DOWN); time.sleep(0.2)
 time.sleep(2)
 key(RIGHT); time.sleep(3)                             # Shell tab runs: Alpine
