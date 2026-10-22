@@ -787,7 +787,7 @@ func (a *bro) drawRadioPanel(i int) {
 			a.drawRadioInput(pv, prompt)
 		}
 	} else {
-		hint := "Tap a row, or ↑ ↓ and Enter; Tab: the next panel; f: forget; s: scan; o: on/off."
+		hint := "Tap a row, or ↑ ↓ and Enter; Ctrl+Tab: the next panel; f: forget; s: scan; o: on/off."
 		if i == panelWiFi {
 			hint = strings.TrimSuffix(hint, ".") + "; i: info."
 		}
@@ -969,9 +969,6 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 				a.radioAnswer(false)
 			}
 		case p.kind == "display":
-		case code == kobo.KeyTab && p.kind == "password":
-			p.reveal = !p.reveal
-			a.drawRadioPanel(p.panel)
 		case code == kobo.KeyBackspace:
 			if rs := []rune(p.answer); len(rs) > 0 {
 				p.answer = string(rs[:len(rs)-1])
@@ -981,10 +978,6 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 			p.answer += ch
 			a.drawRadioPanel(p.panel)
 		}
-		return true
-	}
-	if code == kobo.KeyTab {
-		a.radioStep(map[bool]int{false: 1, true: -1}[m.shift])
 		return true
 	}
 	if r.focus == panelSet {

@@ -156,6 +156,9 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   sessions; the emulator and the remote are resized only when a pane
   that shows changes size (`t.size`). Ctrl+Tab moves the focus on any
   page through `stepPanel`; the panel in focus gets `focusMark`'s ►.
+- A new button or list on a page goes into `controls()` (`focus.go`), so
+  Tab reaches it; Enter on a button is a tap on it. The focus ring is
+  stamped at blit time (`kobo/ring.go`), never drawn into the canvas.
 - Tests sit next to the code (`*_test.go`). Parsers and logic get table
   tests.
 - User-facing text is short and lower-key, like the rest of the UI.

@@ -175,19 +175,20 @@ type App struct {
 	jobs      chan blitJob
 	done      chan error
 	quit      bool
-	alive     atomic.Int64 // last loop tick, for the watchdog
-	blitAt    atomic.Int64 // start of the blit in flight, or 0
-	noPower   bool         // the power button doesn't reach us
-	wokeAt    time.Time    // from sleep: the power press that woke us comes after
-	asleep    bool         // the sleep screen is up: nothing else gets drawn
-	sleeping  atomic.Bool  // asleep, for the watchdog: the clock jumps
-	dozing    bool         // a light sleep: the doze screen on the panel, the page going on in C
-	panelC    Canvas       // while dozing, what's on the panel
-	dozeLight int          // the light's level before dozing
-	eatTouch  bool         // the contact that woke us from dozing isn't over
-	restart   string       // a binary to run in our place once we've quit
-	ctrl      [2]bool      // left and right Ctrl held, for Ctrl+Alt+N
-	alt       [2]bool      // and Alt
+	alive     atomic.Int64    // last loop tick, for the watchdog
+	blitAt    atomic.Int64    // start of the blit in flight, or 0
+	noPower   bool            // the power button doesn't reach us
+	wokeAt    time.Time       // from sleep: the power press that woke us comes after
+	asleep    bool            // the sleep screen is up: nothing else gets drawn
+	sleeping  atomic.Bool     // asleep, for the watchdog: the clock jumps
+	dozing    bool            // a light sleep: the doze screen on the panel, the page going on in C
+	panelC    Canvas          // while dozing, what's on the panel
+	dozeLight int             // the light's level before dozing
+	eatTouch  bool            // the contact that woke us from dozing isn't over
+	restart   string          // a binary to run in our place once we've quit
+	ctrl      [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
+	alt       [2]bool         // and Alt
+	ring      image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
 }
 
 // New opens the log and the screen. The Program, which embeds the App, is
@@ -912,6 +913,7 @@ func (a *App) MarkFlash(r image.Rectangle) {
 }
 
 func (a *App) markAll(flash bool) {
+	a.ring = image.Rectangle{} // a card, or a new layout: the Program puts it back if it's still wanted
 	a.dirty = []dirtyRect{{a.C.Bounds(), true}}
 	a.flash = a.flash || flash
 }
@@ -944,6 +946,9 @@ func (a *App) flush() {
 		src = a.panelC
 	}
 	CopyGray(img, d.r, src.Gray, d.r.Min)
+	if !a.dozing && d.r.Overlaps(a.ring) {
+		stampRing(img, a.ring)
+	}
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {
 		flash, a.flashR = true, image.Rectangle{}

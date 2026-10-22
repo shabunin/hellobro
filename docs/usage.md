@@ -68,8 +68,15 @@ from the top or bottom edge, brings the others back. Like every key
 here, these are set in `keys.conf` (or Settings → Keys): `fullscreen`,
 `panel.next`, `panel.prev`, `panel.fold`. On Music, Now playing in focus takes
 ↑ ↓ for the volume and Enter to play or pause; the Library has them
-otherwise. On Files, the arrows are the list's. On Settings, Tab works
-as well.
+otherwise. On Files, the arrows are the list's.
+
+Tab moves the keys' focus through the page's controls, as on a desktop:
+the tab strip, the buttons and the lists, panel by panel; Shift+Tab goes
+back. A dashed frame shows where it is. Enter or Space presses the
+button in focus; a list takes ↑ ↓, PgUp/PgDn, Home/End and Enter; on
+the tab strip ← → change tabs. Ctrl+Tab, as before, goes to the next
+panel (its list, or its first button). The frame shows once Tab is used,
+and a touch takes it away. The terminals keep Tab for the shell.
 
 ## The switcher
 
@@ -218,7 +225,7 @@ minutes), the Kobo goes to sleep properly.
   and Nickel, frozen, never answers them. hellobro tries to watch the bus
   for them, but the Elipsa's D-Bus (1.6.30) has no monitor mode and
   doesn't allow eavesdropping, so on the Elipsa they're lost.
-- The library has three views (tap them, or Tab / v / 1-3):
+- The library has three views (tap them, or v / 1-3):
   - **Albums**: every folder with tracks in it.
   - **Folders**: the folders as they are, from the one all the music is
     in. A folder plays with all its subfolders, in path order.
@@ -248,7 +255,8 @@ minutes), the Kobo goes to sleep properly.
 ## Settings: Wi-Fi and Bluetooth
 
 - Wi-Fi: tap a network to pick it, again (or Enter) to join or leave it;
-  a new secured one asks for its password (Tab or `show` reveals it).
+  a new secured one asks for its password (`show` reveals it: tap it, or
+  Tab to it and Enter).
   "other network…" (or n) joins a hidden one by name. The address comes
   from the DHCP client already running (Kobo's), or one started for it. Networks are saved
   when wpa_supplicant's file allows it. `turn off`/`turn on` (or o) unload
@@ -267,8 +275,9 @@ minutes), the Kobo goes to sleep properly.
   Realtek UART chip), and starts bluetoothd and bluealsa if they aren't
   running, as [bluetooth.koplugin](https://github.com/Tharavol/bluetooth.koplugin)
   does on the Sage; off undoes it.
-- Tab moves between the panels: Wi-Fi, Bluetooth, and the settings,
-  where a tap (or ←/→, Enter) changes one. They're kept in `settings`.
+- Ctrl+Tab moves between the panels: Wi-Fi, Bluetooth, and the
+  settings, where a tap (or ←/→, Enter) changes one; ↑ ↓ and PgUp/PgDn
+  go through them. They're kept in `settings`.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
   since Nickel wakes up thinking so; networks and devices added stay. On
   the first visit to the tab, what's found of the setup (Kobo's variables,

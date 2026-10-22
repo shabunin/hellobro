@@ -70,6 +70,7 @@ type bro struct {
 	rs       radioState
 	slp      sleepState
 	sv       settingsView
+	fs       focusState // the keys' focus: focus.go
 	set      settings
 	doze     dozeState
 	share    shareState
@@ -226,6 +227,7 @@ func (a *bro) Tick() {
 	a.powerTick()
 	a.updateTick()
 	a.trialTick()
+	a.updateRing()
 }
 
 func (a *bro) Exit() {
@@ -283,6 +285,8 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.runKey(m.Code, m.Value): // ours, never the remote's
 		return true
+	case a.focusKeyed(m.Code, m.Value): // Tab, and Enter on a button
+		return true
 	case a.focusFolded(): // a panel folded to its strip: Enter opens it, the rest waits
 		if m.Value == 1 && m.Code == kobo.KeyEnter {
 			a.foldFocused()
@@ -312,6 +316,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	switch {
 	case g == nil:
 	case ev.Kind == kobo.TouchDown:
+		a.focusTouched(p)
 		switch {
 		case !isTermTab(a.Tab):
 		case !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth:

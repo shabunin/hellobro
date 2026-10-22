@@ -958,7 +958,7 @@ func (a *bro) musicKey(code uint16, value int32) bool {
 		if once {
 			a.libUp()
 		}
-	case code == kobo.KeyTab || ch == "v":
+	case ch == "v":
 		if once {
 			a.setView((a.mus.view + map[bool]int{false: 1, true: numViews - 1}[shift]) % numViews)
 		}

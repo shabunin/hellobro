@@ -236,6 +236,7 @@ func netText(ws radio.WiFiStatus) string {
 // before), as Ctrl+Tab does: the keys go to it. A folded one takes the
 // focus too, and Enter opens it.
 func (a *bro) stepPanel(d int) {
+	delete(a.fs.at, a.Tab) // to the new panel's list, or its first control
 	switch a.Tab {
 	case tabMusic:
 		a.mv.nowFocus = !a.mv.nowFocus

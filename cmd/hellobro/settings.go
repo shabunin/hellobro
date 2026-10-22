@@ -266,7 +266,7 @@ func (a *bro) drawSettings() {
 		t.Max.X -= vw + 20
 		c.Text(a.F.Body, t, a.settingLabel(st), fg, kobo.AlignLeft)
 	}
-	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Tab: the next panel."
+	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Ctrl+Tab: the next panel."
 	switch {
 	case v.top+n < len(settingList): // a short screen
 		hint = fmt.Sprintf("▼ %d more: tap here, or ↓", len(settingList)-v.top-n)
@@ -328,6 +328,14 @@ func (a *bro) settingsKey(code uint16) {
 		v.sel = max(0, v.sel-1)
 	case keyDown:
 		v.sel = min(len(settingList)-1, v.sel+1)
+	case keyPgUp:
+		v.sel = max(0, v.sel-len(v.rows))
+	case keyPgDn:
+		v.sel = min(len(settingList)-1, v.sel+len(v.rows))
+	case keyHome:
+		v.sel = 0
+	case keyEnd:
+		v.sel = len(settingList) - 1
 	case keyLeft:
 		a.stepSetting(v.sel, -1)
 		return

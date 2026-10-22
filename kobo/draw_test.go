@@ -73,3 +73,29 @@ func BenchmarkText(b *testing.B) {
 		})
 	}
 }
+
+// The ring goes on the part of it in img, dashed, and nowhere else.
+func TestStampRing(t *testing.T) {
+	img := image.NewGray(image.Rect(50, 50, 200, 120)) // a blit of part of the screen
+	for i := range img.Pix {
+		img.Pix[i] = White
+	}
+	o := image.Rect(20, 60, 180, 100)
+	stampRing(img, o)
+	for y := 50; y < 120; y++ {
+		for x := 50; x < 200; x++ {
+			in := image.Pt(x, y).In(o) && !image.Pt(x, y).In(o.Inset(ringW))
+			along := x - o.Min.X
+			if y >= o.Min.Y+ringW && y < o.Max.Y-ringW {
+				along = y - o.Min.Y
+			}
+			want := uint8(White)
+			if in && along%(dash*3/2) < dash {
+				want = Black
+			}
+			if got := img.GrayAt(x, y).Y; got != want {
+				t.Fatalf("%d,%d: %d, want %d", x, y, got, want)
+			}
+		}
+	}
+}
