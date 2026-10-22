@@ -2,9 +2,9 @@
 
 Back to the [README](../README.md). From afar: [relay.md](relay.md).
 
-It starts on a "hello bro" screen while it gets going, with its version
-and where it's from at the foot, and says "bye bro!" as it hands the
-Kobo back.
+It starts on a "hello bro" screen while it gets going, and says "bye
+bro!" as it hands the Kobo back; both have its version and where it's
+from (github.com/shabunin/hellobro) at the foot.
 
 ## Tabs
 
