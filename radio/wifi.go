@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -120,7 +121,22 @@ type wpaWiFi struct {
 	ctrlDir string // wpa_supplicant's -C, if it said
 	initial *bool  // the power before we first changed it
 	kept    bool   // off, but Down left the chip powered
+
+	// What we last saw of wpa_supplicant. The bar asks for the status
+	// every 15 s, and reading all of /proc for it, a few times over, was
+	// most of what an idle hellobro did: while the same process runs, a
+	// look at its comm is enough, and what its command line says (saving,
+	// the recipe) is read again only for a new one, or now and then.
+	mu     sync.Mutex
+	pid    string
+	fresh  bool // a new pid: saving and remember want reading again
+	save   bool
+	readAt time.Time
 }
+
+// readEvery is how often Status reads the daemons' command lines again
+// anyway: dhcpcd may come up after wpa_supplicant.
+const readEvery = 5 * time.Minute
 
 const ctrlDirDefault = "/var/run/wpa_supplicant"
 
@@ -186,7 +202,20 @@ func (w *wpaWiFi) ctrl() string {
 	return w.ctrlDir
 }
 
-func (w *wpaWiFi) running() bool { return len(pidsOf("wpa_supplicant")) > 0 }
+func (w *wpaWiFi) running() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.pid != "" && isProc(w.pid, "wpa_supplicant") {
+		return true
+	}
+	pids := pidsOf("wpa_supplicant")
+	if len(pids) == 0 {
+		w.pid = ""
+		return false
+	}
+	w.pid, w.fresh = pids[0], true
+	return true
+}
 
 func (w *wpaWiFi) Status() WiFiStatus {
 	st := WiFiStatus{Interface: w.iface, On: w.running()}
@@ -209,19 +238,25 @@ func (w *wpaWiFi) Status() WiFiStatus {
 		st.IP = ipv4Of(w.iface)
 	}
 	st.Gateway = defaultGateway(w.iface)
-	remember()
-	st.Saving = w.saving()
+	w.mu.Lock()
+	if w.fresh || time.Since(w.readAt) > readEvery {
+		remember()
+		w.save = saving(w.pid)
+		w.fresh, w.readAt = false, time.Now()
+	}
+	st.Saving = w.save
+	w.mu.Unlock()
 	return st
 }
 
-// saving says whether wpa_supplicant writes networks back to its file.
-func (w *wpaWiFi) saving() bool {
-	for _, argv := range cmdlines("wpa_supplicant") {
-		for i, a := range argv {
-			if a == "-c" && i+1 < len(argv) {
-				b, _ := os.ReadFile(argv[i+1])
-				return bytes.Contains(b, []byte("update_config=1"))
-			}
+// saving says whether wpa_supplicant (pid) writes networks back to its
+// file.
+func saving(pid string) bool {
+	argv := cmdline(pid)
+	for i, a := range argv {
+		if a == "-c" && i+1 < len(argv) {
+			b, _ := os.ReadFile(argv[i+1])
+			return bytes.Contains(b, []byte("update_config=1"))
 		}
 	}
 	return false
@@ -812,18 +847,19 @@ func remember() {
 	}
 	rec := recipe()
 	changed := false
-	for _, n := range []string{"wpa_supplicant", "dhcpcd", "udhcpc"} {
-		for _, argv := range cmdlines(n) {
-			if !slices.Equal(rec[n], argv) {
+	names := []string{"wpa_supplicant", "dhcpcd", "udhcpc"}
+	pids := procsNamed(names...)
+	for _, n := range names {
+		if len(pids[n]) > 0 {
+			if argv := cmdline(pids[n][0]); !slices.Equal(rec[n], argv) {
 				rec[n], changed = argv, true
 			}
-			break
 		}
 	}
 	if rec["dhcpcd"] != nil && rec["udhcpc"] != nil {
-		if len(pidsOf("dhcpcd")) > 0 {
+		if len(pids["dhcpcd"]) > 0 {
 			delete(rec, "udhcpc")
-		} else if len(pidsOf("udhcpc")) > 0 {
+		} else if len(pids["udhcpc"]) > 0 {
 			delete(rec, "dhcpcd")
 		}
 	}
@@ -966,27 +1002,57 @@ func defaultGateway(iface string) string {
 
 func pidsOf(names ...string) []string {
 	var pids []string
+	for _, p := range procsNamed(names...) {
+		pids = append(pids, p...)
+	}
+	slices.Sort(pids)
+	return pids
+}
+
+// procsNamed are the pids of the processes called each of names, from
+// one look through /proc.
+func procsNamed(names ...string) map[string][]string {
+	pids := map[string][]string{}
 	dirs, _ := os.ReadDir("/proc")
 	for _, d := range dirs {
+		if d.Name()[0] < '0' || d.Name()[0] > '9' {
+			continue
+		}
 		comm, err := os.ReadFile(filepath.Join("/proc", d.Name(), "comm"))
 		if err != nil {
 			continue
 		}
-		if slices.Contains(names, strings.TrimSpace(string(comm))) {
-			pids = append(pids, d.Name())
+		if n := strings.TrimSpace(string(comm)); slices.Contains(names, n) {
+			pids[n] = append(pids[n], d.Name())
 		}
 	}
 	return pids
+}
+
+// isProc says whether pid is still a process called name.
+func isProc(pid, name string) bool {
+	comm, err := os.ReadFile("/proc/" + pid + "/comm")
+	return err == nil && strings.TrimSpace(string(comm)) == name
 }
 
 // cmdlines are the command lines of the processes called name.
 func cmdlines(name string) [][]string {
 	var out [][]string
 	for _, pid := range pidsOf(name) {
-		b, _ := os.ReadFile("/proc/" + pid + "/cmdline")
-		out = append(out, strings.Split(strings.TrimRight(string(b), "\x00"), "\x00"))
+		if argv := cmdline(pid); argv != nil {
+			out = append(out, argv)
+		}
 	}
 	return out
+}
+
+// cmdline is the command line of the process pid, nil if it's gone.
+func cmdline(pid string) []string {
+	b, err := os.ReadFile("/proc/" + pid + "/cmdline")
+	if err != nil || len(b) == 0 {
+		return nil
+	}
+	return strings.Split(strings.TrimRight(string(b), "\x00"), "\x00")
 }
 
 func killAll(sig syscall.Signal, names ...string) {

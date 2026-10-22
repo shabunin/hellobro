@@ -1,6 +1,12 @@
 package radio
 
-import "testing"
+import (
+	"os"
+	"slices"
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestUnescape(t *testing.T) {
 	for in, want := range map[string]string{
@@ -51,5 +57,29 @@ func TestMerge(t *testing.T) {
 	}
 	if !got[0].Current || got[1].ID != 3 || got[1].Signal != -40 || !got[2].Hidden {
 		t.Errorf("got %+v", got)
+	}
+}
+
+// The test's own process stands in for wpa_supplicant.
+func TestProcs(t *testing.T) {
+	b, err := os.ReadFile("/proc/self/comm")
+	if err != nil {
+		t.Skip("no /proc")
+	}
+	name, pid := strings.TrimSpace(string(b)), strconv.Itoa(os.Getpid())
+	if !slices.Contains(procsNamed(name, "no-such-process")[name], pid) {
+		t.Errorf("procsNamed(%q) misses %s", name, pid)
+	}
+	if !slices.Contains(pidsOf(name), pid) {
+		t.Errorf("pidsOf(%q) misses %s", name, pid)
+	}
+	if !isProc(pid, name) || isProc(pid, "no-such-process") || isProc("0", name) {
+		t.Errorf("isProc wrong for %s", pid)
+	}
+	if argv := cmdline(pid); len(argv) == 0 || argv[0] != os.Args[0] {
+		t.Errorf("cmdline(%s) = %q, want %q first", pid, argv, os.Args[0])
+	}
+	if cmdline("0") != nil {
+		t.Error("cmdline of no process isn't nil")
 	}
 }
