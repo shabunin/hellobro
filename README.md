@@ -8,8 +8,9 @@ Kobo e-reader. Bring a Bluetooth keyboard.
   <img src="docs/screenshots/btop.png" width="48.5%" alt="btop on the PC, over SSH">
 </p>
 <p align="center">
-  <img src="docs/screenshots/ssh.png" width="48.5%" alt="An SSH session">
-  <img src="docs/screenshots/light-sleep.png" width="48.5%" alt="Light sleep, the music playing on">
+  <img src="docs/screenshots/ssh.png" width="32%" alt="An SSH session">
+  <img src="docs/screenshots/cmus.png" width="32%" alt="cmus in the Shell tab, the header showing what plays">
+  <img src="docs/screenshots/light-sleep.png" width="32%" alt="Light sleep, the music playing on">
 </p>
 <p align="center">
   <img src="docs/screenshots/switcher.png" width="48.5%" alt="The switcher">

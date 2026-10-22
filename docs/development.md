@@ -97,6 +97,7 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     MPRIS=1 harness/run.sh /tmp/hb 0 doze              # settings, light sleep with music, media keys
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 tmux       # saved host 1 (dir/ssh.conf, dir/id_ed25519): tmux attach, framed and fullscreen
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 btop       # the same, btop
+    CMUS=cmd HELLOBRO_MPRIS_BUS=addr harness/run.sh /tmp/hb 0 cmus  # cmd (cmus, say in a container with music) in the Shell tab, a track playing
     harness/relay.sh /tmp/hb                           # the relay: sshd as the VPS, both ways through it, an update (with the server)
 
 `MPRIS=1` starts a session bus in `OUT/bus` with a stand-in mpv on it
