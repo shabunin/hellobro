@@ -53,3 +53,32 @@ func TestLightIdle(t *testing.T) {
 		t.Error("LightIdle 0 turned it off")
 	}
 }
+
+// The level the reader chose is set at the next start, over Nickel's,
+// which is still the one put back on leaving.
+func TestLightKept(t *testing.T) {
+	dir := t.TempDir()
+	ntx := filepath.Join(dir, "ntx_io")
+	os.WriteFile(ntx, nil, 0o644)
+	t.Setenv("HELLOBRO_NTX_IO", ntx)
+	conf := filepath.Join(dir, "nickel.conf")
+	os.WriteFile(conf, []byte("[PowerOptions]\nFrontLightLevel=60\n"), 0o644)
+	was := nickelConf
+	nickelConf = conf
+	defer func() { nickelConf = was }()
+	save := filepath.Join(dir, "light")
+
+	l := openFrontlight(save)
+	if l.level != 60 || l.kept != -1 {
+		t.Fatalf("first start: %d, kept %d", l.level, l.kept)
+	}
+	l.set(0)
+	l.keep()
+	l.close()
+
+	l = openFrontlight(save)
+	defer l.close()
+	if l.level != 0 || l.initial != 60 {
+		t.Fatalf("next start: %d, Nickel's %d", l.level, l.initial)
+	}
+}

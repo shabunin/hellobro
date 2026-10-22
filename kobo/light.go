@@ -3,7 +3,8 @@ package kobo
 // The frontlight, the way KOReader drives the Elipsa's: an ioctl on
 // /dev/ntx_io taking 0-100. It can't be read back, so we start from the
 // level Nickel saved, and put that back when we leave, since Nickel would
-// otherwise believe its own level is still on.
+// otherwise believe its own level is still on. Ours is kept too: the
+// level the reader last chose here is the one the next start sets.
 
 import (
 	"bufio"
@@ -27,15 +28,17 @@ type frontlight struct {
 	level   int // what we set last
 	initial int // Nickel's, restored on close
 	from    string
+	save    string // where the reader's level is kept
+	kept    int    // what's in it, -1 if nothing yet
 }
 
-func openFrontlight() *frontlight {
+func openFrontlight(save string) *frontlight {
 	f, err := os.OpenFile(EnvOr("HELLOBRO_NTX_IO", "/dev/ntx_io"), os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		log.Printf("frontlight: %v", err)
 		return nil
 	}
-	l := &frontlight{f: f, level: 50, from: "a guess"}
+	l := &frontlight{f: f, level: 50, from: "a guess", save: save, kept: -1}
 	if lvl, ok := nickelLightLevel(); ok {
 		l.level, l.from = lvl, "Nickel's settings"
 	} else if lvl, ok := sysfsBrightness(); ok {
@@ -43,7 +46,30 @@ func openFrontlight() *frontlight {
 	}
 	l.initial = l.level
 	log.Printf("frontlight: %d%% (from %s)", l.level, l.from)
+	if b, err := os.ReadFile(save); err == nil {
+		if lvl, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil {
+			l.kept = max(0, min(100, lvl))
+			if err := l.set(l.kept); err != nil {
+				log.Print(err)
+			} else {
+				log.Printf("frontlight: %d%%, as last time", l.level)
+			}
+		}
+	}
 	return l
+}
+
+// keep writes down the level the reader chose, for the next start. Not
+// the idle's, a doze's or a notice's: those aren't the reader's.
+func (l *frontlight) keep() {
+	if l.save == "" || l.level == l.kept {
+		return
+	}
+	if err := os.WriteFile(l.save, []byte(strconv.Itoa(l.level)+"\n"), 0o644); err != nil {
+		log.Printf("frontlight: %v", err)
+		return
+	}
+	l.kept = l.level
 }
 
 // set changes the light, 0 (off) to 100.
@@ -206,7 +232,7 @@ func (a *App) SetLight(level int) {
 		return
 	}
 	a.setLight(level)
-	a.lightHideAt = time.Now().Add(1500 * time.Millisecond)
+	a.lightHideAt = time.Now().Add(1500 * time.Millisecond) // kept when the gauge goes: keys come in runs
 	log.Printf("light: %d%%", a.light.level)
 }
 
@@ -254,5 +280,5 @@ func (a *App) lightInfo() string {
 	if a.light == nil {
 		return "frontlight: not available"
 	}
-	return fmt.Sprintf("frontlight: %d%% (started at %d%%, from %s)", a.light.level, a.light.initial, a.light.from)
+	return fmt.Sprintf("frontlight: %d%% (Nickel's %d%%, from %s; kept %d%%)", a.light.level, a.light.initial, a.light.from, a.light.kept)
 }

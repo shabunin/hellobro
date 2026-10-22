@@ -154,6 +154,10 @@ does what it does as well. The terminal's output doesn't count, only
 you. Settings, **Light off when idle**: after 10 s, 30 s, 1 min, 5 min,
 or never. Sleeping meanwhile wakes with the light as it was before.
 
+hellobro starts with the light as you last set it (kept in `light`,
+next to the app); until you set it once, it takes Nickel's. Leaving
+gives Nickel its own level back.
+
 ## Sleep
 
 The power button, Ctrl+Alt+S, the header's `sleep`, or "Sleep"

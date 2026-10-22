@@ -243,7 +243,7 @@ func (a *App) Run() {
 		a.flush()
 	}
 	os.Unsetenv(restartedEnv)
-	a.light = openFrontlight()
+	a.light = openFrontlight(AppFile("light"))
 	a.devs = inputDevices()
 	touches := make(chan TouchEv, 4096)
 	for _, d := range a.devs {
@@ -280,10 +280,18 @@ func (a *App) Run() {
 	a.WaitBlit()
 	a.scr.close()
 	if a.light != nil {
-		a.light.close()
+		if !a.lightHideAt.IsZero() { // set by a key just now
+			a.light.keep()
+		}
+		if a.restart == "" { // a new build sets the kept level: no blink of Nickel's between
+			a.light.close()
+		}
 	}
 	if a.restart != "" {
 		a.exec()
+		if a.light != nil {
+			a.light.close()
+		}
 		return // it didn't: launch.sh gives Kobo back
 	}
 	log.Print("bye")
@@ -444,6 +452,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			if !a.lightHideAt.IsZero() && time.Now().After(a.lightHideAt) {
 				a.lightHideAt = time.Time{}
 				a.hideGauge(&a.lightOverlay)
+				a.light.keep()
 			}
 			if !a.asleep {
 				a.prog.Tick()
@@ -722,6 +731,7 @@ func (a *App) onTouch(ev TouchEv) {
 		if g.light {
 			log.Printf("light swipe: %d%% → %d%%", g.lightFrom, a.light.level)
 			a.hideGauge(&a.lightOverlay)
+			a.light.keep()
 			return
 		}
 		if g.unfulled {
