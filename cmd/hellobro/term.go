@@ -43,6 +43,8 @@ const (
 
 const (
 	termFrame     = 60 * time.Millisecond // at most this often we redraw from the emulator
+	termBackFrame = time.Second           // and a pane not in focus, at most this often
+	termTyping    = time.Second           // after a key, a pane not in focus waits
 	termFullEvery = 3 * time.Second       // and this often we compare all the cells, not only the touched rows
 	maxSessions   = 9
 )
@@ -129,6 +131,9 @@ type termPane struct {
 	alt          bool              // the alternate screen was drawn
 	selShown     bool              // a selection was drawn
 	fullAt       time.Time         // all the cells were last compared
+	drawnAt      time.Time         // its output was last drawn
+	fastArea     image.Rectangle   // drawn with the fast (DU) waveform since the last clean refresh
+	fastAt       time.Time         // when fastArea got its first update
 }
 
 // write puts the remote's output into the emulator.
@@ -172,14 +177,11 @@ type termView struct {
 	hosts    []sshHost
 	keyAsked map[string]bool // hosts we offered to install our key on
 
-	sel      *termSel // the selection, or a contact that may become one (clipboard.go): the focused session's
-	cw, ch   int      // cell size
-	drawnAt  time.Time
-	outAt    time.Time       // last output drawn
-	fastArea image.Rectangle // drawn with the fast (DU) waveform since the last clean refresh
-	fastAt   time.Time       // when fastArea got its first update
-	churn    int             // pixels changed since the last flash
-	bigAt    time.Time       // the last change of more than a few rows
+	sel     *termSel // the selection, or a contact that may become one (clipboard.go): the focused session's
+	cw, ch  int      // cell size
+	drawnAt time.Time
+	churn   int       // pixels changed since the last flash
+	bigAt   time.Time // the last change of more than a few rows
 
 	mods   termMods
 	glyphs map[glyphKey]*image.Alpha
@@ -610,10 +612,10 @@ func (a *bro) renderTerm(t *termSession) {
 	for _, c := range rows {
 		v.churn += kobo.Area(c.r)
 		if !c.gray && !big {
-			if v.fastArea.Empty() {
-				v.fastAt = time.Now()
+			if pn.fastArea.Empty() {
+				pn.fastAt = time.Now()
 			}
-			v.fastArea = v.fastArea.Union(c.r)
+			pn.fastArea = pn.fastArea.Union(c.r)
 		}
 		a.Mark(c.r, c.gray || big)
 	}
@@ -1102,28 +1104,48 @@ func (a *bro) termTick() {
 	if a.GaugeUp() || a.overlay() {
 		return // something is up over the terminal: drawing under it would be undone when it goes
 	}
+	// The panel does one update at a time, so a pane whose output never
+	// stops (a player's position, a clock) would keep it busy, and the
+	// keys typed into another behind it: the panes not in focus show
+	// their output once a second, and not while the one in focus is
+	// being typed into.
+	focus := a.term()
+	typing := focus != nil && time.Since(focus.keyAt) < termTyping
 	if time.Since(v.drawnAt) >= termFrame {
 		for _, t := range g.sessions {
-			if t.connected() && t.dirty.Load() && a.showing(t) {
-				v.outAt = time.Now()
-				a.renderTerm(t)
+			if !t.connected() || !t.dirty.Load() || !a.showing(t) {
+				continue
 			}
+			if t != focus && (typing || time.Since(t.pane.drawnAt) < termBackFrame) {
+				continue
+			}
+			t.pane.drawnAt = time.Now()
+			a.renderTerm(t)
 		}
 	}
 	if a.Blitting() {
 		return
 	}
-	// Clean up after the fast waveform once output pauses, or every few
-	// seconds if it doesn't (a spinner never stops while its app works).
-	if !v.fastArea.Empty() && (time.Since(v.outAt) > 1200*time.Millisecond || time.Since(v.fastAt) > 4*time.Second) {
-		a.Mark(v.fastArea, true)
-		v.fastArea = image.Rectangle{}
+	// Clean up after the fast waveform once a pane's output pauses, or
+	// every few seconds if it doesn't (a spinner never stops while its app
+	// works): each pane its own, as one area for two would cover what's
+	// between them.
+	for _, t := range g.sessions {
+		pn := &t.pane
+		if !pn.fastArea.Empty() && (time.Since(pn.drawnAt) > 1200*time.Millisecond || time.Since(pn.fastAt) > 4*time.Second) {
+			a.Mark(pn.fastArea, true)
+			pn.fastArea = image.Rectangle{}
+			break // one a tick: each is an update of its own
+		}
 	}
 	// Grayscale updates leave ghosts too, slowly: after a few screenfuls
 	// of change, flash the terminal clean once it settles (a clock or a
 	// spinner may still tick), as e-readers do every few pages.
 	if v.churn > 4*kobo.Area(a.termP.Body) && time.Since(v.bigAt) > 2500*time.Millisecond {
-		v.churn, v.fastArea = 0, image.Rectangle{}
+		v.churn = 0
+		for _, t := range g.sessions {
+			t.pane.fastArea = image.Rectangle{}
+		}
 		a.MarkFlash(a.termP.Body)
 	}
 }
