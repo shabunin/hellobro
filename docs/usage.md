@@ -333,7 +333,9 @@ the auto-exit.
 
 ## Updating over the air
 
-`make push` (with this computer paired)
+From a release (see the README's Install): send its bare `hellobro` as
+`hellobro.new`, then `ssh -p 2022 kobo.local hellobro-update`. From the
+source, `make push` (with this computer paired)
 sends the new build as `hellobro.new` and asks hellobro to take it
 (`hellobro-update`). It checks it's an ARM build that runs and says it's
 hellobro, keeps the running one as `hellobro.old`, and restarts into the

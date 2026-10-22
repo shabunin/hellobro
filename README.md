@@ -39,21 +39,55 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 - **From afar**: a relay through a VPS, so the Kobo and your PC reach
   each other away from home.
 
-## Get started
+## Install
 
-You need a Kobo with [NickelMenu](https://pgaskin.net/NickelMenu/), and
-podman on the computer for the build.
+You need a Kobo with [NickelMenu](https://pgaskin.net/NickelMenu/)
+installed. hellobro is built and tested on the Elipsa (N604, firmware
+4.38).
+
+1. Download `hellobro-<version>.zip` from the
+   [latest release](https://github.com/shabunin/hellobro/releases/latest).
+2. Plug the Kobo in over USB and choose Connect, so it shows up as a
+   drive (`KOBOeReader`).
+3. Unzip the file into the top of that drive. It holds a `.adds` folder,
+   which merges with the one already there (NickelMenu's):
+   `.adds/hellobro/` is the app, `.adds/nm/hellobro` its menu entry.
+   `.adds` is hidden, so if your file manager won't show it, unzip from
+   a terminal: `unzip hellobro-<version>.zip -d /path/to/KOBOeReader`.
+4. Eject the Kobo. Open **Hello Bro** from NickelMenu (the menu at the
+   bottom right of the home screen). The first start asks you to tap two
+   targets, to calibrate the touch screen. Esc or `exit` goes back to
+   Nickel.
+
+### Updates over Wi-Fi
+
+Pair the computer once:
+
+1. In hellobro, open Files and press `pair` (it turns file sharing on).
+   It shows a code.
+2. On the computer, run `ssh -p 2022 kobo.local` and type the code.
+
+Then, for a new release, download the bare `hellobro` file and send it:
+
+```sh
+scp -P 2022 hellobro kobo.local:/mnt/onboard/.adds/hellobro/hellobro.new
+ssh -p 2022 kobo.local hellobro-update
+```
+
+hellobro restarts into the new build, and goes back to the old one by
+itself if the new one fails. Unzipping a new release over USB works too.
+If `kobo.local` doesn't resolve, use the Kobo's IP (Settings, Wi-Fi).
+
+### From source
+
+You need podman for the build.
 
 ```sh
 make                 # static ARM build, in a container
 make install         # to the Kobo, mounted over USB
+make push            # later: a new build over Wi-Fi (paired, as above)
+make dist            # a release's files, in dist/
 ```
-
-Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
-
-1. On the Kobo, open Files and press `pair`. It shows a code.
-2. On the computer, run `ssh -p 2022 kobo.local` and type the code.
-3. From then on, `make push` installs a new build over Wi-Fi.
 
 ## Keys
 

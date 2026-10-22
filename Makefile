@@ -93,6 +93,22 @@ push-profile:
 		{ cat cpu.pprof; rm -f $(CURDIR)/cpu.pprof; exit 1; }
 	go tool pprof -top -nodecount=30 cpu.pprof
 
+# A release: a zip to unpack onto the Kobo over USB (what install puts
+# there, but ssh.conf), the bare build for updates over Wi-Fi, and their
+# sums. Tag first, so the version is the tag.
+REL := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+DIST = $(CURDIR)/dist
+dist: hellobro bin/fbink
+	rm -rf $(DIST)/$(REL) && mkdir -p $(DIST)/$(REL)/.adds/hellobro $(DIST)/$(REL)/.adds/nm
+	cp hellobro launch.sh bin/fbink $(DIST)/$(REL)/.adds/hellobro/
+	cp nm/hellobro $(DIST)/$(REL)/.adds/nm/
+	rm -f $(DIST)/hellobro-$(REL).zip
+	cd $(DIST)/$(REL) && zip -qrX $(DIST)/hellobro-$(REL).zip .adds
+	cp hellobro $(DIST)/hellobro
+	cd $(DIST) && sha256sum hellobro-$(REL).zip hellobro > SHA256SUMS
+	rm -rf $(DIST)/$(REL)
+	ls -l $(DIST)
+
 # The log, over Wi-Fi.
 push-log:
 	ssh $(SSH_TO) $(KOBO_HOST) cat $(KOBO_DIR)/hellobro.log
@@ -115,5 +131,6 @@ test:
 
 clean:
 	rm -f $(APPS) $(APPS:=-nocgo)
+	rm -rf $(DIST)
 
-.PHONY: all install install-tools uninstall-tools log log-tools clean server test push push-rollback push-log push-profile
+.PHONY: all install install-tools uninstall-tools log log-tools clean dist server test push push-rollback push-log push-profile

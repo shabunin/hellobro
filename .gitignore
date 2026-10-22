@@ -21,6 +21,8 @@
 /wifi-recipe
 /hellobro.new
 /hellobro.old
+# make dist
+/dist/
 # make push-profile
 /cpu.pprof
 # the test server's binary and its host key (made on first start)

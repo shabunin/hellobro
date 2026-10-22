@@ -40,6 +40,13 @@ they share the touch calibration; each logs to its own `NAME.log` there.
 the watchdog alone) and thaws it afterwards; the app thaws it itself if it
 ever gets stuck.
 
+A release: tag it (`git tag -a v0.2.0 -m v0.2.0`, push the tag), then
+`touch cmd/hellobro/main.go && make dist`, so the build takes the tag as
+its version. `dist/` gets `hellobro-TAG.zip` (the `.adds` tree to unzip
+onto the Kobo: what `make install` copies, without `ssh.conf`), the bare
+`hellobro` for updates over Wi-Fi, and `SHA256SUMS`. `gh release create
+TAG dist/*` puts them up. brotools isn't in it.
+
 `third_party/fbink` (header and static library) and `bin/fbink` are
 prebuilt from FBInk v1.25.0-543-g886f25f1 with image and TrueType support.
 To rebuild them: `./build-fbink.sh path/to/FBInk-checkout`.
