@@ -24,6 +24,7 @@ import (
 	"unicode/utf8"
 
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/vt"
 
 	"hellobro/kobo"
@@ -148,19 +149,17 @@ func (t *termSession) write(p []byte) {
 
 // touchedRows are the rows the emulator changed since the last call, and
 // whether it's on its alternate screen. vt keeps them but has no way to
-// clear them, so we clear its list ourselves, under t.mu.
+// clear them, so we clear its list ourselves. It's called under t.mu.
 func (t *termSession) touchedRows(rows int) ([]bool, bool) {
 	touched := make([]bool, rows)
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	ls := t.emu.Touched()
+	ls := t.emu.Emulator.Touched()
 	for y, l := range ls {
 		if l != nil && y < rows {
 			touched[y] = true
 		}
 		ls[y] = nil
 	}
-	return touched, t.emu.IsAltScreen()
+	return touched, t.emu.Emulator.IsAltScreen()
 }
 
 func (t *termSession) connected() bool { return t.state == termConnected }
@@ -523,14 +522,8 @@ func (a *bro) renderTerm(t *termSession) {
 	}
 	t.dirty.Store(false)
 	v.drawnAt = time.Now()
-	// Only the rows that may have changed are compared: the emulator's
-	// touched ones, where the cursor was and is. All of them after a
-	// redraw, a switch of screens, with a selection, and every few
-	// seconds, in case something changed that vt didn't mark.
-	touched, alt := t.touchedRows(pn.rows)
 	sel := t == a.term() && v.sel != nil
-	full := alt != pn.alt || sel || pn.selShown || time.Since(pn.fullAt) > termFullEvery
-	pn.alt, pn.selShown = alt, sel
+	full := sel || pn.selShown || time.Since(pn.fullAt) > termFullEvery
 	if len(pn.shown) != pn.rows || (pn.rows > 0 && len(pn.shown[0]) != pn.cols) {
 		full = true
 		pn.shown = make([][]cellKey, pn.rows)
@@ -541,41 +534,56 @@ func (a *bro) renderTerm(t *termSession) {
 			}
 		}
 	}
-	cur := t.emu.CursorPosition()
-	showCursor := !t.emu.CursorHidden()
+	// The cells are read under t.mu, which every write and resize holds:
+	// then they're vt's own, without its lock taken for each (a few
+	// thousand times a frame, that was a good part of the drawing). What
+	// changed is drawn after, so the output isn't kept waiting on glyphs.
 	type changed struct {
-		r    image.Rectangle
-		gray bool
-	}
-	if full {
-		pn.fullAt = time.Now()
+		y, from, to int
+		gray        bool
 	}
 	var rows []changed
+	var cells []image.Point
+	t.mu.Lock()
+	emu := t.emu.Emulator
+	// Only the rows that may have changed are compared: the emulator's
+	// touched ones, where the cursor was and is. All of them after a
+	// redraw, a switch of screens, with a selection, and every few
+	// seconds, in case something changed that vt didn't mark.
+	touched, alt := t.touchedRows(pn.rows)
+	full = full || alt != pn.alt
+	cur := emu.CursorPosition()
+	showCursor := !emu.CursorHidden()
 	for y := 0; y < pn.rows; y++ {
 		if !full && !touched[y] && y != pn.cursorY && y != cur.Y {
 			continue
 		}
-		from, to, gray := -1, -1, false
-		for x := 0; x < pn.cols; x++ {
-			k := t.cellKeyAt(x, y, showCursor && cur.X == x && cur.Y == y)
+		c := changed{y, -1, -1, false}
+		shown := pn.shown[y]
+		var k cellKey
+		for x := range shown {
+			k.set(emu.CellAt(x, y), showCursor && cur.X == x && cur.Y == y)
 			k.sel = sel && v.sel.has(x, y) // sel, not a.term() again: a cell at a time, that's a map lookup each
-			if k == pn.shown[y][x] {
+			if k.same(&shown[x]) {
 				continue
 			}
-			pn.shown[y][x] = k
-			a.drawCell(pn, x, y, k)
-			if from < 0 {
-				from = x
+			shown[x] = k
+			cells = append(cells, image.Pt(x, y))
+			if c.from < 0 {
+				c.from = x
 			}
-			to = x
-			gray = gray || !bw(k.fg) || !bw(k.bg)
+			c.to = x
+			c.gray = c.gray || !bw(k.fg) || !bw(k.bg)
 		}
-		if from >= 0 {
-			r := image.Rect(pn.grid.Min.X+from*v.cw, pn.grid.Min.Y+y*v.ch, pn.grid.Min.X+(to+1)*v.cw, pn.grid.Min.Y+(y+1)*v.ch)
-			rows = append(rows, changed{r.Inset(-1).Intersect(pn.grid), gray})
+		if c.from >= 0 {
+			rows = append(rows, c)
 		}
 	}
-	pn.cursorY = cur.Y
+	t.mu.Unlock()
+	pn.alt, pn.selShown, pn.cursorY = alt, sel, cur.Y
+	if full {
+		pn.fullAt = time.Now()
+	}
 	// Black & white changes to a row or three (typing, a spinner) take the
 	// fast waveform. It ghosts, though, so scrolls and redraws, where a
 	// moment more doesn't matter, get the clean grayscale one.
@@ -583,25 +591,40 @@ func (a *bro) renderTerm(t *termSession) {
 	if big {
 		v.bigAt = time.Now()
 	}
+	for _, p := range cells {
+		a.drawCell(pn, p.X, p.Y, pn.shown[p.Y][p.X])
+	}
 	for _, c := range rows {
-		v.churn += kobo.Area(c.r)
+		r := image.Rect(pn.grid.Min.X+c.from*v.cw, pn.grid.Min.Y+c.y*v.ch, pn.grid.Min.X+(c.to+1)*v.cw, pn.grid.Min.Y+(c.y+1)*v.ch)
+		r = r.Inset(-1).Intersect(pn.grid)
+		v.churn += kobo.Area(r)
 		if !c.gray && !big {
 			if pn.fastArea.Empty() {
 				pn.fastAt = time.Now()
 			}
-			pn.fastArea = pn.fastArea.Union(c.r)
+			pn.fastArea = pn.fastArea.Union(r)
 		}
-		a.Mark(c.r, c.gray || big)
+		a.Mark(r, c.gray || big)
 	}
 }
 
 func bw(g uint8) bool { return g == 0 || g == 255 }
 
-func (t *termSession) cellKeyAt(x, y int, cursor bool) cellKey {
-	c := t.emu.CellAt(x, y)
-	k := cellKey{fg: kobo.Black, bg: kobo.White, width: 1, cursor: cursor}
+// same is k == o, with the cheap fields first: most cells haven't changed,
+// and those that have mostly differ in their content.
+func (k *cellKey) same(o *cellKey) bool {
+	return k.content == o.content && k.fg == o.fg && k.bg == o.bg && k.attrs == o.attrs &&
+		k.ul == o.ul && k.width == o.width && k.cursor == o.cursor && k.sel == o.sel
+}
+
+// set makes k what a cell of the emulator looks like on the panel, all
+// but sel. Field by field: a new cellKey for each cell, zeroed and
+// copied, cost as much as the rest.
+func (k *cellKey) set(c *uv.Cell, cursor bool) {
+	k.fg, k.bg, k.cursor = kobo.Black, kobo.White, cursor
 	if c == nil {
-		return k
+		k.content, k.width, k.attrs, k.ul = "", 1, 0, 0
+		return
 	}
 	k.content, k.width, k.attrs, k.ul = c.Content, c.Width, c.Style.Attrs, uint8(c.Style.Underline)
 	if c.Style.Fg != nil {
@@ -626,11 +649,31 @@ func (t *termSession) cellKeyAt(x, y int, cursor bool) cellKey {
 			k.fg = kobo.White
 		}
 	}
-	return k
 }
 
 // gray turns a color into one of the 16 levels the panel shows cleanly.
+// The 256 colors' are worked out once (grays): most cells' colors are of
+// them.
 func gray(c color.Color) uint8 {
+	switch c := c.(type) {
+	case ansi.IndexedColor:
+		return grays[c]
+	case ansi.BasicColor:
+		if c < 16 {
+			return grays[c]
+		}
+	}
+	return grayOf(c)
+}
+
+var grays = func() (g [256]uint8) {
+	for i := range g {
+		g[i] = grayOf(ansi.IndexedColor(i))
+	}
+	return g
+}()
+
+func grayOf(c color.Color) uint8 {
 	r, g, b, _ := c.RGBA()
 	y := (299*r + 587*g + 114*b) / 1000 >> 8
 	return uint8((y + 8) / 17 * 17)

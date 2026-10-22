@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/vt"
 
 	"hellobro/kobo"
@@ -84,7 +85,7 @@ func TestRenderRecording(t *testing.T) {
 	t.Logf("%d×%d", v.cols, v.rows)
 	for _, p := range []image.Point{{10, 5}, {20, 5}, {30, 6}} {
 		if c := tr.emu.CellAt(p.X, p.Y); c != nil {
-			t.Logf("cell %v %q fg %v bg %v → %+v", p, c.Content, c.Style.Fg, c.Style.Bg, tr.cellKeyAt(p.X, p.Y, false))
+			t.Logf("cell %v %q fg %v bg %v → %+v", p, c.Content, c.Style.Fg, c.Style.Bg, func() (k cellKey) { k.set(c, false); return k }())
 		}
 	}
 	f, err := os.Create(out)
@@ -230,4 +231,69 @@ func testTerm(a *bro) *termSession {
 	a.wm.wins[a.wm.tree.Open(tr)] = tr
 	a.termGeometry()
 	return tr
+}
+
+// The grays worked out once are those worked out each time.
+func TestGrays(t *testing.T) {
+	for i := range 256 {
+		if c := ansi.IndexedColor(i); gray(c) != grayOf(c) {
+			t.Errorf("indexed %d: %d, want %d", i, gray(c), grayOf(c))
+		}
+		if c := ansi.BasicColor(i); gray(c) != grayOf(c) {
+			t.Errorf("basic %d: %d, want %d", i, gray(c), grayOf(c))
+		}
+	}
+	if c := ansi.TrueColor(0x808080); gray(c) != grayOf(c) {
+		t.Errorf("true color: %d, want %d", gray(c), grayOf(c))
+	}
+}
+
+// BenchmarkRenderTerm is a full-screen program redrawing: each frame
+// writes the bottom rows again, colored, mostly as they were (a spinner
+// changes), then draws. "full" compares all the cells, as every few
+// seconds and with a selection.
+func BenchmarkRenderTerm(b *testing.B) {
+	for _, full := range []bool{false, true} {
+		b.Run(map[bool]string{false: "touched", true: "full"}[full], func(b *testing.B) {
+			a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+			a.tf.setSize(termFontDefault)
+			a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1872, 1404))}
+			tr := testTerm(a)
+			tr.pane.p = kobo.NewPanel(a.F, "Terminal", image.Rect(16, 60, 1856, 1390), "")
+			a.paneGeometry(tr)
+			v := &tr.pane
+			tr.emu = vt.NewSafeEmulator(v.cols, v.rows)
+			tr.size = image.Pt(v.cols, v.rows)
+			tr.state = termConnected
+			go func() {
+				buf := make([]byte, 4096)
+				for {
+					if _, err := tr.emu.Read(buf); err != nil {
+						return
+					}
+				}
+			}()
+			var screen []byte
+			for y := 1; y <= v.rows; y++ {
+				screen = append(screen, "\x1b["+strconv.Itoa(y)+";1H\x1b[38;5;"+strconv.Itoa(y%200)+"mrow "+strconv.Itoa(y)+" \x1b[1mbold\x1b[0m some text that fills the line ok \x1b[48;2;40;40;40m\x1b[37m dark \x1b[0m"...)
+			}
+			tr.write(screen)
+			a.renderTerm(tr)
+			spin := []string{"|", "/", "-", "\\"}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				var f []byte
+				for y := v.rows - 20; y <= v.rows; y++ {
+					f = append(f, "\x1b["+strconv.Itoa(y)+";1H\x1b[2K\x1b[38;5;"+strconv.Itoa(y%200)+"m"+spin[i%4]+" row "+strconv.Itoa(y)+" \x1b[1mbold\x1b[0m some text that fills the line ok \x1b[48;2;40;40;40m\x1b[37m dark \x1b[0m"...)
+				}
+				b.StopTimer()
+				tr.write(f) // vt's work, not ours
+				b.StartTimer()
+				if full {
+					v.fullAt = time.Time{}
+				}
+				a.renderTerm(tr)
+			}
+		})
+	}
 }
