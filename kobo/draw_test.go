@@ -42,4 +42,18 @@ func TestFillAndText(t *testing.T) {
 			t.Errorf("gray %d: %d pixels differ", g, bad)
 		}
 	}
+	// CopyGray, as draw.Draw copies, at an offset and off the edges.
+	src := image.NewGray(size)
+	for i := range src.Pix {
+		src.Pix[i] = uint8(i * 13)
+	}
+	ours, theirs := image.NewGray(image.Rect(10, 10, 300, 90)), image.NewGray(image.Rect(10, 10, 300, 90))
+	r, sp := image.Rect(0, 20, 250, 200), image.Pt(40, 5)
+	CopyGray(ours, r, src, sp)
+	draw.Draw(theirs, r, src, sp, draw.Src)
+	for i := range ours.Pix {
+		if ours.Pix[i] != theirs.Pix[i] {
+			t.Fatalf("CopyGray: pixel %d is %d, want %d", i, ours.Pix[i], theirs.Pix[i])
+		}
+	}
 }

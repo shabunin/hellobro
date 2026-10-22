@@ -85,6 +85,19 @@ func (c Canvas) Fill(r image.Rectangle, g uint8) {
 	}
 }
 
+// CopyGray copies src's pixels from sp on into dst's r, a row at a time
+// (draw.Draw does it a pixel at a time for Gray images).
+func CopyGray(dst *image.Gray, r image.Rectangle, src *image.Gray, sp image.Point) {
+	clipped := r.Intersect(dst.Rect).Intersect(src.Rect.Sub(sp).Add(r.Min))
+	if clipped.Empty() {
+		return
+	}
+	sp = sp.Add(clipped.Min.Sub(r.Min))
+	for y := 0; y < clipped.Dy(); y++ {
+		copy(dst.Pix[dst.PixOffset(clipped.Min.X, clipped.Min.Y+y):][:clipped.Dx()], src.Pix[src.PixOffset(sp.X, sp.Y+y):])
+	}
+}
+
 // Mask paints gray g into r through mask (at mp), as draw.DrawMask with
 // draw.Over does, but fast for the glyphs' *image.Alpha.
 func (c Canvas) Mask(r image.Rectangle, g uint8, mask image.Image, mp image.Point) {

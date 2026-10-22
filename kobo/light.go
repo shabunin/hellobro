@@ -9,7 +9,6 @@ import (
 	"bufio"
 	"fmt"
 	"image"
-	"image/draw"
 	"log"
 	"os"
 	"path/filepath"
@@ -144,7 +143,7 @@ func (a *App) setLight(level int) {
 	r := a.lightLabelRect()
 	if a.lightOverlay == nil {
 		a.lightOverlay = image.NewGray(r)
-		draw.Draw(a.lightOverlay, r, a.C.Gray, r.Min, draw.Src)
+		CopyGray(a.lightOverlay, r, a.C.Gray, r.Min)
 	}
 	a.C.Fill(r, White)
 	a.C.Frame(r, 3, Black)
@@ -187,7 +186,7 @@ func (a *App) GaugeUp() bool { return a.lightOverlay != nil || a.gaugeOverlay !=
 func (a *App) drawGauge(under **image.Gray, r image.Rectangle, n, of int, label string) {
 	if *under == nil {
 		*under = image.NewGray(r)
-		draw.Draw(*under, r, a.C.Gray, r.Min, draw.Src)
+		CopyGray(*under, r, a.C.Gray, r.Min)
 	}
 	c := a.C
 	c.Fill(r, White)
@@ -206,7 +205,7 @@ func (a *App) hideGauge(under **image.Gray) {
 		return
 	}
 	r := (*under).Bounds()
-	draw.Draw(a.C.Gray, r, *under, r.Min, draw.Src)
+	CopyGray(a.C.Gray, r, *under, r.Min)
 	*under = nil
 	a.Mark(r, true)
 }

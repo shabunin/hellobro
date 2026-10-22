@@ -18,7 +18,6 @@ package kobo
 import (
 	"fmt"
 	"image"
-	"image/draw"
 	"io"
 	"log"
 	"math"
@@ -944,7 +943,7 @@ func (a *App) flush() {
 	if a.dozing {
 		src = a.panelC
 	}
-	draw.Draw(img, d.r, src.Gray, d.r.Min, draw.Src)
+	CopyGray(img, d.r, src.Gray, d.r.Min)
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {
 		flash, a.flashR = true, image.Rectangle{}
