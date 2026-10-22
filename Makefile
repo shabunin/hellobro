@@ -46,8 +46,9 @@ install: hellobro bin/fbink
 	cp hellobro launch.sh bin/fbink $(ADDS)/
 	rm -f $(ADDS)/hellobro.sh # the launcher before launch.sh
 	cp nm/hellobro $(KOBO)/.adds/nm/hellobro
-	@# a first ssh.conf pointing at hellobro-server on this PC; kept if it's there
-	test -f $(ADDS)/ssh.conf || \
+	@# a first ssh.conf pointing at hellobro-server on this PC, which hellobro
+	@# takes into hellobro.json (keeping it as ssh.conf.old): only the first time
+	test -f $(ADDS)/ssh.conf || test -f $(ADDS)/ssh.conf.old || \
 		printf '# name  user@host[:port]\nhellobro-server  bro@%s:2222\n' "$(PC_IP)" > $(ADDS)/ssh.conf
 	sync
 

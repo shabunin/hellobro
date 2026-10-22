@@ -12,7 +12,7 @@ them, end to end encrypted: it never sees passwords, files or screens.
           └──────▲──────────────────────────────────────▲───────┘
                  │ ssh -R 2023                           │ ssh -R 2222
                Kobo                                      PC
-   "home" in ssh.conf: via the VPS          ssh -J relay@VPS -p 2023
+   "home", a saved host: via the VPS        ssh -J relay@VPS -p 2023
    to 127.0.0.1:2222, the PC                root@127.0.0.1, the Kobo
 ```
 

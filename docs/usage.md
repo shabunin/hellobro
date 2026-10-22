@@ -7,7 +7,7 @@ bro!" as it hands the Kobo back.
 
 ## Tabs
 
-Tap a tab, or Ctrl+Alt+1–5 (by place; works everywhere, fullscreen and
+Tap a tab, or Ctrl+Alt+1–4 (by place; works everywhere, fullscreen and
 in a session too):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,

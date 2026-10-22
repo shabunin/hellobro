@@ -34,7 +34,8 @@ The build runs in a podman container with Go and an ARM toolchain
 
 `make install` copies `hellobro`, `launch.sh`, `bin/fbink` and its
 NickelMenu entry (`nm/hellobro`) to `.adds/hellobro`, and writes a first
-`ssh.conf` pointing at this PC. brotools only goes there with
+`ssh.conf` pointing at this PC (once: hellobro takes it into
+`hellobro.json`). brotools only goes there with
 `make install-tools` (and its entry, `nm/brotools`). The apps share that directory, so
 they share the touch calibration; each logs to its own `NAME.log` there.
 `launch.sh APP` freezes Nickel while the app runs (leaving whatever holds
