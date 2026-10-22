@@ -1,12 +1,12 @@
 package main
 
-// SSH for the SSH tab: hosts from ssh.conf, our own key (made on
-// first use), trust-on-first-use host keys in known_hosts, and password /
-// keyboard-interactive prompts answered from the Kobo's keyboard. A host
-// can be reached through another (ssh -J): "via kobo@vps" in ssh.conf.
+// SSH for the SSH tab: the saved hosts (in hellobro.json), our own key
+// (made on first use), trust-on-first-use host keys in known_hosts, and
+// password / keyboard-interactive prompts answered from the Kobo's
+// keyboard. A host can be reached through another (ssh -J): "via
+// kobo@vps".
 
 import (
-	"bufio"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
@@ -40,45 +40,12 @@ func (h sshHost) String() string {
 	return h.user + "@" + h.addr
 }
 
-// line is h as a line of ssh.conf.
+// line is h as a line: as it's edited, and as ssh.conf had it.
 func (h sshHost) line() string { return strings.TrimSpace(h.name + "  " + h.String() + "  " + h.cmd) }
 
 func (h sshHost) same(o sshHost) bool { return h.String() == o.String() && h.cmd == o.cmd }
 
-const sshConfExample = `# hellobro ssh hosts, one per line:
-#   name  user@host[:port]  [via user@jumphost[:port]]  [command]
-# The command, if any, runs instead of a login shell; with tmux, a dropped
-# connection comes back where it was. "via" reaches the host through a
-# jump host, as ssh -J does: a VPS both ends can reach, say, where the
-# PC keeps a tunnel open to its sshd (see the README).
-# hellobro-server  bro@192.168.1.10:2222
-# pc  me@192.168.1.10  tmux new -A -s kobo
-# home  me@127.0.0.1:2222  via kobo@203.0.113.7  tmux new -A -s kobo
-`
-
-// loadSSHHosts reads ssh.conf, creating an example if there's none.
-func loadSSHHosts() []sshHost {
-	path := kobo.AppFile("ssh.conf")
-	f, err := os.Open(path)
-	if errors.Is(err, os.ErrNotExist) {
-		os.WriteFile(path, []byte(sshConfExample), 0o644)
-		return nil
-	}
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-	var hosts []sshHost
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		if h, ok := parseSSHConfLine(sc.Text()); ok {
-			hosts = append(hosts, h)
-		}
-	}
-	return hosts
-}
-
-// parseSSHConfLine reads a line of ssh.conf: name  user@host[:port]
+// parseSSHConfLine reads a host's line: name  user@host[:port]
 // [via user@jumphost[:port]]  [command].
 func parseSSHConfLine(line string) (sshHost, bool) {
 	fields := strings.Fields(line)
@@ -101,28 +68,39 @@ func parseSSHConfLine(line string) (sshHost, bool) {
 	return h, true
 }
 
-// saveSSHHost adds h to ssh.conf, under a name no other host has; it
-// returns that name.
-func saveSSHHost(hosts []sshHost, h sshHost) (string, error) {
+// savedHost is a host as hellobro.json keeps it.
+type savedHost struct {
+	Name    string `json:"name"`
+	Target  string `json:"target"`        // user@host:port
+	Via     string `json:"via,omitempty"` // the jump host, user@host:port
+	Command string `json:"command,omitempty"`
+}
+
+func (h sshHost) saved() savedHost {
+	s := savedHost{Name: h.name, Target: h.user + "@" + h.addr, Command: h.cmd}
+	if h.via != nil {
+		s.Via = h.via.user + "@" + h.via.addr
+	}
+	return s
+}
+
+func (s savedHost) host() (sshHost, bool) {
+	line := s.Name + "  " + s.Target
+	if s.Via != "" {
+		line += "  via " + s.Via
+	}
+	return parseSSHConfLine(line + "  " + s.Command)
+}
+
+// newHostName is a name for h no other host has: its address's.
+func newHostName(hosts []sshHost, h sshHost) string {
 	base, _, _ := net.SplitHostPort(h.addr)
 	base = strings.Trim(base, "[]")
 	name := base
 	for n := 2; slices.ContainsFunc(hosts, func(o sshHost) bool { return o.name == name }); n++ {
 		name = fmt.Sprintf("%s-%d", base, n)
 	}
-	h.name = name
-	path := kobo.AppFile("ssh.conf")
-	b, _ := os.ReadFile(path)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	if len(b) > 0 && b[len(b)-1] != '\n' {
-		fmt.Fprintln(f)
-	}
-	_, err = fmt.Fprintln(f, h.line())
-	return name, err
+	return name
 }
 
 // parseSSHTarget reads user@host[:port] (user defaults to root, port to
@@ -339,6 +317,48 @@ type dialOpts struct {
 // dialSSH connects, and returns the session and the password typed for
 // it, if one was.
 func dialSSH(h sshHost, o dialOpts) (*sshSession, string, error) {
+	client, typed, err := dialClient(h, o)
+	if err != nil {
+		return nil, "", err
+	}
+	sess, err := client.NewSession()
+	if err != nil {
+		client.Close()
+		return nil, "", err
+	}
+	fail := func(err error) (*sshSession, string, error) {
+		sess.Close()
+		client.Close()
+		return nil, "", err
+	}
+	modes := ssh.TerminalModes{ssh.ECHO: 1, ssh.TTY_OP_ISPEED: 115200, ssh.TTY_OP_OSPEED: 115200}
+	if err := sess.RequestPty("xterm-256color", o.rows, o.cols, modes); err != nil {
+		return fail(fmt.Errorf("pty: %w", err))
+	}
+	sess.Setenv("LANG", "C.UTF-8") // most servers refuse it; harmless
+	s := &sshSession{client: client, session: sess, done: make(chan struct{})}
+	if s.stdin, err = sess.StdinPipe(); err != nil {
+		return fail(err)
+	}
+	if s.stdout, err = sess.StdoutPipe(); err != nil {
+		return fail(err)
+	}
+	sess.Stderr = nil // with a PTY, stderr comes through stdout
+	if h.cmd != "" {
+		err = sess.Start(h.cmd)
+	} else {
+		err = sess.Shell()
+	}
+	if err != nil {
+		return fail(fmt.Errorf("shell: %w", err))
+	}
+	go keepalive(client, s.done, &s.lost)
+	return s, typed, nil
+}
+
+// dialClient logs in to h: our key, or what o asks for; and offers to
+// install our key if a password was typed.
+func dialClient(h sshHost, o dialOpts) (*ssh.Client, string, error) {
 	signer, err := clientKey()
 	if err != nil {
 		return nil, "", fmt.Errorf("client key: %w", err)
@@ -398,39 +418,7 @@ func dialSSH(h sshHost, o dialOpts) (*sshSession, string, error) {
 			o.note("key installed: next time needs no password")
 		}
 	}
-	sess, err := client.NewSession()
-	if err != nil {
-		client.Close()
-		return nil, "", err
-	}
-	fail := func(err error) (*sshSession, string, error) {
-		sess.Close()
-		client.Close()
-		return nil, "", err
-	}
-	modes := ssh.TerminalModes{ssh.ECHO: 1, ssh.TTY_OP_ISPEED: 115200, ssh.TTY_OP_OSPEED: 115200}
-	if err := sess.RequestPty("xterm-256color", o.rows, o.cols, modes); err != nil {
-		return fail(fmt.Errorf("pty: %w", err))
-	}
-	sess.Setenv("LANG", "C.UTF-8") // most servers refuse it; harmless
-	s := &sshSession{client: client, session: sess, done: make(chan struct{})}
-	if s.stdin, err = sess.StdinPipe(); err != nil {
-		return fail(err)
-	}
-	if s.stdout, err = sess.StdoutPipe(); err != nil {
-		return fail(err)
-	}
-	sess.Stderr = nil // with a PTY, stderr comes through stdout
-	if h.cmd != "" {
-		err = sess.Start(h.cmd)
-	} else {
-		err = sess.Shell()
-	}
-	if err != nil {
-		return fail(fmt.Errorf("shell: %w", err))
-	}
-	go s.keepalive()
-	return s, typed, nil
+	return client, typed, nil
 }
 
 // installKey appends key to the remote's authorized_keys, unless it's
@@ -453,25 +441,26 @@ func installKey(client *ssh.Client, key string) error {
 	return nil
 }
 
-// keepalive asks the server for a reply now and then: a connection that
-// died quietly (Wi-Fi gone to sleep, a laptop lid closed) gets closed, so
-// it can be noticed and made again, instead of hanging there.
-func (s *sshSession) keepalive() {
+// keepalive asks the server for a reply now and then, till done: a
+// connection that died quietly (Wi-Fi gone to sleep, a laptop lid closed)
+// gets closed, and lost set, so it can be noticed and made again,
+// instead of hanging there.
+func keepalive(c *ssh.Client, done <-chan struct{}, lost *atomic.Bool) {
 	t := time.NewTicker(15 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-s.done:
+		case <-done:
 			return
 		case <-t.C:
 		}
 		reply := make(chan error, 1)
 		go func() {
-			_, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil)
+			_, _, err := c.SendRequest("keepalive@openssh.com", true, nil)
 			reply <- err
 		}()
 		select {
-		case <-s.done:
+		case <-done:
 			return
 		case err := <-reply:
 			if err == nil {
@@ -479,8 +468,8 @@ func (s *sshSession) keepalive() {
 			}
 		case <-time.After(10 * time.Second):
 		}
-		s.lost.Store(true)
-		s.client.Close()
+		lost.Store(true)
+		c.Close()
 		return
 	}
 }

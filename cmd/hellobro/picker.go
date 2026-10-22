@@ -59,9 +59,6 @@ func (a *bro) openPicker() {
 		p.all = append(p.all, pickEntry{kind: "tab", title: tabNames[tab], detail: a.keyLabels("tab." + tabKey(tab)),
 			current: a.Tab == tab, do: func() { a.SwitchTab(tab) }})
 	}
-	if a.tv.hosts == nil {
-		a.tv.hosts = loadSSHHosts()
-	}
 	for _, h := range a.tv.hosts {
 		cmd := ""
 		if h.cmd != "" {

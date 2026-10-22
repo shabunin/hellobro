@@ -1,8 +1,9 @@
 package main
 
-// A question over the page, yes or no: "restart into the new hellobro?",
-// "delete this album?". Enter (or y) says yes, Esc (or n) no; or tap a
-// button. The page holds still under it, like under the switcher.
+// A question over the page: yes or no ("restart into the new hellobro?"),
+// or one of a few things to do (a saved host's menu). Enter picks the
+// first, a choice's letter that one, Esc none; or tap a button. The page
+// holds still under it, like under the switcher.
 
 import (
 	"image"
@@ -10,23 +11,48 @@ import (
 	"hellobro/kobo"
 )
 
-type askBox struct {
-	title, text, yes string
-	do               func()
-	box, yesR, noR   image.Rectangle
+// askOpt is one of the answers: its button, its key (a letter), and what
+// it does (nil: nothing, as Esc).
+type askOpt struct {
+	label, key string
+	do         func()
 }
 
-// ask puts the question up; do runs on a yes.
+type askBox struct {
+	title, text string
+	opts        []askOpt
+	box         image.Rectangle
+	optR        []image.Rectangle
+}
+
+// ask puts a yes-or-no question up; do runs on a yes.
 func (a *bro) ask(title, text, yes string, do func()) {
+	a.choose(title, text, askOpt{yes, "y", do}, askOpt{"no", "n", nil})
+}
+
+// choose puts a question up with these answers: side by side if two, the
+// second being no; else one under another.
+func (a *bro) choose(title, text string, opts ...askOpt) {
 	b := a.C.Bounds()
 	w := min(1000, b.Dx()-80)
 	h := 330
+	if len(opts) > 2 {
+		h = 200 + len(opts)*84
+	}
 	top := b.Min.Y + (b.Dy()-h)/2
-	q := &askBox{title: title, text: text, yes: yes, do: do}
+	q := &askBox{title: title, text: text, opts: opts}
 	q.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
-	bw, by := 240, q.box.Max.Y-96
-	q.noR = image.Rect(q.box.Max.X-32-bw, by, q.box.Max.X-32, by+68)
-	q.yesR = image.Rect(q.noR.Min.X-20-bw, by, q.noR.Min.X-20, by+68)
+	if len(opts) == 2 {
+		bw, by := 240, q.box.Max.Y-96
+		no := image.Rect(q.box.Max.X-32-bw, by, q.box.Max.X-32, by+68)
+		q.optR = []image.Rectangle{image.Rect(no.Min.X-20-bw, by, no.Min.X-20, by+68), no}
+	} else {
+		y := q.box.Min.Y + 160
+		for range opts {
+			q.optR = append(q.optR, image.Rect(q.box.Min.X+32, y, q.box.Max.X-32, y+68))
+			y += 84
+		}
+	}
 	a.asking = q
 	a.drawAsk()
 }
@@ -43,31 +69,37 @@ func (a *bro) drawAsk() {
 	in := q.box.Inset(32)
 	c.Text(a.F.Panel, image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Min.Y+56), q.title, kobo.Black, kobo.AlignLeft)
 	c.Text(a.F.Small, image.Rect(in.Min.X, in.Min.Y+70, in.Max.X, in.Min.Y+110), q.text, kobo.Dark, kobo.AlignLeft)
-	for _, b := range []struct {
-		r     image.Rectangle
-		label string
-		dark  bool
-	}{{q.yesR, q.yes + "  (Enter)", true}, {q.noR, "no  (Esc)", false}} {
+	for i, o := range q.opts {
+		r, label := q.optR[i], o.label
+		switch {
+		case i == 0:
+			label += "  (Enter)"
+		case o.do == nil:
+			label += "  (Esc)"
+		case o.key != "":
+			label += "  (" + o.key + ")"
+		}
 		fg := uint8(kobo.Black)
-		if b.dark {
-			c.Fill(b.r, kobo.Black)
+		if i == 0 {
+			c.Fill(r, kobo.Black)
 			fg = kobo.White
 		} else {
-			c.Frame(b.r, 2, kobo.Black)
+			c.Frame(r, 2, kobo.Black)
 		}
-		c.Text(a.F.Small, b.r, b.label, fg, kobo.AlignCenter)
+		c.Text(a.F.Small, r, label, fg, kobo.AlignCenter)
 	}
 	a.Mark(q.box, true)
 }
 
-// answer takes the question down, and does it on a yes.
-func (a *bro) answer(yes bool) {
+// answer takes the question down, and does what the answer i says (-1:
+// none).
+func (a *bro) answer(i int) {
 	q := a.asking
 	a.asking = nil
 	a.DrawPage()
 	a.drawStat(true)
-	if yes {
-		q.do()
+	if i >= 0 && q.opts[i].do != nil {
+		q.opts[i].do()
 	}
 }
 
@@ -77,19 +109,29 @@ func (a *bro) askKey(code uint16, value int32) {
 	}
 	ch, _ := kobo.KeyChar(code, false, false)
 	switch {
-	case code == kobo.KeyEnter || ch == "y":
-		a.answer(true)
-	case code == kobo.KeyEsc || ch == "n":
-		a.answer(false)
+	case code == kobo.KeyEnter:
+		a.answer(0)
+	case code == kobo.KeyEsc:
+		a.answer(-1)
+	case ch != "":
+		for i, o := range a.asking.opts {
+			if o.key == ch {
+				a.answer(i)
+				return
+			}
+		}
 	}
 }
 
 func (a *bro) askTap(p image.Point) {
 	q := a.asking
-	switch {
-	case kobo.Hit(p, q.yesR):
-		a.answer(true)
-	case kobo.Hit(p, q.noR), !p.In(q.box):
-		a.answer(false)
+	for i, r := range q.optR {
+		if kobo.Hit(p, r) {
+			a.answer(i)
+			return
+		}
+	}
+	if !p.In(q.box) {
+		a.answer(-1)
 	}
 }

@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/x/vt v0.1.0
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/hanwen/go-fuse/v2 v2.11.0
 	github.com/pkg/sftp v1.13.11
 	golang.org/x/crypto v0.58.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20261020153306-9f2b28d4331a

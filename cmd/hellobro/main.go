@@ -68,6 +68,7 @@ type bro struct {
 	fs     focusState // the keys' focus: focus.go
 	set    settings
 	mem    remembered // hellobro.json
+	mnt    mountState // the hosts' files, mounted (mount.go)
 	doze   dozeState
 	share  shareState
 	relay  relayState
@@ -93,6 +94,10 @@ func main() {
 		fmt.Println("hellobro", version)
 		return
 	}
+	if len(os.Args) == 4 && os.Args[1] == "--mount" { // a host's files (sftpfs.go), screen untouched
+		mountMain(os.Args[2], os.Args[3])
+		return
+	}
 	if len(os.Args) == 3 && os.Args[1] == "--alpine-init" { // a jail's first process (alpineinit.go), screen untouched
 		alpineInit(os.Args[2])
 		return
@@ -102,6 +107,7 @@ func main() {
 	a.loadStatBar()
 	a.set = loadSettings()
 	a.mem = loadRemembered(kobo.AppFile(""))
+	a.tv.hosts = a.mem.hosts()
 	radio.StateDir = kobo.AppFile("")
 	a.tabs = loadTabs()
 	a.folds = loadFolds()
@@ -228,6 +234,8 @@ func (a *bro) Exit() {
 	a.termCloseAll()
 	a.radioExit()
 	a.shareExit()
+	a.unmountAll(false)
+	mountsExit()
 	alpineExit()
 }
 

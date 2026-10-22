@@ -54,7 +54,7 @@ func (a *bro) dozeWhenIdle() {
 // a while, sleep.
 func (a *bro) dozeTick() {
 	z := &a.doze
-	if !z.wifiAsk && time.Since(z.since) >= dozeWiFiAfter && a.setting("doze-wifi") == "off" && !a.relayOn() {
+	if !z.wifiAsk && time.Since(z.since) >= dozeWiFiAfter && a.setting("doze-wifi") == "off" && !a.relayOn() && len(a.mnt.on) == 0 { // a host's files may be what's playing
 		z.wifiAsk = true
 		a.dozeWiFi("off")
 	}

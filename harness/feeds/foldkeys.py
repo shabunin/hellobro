@@ -21,9 +21,9 @@ key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # Sharing folded too
 key(TAB, ctrl=True); time.sleep(2)                    # Sharing's strip
 key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # opened
 tap(tab_x(0), tabs_y); time.sleep(2)                  # SSH tab
-keys("1"); time.sleep(5)
+keys("1"); key(ENTER); time.sleep(5)
 key(KEY_T, shift=True, ctrl=True); time.sleep(2)
-keys("1"); time.sleep(5)                              # session 2, in focus
+keys("1"); key(ENTER); time.sleep(5)                              # session 2, in focus
 key(KEY_M, ctrl=True, shift=True); time.sleep(3)      # folded: session 1 has it all
 key(TAB, ctrl=True); time.sleep(2)                    # session 2's strip
 keys("lost"); time.sleep(2)                           # waits: not typed

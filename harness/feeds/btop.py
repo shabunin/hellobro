@@ -7,7 +7,7 @@ from feedlib import *
 
 start()
 tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab: connect screen
-keys("1"); time.sleep(5)                             # saved host 1: a login shell
+keys("1"); key(ENTER); time.sleep(5)                             # saved host 1: a login shell
 keys("btop\n"); time.sleep(10)                       # its graphs fill in
 fullscreen(); time.sleep(10)                             # fullscreen
 fullscreen(); time.sleep(3)

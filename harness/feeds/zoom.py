@@ -6,7 +6,7 @@ from feedlib import *
 
 start()
 tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
-keys("1"); time.sleep(5)
+keys("1"); key(ENTER); time.sleep(5)
 keys("4"); time.sleep(2)                              # Showcase: shows the window size
 for _ in range(3): key(13, ctrl=True); time.sleep(2)  # Ctrl+= x3: 32 px
 for _ in range(5): key(12, ctrl=True); time.sleep(2)  # Ctrl+- x5: 22 px

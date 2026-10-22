@@ -7,7 +7,8 @@ package main
 //
 // The jail: the image (alpine.go) as /, a /dev of a few devices (none of
 // the Kobo's: not the screen, the input, ntx_io or the disks), its own
-// /proc, a read-only /sys, and the Kobo's storage at /mnt/onboard, but
+// /proc, a read-only /sys, the hosts' files mounted from the SSH tab at
+// /mnt/hosts (mount.go), and the Kobo's storage at /mnt/onboard, but
 // .adds and .kobo read-only: what's there runs as root outside (the
 // launcher, NickelMenu's entries, KoboRoot.tgz). The shell is root in
 // it, as the storage is FAT and only root writes there, but with root's
@@ -148,8 +149,11 @@ func alpineJail() error {
 			}
 		}
 	}
-	if err := syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, ""); err != nil {
-		return fmt.Errorf("making mounts private: %w", err)
+	// Slaves: nothing mounted here goes out. The Kobo's mounts are all
+	// private, so this is private for them; only the hosts' folder is
+	// shared (mount.go), and what's mounted there later comes in.
+	if err := syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_SLAVE, ""); err != nil {
+		return fmt.Errorf("making mounts slaves: %w", err)
 	}
 	old := filepath.Join(alpineRoot, ".oldroot")
 	if st, err := os.Lstat(old); err == nil && !st.IsDir() {
@@ -192,6 +196,19 @@ func alpineJail() error {
 			if err := syscall.Mount("", m.dst, "", syscall.MS_BIND|syscall.MS_REMOUNT|nosuid|nodev, ""); err != nil {
 				return fmt.Errorf("mounting %s: %w", m.dst, err)
 			}
+		}
+	}
+	// The hosts' folders, read-only: nothing in here can put a symlink
+	// where hellobro mounts. The mounts in them are their own.
+	if _, err := os.Lstat("/.oldroot" + hostsDir); err == nil {
+		if err := jailDir("/mnt/hosts"); err != nil {
+			return err
+		}
+		if err := syscall.Mount("/.oldroot"+hostsDir, "/mnt/hosts", "", bind, ""); err != nil {
+			return fmt.Errorf("mounting /mnt/hosts: %w", err)
+		}
+		if err := syscall.Mount("", "/mnt/hosts", "", syscall.MS_BIND|syscall.MS_REMOUNT|rdonly|nosuid|nodev, ""); err != nil {
+			return fmt.Errorf("mounting /mnt/hosts: %w", err)
 		}
 	}
 	if bus {

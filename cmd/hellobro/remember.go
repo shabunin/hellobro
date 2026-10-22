@@ -1,14 +1,16 @@
 package main
 
-// What hellobro remembers of how it was left, for the next start: the
-// light, the terminal's font. Not settings (those are chosen, in the
-// settings file): just where things were, in hellobro.json.
+// What hellobro remembers, for the next start, in hellobro.json: how it
+// was left (the light, the terminal's font) and the SSH tab's saved
+// hosts. Not settings: those are chosen, in the settings file.
 
 import (
+	"bufio"
 	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -16,9 +18,10 @@ import (
 const rememberFile = "hellobro.json"
 
 type remembered struct {
-	Light    *int `json:"light,omitempty"`     // the frontlight as last set, 0-100
-	LightOn  int  `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
-	TermFont int  `json:"term-font,omitempty"` // the terminal font's size, px
+	Light    *int        `json:"light,omitempty"`     // the frontlight as last set, 0-100
+	LightOn  int         `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
+	TermFont int         `json:"term-font,omitempty"` // the terminal font's size, px
+	Hosts    []savedHost `json:"hosts,omitempty"`     // the SSH tab's, in order
 	dir      string
 }
 
@@ -39,7 +42,53 @@ func loadRemembered(dir string) remembered {
 			}
 		}
 	}
+	r.importSSHConf()
 	return r
+}
+
+// importSSHConf takes in the hosts of an ssh.conf, if there is one (as
+// they were kept once, and as the harness and make install leave them),
+// those whose names are new; it's kept as ssh.conf.old.
+func (r *remembered) importSSHConf() {
+	conf := filepath.Join(r.dir, "ssh.conf")
+	f, err := os.Open(conf)
+	if err != nil {
+		return
+	}
+	n := 0
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		h, ok := parseSSHConfLine(sc.Text())
+		if ok && !slices.ContainsFunc(r.Hosts, func(s savedHost) bool { return s.Name == h.name }) {
+			r.Hosts = append(r.Hosts, h.saved())
+			n++
+		}
+	}
+	f.Close()
+	if r.save() == nil {
+		os.Rename(conf, conf+".old")
+		log.Printf("%s: %d hosts from ssh.conf (now ssh.conf.old)", rememberFile, n)
+	}
+}
+
+// hosts are the saved hosts.
+func (r remembered) hosts() []sshHost {
+	var hs []sshHost
+	for _, s := range r.Hosts {
+		if h, ok := s.host(); ok {
+			hs = append(hs, h)
+		}
+	}
+	return hs
+}
+
+// saveHosts keeps the SSH tab's hosts.
+func (a *bro) saveHosts() error {
+	a.mem.Hosts = nil
+	for _, h := range a.tv.hosts {
+		a.mem.Hosts = append(a.mem.Hosts, h.saved())
+	}
+	return a.mem.save()
 }
 
 func (r remembered) save() error {

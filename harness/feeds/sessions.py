@@ -16,7 +16,7 @@ def server():
 srv = server()
 start()
 tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
-keys("1"); time.sleep(5)                             # session 1: saved host 1
+keys("1"); key(ENTER); time.sleep(5)                             # session 1: saved host 1
 key(KEY_T, shift=True, ctrl=True); time.sleep(1.5)   # session 2
 keys("ssh -p 2223 bro@127.0.0.1\n"); time.sleep(4)   # wants a password
 keys("bro\n"); time.sleep(3)                         # the key offer

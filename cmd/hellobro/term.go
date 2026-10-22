@@ -96,7 +96,8 @@ type termSession struct {
 	notes  []string
 	state  int
 	target sshHost
-	typed  bool // the target was typed in: saved to ssh.conf once it works
+	typed  bool     // the target was typed in: saved once it works
+	edit   *sshHost // the saved host the line is editing, if it is
 	prompt *termPrompt
 	gen    int // bumps per connection, so late messages from an old one are ignored
 
@@ -485,6 +486,8 @@ func (a *bro) drawConnect(t *termSession) {
 			help += "   CAPS LOCK is on"
 		}
 		lines = append(lines, t.prompt.question+shown+"█", help)
+	case t.state == termIdle && t.edit != nil:
+		lines = append(lines, "edit> "+t.input+"█", "(name  user@host[:port]  [via user@jump]  [command]; Enter to save, Esc to leave it)")
 	case t.state == termIdle:
 		lines = append(lines, "ssh> "+t.input+"█")
 	case t.state == termWaiting:
@@ -492,17 +495,20 @@ func (a *bro) drawConnect(t *termSession) {
 	default:
 		lines = append(lines, "ssh> "+t.input)
 	}
-	lines = append(lines, "", fmt.Sprintf("saved hosts (%s):", kobo.AppFile("ssh.conf")))
+	lines = append(lines, "", "saved hosts: tap or 1-9 to connect, mount, edit or forget")
 	firstHost := len(lines)
 	for i, h := range v.hosts {
 		line := fmt.Sprintf("   %d   %s   %s", i+1, h.name, h)
 		if h.cmd != "" {
 			line += "   ▸ " + h.cmd
 		}
+		if m := a.mounted(h); m != nil && m.cmd != nil {
+			line += "   · mounted, " + mountMode(m.rw)
+		}
 		lines = append(lines, line)
 	}
 	if len(v.hosts) == 0 {
-		lines = append(lines, "   none yet: add lines like  myserver  bro@192.168.1.10:2222  [command]")
+		lines = append(lines, "   none yet: type user@host[:port] [command] and Enter; it's saved once it connects")
 	}
 	lines = append(lines, "", "This Kobo's key, for ~/.ssh/authorized_keys (also in id_ed25519.pub next to hellobro):")
 	if s, err := clientKey(); err == nil {
@@ -694,9 +700,6 @@ func (a *bro) drawCell(pn *termPane, x, y int, k cellKey) {
 func (a *bro) enterTerm() {
 	v := &a.tv
 	v.sel = nil // the other tab's
-	if v.hosts == nil {
-		v.hosts = loadSSHHosts()
-	}
 	if v.cw == 0 {
 		v.fontPx = termFontDefault
 		if px := a.mem.TermFont; px != 0 && px != v.fontPx {
@@ -892,38 +895,9 @@ func (a *bro) termConnect(t *termSession, h sshHost) {
 	t.gen++
 	gen := t.gen
 	a.termNote(t, "connecting to "+h.String()+"…")
-	ask := func(q string, echo, yesno bool) (string, error) {
-		reply := make(chan string, 1)
-		a.Do(func() {
-			if t.gen == gen {
-				t.prompt = &termPrompt{question: q, echo: echo, yesno: yesno, reply: reply}
-				a.updateTerm(t)
-			} else {
-				close(reply)
-			}
-		})
-		ans, ok := <-reply
-		if !ok {
-			return "", errors.New("canceled")
-		}
-		return ans, nil
-	}
 	size := t.startSize()
-	o := dialOpts{
-		cols: size.X, rows: size.Y, password: t.password,
-		ask:  func(q string, echo bool) (string, error) { return ask(q, echo, false) },
-		note: func(s string) { a.Do(func() { a.termNote(t, s) }) },
-	}
-	if a.tv.keyAsked == nil {
-		a.tv.keyAsked = map[string]bool{}
-	}
-	if !a.tv.keyAsked[h.String()] {
-		o.confirm = func(q string) bool {
-			a.Do(func() { a.tv.keyAsked[h.String()] = true })
-			ans, err := ask(q, true, true)
-			return err == nil && ans == "y"
-		}
-	}
+	o := a.dialPrompts(t, gen, h)
+	o.cols, o.rows, o.password = size.X, size.Y, t.password
 	go func() {
 		s, typed, err := dialSSH(h, o)
 		a.Do(func() {
@@ -952,18 +926,142 @@ func (a *bro) termConnect(t *termSession, h sshHost) {
 			}
 			t.retries = 0
 			if t.typed && !slices.ContainsFunc(a.tv.hosts, h.same) {
-				if name, err := saveSSHHost(a.tv.hosts, h); err != nil {
+				h.name = newHostName(a.tv.hosts, h)
+				a.tv.hosts = append(a.tv.hosts, h)
+				if err := a.saveHosts(); err != nil {
 					a.termNote(t, "couldn't save the host: "+err.Error())
 				} else {
-					h.name = name
-					a.tv.hosts = append(a.tv.hosts, h)
-					log.Printf("ssh: saved %s as %s", h, name)
+					log.Printf("ssh: saved %s as %s", h, h.name)
 				}
 			}
 			t.typed, t.input = false, ""
 			a.termStart(t, s, gen)
 		})
 	}()
+}
+
+// dialPrompts are dialOpts for logging in to h whose questions go to
+// t's page, while its connection is gen.
+func (a *bro) dialPrompts(t *termSession, gen int, h sshHost) dialOpts {
+	ask := func(q string, echo, yesno bool) (string, error) {
+		reply := make(chan string, 1)
+		a.Do(func() {
+			if t.gen == gen {
+				t.prompt = &termPrompt{question: q, echo: echo, yesno: yesno, reply: reply}
+				a.updateTerm(t)
+			} else {
+				close(reply)
+			}
+		})
+		ans, ok := <-reply
+		if !ok {
+			return "", errors.New("canceled")
+		}
+		return ans, nil
+	}
+	o := dialOpts{
+		ask:  func(q string, echo bool) (string, error) { return ask(q, echo, false) },
+		note: func(s string) { a.Do(func() { a.termNote(t, s) }) },
+	}
+	if a.tv.keyAsked == nil {
+		a.tv.keyAsked = map[string]bool{}
+	}
+	if !a.tv.keyAsked[h.String()] {
+		o.confirm = func(q string) bool {
+			a.Do(func() { a.tv.keyAsked[h.String()] = true })
+			ans, err := ask(q, true, true)
+			return err == nil && ans == "y"
+		}
+	}
+	return o
+}
+
+// hostMenu is what can be done with saved host i: connect, mount its
+// files (or unmount them), edit its line, forget it.
+func (a *bro) hostMenu(t *termSession, i int) {
+	h := a.tv.hosts[i]
+	opts := []askOpt{{"connect", "c", func() { a.termConnect(t, h) }}}
+	if m := a.mounted(h); m != nil {
+		opts = append(opts, askOpt{"unmount its files", "u", func() { a.unmountHost(h) }})
+	} else {
+		opts = append(opts, askOpt{"mount its files…", "m", func() { a.mountAsk(t, h) }})
+	}
+	opts = append(opts,
+		askOpt{"edit", "e", func() { a.hostEdit(t, h) }},
+		askOpt{"forget", "f", func() {
+			a.ask("Forget "+h.name+"?", h.line(), "forget", func() { a.hostSave(t, h, "") })
+		}},
+		askOpt{"cancel", "", nil})
+	a.choose(h.name, h.String(), opts...)
+}
+
+// mountAsk asks how to mount h: reading only, or writing too.
+func (a *bro) mountAsk(t *termSession, h sshHost) {
+	a.choose("Mount "+h.name, "its home, at /mnt/hosts/"+hostDirName(h.name)+" in Alpine",
+		askOpt{"read-only", "r", func() { a.mountHost(t, h, false, false) }},
+		askOpt{"read-write", "w", func() { a.mountHost(t, h, true, false) }},
+		askOpt{"cancel", "", nil})
+}
+
+// hostEdit puts h's line in the line, to change and save with Enter.
+func (a *bro) hostEdit(t *termSession, h sshHost) {
+	if t.state != termIdle {
+		return
+	}
+	t.edit, t.input = &h, h.line()
+	a.updateTerm(t)
+}
+
+// hostSave puts line in place of h's line, or takes h out if it's
+// empty.
+func (a *bro) hostSave(t *termSession, h sshHost, line string) {
+	if line != "" {
+		n, ok := parseSSHConfLine(line)
+		switch {
+		case !ok:
+			a.termNote(t, "that's not a host: name  user@host[:port]  [via user@jump]  [command]")
+			return
+		case n.name != h.name && slices.ContainsFunc(a.tv.hosts, func(o sshHost) bool { return o.name == n.name }):
+			a.termNote(t, "there's a host called "+n.name+" already")
+			return
+		}
+		line = n.line()
+	}
+	if m := a.mounted(h); m != nil && line == "" {
+		a.unmountHost(h)
+	}
+	i := slices.IndexFunc(a.tv.hosts, func(o sshHost) bool { return o.name == h.name })
+	if i < 0 {
+		a.termNote(t, h.name+" isn't saved any more")
+		return
+	}
+	if line == "" {
+		a.tv.hosts = slices.Delete(a.tv.hosts, i, i+1)
+	} else {
+		a.tv.hosts[i], _ = parseSSHConfLine(line)
+	}
+	if err := a.saveHosts(); err != nil {
+		a.termNote(t, "couldn't save: "+err.Error())
+		return
+	}
+	if line == "" {
+		a.termNote(t, h.name+" forgotten")
+	} else {
+		a.termNote(t, "saved: "+line)
+	}
+}
+
+// redrawHosts redraws the saved hosts where they show: a mount came or
+// went.
+func (a *bro) redrawHosts() {
+	if a.Tab == tabSSH {
+		for _, t := range a.tv.groups[kindSSH].sessions {
+			if !t.connected() && a.onScreen(t) {
+				t.pane.shownConnect = nil
+				a.updateTerm(t)
+			}
+		}
+	}
 }
 
 func (a *bro) termStartShell(t *termSession) {
@@ -1228,6 +1326,15 @@ func (a *bro) termKey(code uint16, value int32) bool {
 			t.retries = 0
 			a.termNote(t, "canceled")
 		case t.state != termIdle:
+		case t.edit != nil && code == kobo.KeyEsc:
+			t.edit, t.input = nil, ""
+		case t.edit != nil && code == kobo.KeyEnter:
+			h, line := *t.edit, strings.TrimSpace(t.input)
+			t.edit, t.input = nil, ""
+			if line == "" {
+				break
+			}
+			a.hostSave(t, h, line)
 		case code == kobo.KeyEsc && len(g.sessions) > 1:
 			a.closeSession()
 			return true
@@ -1250,9 +1357,9 @@ func (a *bro) termKey(code uint16, value int32) bool {
 			if r := []rune(t.input); len(r) > 0 {
 				t.input = string(r[:len(r)-1])
 			}
-		case printable && t.input == "" && ch >= "1" && ch <= "9":
+		case printable && t.input == "" && t.edit == nil && ch >= "1" && ch <= "9":
 			if i := int(ch[0] - '1'); i < len(v.hosts) {
-				a.termConnect(t, v.hosts[i])
+				a.hostMenu(t, i)
 			}
 		case printable && !m.ctrl:
 			t.input += ch
@@ -1382,7 +1489,7 @@ func (a *bro) sessionAt(p image.Point) (*termSession, int) {
 // termTap handles a tap on a terminal tab: the panel's button, the
 // session buttons, a saved host, or a click for the remote app.
 func (a *bro) termTap(p image.Point) {
-	t, v := a.term(), &a.tv
+	t := a.term()
 	if t == nil {
 		return
 	}
@@ -1407,7 +1514,7 @@ func (a *bro) termTap(p image.Point) {
 		}
 		for i, r := range t.pane.hostRows {
 			if p.In(r) && t.state == termIdle {
-				a.termConnect(t, v.hosts[i])
+				a.hostMenu(t, i)
 				return
 			}
 		}

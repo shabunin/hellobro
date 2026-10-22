@@ -19,6 +19,7 @@ type sleepState struct {
 func (a *bro) Sleep() func() {
 	a.picker = nil   // the sleep screen goes over it; waking draws the page
 	a.pausePlayers() // the Bluetooth audio goes with the radio: on again after, where it was
+	a.unmountAll(true)
 	a.radioStart()
 	r, s := &a.rs, &a.slp
 	r.discoverTo = time.Time{}
@@ -56,11 +57,15 @@ func (a *bro) Wake() {
 	}
 	if !s.wifiWas {
 		a.termKick()
+		a.mountAgain()
 		return
 	}
 	a.radioRun(panelWiFi, "turning Wi-Fi back on…", func(p func(string)) error {
 		err := r.wifi.SetPower(true, p)
-		a.Do(a.termKick)
+		a.Do(func() {
+			a.termKick()
+			a.mountAgain()
+		})
 		return err
 	})
 }

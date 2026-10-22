@@ -135,6 +135,9 @@ func alpineReady(out io.Writer) error {
 	if err := alpineMount(); err != nil {
 		return err
 	}
+	if err := hostsReady(); err != nil { // before the jail: it's to follow the mounts there
+		log.Printf("alpine: %v", err)
+	}
 	if _, err := os.Lstat(filepath.Join(alpineRoot, alpineDone)); err == nil {
 		return nil
 	}

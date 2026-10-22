@@ -15,9 +15,9 @@ X0, Y0, X1, Y1 = 16, 160, W - 16, H - 62 - 36   # the page's body, less the stat
 
 start(); time.sleep(3)
 tap(tab_x(0), tabs_y); time.sleep(2)                  # SSH tab
-keys("1"); time.sleep(5)                              # session 1: saved host 1
+keys("1"); key(ENTER); time.sleep(5)                              # session 1: saved host 1
 key(KEY_T, shift=True, ctrl=True); time.sleep(2)      # session 2, beside it
-keys("1"); time.sleep(5)
+keys("1"); key(ENTER); time.sleep(5)
 keys("echo two\n"); time.sleep(2)                     # into session 2, the focused one
 key(TAB, ctrl=True); time.sleep(2)                    # the focus: session 1
 keys("echo one\n"); time.sleep(2)
