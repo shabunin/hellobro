@@ -12,6 +12,14 @@ package main
 //
 // The image is unmounted when we leave (and launch.sh makes sure), so
 // that Nickel can hand the storage to a computer over USB.
+//
+// Sound, if Settings says so: the Kobo has no sound card, only Bluetooth
+// through its bluealsa (3.1), which a client reaches over the system bus.
+// The jail gets the bus, and ALSA a plugin that speaks to that bluealsa:
+// Alpine's own bluez-alsa is 4.x, whose API the Kobo's lacks, so it's
+// the 3.1.0 one of Alpine 3.15, checked against its pinned hash too.
+// The bus is the price: root on it reaches BlueZ and dhcpcd (Bluetooth
+// and Wi-Fi setup), which is why it's off by default.
 
 import (
 	"archive/tar"
@@ -27,9 +35,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -37,10 +47,11 @@ import (
 )
 
 const (
-	alpineVersion = "3.24.3"
-	alpineSHA256  = "dc1ddfaf03ede4be79ad7475490f6b7859dbcbbbbb85150aa1ee013b4bc2f0c1"
-	alpineMB      = 1024 // the image's size
-	alpineDone    = "etc/hellobro-alpine"
+	alpineVersion  = "3.24.3"
+	alpineSHA256   = "dc1ddfaf03ede4be79ad7475490f6b7859dbcbbbbb85150aa1ee013b4bc2f0c1"
+	alpineMB       = 1024 // the image's size
+	alpineDone     = "etc/hellobro-alpine"
+	bluealsaSHA256 = "b515919407a3c098a1d794f88a997c54888e62806ef32bb3bbcd52087ec9bbec"
 )
 
 var (
@@ -48,6 +59,15 @@ var (
 	alpineImg  = kobo.AppFile("alpine.img")
 	alpineRoot = kobo.EnvOr("HELLOBRO_ALPINE_ROOT", "/tmp/hellobro-alpine")
 	alpineMu   sync.Mutex // one setup at a time
+
+	bluealsaURL = "http://dl-cdn.alpinelinux.org/alpine/v3.15/community/armv7/bluez-alsa-3.1.0-r0.apk"
+	// The plugins, as kept next to hellobro: the jail's first process
+	// copies them in (alpineinit.go).
+	bluealsaPlugins = map[string]string{
+		"usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so": kobo.AppFile("alpine-bluealsa-pcm.so"),
+		"usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so": kobo.AppFile("alpine-bluealsa-ctl.so"),
+	}
+	alpineSound atomic.Bool // the setting, for the share server's goroutines too
 )
 
 // startAlpine starts a session in the jail on a new PTY: a login shell,
@@ -70,6 +90,14 @@ func startAlpine(cols, rows int, command string) (*localShell, error) {
 		cmd := exec.Command("/proc/self/exe", "--alpine-init", command)
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 		cmd.Env = []string{"TERM=xterm-256color"}
+		if alpineSound.Load() {
+			if err := bluealsaReady(tty); err != nil {
+				log.Printf("alpine: sound: %v", err)
+				fmt.Fprintf(tty, "alpine: no sound: %v\r\n", err)
+			} else {
+				cmd.Env = append(cmd.Env, "HELLOBRO_ALPINE_SOUND=1")
+			}
+		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setpgid:    true, // close's hangup goes to the jail's first process, and with it the jail
 			Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC,
@@ -192,23 +220,9 @@ func alpineExit() {
 // alpineInstall fetches Alpine's minirootfs and unpacks it in the image.
 func alpineInstall(out io.Writer) error {
 	fmt.Fprintf(out, "fetching Alpine %s (3 MB)…\r\n", alpineVersion)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", alpineURL, nil)
-	resp, err := http.DefaultClient.Do(req)
+	b, err := fetchPinned(alpineURL, alpineSHA256)
 	if err != nil {
-		return fmt.Errorf("fetching Alpine (is Wi-Fi on?): %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("fetching Alpine: %s", resp.Status)
-	}
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
-	if err != nil {
-		return fmt.Errorf("fetching Alpine: %w", err)
-	}
-	if sum := sha256.Sum256(b); hex.EncodeToString(sum[:]) != alpineSHA256 {
-		return errors.New("the download isn't Alpine's: its SHA-256 doesn't match")
+		return err
 	}
 	fmt.Fprint(out, "unpacking…\r\n")
 	if err := alpineExtract(bytes.NewReader(b), alpineRoot); err != nil {
@@ -228,6 +242,80 @@ func alpineInstall(out io.Writer) error {
 	log.Printf("alpine: %s installed", alpineVersion)
 	fmt.Fprint(out, "done.\r\n\n")
 	return nil
+}
+
+// bluealsaReady fetches the bluealsa 3.1 plugins, once.
+func bluealsaReady(out io.Writer) error {
+	alpineMu.Lock()
+	defer alpineMu.Unlock()
+	missing := false
+	for _, keep := range bluealsaPlugins {
+		if _, err := os.Stat(keep); err != nil {
+			missing = true
+		}
+	}
+	if !missing {
+		return nil
+	}
+	fmt.Fprint(out, "fetching the sound plugin, bluez-alsa 3.1.0 (once)…\r\n")
+	b, err := fetchPinned(bluealsaURL, bluealsaSHA256)
+	if err != nil {
+		return err
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(b)) // an .apk: gzipped tar, in three streams
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(zr)
+	found := 0
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		keep, ok := bluealsaPlugins[h.Name]
+		if !ok || h.Typeflag != tar.TypeReg {
+			continue
+		}
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			return err
+		}
+		if err := writeNew(keep, string(data)); err != nil {
+			return err
+		}
+		found++
+	}
+	if found != len(bluealsaPlugins) {
+		return fmt.Errorf("the package has %d of the %d plugins", found, len(bluealsaPlugins))
+	}
+	return nil
+}
+
+// fetchPinned gets url over HTTP, if what comes is what hash says.
+func fetchPinned(url, hash string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching %s (is Wi-Fi on?): %w", path.Base(url), err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetching %s: %s", path.Base(url), resp.Status)
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	if err != nil {
+		return nil, fmt.Errorf("fetching %s: %w", path.Base(url), err)
+	}
+	if sum := sha256.Sum256(b); hex.EncodeToString(sum[:]) != hash {
+		return nil, fmt.Errorf("%s isn't what it should be: its SHA-256 doesn't match", path.Base(url))
+	}
+	return b, nil
 }
 
 // writeNew writes a file afresh: if a symlink was there, it's replaced,

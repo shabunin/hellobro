@@ -12,6 +12,7 @@ package audio
 // Open with or without a mode. What it finds goes to the log.
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -276,6 +277,9 @@ func openPCM(bus *dbus.Conn, pcm PCM) (data, ctrl *os.File, err error) {
 	}
 	var dataFD, ctrlFD dbus.UnixFD
 	if err := bus.Object(pcm.service, pcm.Path).Call("org.bluealsa.PCM1.Open", 0, args...).Store(&dataFD, &ctrlFD); err != nil {
+		if strings.Contains(err.Error(), "busy") { // bluealsa gives a PCM to one client at a time
+			return nil, nil, errors.New("the headphones are in use by another program (the Alpine shell?)")
+		}
 		return nil, nil, fmt.Errorf("PCM1.Open: %w", err)
 	}
 	return pollable(int(dataFD), "bluealsa-pcm"), pollable(int(ctrlFD), "bluealsa-ctrl"), nil

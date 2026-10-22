@@ -251,6 +251,18 @@ away from the Kobo's system.
   - No mount, modules, raw devices, mknod, reboot, ptrace, clock or
     network setup, and no way to get them back (no_new_privs). The
     network itself works.
+- Sound: off by default. The Kobo has no sound card, only Bluetooth,
+  through its bluealsa (3.1) on the system bus. Settings, **… Alpine's
+  sound** gives the jail that bus, the bluez-alsa 3.1.0 ALSA plugins
+  (from Alpine 3.15, as Alpine's own 4.x doesn't speak to the Kobo's;
+  fetched once, pinned hash) and an `/etc/asound.conf` making them the
+  default (written if there's none). Then mplayer, mpv, aplay… play to
+  the headphones connected last. The price: root on the bus can also
+  pair, unpair and connect Bluetooth devices and change the Wi-Fi
+  (dhcpcd, wpa_supplicant): settings, not the Kobo's system, but mind it
+  if what runs in the jail faces the network. One program has the
+  headphones at a time: the Music tab lets go of them while paused, and
+  says so if the jail has them.
 - Each session is a jail of its own on the same image: when its shell
   exits, everything it started goes too (tmux's server included).
 - From a computer: `ssh -t -p 2022 kobo.local hellobro-alpine`, or

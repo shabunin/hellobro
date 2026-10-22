@@ -74,6 +74,9 @@ var settingList = []setting{
 	{key: "shell", label: "Shell tab runs",
 		values: []string{"kobo", "alpine"},
 		shown:  []string{"the Kobo's /bin/sh, as root", "Alpine Linux, in a jail"}},
+	{key: "alpine-sound", label: "… Alpine's sound (the system bus)",
+		values: []string{"off", "on"},
+		shown:  []string{"off: no sound in the jail", "on: it reaches Bluetooth and Wi-Fi setup too"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
@@ -197,6 +200,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.shareApply()
 		case "profile":
 			profileOn.Store(a.setting(st.key) == "on")
+		case "alpine-sound":
+			alpineSound.Store(a.setting(st.key) == "on")
 		case "light-idle":
 			a.applyLightIdle()
 		}

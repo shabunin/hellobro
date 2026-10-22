@@ -113,6 +113,7 @@ func main() {
 	a.folds = loadFolds()
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames, OwnKeys: true}, a)
 	profileOn.Store(a.setting("profile") == "on")
+	alpineSound.Store(a.setting("alpine-sound") == "on")
 	a.applyLightIdle()
 	log.Printf("hellobro %s", version)
 	a.keys = loadKeys()

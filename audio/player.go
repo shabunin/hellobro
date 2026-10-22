@@ -3,7 +3,9 @@ package audio
 // The player: one Source into one bluealsa PCM, converted to the PCM's
 // rate and channels (linear resampling), with software volume. Pausing
 // and stopping go through the PCM's control socket too, so they're heard
-// at once rather than after what bluealsa has buffered.
+// at once rather than after what bluealsa has buffered. Paused, the
+// player lets go of the PCM: bluealsa gives a PCM to one client at a
+// time, and another (ALSA in the Alpine jail) may want it meanwhile.
 
 import (
 	"encoding/binary"
@@ -67,18 +69,22 @@ func (p *Player) SeekTo(d time.Duration) {
 
 func (p *Player) run(bus *dbus.Conn, pcm PCM, src Source, tick func(time.Duration), done func(how string)) {
 	defer src.Close()
-	var out0 output
-	var err error
-	if pcm.service == fakeService {
-		out0, err = openFake(pcm)
-	} else {
-		out0, err = openBluealsa(bus, pcm)
+	open := func() (output, error) {
+		if pcm.service == fakeService {
+			return openFake(pcm)
+		}
+		return openBluealsa(bus, pcm)
 	}
+	out0, err := open() // nil while paused
 	if err != nil {
 		done(err.Error())
 		return
 	}
-	defer out0.Close()
+	defer func() {
+		if out0 != nil {
+			out0.Close()
+		}
+	}()
 	rate, channels := pcm.Rate, pcm.Channels
 	if rate == 0 {
 		rate = 44100
@@ -96,7 +102,9 @@ func (p *Player) run(bus *dbus.Conn, pcm PCM, src Source, tick func(time.Duratio
 	for {
 		select {
 		case <-p.stop:
-			out0.command("Drop", time.Second)
+			if out0 != nil {
+				out0.command("Drop", time.Second)
+			}
 			done("stopped")
 			return
 		case to := <-p.seek:
@@ -105,7 +113,9 @@ func (p *Player) run(bus *dbus.Conn, pcm PCM, src Source, tick func(time.Duratio
 					log.Printf("audio: seek to %v: %v", to, err)
 					continue
 				}
-				out0.command("Drop", time.Second) // what's buffered is from before
+				if out0 != nil {
+					out0.command("Drop", time.Second) // what's buffered is from before
+				}
 				*r = resampler{src: src, in: r.in, step: r.step}
 				base = to
 				p.pos.Store(int64(to))
@@ -117,7 +127,9 @@ func (p *Player) run(bus *dbus.Conn, pcm PCM, src Source, tick func(time.Duratio
 		if p.paused.Load() {
 			if !paused {
 				paused = true
-				out0.command("Pause", time.Second)
+				out0.command("Drop", time.Second) // heard at once
+				out0.Close()
+				out0 = nil
 			}
 			select {
 			case <-p.stop:
@@ -128,8 +140,11 @@ func (p *Player) run(bus *dbus.Conn, pcm PCM, src Source, tick func(time.Duratio
 			continue
 		}
 		if paused {
+			if out0, err = open(); err != nil {
+				done(err.Error())
+				return
+			}
 			paused = false
-			out0.command("Resume", time.Second)
 		}
 
 		var more bool
