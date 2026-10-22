@@ -56,6 +56,9 @@ var settingList = []setting{
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
+	{key: "fast-tabs", label: "Changing tabs",
+		values: []string{"off", "on"},
+		shown:  []string{"in grays at once", "fast in black and white, grays after"}},
 	{key: "tabs", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
 	{key: "keys", label: "Keys", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
 }
@@ -170,8 +173,11 @@ func (a *bro) stepSetting(i, d int) {
 		n := len(st.values)
 		a.set[st.key] = (a.set[st.key] + d + n) % n
 		a.set.save()
-		if st.key == "mdns" || st.key == "relay" {
+		switch st.key {
+		case "mdns", "relay":
 			a.shareApply()
+		case "fast-tabs":
+			a.FastTabs = a.setting(st.key) == "on"
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))

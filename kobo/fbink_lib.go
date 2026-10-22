@@ -76,10 +76,13 @@ func (l *fbinkLib) setRota(rota int) (ScreenInfo, error) {
 var waveforms = map[string]C.WFM_MODE_INDEX_T{"DU": C.WFM_DU, "GL16": C.WFM_GL16, "GC16": C.WFM_GC16}
 
 func (l *fbinkLib) blit(img *image.Gray, r image.Rectangle, waveform string, flash bool) error {
-	pix := make([]byte, r.Dx()*r.Dy())
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		off := img.PixOffset(r.Min.X, y)
-		copy(pix[(y-r.Min.Y)*r.Dx():], img.Pix[off:off+r.Dx()])
+	pix := img.Pix // flush makes img just r's size: no copy needed then
+	if r != img.Rect || img.Stride != r.Dx() {
+		pix = make([]byte, r.Dx()*r.Dy())
+		for y := r.Min.Y; y < r.Max.Y; y++ {
+			off := img.PixOffset(r.Min.X, y)
+			copy(pix[(y-r.Min.Y)*r.Dx():], img.Pix[off:off+r.Dx()])
+		}
 	}
 	if flash { // let everything else finish, so it doesn't spoil the full refresh
 		l.waitInflight(0)

@@ -136,6 +136,7 @@ type App struct {
 	Tab      int
 	Full     bool   // the page has the whole screen
 	Keyboard string // the keyboard connected, if any
+	FastTabs bool   // a new tab goes up in black and white (DU), its grays a moment later
 
 	prog  Program
 	cfg   Config
@@ -188,6 +189,10 @@ type App struct {
 	restart   string       // a binary to run in our place once we've quit
 	ctrl      [2]bool      // left and right Ctrl held, for Ctrl+Alt+N
 	alt       [2]bool      // and Alt
+
+	fast      bool            // while a tab is drawn with FastTabs: Mark uses DU
+	fastArea  image.Rectangle // drawn so, to be cleaned (GL16) at fastClean
+	fastClean time.Time
 }
 
 // New opens the log and the screen. The Program, which embeds the App, is
@@ -431,6 +436,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			}
 			if !a.asleep {
 				a.prog.Tick()
+				a.cleanFast()
 			}
 			a.flush()
 		case <-clock.C:
@@ -622,8 +628,24 @@ func (a *App) SwitchTab(t int) {
 		a.SetFull(false)
 		return
 	}
+	a.fast = a.FastTabs
 	a.drawTabs()
 	a.DrawPage()
+	a.fast = false
+}
+
+// Switching tabs, half the wait is the panel: GL16 drives every pixel
+// through its grays, DU goes straight to black or white, in about half the
+// time. So with FastTabs the page goes up with DU, and once the switching
+// stops, a GL16 over it brings back the grays (as the terminal does).
+const fastCleanAfter = 800 * time.Millisecond
+
+func (a *App) cleanFast() {
+	if a.fastArea.Empty() || time.Now().Before(a.fastClean) {
+		return
+	}
+	a.Mark(a.fastArea, true)
+	a.fastArea = image.Rectangle{}
 }
 
 // SetFull gives the page the whole screen, or puts the app back around it.
@@ -892,6 +914,14 @@ func (a *App) Mark(r image.Rectangle, ui bool) {
 	if r.Empty() || a.dozing { // the page is off the panel
 		return
 	}
+	if a.fast && ui {
+		ui = false
+		a.fastArea = a.fastArea.Union(r)
+		a.fastClean = time.Now().Add(fastCleanAfter)
+		// What was waiting to go up under it goes up with it, not first
+		// on its own, a piece of the new tab.
+		a.dirty = slices.DeleteFunc(a.dirty, func(d dirtyRect) bool { return d.r.In(r) })
+	}
 	for i, d := range a.dirty {
 		if d.ui == ui && compact(d.r, r) {
 			a.dirty[i].r = d.r.Union(r)
@@ -912,6 +942,7 @@ func (a *App) MarkFlash(r image.Rectangle) {
 }
 
 func (a *App) markAll(flash bool) {
+	a.fastArea = image.Rectangle{} // it's all GL16 now
 	a.dirty = []dirtyRect{{a.C.Bounds(), true}}
 	a.flash = a.flash || flash
 }

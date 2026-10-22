@@ -107,6 +107,7 @@ func main() {
 	a.tabs = loadTabs()
 	a.folds = loadFolds()
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", Tabs: tabNames, OwnKeys: true}, a)
+	a.FastTabs = a.setting("fast-tabs") == "on"
 	log.Printf("hellobro %s", version)
 	a.keys = loadKeys()
 	a.applyTabs()

@@ -39,14 +39,15 @@ type powerView struct {
 }
 
 type powerState struct {
-	bat     battery
-	use     usage
-	prev    *usageCounts // the last sample, for what changed since
-	at      time.Time    // of the last sample
-	hist    []batSample
-	histAt  time.Time
-	histErr bool
-	loaded  bool
+	bat      battery
+	use      usage
+	prev     *usageCounts // the last sample, for what changed since
+	at       time.Time    // of the last sample
+	hist     []batSample
+	histAt   time.Time
+	histErr  bool
+	loaded   bool
+	sampling bool // a sample is being read
 }
 
 // battery is the battery as sysfs has it now.
@@ -421,31 +422,48 @@ func (a *bro) powerTick() {
 	a.histTick()
 	if a.showingPower() && time.Since(a.pw.at) >= powerEvery {
 		a.powerSample()
-		a.drawPower()
 	}
 }
 
+// powerSample reads the battery and what uses it in the background: that's
+// some 150 files in /proc, 60 ms on the Kobo, too long for the UI's thread.
+// The page shows the last sample meanwhile, and is drawn again with this one.
 func (a *bro) powerSample() {
 	ps := &a.pw
+	if ps.sampling {
+		return
+	}
 	if !ps.loaded {
 		a.loadHistory()
 	}
 	if a.stat.bat == "" {
 		a.stat.bat = batteryDir()
 	}
-	ps.at = time.Now()
-	ps.bat = readBattery(a.stat.bat)
-	c := countUsage()
-	if ps.prev != nil {
-		ps.use = usageSince(ps.prev, c)
-		cores, _ := os.ReadFile("/sys/devices/system/cpu/online")
-		load, _ := os.ReadFile("/proc/loadavg")
-		ps.use.cores = strings.TrimSpace(string(cores))
-		if f := strings.Fields(string(load)); len(f) > 0 {
-			ps.use.load = f[0]
+	ps.sampling = true
+	dir, prev := a.stat.bat, ps.prev
+	go func() {
+		at := time.Now()
+		bat := readBattery(dir)
+		c := countUsage()
+		var use usage
+		if prev != nil {
+			use = usageSince(prev, c)
+			cores, _ := os.ReadFile("/sys/devices/system/cpu/online")
+			load, _ := os.ReadFile("/proc/loadavg")
+			use.cores = strings.TrimSpace(string(cores))
+			if f := strings.Fields(string(load)); len(f) > 0 {
+				use.load = f[0]
+			}
 		}
-	}
-	ps.prev = c
+		a.Do(func() {
+			ps.sampling = false
+			ps.at, ps.bat, ps.prev = at, bat, c
+			if prev != nil {
+				ps.use = use
+			}
+			a.drawPower()
+		})
+	}()
 }
 
 func (a *bro) drawPower() {
@@ -483,7 +501,9 @@ func (a *bro) drawBattery() {
 	b := ps.bat
 	var lines []textLine
 	status := ""
-	if !b.ok {
+	if ps.at.IsZero() {
+		lines = append(lines, textLine{"looking…", kobo.Mid, false})
+	} else if !b.ok {
 		lines = append(lines, textLine{"no battery found", kobo.Dark, false})
 	} else {
 		word := "on battery"

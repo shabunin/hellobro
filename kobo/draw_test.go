@@ -21,7 +21,7 @@ func TestFillAndText(t *testing.T) {
 				img.Pix[i] = uint8(i * 7) // a background that isn't flat
 			}
 		}
-		c := Canvas{ours}
+		c := Canvas{ours}                     // the second and third time, the glyphs come from the cache
 		c.Fill(image.Rect(-10, 5, 50, 30), g) // off the edge too
 		draw.Draw(theirs, image.Rect(-10, 5, 50, 30), image.NewUniform(color.Gray{g}), image.Point{}, draw.Src)
 		r := image.Rect(60, 10, 300, 100) // a clip: the text doesn't fit
@@ -55,5 +55,21 @@ func TestFillAndText(t *testing.T) {
 		if ours.Pix[i] != theirs.Pix[i] {
 			t.Fatalf("CopyGray: pixel %d is %d, want %d", i, ours.Pix[i], theirs.Pix[i])
 		}
+	}
+}
+
+func BenchmarkText(b *testing.B) {
+	f := LoadFonts()
+	c := Canvas{image.NewGray(image.Rect(0, 0, 1404, 200))}
+	for _, cached := range []bool{false, true} {
+		b.Run(map[bool]string{false: "rasterized", true: "cached"}[cached], func(b *testing.B) {
+			for b.Loop() {
+				if !cached {
+					clear(glyphCache)
+				}
+				c.Text(f.Panel, image.Rect(0, 0, 1404, 100), "Settings · File sharing (SFTP, port 2022)", Black, AlignLeft)
+				c.Text(f.Small, image.Rect(0, 100, 1404, 200), "deep sleep after 10 min · on (Files tab)", Dark, AlignLeft)
+			}
+		})
 	}
 }

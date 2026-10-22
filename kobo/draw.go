@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/image/font"
@@ -165,7 +166,7 @@ func (c Canvas) Text(f font.Face, r image.Rectangle, s string, g uint8, align in
 		if prev >= 0 {
 			dot.X += f.Kern(prev, ch)
 		}
-		dr, mask, mp, advance, ok := f.Glyph(dot, ch)
+		dr, mask, mp, advance, ok := glyph(f, dot, ch)
 		if ok {
 			if clip := dr.Intersect(r); !clip.Empty() {
 				c.Mask(clip, g, mask, mp.Add(clip.Min.Sub(dr.Min)))
@@ -174,6 +175,58 @@ func (c Canvas) Text(f font.Face, r image.Rectangle, s string, g uint8, align in
 		dot.X += advance
 		prev = ch
 	}
+}
+
+// A glyph's mask, as the face gave it at a dot's fraction of a pixel.
+type glyphKey struct {
+	f    font.Face
+	ch   rune
+	x, y fixed.Int26_6 // the dot's fraction
+}
+
+type cachedGlyph struct {
+	dr      image.Rectangle // from the dot, floored
+	mask    *image.Alpha    // dr's size, at 0, 0
+	advance fixed.Int26_6
+	ok      bool
+}
+
+// The glyphs drawn so far: opentype rasterizes each anew, a third of
+// drawing a page. It's emptied when it gets big (a few MB).
+var (
+	glyphMu    sync.Mutex
+	glyphCache = map[glyphKey]cachedGlyph{}
+)
+
+const glyphCacheMax = 8192
+
+// glyph is f.Glyph, from the cache when it can.
+func glyph(f font.Face, dot fixed.Point26_6, ch rune) (image.Rectangle, image.Image, image.Point, fixed.Int26_6, bool) {
+	k := glyphKey{f, ch, dot.X & 63, dot.Y & 63}
+	at := image.Pt(dot.X.Floor(), dot.Y.Floor())
+	glyphMu.Lock()
+	defer glyphMu.Unlock()
+	if g, ok := glyphCache[k]; ok {
+		return g.dr.Add(at), g.mask, image.Point{}, g.advance, g.ok
+	}
+	dr, mask, mp, advance, ok := f.Glyph(dot, ch)
+	a, isAlpha := mask.(*image.Alpha)
+	if !isAlpha && ok {
+		return dr, mask, mp, advance, ok // not ours to keep
+	}
+	g := cachedGlyph{dr: dr.Sub(at), advance: advance, ok: ok}
+	if ok {
+		// The face draws its next glyph into the same mask: keep a copy.
+		g.mask = image.NewAlpha(image.Rect(0, 0, dr.Dx(), dr.Dy()))
+		for y := 0; y < dr.Dy(); y++ {
+			copy(g.mask.Pix[y*g.mask.Stride:][:dr.Dx()], a.Pix[a.PixOffset(mp.X, mp.Y+y):])
+		}
+	}
+	if len(glyphCache) >= glyphCacheMax {
+		clear(glyphCache)
+	}
+	glyphCache[k] = g
+	return g.dr.Add(at), g.mask, image.Point{}, advance, ok
 }
 
 func fit(f font.Face, s string, w int) string {
