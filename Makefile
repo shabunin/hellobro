@@ -85,6 +85,13 @@ push-rollback:
 	ssh $(SSH_TO) $(KOBO_HOST) 'cd $(KOBO_DIR) && cp hellobro.old hellobro.new' && \
 	ssh $(SSH_TO) $(KOBO_HOST) hellobro-update
 
+# A CPU profile of hellobro on the Kobo, PROFILE_SECS long (30), kept in
+# cpu.pprof here: go tool pprof -http=: cpu.pprof for the whole of it.
+PROFILE_SECS ?= 30
+push-profile:
+	ssh $(SSH_TO) $(KOBO_HOST) hellobro-profile $(PROFILE_SECS) > cpu.pprof
+	go tool pprof -top -nodecount=30 cpu.pprof
+
 # The log, over Wi-Fi.
 push-log:
 	ssh $(SSH_TO) $(KOBO_HOST) cat $(KOBO_DIR)/hellobro.log
@@ -108,4 +115,4 @@ test:
 clean:
 	rm -f $(APPS) $(APPS:=-nocgo)
 
-.PHONY: all install install-tools uninstall-tools log log-tools clean server test push push-rollback push-log
+.PHONY: all install install-tools uninstall-tools log log-tools clean server test push push-rollback push-log push-profile

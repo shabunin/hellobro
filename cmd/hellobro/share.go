@@ -3,15 +3,19 @@ package main
 // The computer's way in (the share package): the SSH and SFTP server on
 // port 2022 while Settings has file sharing on, the Kobo as kobo.local on
 // the network (mDNS), pairing a computer with a code shown here, and our
-// own commands: hellobro-version, and hellobro-update (make push).
+// own commands: hellobro-version, hellobro-update (make push), and
+// hellobro-profile (make push-profile).
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"runtime/pprof"
 	"strconv"
+	"strings"
 	"time"
 
 	"hellobro/kobo"
@@ -223,7 +227,29 @@ func (a *bro) builtin(cmd string, out io.Writer) (int, bool) {
 		time.AfterFunc(700*time.Millisecond, func() { a.Do(func() { a.installUpdate(path, ver) }) })
 		return 0, true
 	}
+	if f := strings.Fields(cmd); len(f) > 0 && f[0] == "hellobro-profile" { // make push-profile: a CPU profile, to stdout
+		secs := 30
+		if len(f) > 1 {
+			secs, _ = strconv.Atoi(f[1])
+		}
+		return profileCPU(time.Duration(max(1, min(secs, 600)))*time.Second, out), true
+	}
 	return 0, false
+}
+
+// profileCPU writes a CPU profile of the next d to out (pprof's format,
+// the function names in it: our build has no symbols for pprof to read).
+func profileCPU(d time.Duration, out io.Writer) int {
+	var buf bytes.Buffer
+	if err := pprof.StartCPUProfile(&buf); err != nil {
+		log.Printf("profile: %v", err)
+		return 1
+	}
+	log.Printf("profile: the CPU for %s", d)
+	time.Sleep(d)
+	pprof.StopCPUProfile()
+	out.Write(buf.Bytes())
+	return 0
 }
 
 func humanBytes(n int64) string {
