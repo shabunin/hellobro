@@ -15,12 +15,14 @@ package main
 // when it has the focus), + for a window next to it and × to close it.
 
 import (
+	"encoding/json"
 	"fmt"
 	"image"
 	"log"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"hellobro/kobo"
 	"hellobro/wm"
@@ -41,9 +43,10 @@ type window interface {
 }
 
 const (
-	wmGap   = kobo.Pad // between the windows
-	wmTabH  = kobo.FoldH
-	maxWins = 24
+	wmKeepAfter = 5 * time.Second // the layout's kept this long after a change
+	wmGap       = kobo.Pad        // between the windows
+	wmTabH      = kobo.FoldH
+	maxWins     = 24
 )
 
 type wmState struct {
@@ -59,6 +62,9 @@ type wmState struct {
 	empty     image.Rectangle   // an empty workspace's hint, for a tap
 	drag      *wmDrag           // a floating window being moved by its strip
 	composing bool              // drawing the floating windows over what was drawn
+	starts    []func()          // what the windows brought back run (wmRestore)
+	kept      string            // the layout as last kept, JSON
+	changed   time.Time         // the first change since
 }
 
 type wmTab struct {
@@ -72,11 +78,120 @@ type wmDrag struct {
 	from image.Rectangle // where it was
 }
 
-// wmInit makes the tree, with a launcher on workspace 1.
+// wmInit makes the tree: the windows as they were left, or a launcher
+// on workspace 1.
 func (a *bro) wmInit() {
 	a.wm.tree = wm.New(image.Rect(0, 0, 1, 1), wmTabH)
 	a.wm.wins = map[*wm.Node]window{}
+	if s := a.mem.Layout; s != nil && a.wmRestore(*s) {
+		return
+	}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1, 1), wmTabH)
+	a.wm.wins = map[*wm.Node]window{}
 	a.openWin(&termSession{})
+}
+
+// winWord is what's kept of a window between runs: what it was, so it can
+// be again. A terminal runs it again: a shell starts, SSH connects.
+func winWord(w wm.Window) string {
+	switch w := w.(type) {
+	case *guiWin:
+		return "gui:" + w.key
+	case *termSession:
+		switch {
+		case w.launcher():
+			return "launcher"
+		case w.kind == kindSSH && w.target.name != "":
+			return "ssh:" + w.target.name
+		case w.kind == kindSSH, w.exec != "": // typed in, or a command: what it was isn't kept
+			return "launcher"
+		case w.alpine:
+			return "alpine"
+		}
+		return "sh"
+	}
+	return ""
+}
+
+// wmRestore builds the windows as s has them; false if none came back.
+// Their shells and connections start once they're placed.
+func (a *bro) wmRestore(s wm.Saved) (ok bool) {
+	defer func() {
+		if r := recover(); r != nil { // a layout to forget, not a hellobro that can't start
+			log.Printf("wm: the windows as they were: %v", r)
+			ok = false
+		}
+	}()
+	gui := map[string]bool{}
+	var starts []func()
+	n := 0
+	leaves := a.wm.tree.Load(s, func(word string) wm.Window {
+		if n >= maxWins {
+			return nil
+		}
+		kind, arg, _ := strings.Cut(word, ":")
+		t := &termSession{}
+		switch kind {
+		case "gui":
+			if guiName(arg) == "" || gui[arg] {
+				return nil
+			}
+			gui[arg] = true
+			n++
+			return &guiWin{key: arg}
+		case "launcher":
+		case "alpine", "sh":
+			starts = append(starts, func() { a.termStartShell(t, kind == "alpine") })
+		case "ssh":
+			if i := slices.IndexFunc(a.tv.hosts, func(h sshHost) bool { return h.name == arg }); i >= 0 {
+				h := a.tv.hosts[i]
+				starts = append(starts, func() { a.termConnect(t, h) })
+			}
+		default:
+			return nil
+		}
+		n++
+		return t
+	})
+	for _, l := range leaves {
+		a.wm.wins[l] = l.Window.(window)
+	}
+	a.wm.starts = starts
+	a.wm.kept = a.wmSaved()
+	log.Printf("wm: %d windows back, as they were", len(leaves))
+	return len(leaves) > 0
+}
+
+// wmStarts starts what the windows brought back run, once placed.
+func (a *bro) wmStarts() {
+	starts := a.wm.starts
+	a.wm.starts = nil
+	for _, f := range starts {
+		f()
+	}
+}
+
+// wmSaved is the layout as it would be kept now.
+func (a *bro) wmSaved() string {
+	b, _ := json.Marshal(a.wm.tree.Save(winWord))
+	return string(b)
+}
+
+// wmKeep keeps the layout in hellobro.json, if it changed; now, or else
+// when it's been a while since the last change.
+func (a *bro) wmKeep(now bool) {
+	if a.wm.tree == nil || a.wm.changed.IsZero() || !now && time.Since(a.wm.changed) < wmKeepAfter {
+		return
+	}
+	a.wm.changed = time.Time{}
+	s := a.wmSaved()
+	if s == a.wm.kept {
+		return
+	}
+	a.wm.kept = s
+	saved := a.wm.tree.Save(winWord)
+	a.mem.Layout = &saved
+	a.mem.save()
 }
 
 func (a *bro) winOf(n *wm.Node) window {
@@ -310,6 +425,9 @@ func (h wmHost) Command(n *wm.Node, name string, args []string) (bool, error) {
 // their title strips where only the focus moved.
 func (a *bro) wmApply() {
 	defer a.ipcLook() // the events of what changed
+	if a.wm.changed.IsZero() {
+		a.wm.changed = time.Now()
+	}
 	t := a.wm.tree
 	a.wmBar()
 	if full := t.Fullscreen() != nil; full != a.Full && !a.Calibrating() {

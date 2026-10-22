@@ -139,6 +139,7 @@ func (a *bro) Layout(L kobo.Layout) {
 	a.wm.laid = ""
 	a.wmPlace()
 	a.wmFocusMoved()
+	a.wmStarts()
 }
 
 func (a *bro) Enter(tab int) {}
@@ -176,10 +177,12 @@ func (a *bro) Tick() {
 	a.updateTick()
 	a.trialTick()
 	a.ipcTick()
+	a.wmKeep(false)
 	a.updateRing()
 }
 
 func (a *bro) Exit() {
+	a.wmKeep(true)
 	a.ipcExit()
 	a.termCloseAll()
 	a.radioExit()

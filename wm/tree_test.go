@@ -1,8 +1,10 @@
 package wm
 
 import (
+	"encoding/json"
 	"image"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -442,5 +444,48 @@ func TestIPC(t *testing.T) {
 	}
 	if o := tr.IPCOutputs(); *o[1].CurrentWorkspace != "1" {
 		t.Errorf("outputs: %+v", o)
+	}
+}
+
+func TestSaveLoad(t *testing.T) {
+	for _, c := range []struct{ spec, gone, want string }{
+		{"1:splith[a, splitv[b*, c]] float[f] | 2:splith[tabbed[d, e]]", "", ""},
+		{"1:splith[a] | 2:splitv[stacked[d, e*], g]", "", ""},
+		{"1:splith[a, splitv[b*, c]]", "b c", "<1:splith[a*]>"},
+		{"1:splith[a, b] float[f*] | 3:splith[c]", "f", "<1:splith[a*, b]> 3:splith[c]"},
+		{"1:splith[a] | 2:splith[b*]", "b", "<1:splith[a*]>"},
+	} {
+		tr := build(t, c.spec)
+		tr.ResizeSize(w(tr, "a"), true, Amount{Ppt: 10})
+		want := c.want
+		if want == "" {
+			want = tr.DumpAll()
+		}
+		s := tr.Save(func(x Window) string { return x.Title() })
+		b, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var back Saved
+		json.Unmarshal(b, &back)
+		nt := New(screen, 20)
+		gone := strings.Fields(c.gone)
+		leaves := nt.Load(back, func(word string) Window {
+			if slices.Contains(gone, word) {
+				return nil
+			}
+			return win(word)
+		})
+		if got := nt.DumpAll(); got != want {
+			t.Errorf("%s: loads %q, want %q", c.spec, got, want)
+		}
+		if len(leaves) != len(nt.Windows()) {
+			t.Errorf("%s: %d leaves, %d windows", c.spec, len(leaves), len(nt.Windows()))
+		}
+		if c.gone == "" {
+			if p, q := w(tr, "a").Percent, w(nt, "a").Percent; math.Abs(p-q) > 1e-9 {
+				t.Errorf("%s: a's share %v, was %v", c.spec, q, p)
+			}
+		}
 	}
 }

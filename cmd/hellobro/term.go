@@ -94,6 +94,7 @@ type termBackend interface {
 type termSession struct {
 	kind   int
 	alpine bool   // a shell in the Alpine jail (alpine.go)
+	exec   string // what it runs there, if not a shell
 	input  string // the ssh> line
 	notes  []string
 	state  int
@@ -938,6 +939,7 @@ func (a *bro) termStartShell(t *termSession, alpine bool) {
 
 // termStartAlpine runs command (a login shell, for "") in Alpine, in t.
 func (a *bro) termStartAlpine(t *termSession, command string) {
+	t.exec = command
 	a.termRun(t, true, func(size image.Point) (*localShell, error) { return startAlpine(size.X, size.Y, command) })
 }
 
