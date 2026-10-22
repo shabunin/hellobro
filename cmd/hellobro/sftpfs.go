@@ -72,7 +72,14 @@ func mountMain(dir, mode string) {
 			Options:     []string{"nosuid", "nodev"},
 		},
 	}
-	if !m.rw {
+	switch {
+	case m.rw:
+	case os.Getuid() == 0:
+		// A flag for mount(2): the Kobo's kernel (4.9) takes no "ro" among
+		// fuse's options, and the mount failing, go-fuse goes for a
+		// fusermount the Kobo hasn't got.
+		opts.MountOptions.DirectMountFlags = syscall.MS_NOSUID | syscall.MS_NODEV | syscall.MS_RDONLY
+	default: // fusermount's, which knows it
 		opts.MountOptions.Options = append(opts.MountOptions.Options, "ro")
 	}
 	srv, err := fs.Mount(dir, &sftpNode{m: m}, opts)
