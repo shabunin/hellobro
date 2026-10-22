@@ -3,7 +3,8 @@ package main
 // A question over the page: yes or no ("restart into the new hellobro?"),
 // or one of a few things to do (a saved host's menu). Enter picks the
 // first, a choice's letter that one, Esc none; or tap a button. The page
-// holds still under it, like under the switcher.
+// holds still under it, like under the switcher. For what can't be
+// undone, the yes waits for words typed first (askTyped).
 
 import (
 	"image"
@@ -23,6 +24,8 @@ type askBox struct {
 	opts        []askOpt
 	box         image.Rectangle
 	optR        []image.Rectangle
+	want, typed string // askTyped's: the words wanted, and what's typed so far
+	field       image.Rectangle
 }
 
 // ask puts a yes-or-no question up; do runs on a yes.
@@ -57,6 +60,23 @@ func (a *bro) choose(title, text string, opts ...askOpt) {
 	a.drawAsk()
 }
 
+// askTyped is ask, but its yes holds till want is typed, as it is.
+func (a *bro) askTyped(title, text, want, yes string, do func()) {
+	a.choose(title, text, askOpt{yes, "", do}, askOpt{"cancel", "", nil})
+	q := a.asking
+	q.want = want
+	q.box.Min.Y -= 50 // room for the field
+	q.box.Max.Y += 50
+	for i := range q.optR {
+		q.optR[i] = q.optR[i].Add(image.Pt(0, 50))
+	}
+	q.field = image.Rect(q.box.Min.X+32, q.box.Min.Y+150, q.box.Max.X-32, q.box.Min.Y+220)
+	a.drawAsk()
+}
+
+// ready says whether the first answer can be taken.
+func (q *askBox) ready() bool { return q.typed == q.want }
+
 // overlay says whether something is up over the page.
 func (a *bro) overlay() bool {
 	return a.picker != nil || a.asking != nil || a.info != nil || a.tabsEd != nil || a.keyset != nil
@@ -69,6 +89,16 @@ func (a *bro) drawAsk() {
 	in := q.box.Inset(32)
 	c.Text(a.F.Panel, image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Min.Y+56), q.title, kobo.Black, kobo.AlignLeft)
 	c.Text(a.F.Small, image.Rect(in.Min.X, in.Min.Y+70, in.Max.X, in.Min.Y+110), q.text, kobo.Dark, kobo.AlignLeft)
+	if q.want != "" {
+		c.Frame(q.field, 2, kobo.Black)
+		f := q.field.Inset(4)
+		f.Min.X += 12
+		if q.typed == "" {
+			c.Text(a.F.Small, f, "type: "+q.want, kobo.Mid, kobo.AlignLeft)
+		} else {
+			c.Text(a.F.Small, f, q.typed+"_", kobo.Black, kobo.AlignLeft)
+		}
+	}
 	for i, o := range q.opts {
 		r, label := q.optR[i], o.label
 		switch {
@@ -80,10 +110,14 @@ func (a *bro) drawAsk() {
 			label += "  (" + o.key + ")"
 		}
 		fg := uint8(kobo.Black)
-		if i == 0 {
+		switch {
+		case i == 0 && !q.ready(): // not yet
+			c.Frame(r, 2, kobo.Mid)
+			fg = kobo.Mid
+		case i == 0:
 			c.Fill(r, kobo.Black)
 			fg = kobo.White
-		} else {
+		default:
 			c.Frame(r, 2, kobo.Black)
 		}
 		c.Text(a.F.Small, r, label, fg, kobo.AlignCenter)
@@ -95,6 +129,9 @@ func (a *bro) drawAsk() {
 // none).
 func (a *bro) answer(i int) {
 	q := a.asking
+	if i == 0 && !q.ready() {
+		return
+	}
 	a.asking = nil
 	a.DrawPage()
 	a.drawStat(true)
@@ -105,6 +142,25 @@ func (a *bro) answer(i int) {
 
 func (a *bro) askKey(code uint16, value int32) {
 	if a.termMod(code, value) || value != 1 {
+		return
+	}
+	if q := a.asking; q.want != "" {
+		m := &a.tv.mods
+		ch, printable := kobo.KeyChar(code, m.shift, m.caps)
+		switch {
+		case code == kobo.KeyEnter:
+			a.answer(0)
+		case code == kobo.KeyEsc:
+			a.answer(-1)
+		case code == kobo.KeyBackspace:
+			if rs := []rune(q.typed); len(rs) > 0 {
+				q.typed = string(rs[:len(rs)-1])
+				a.drawAsk()
+			}
+		case printable && !m.ctrl && len(q.typed) < 2*len(q.want):
+			q.typed += ch
+			a.drawAsk()
+		}
 		return
 	}
 	ch, _ := kobo.KeyChar(code, false, false)

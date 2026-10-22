@@ -456,7 +456,7 @@ func (a *bro) drawConnect(t *termSession) {
 		if a.setting("shell") == "alpine" {
 			lines[0] = "Alpine Linux " + alpineVersion + ", in a jail on this Kobo: Enter or tap here to start it."
 			if _, err := os.Stat(alpineImg); err != nil {
-				lines = append(lines[:1], append([]string{"The first time sets it up: a 1 GB disk image, and 3 MB from the net."}, lines[1:]...)...)
+				lines = append(lines[:1], append([]string{"The first time sets it up: a disk image, as big as you say (1 GB if you just press Enter), and 3 MB from the net."}, lines[1:]...)...)
 			}
 		}
 		if t.state == termIdle && len(a.tv.groups[t.kind].sessions) > 1 {

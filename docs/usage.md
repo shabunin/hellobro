@@ -278,8 +278,11 @@ default), or **Alpine Linux, in a jail**: a small Linux of its own, with
 its own tools and `apk add` for more (git, python3, vim, tmux…), kept
 away from the Kobo's system.
 
-- The first Alpine session sets it up, in the session: a 1 GB disk image
-  (`.adds/hellobro/alpine.img`, ext2), and Alpine's minirootfs
+- The first Alpine session sets it up, in the session: a disk image
+  (`.adds/hellobro/alpine.img`, ext2), as big as you say there, in MB
+  (Enter: 1024). It's made once and doesn't grow: 256 MB at least, and
+  at most 4095 MB, as FAT's files stop at 4 GB, with 256 MB left free
+  on the storage. Then Alpine's minirootfs
   (3.24.3, 3 MB, needs Wi-Fi). It's fetched over plain HTTP, as the Kobo
   has no CA certificates, and checked against the SHA-256 pinned in
   `alpine.go`; inside, apk goes over HTTPS with Alpine's own.
@@ -318,7 +321,12 @@ away from the Kobo's system.
 - The image is mounted at `/tmp/hellobro-alpine` while hellobro runs and
   let go of when it quits, so USB still works. ext2 has no journal: after
   a crash, check it on a computer (`e2fsck -f alpine.img`, copied over
-  with hellobro not running). Removing `alpine.img` starts over.
+  with hellobro not running).
+- Settings, **… Alpine: remove it** (or "Alpine: remove it…" in the
+  switcher) deletes the image and all in it, once you type `yes delete
+  it bro` in the question (a keyboard is needed). The Alpine sessions
+  have to be closed first. The Shell tab goes back to the Kobo's shell;
+  choosing Alpine again starts over, asking the size anew.
 
 ## Music
 

@@ -24,6 +24,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -38,6 +39,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -50,7 +52,9 @@ import (
 const (
 	alpineVersion  = "3.24.3"
 	alpineSHA256   = "dc1ddfaf03ede4be79ad7475490f6b7859dbcbbbbb85150aa1ee013b4bc2f0c1"
-	alpineMB       = 1024 // the image's size
+	alpineMBMin    = 256
+	alpineMBMax    = 4095 // FAT's biggest file is 4 GB less a byte
+	alpineMBDef    = 1024
 	alpineDone     = "etc/hellobro-alpine"
 	bluealsaSHA256 = "b515919407a3c098a1d794f88a997c54888e62806ef32bb3bbcd52087ec9bbec"
 )
@@ -117,8 +121,9 @@ func startAlpine(cols, rows int, command string) (*localShell, error) {
 }
 
 // alpineReady makes the image and puts Alpine in if that's not done yet,
-// and mounts it. Its progress goes to out.
-func alpineReady(out io.Writer) error {
+// and mounts it. Its progress goes to out, the session's terminal, which
+// is asked how big the image is to be.
+func alpineReady(out io.ReadWriter) error {
 	if !alpineMu.TryLock() {
 		fmt.Fprint(out, "waiting for another session's setup…\r\n")
 		alpineMu.Lock()
@@ -144,12 +149,21 @@ func alpineReady(out io.Writer) error {
 	return alpineInstall(out)
 }
 
-// alpineMakeImage writes the image: zeros (FAT has no holes), then an
-// ext2 file system. It's named .part till that's done.
-func alpineMakeImage(out io.Writer) error {
+// alpineMakeImage writes the image, as big as out's answer says: zeros
+// (FAT has no holes), then an ext2 file system. It's named .part till
+// that's done.
+func alpineMakeImage(out io.ReadWriter) error {
+	most := alpineMBMax
 	var st syscall.Statfs_t
-	if err := syscall.Statfs(filepath.Dir(alpineImg), &st); err == nil && st.Bavail*uint64(st.Bsize) < (alpineMB+256)<<20 {
-		return fmt.Errorf("the image needs %d MB free, and there's %d MB", alpineMB+256, st.Bavail*uint64(st.Bsize)>>20)
+	if err := syscall.Statfs(filepath.Dir(alpineImg), &st); err == nil {
+		free := int(st.Bavail * uint64(st.Bsize) >> 20)
+		if most = min(most, free-256); most < alpineMBMin { // 256 MB left for the books
+			return fmt.Errorf("the image needs %d MB free, and there's %d MB", alpineMBMin+256, free)
+		}
+	}
+	size, err := alpineAskSize(out, most)
+	if err != nil {
+		return err
 	}
 	part := alpineImg + ".part"
 	f, err := os.OpenFile(part, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
@@ -157,9 +171,9 @@ func alpineMakeImage(out io.Writer) error {
 		return err
 	}
 	zeros := make([]byte, 1<<20)
-	for mb := 0; mb < alpineMB; mb++ {
+	for mb := 0; mb < size; mb++ {
 		if mb%32 == 0 {
-			fmt.Fprintf(out, "\rmaking the disk image (once): %d of %d MB", mb, alpineMB)
+			fmt.Fprintf(out, "\rmaking the disk image (once): %d of %d MB", mb, size)
 		}
 		if _, err := f.Write(zeros); err != nil {
 			f.Close()
@@ -175,12 +189,45 @@ func alpineMakeImage(out io.Writer) error {
 		os.Remove(part)
 		return err
 	}
-	fmt.Fprintf(out, "\rmaking the disk image (once): %d MB, done\r\n", alpineMB)
+	fmt.Fprintf(out, "\rmaking the disk image (once): %d MB, done\r\n", size)
 	if b, err := exec.Command("mke2fs", "-F", "-m", "1", "-L", "alpine", part).CombinedOutput(); err != nil {
 		os.Remove(part)
 		return fmt.Errorf("mke2fs: %v: %s", err, bytes.TrimSpace(b))
 	}
 	return os.Rename(part, alpineImg)
+}
+
+// alpineAskSize asks on the session's terminal how big the image is to
+// be, in MB. The PTY is as new, in line mode: the kernel echoes and edits
+// the line, and Enter sends it.
+func alpineAskSize(rw io.ReadWriter, most int) (int, error) {
+	in := bufio.NewReader(rw)
+	for {
+		fmt.Fprintf(rw, "Alpine's disk image, made once: how big, in MB (%d to %d; Enter: %d)? ", alpineMBMin, most, min(alpineMBDef, most))
+		line, err := in.ReadString('\n')
+		if err != nil {
+			return 0, errors.New("no size given")
+		}
+		mb, err := alpineSize(line, most)
+		if err == nil {
+			return mb, nil
+		}
+		fmt.Fprintf(rw, "%v\r\n", err)
+	}
+}
+
+// alpineSize reads a size typed, in MB ("2048", "2048 MB"); empty is the
+// default.
+func alpineSize(s string, most int) (int, error) {
+	s = strings.TrimSpace(strings.TrimSuffix(strings.ToLower(strings.TrimSpace(s)), "mb"))
+	if s == "" {
+		return min(alpineMBDef, most), nil
+	}
+	mb, err := strconv.Atoi(s)
+	if err != nil || mb < alpineMBMin || mb > most {
+		return 0, fmt.Errorf("a number of MB, %d to %d, please", alpineMBMin, most)
+	}
+	return mb, nil
 }
 
 // alpineMounted says whether the image is mounted at alpineRoot.
@@ -248,6 +295,78 @@ func alpineInstall(out io.Writer) error {
 	syscall.Sync()
 	log.Printf("alpine: %s installed", alpineVersion)
 	fmt.Fprint(out, "done.\r\n\n")
+	return nil
+}
+
+const alpineRemoveWords = "yes delete it bro"
+
+// alpineSummary is the Settings row's: what removing would delete.
+func alpineSummary() string {
+	if st, err := os.Stat(alpineImg); err == nil {
+		return fmt.Sprintf("deletes alpine.img (%d MB), once you type it", st.Size()>>20)
+	}
+	return "none here"
+}
+
+// alpineRemoveAsk asks before Alpine goes, firmly: nothing in the image
+// comes back.
+func (a *bro) alpineRemoveAsk() {
+	st, err := os.Stat(alpineImg)
+	if err != nil {
+		a.Toast("there's no Alpine to remove", 3*time.Second)
+		return
+	}
+	if n := jailCount(); n > 0 {
+		a.Toast(fmt.Sprintf("close the Alpine sessions first (%d open)", n), 5*time.Second)
+		return
+	}
+	text := fmt.Sprintf("alpine.img (%d MB) goes, and everything in it: what apk put there, /root, all of it.", st.Size()>>20)
+	a.askTyped("Remove Alpine?", text, alpineRemoveWords, "delete it", func() {
+		go func() {
+			err := alpineRemove()
+			a.Do(func() {
+				if err != nil {
+					log.Printf("alpine: not removed: %v", err)
+					a.Toast("Alpine not removed: "+err.Error(), 6*time.Second)
+					return
+				}
+				if a.setting("shell") == "alpine" { // there's none to run
+					a.set["shell"] = indexOf(settingList[settingIndex("shell")].values, "kobo")
+					a.set.save()
+				}
+				a.Toast("Alpine removed; the Shell tab runs the Kobo's shell", 5*time.Second)
+				a.sv.shown = ""
+				a.drawSettings()
+			})
+		}()
+	})
+}
+
+// alpineRemove unmounts the image and deletes it, and the sound plugins
+// fetched for it. Not lazily: whatever still holds it, it stays.
+func alpineRemove() error {
+	if !alpineMu.TryLock() {
+		return errors.New("a session is setting it up")
+	}
+	defer alpineMu.Unlock()
+	if n := jailCount(); n > 0 {
+		return fmt.Errorf("%d Alpine sessions are open", n)
+	}
+	if alpineMounted() {
+		if err := syscall.Unmount(alpineRoot, 0); err != nil {
+			return fmt.Errorf("unmounting it: %w", err)
+		}
+		log.Print("alpine: unmounted")
+	}
+	if err := os.Remove(alpineImg); err != nil {
+		return err
+	}
+	os.Remove(alpineImg + ".part")
+	for _, keep := range bluealsaPlugins {
+		os.Remove(keep)
+	}
+	syscall.Sync()
+	log.Print("alpine: removed")
 	return nil
 }
 

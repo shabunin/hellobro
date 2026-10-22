@@ -70,6 +70,14 @@ func jailStarted(pid int) {
 	jails.Unlock()
 }
 
+// jailCount is how many jails are running: Alpine sessions, here or over
+// SSH.
+func jailCount() int {
+	jails.Lock()
+	defer jails.Unlock()
+	return len(jails.pids)
+}
+
 func jailEnded(pid int) {
 	jails.Lock()
 	jails.pids = slices.DeleteFunc(jails.pids, func(p int) bool { return p == pid })

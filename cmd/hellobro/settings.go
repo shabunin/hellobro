@@ -87,6 +87,8 @@ var settingList = []setting{
 	{key: "alpine-bus", label: "… Alpine: system bus access", title: "Alpine: system bus access",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
+	{key: "alpine-remove", label: "… Alpine: remove it", title: "Alpine: remove it",
+		values: []string{""}, shown: []string{""}}, // the question: alpine.go
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
@@ -109,6 +111,9 @@ func settingCommands() []*command {
 	for i, st := range settingList {
 		switch st.key {
 		case "share", "relay", "status-bar", "tabs", "keys":
+			continue
+		case "alpine-remove":
+			cs = append(cs, &command{id: "alpine.remove", title: "Alpine: remove it…", run: (*bro).alpineRemoveAsk})
 			continue
 		}
 		title := st.title
@@ -175,7 +180,7 @@ func loadSettings() settings {
 func (s settings) save() {
 	var b strings.Builder
 	for _, st := range settingList {
-		if st.key != "status-bar" && st.key != "tabs" && st.key != "keys" { // kept in their own files
+		if st.key != "status-bar" && st.key != "tabs" && st.key != "keys" && st.key != "alpine-remove" { // kept in their own files, or none
 			fmt.Fprintf(&b, "%s=%s\n", st.key, st.values[s[st.key]])
 		}
 	}
@@ -217,6 +222,9 @@ func (a *bro) stepSetting(i, d int) {
 		return
 	case "keys":
 		a.openKeys(nil)
+		return
+	case "alpine-remove":
+		a.alpineRemoveAsk()
 		return
 	case "status-bar":
 		a.toggleStat()
@@ -323,6 +331,8 @@ func (a *bro) drawSettings() {
 			shown = "pairing: code " + a.share.code
 		case st.key == "tabs":
 			shown = a.tabsSummary()
+		case st.key == "alpine-remove":
+			shown = alpineSummary()
 		case st.key == "keys" && len(a.keys.named) == 0:
 			shown = "the defaults (keys.conf)"
 		case st.key == "keys":

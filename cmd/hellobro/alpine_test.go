@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,5 +118,55 @@ func TestAlpineExtractMinirootfs(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(dir, "etc/alpine-release")); strings.TrimSpace(string(b)) != alpineVersion {
 		t.Errorf("etc/alpine-release: %q", b)
+	}
+}
+
+func TestAlpineSize(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		most int
+		mb   int // 0 for an error
+	}{
+		{"", 4095, 1024},
+		{"\n", 4095, 1024},
+		{"", 600, 600}, // the default won't fit
+		{"2048", 4095, 2048},
+		{" 2048 MB\n", 4095, 2048},
+		{"3000mb", 4095, 3000},
+		{"256", 4095, 256},
+		{"4095", 4095, 4095},
+		{"4096", 4095, 0}, // FAT's limit
+		{"2048", 1500, 0}, // no room
+		{"255", 4095, 0},
+		{"-1", 4095, 0},
+		{"2 GB", 4095, 0},
+		{"lots", 4095, 0},
+	} {
+		mb, err := alpineSize(c.in, c.most)
+		if c.mb == 0 && err == nil || c.mb != 0 && (err != nil || mb != c.mb) {
+			t.Errorf("%q (most %d): %d, %v; want %d", c.in, c.most, mb, err, c.mb)
+		}
+	}
+}
+
+// tty is a terminal's two ends, as alpineAskSize sees them.
+type tty struct {
+	io.Reader
+	out strings.Builder
+}
+
+func (t *tty) Write(p []byte) (int, error) { return t.out.Write(p) }
+
+func TestAlpineAskSize(t *testing.T) {
+	term := &tty{Reader: strings.NewReader("lots\n100\n2048\n")}
+	mb, err := alpineAskSize(term, 4095)
+	if err != nil || mb != 2048 {
+		t.Fatalf("%d, %v; want 2048", mb, err)
+	}
+	if n := strings.Count(term.out.String(), "how big"); n != 3 {
+		t.Errorf("asked %d times, want 3:\n%s", n, term.out.String())
+	}
+	if _, err := alpineAskSize(&tty{Reader: strings.NewReader("lots\n")}, 4095); err == nil {
+		t.Error("the session closed, and it still has a size")
 	}
 }
