@@ -37,6 +37,7 @@ run they freeze Nickel and draw an e-ink UI through FBInk.
   `third_party/fbink/libfbink.a` and leaves the version `-dirty`. If it
   happens: `git checkout -- bin/fbink third_party/fbink/libfbink.a`.
 - Work on `main`, small commits, push when a piece works and is tested.
+  `legacy` is v0.2.1, the tabs before the windows: leave it be.
 
 ## Build and test
 

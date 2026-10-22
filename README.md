@@ -133,6 +133,9 @@ and [i3's IPC](docs/usage.md#i3s-ipc).
 - [Developing](docs/development.md): code, building, the test harness
 - [AGENTS.md](AGENTS.md): for coding agents
 
+The tabs as they were before the windows (v0.2.1) live on the
+[`legacy`](https://github.com/shabunin/hellobro/tree/legacy) branch.
+
 **Bro Tools**, a diagnostics app (keys, touch, stylus, network, sound,
 system), lives here too. It's only installed on request:
 `make install-tools`.
