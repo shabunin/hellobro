@@ -371,12 +371,12 @@ func makeLayout(w, h int, f Fonts, cfg Config, tabs, info []string, full bool) L
 
 // makeBar is Config.Bar's frame: one bar at the top, the tabs at its left
 // as wide as their labels and what's in them want (squeezed when they
-// don't fit), the status after them, and the menu button at the end.
+// don't fit), the status after them, and the menu button at the end. No
+// footer: the page goes down to the bottom.
 func makeBar(L Layout, f Fonts, tabs, info []string) Layout {
 	w, h := L.W, L.H
 	L.tabBar = image.Rect(0, 0, w, barH)
-	L.footer = image.Rect(0, h-footerH, w, h)
-	L.Page = image.Rect(0, barH, w, L.footer.Min.Y)
+	L.Page = image.Rect(0, barH, w, h)
 	L.Body = L.Page.Inset(Pad)
 	L.btnMenu = image.Rect(w-barH-16, 0, w, barH)
 	room := (L.btnMenu.Min.X - 2*Pad) * 7 / 10 // the rest is the status's
@@ -823,7 +823,7 @@ func (a *App) DrawFooter() {
 }
 
 func (a *App) drawFooter() {
-	if a.Full {
+	if a.Full || a.L.footer.Empty() { // Config.Bar's has none
 		return
 	}
 	c, L := a.C, a.L

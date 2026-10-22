@@ -205,7 +205,7 @@ and `minus` for `-`), brightnessup and brightnessdown (a keyboard's
 light keys), and any other by its Linux code (`key183`), with any of
 ctrl, shift, alt and meta. Saved (over SFTP, say), it takes effect at
 once; the log says what it didn't understand. The workspaces' corners,
-the footer and the hints show the keys as they are. The ids of an older
+the hints and an empty workspace show the keys as they are. The ids of an older
 hellobro that have a match now are read as it (`tab.1` as `workspace
 number 1`, `session.new` as `launcher`).
 

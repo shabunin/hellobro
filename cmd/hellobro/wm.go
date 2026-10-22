@@ -828,7 +828,7 @@ func (a *bro) emptyHelp() [][2]string {
 			help = append(help, [2]string{k, row.what})
 		}
 	}
-	return help
+	return append(help, [2]string{"swipe the left edge", "the light, up or down"}, [2]string{"≡ in the bar", "rotate, touch calibration, sleep, quit"})
 }
 
 // --- input ---

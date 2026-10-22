@@ -558,7 +558,7 @@ func (a *bro) renderTerm(t *termSession) {
 		from, to, gray := -1, -1, false
 		for x := 0; x < pn.cols; x++ {
 			k := t.cellKeyAt(x, y, showCursor && cur.X == x && cur.Y == y)
-			k.sel = t == a.term() && v.sel.has(x, y)
+			k.sel = sel && v.sel.has(x, y) // sel, not a.term() again: a cell at a time, that's a map lookup each
 			if k == pn.shown[y][x] {
 				continue
 			}
