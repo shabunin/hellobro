@@ -468,6 +468,24 @@ func (h ipcHost) Command(n *wm.Node, name string, args []string) (bool, error) {
 
 // --- hellobro-msg ---
 
+// msgLine is hellobro-msg's words as one line, as i3-msg joins them; but a
+// word after the first with a space, "," or ";" in it is quoted, so
+// `hellobro-msg notify "done, bro"` stays one command. One word is the
+// line as it is: 'workspace 2; layout tabbed'.
+func msgLine(words []string) string {
+	if len(words) < 2 {
+		return strings.Join(words, "")
+	}
+	out := []string{words[0]}
+	for _, w := range words[1:] {
+		if strings.ContainsAny(w, " \t,;") && !strings.HasPrefix(w, `"`) {
+			w = `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(w) + `"`
+		}
+		out = append(out, w)
+	}
+	return strings.Join(out, " ")
+}
+
 // msgMain is hellobro-msg, as i3-msg: [-s socket] [-t type] [-q] [-m]
 // [message]. It exits 1 if it couldn't, 2 if a command failed.
 func msgMain(args []string) {
@@ -505,7 +523,7 @@ func msgMain(args []string) {
 		os.Exit(1)
 	}
 	defer c.Close()
-	if err := ipcWrite(c, uint32(i), []byte(strings.Join(words, " "))); err != nil {
+	if err := ipcWrite(c, uint32(i), []byte(msgLine(words))); err != nil {
 		fmt.Fprintf(os.Stderr, "hellobro-msg: %v\n", err)
 		os.Exit(1)
 	}

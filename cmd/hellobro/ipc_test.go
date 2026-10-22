@@ -74,3 +74,21 @@ func TestIPCHost(t *testing.T) {
 		}
 	}
 }
+
+func TestMsgLine(t *testing.T) {
+	for _, c := range []struct {
+		words []string
+		want  string
+	}{
+		{[]string{"workspace 2; layout tabbed"}, "workspace 2; layout tabbed"},
+		{[]string{"workspace", "2"}, "workspace 2"},
+		{[]string{"notify", "done, bro"}, `notify "done, bro"`},
+		{[]string{"notify", `say "hi"; ok`}, `notify "say \"hi\"; ok"`},
+		{[]string{`[class="x"]`, "kill"}, `[class="x"] kill`},
+		{[]string{"notify", `"quoted already"`}, `notify "quoted already"`},
+	} {
+		if got := msgLine(c.words); got != c.want {
+			t.Errorf("msgLine(%q) = %q, want %q", c.words, got, c.want)
+		}
+	}
+}

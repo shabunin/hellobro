@@ -113,3 +113,12 @@ func TestRunMisc(t *testing.T) {
 		t.Errorf("marks %q", m)
 	}
 }
+
+func TestRunQuoted(t *testing.T) {
+	tr := build(t, "1:splith[a*, b]")
+	h := &host{}
+	got := tr.Run(`hellobro "done, bro; \"really\""; focus left`, h)
+	if len(got) != 2 || !got[0].Success || !got[1].Success || !reflect.DeepEqual(h.did, []string{`hellobro a done, bro; "really"`}) {
+		t.Errorf("results %+v, did %q", got, h.did)
+	}
+}
