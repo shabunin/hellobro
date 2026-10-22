@@ -117,7 +117,10 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   chose to leave it (2026-10-21). With godbus `Eavesdrop`, a method reply
   goes to the eavesdrop channel: `Call` blocks forever, so use `Go`.
 - e-ink: never overlap an update with one still in flight. Small changes
-  use DU, then a GL16 cleanup; a GC16 flash now and then.
+  use DU, then a GL16 cleanup; a GC16 flash now and then. DU blits are
+  rounded to black and white (`blackWhite`): sent grays, DU leaves them
+  faint and the panel counts them drawn, so a cleanup with the same
+  pixels changes nothing on screen.
 - The Kobo's loopback (`lo`) is down: nothing on the Kobo can reach
   127.0.0.1. The relay hands its connections to the share server in
   process (`share.Server.ServeConn`). The harness can't show this: the

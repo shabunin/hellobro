@@ -91,7 +91,7 @@ var settingList = []setting{
 var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
 // The defaults, by key: the index of a value.
-var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1}
+var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1, "term-clean": 3}
 
 func settingIndex(key string) int {
 	for i, st := range settingList {

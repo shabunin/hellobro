@@ -431,12 +431,12 @@ use GL16, and after a few screenfuls of change the terminal gets one GC16
 flash. Updates never overlap a refresh still in flight (on sunxi that mixes
 both up).
 
-The GL16 cleanup leaves typed text faint and thin, as the panel only
-drives the pixels that change. So the rows drawn fast also get a small
-flash of their own every 10 s, in SSH and Shell sessions alike, while
-there's any (typing or not). Settings, "Terminal: clean redraw of typed
-text", makes that 30 s, 1 min, or off. Switching tabs and back cleans it
-all too.
+DU can't show gray, so what it draws is sent rounded to black and white:
+crisp, if without smooth edges till the GL16 cleanup puts them in. (Sent
+the grays, DU left them faint, and the cleanup, sending the same pixels,
+didn't touch them.) Settings, "Terminal: clean redraw of typed text", adds
+a small flash of what was drawn fast every 10 s, 30 s or 1 min, in SSH and
+Shell sessions alike; it's off at first.
 
 ## Files on the Kobo
 

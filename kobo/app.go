@@ -986,9 +986,26 @@ func (a *App) flush() {
 		}
 	case d.ui:
 		wf = "GL16"
+	default:
+		blackWhite(img)
 	}
 	a.jobs <- blitJob{img, wf, flash}
 	a.blitting = true
+}
+
+// blackWhite rounds img's grays (text's smoothed edges) to black or
+// white, for the fast waveform. DU can't show gray: sent one, it leaves
+// the pixel faint, while the panel takes it as drawn, so the grayscale
+// cleanup after, with the same gray, wouldn't touch it again. Rounded,
+// the edges differ from what the cleanup sends, and it draws them.
+func blackWhite(img *image.Gray) {
+	for i, v := range img.Pix {
+		if v < 128 {
+			img.Pix[i] = 0
+		} else {
+			img.Pix[i] = 255
+		}
+	}
 }
 
 // WaitBlit waits for the update in flight, if any.
