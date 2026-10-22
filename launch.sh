@@ -63,7 +63,6 @@ nickel_back() {
 	[ -n "$closed" ] || return
 	closed=""
 	say "starting Nickel again"
-	./fbink -q -m -M -S 2 "starting Kobo…" 2>/dev/null
 	killall -q -TERM bluealsa bluetoothd
 	rm -f /tmp/nickel-hardware-status
 	mkfifo /tmp/nickel-hardware-status

@@ -80,7 +80,7 @@ func (a *bro) termNotify(t *termSession, msg string) {
 	}
 	log.Printf("terminal: %s: %s", name, msg)
 	if s, err := strconv.Atoi(a.setting("notify-light")); err == nil {
-		a.FlashLight(max(2*lightStep, a.lightWas), time.Duration(s)*time.Second)
+		a.FlashLight(max(2*lightStep, a.mem.LightOn), time.Duration(s)*time.Second)
 	}
 	if a.Dozing() {
 		return

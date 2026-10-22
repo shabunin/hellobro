@@ -48,37 +48,36 @@ const relayIdle = 24 * time.Hour         // with the relay on: as good as never
 // Linux players' remote control.
 type bro struct {
 	*kobo.App
-	tf       termFonts
-	termP    kobo.Panel
-	tv       termView
-	font     *fontSwipe // a contact along the right edge, which may become a font swipe
-	media    mediaState
-	stat     statBar     // the terminal tabs' status bar
-	picker   *picker     // the switcher, while it's up
-	asking   *askBox     // a question, while it's up
-	info     *infoBox    // facts to read, while they're up
-	tabsEd   *tabsEditor // the Tabs dialog, while it's up
-	tabs     tabsConf
-	keys     keyMap
-	keyset   *keySet // Settings' Keys: a key being asked for
-	lightWas int     // the light's level before light.toggle turned it off
-	rv       [2]radioPanelView
-	rs       radioState
-	slp      sleepState
-	sv       settingsView
-	fs       focusState // the keys' focus: focus.go
-	set      settings
-	mem      remembered // hellobro.json
-	doze     dozeState
-	share    shareState
-	relay    relayState
-	fv       filesView
-	upd      updateState
-	folds    map[string]bool // the panels folded, by key (fold.go)
-	net      netState        // the header's network
-	pv       powerView
-	pw       powerState
-	lay      kobo.Layout // the last layout, to lay out again
+	tf     termFonts
+	termP  kobo.Panel
+	tv     termView
+	font   *fontSwipe // a contact along the right edge, which may become a font swipe
+	media  mediaState
+	stat   statBar     // the terminal tabs' status bar
+	picker *picker     // the switcher, while it's up
+	asking *askBox     // a question, while it's up
+	info   *infoBox    // facts to read, while they're up
+	tabsEd *tabsEditor // the Tabs dialog, while it's up
+	tabs   tabsConf
+	keys   keyMap
+	keyset *keySet // Settings' Keys: a key being asked for
+	rv     [2]radioPanelView
+	rs     radioState
+	slp    sleepState
+	sv     settingsView
+	fs     focusState // the keys' focus: focus.go
+	set    settings
+	mem    remembered // hellobro.json
+	doze   dozeState
+	share  shareState
+	relay  relayState
+	fv     filesView
+	upd    updateState
+	folds  map[string]bool // the panels folded, by key (fold.go)
+	net    netState        // the header's network
+	pv     powerView
+	pw     powerState
+	lay    kobo.Layout // the last layout, to lay out again
 }
 
 // fontSwipe is a contact that started on the right edge.

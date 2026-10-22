@@ -17,6 +17,7 @@ const rememberFile = "hellobro.json"
 
 type remembered struct {
 	Light    *int `json:"light,omitempty"`     // the frontlight as last set, 0-100
+	LightOn  int  `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
 	TermFont int  `json:"term-font,omitempty"` // the terminal font's size, px
 	dir      string
 }
@@ -59,6 +60,9 @@ func (a *bro) applyLightStart() {
 	}
 	a.LightKept = func(l int) {
 		a.mem.Light = &l
+		if l > 0 {
+			a.mem.LightOn = l
+		}
 		a.mem.save()
 	}
 }

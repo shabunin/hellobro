@@ -533,10 +533,10 @@ func (a *bro) toggleLight() {
 	switch {
 	case !ok:
 	case l > 0:
-		a.lightWas = l
+		a.mem.LightOn = l // Nickel's, maybe, which LightKept never heard of; saved with the 0
 		a.SetLight(0)
 	default:
-		a.SetLight(max(lightStep, a.lightWas))
+		a.SetLight(max(lightStep, a.mem.LightOn))
 	}
 }
 
