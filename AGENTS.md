@@ -149,6 +149,10 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   Keep `DAC_READ_SEARCH` out (`open_by_handle_at` goes around the
   read-only `.adds`). Test escapes with `ssh -tt -p 2022 kobo.local
   'hellobro-alpine COMMAND'`; never `echo b` at sysrq-trigger to check it.
+- A session off screen reads a trickle of output in batches
+  (`termUnseen`): on the Kobo, waking up for each small read costs more
+  than parsing it. Floods are still read at once, so the writer never
+  blocks on a full pty.
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 

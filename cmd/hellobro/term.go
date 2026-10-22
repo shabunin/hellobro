@@ -42,10 +42,11 @@ const (
 )
 
 const (
-	termFrame     = 60 * time.Millisecond // at most this often we redraw from the emulator
-	termBackFrame = time.Second           // and a pane not in focus, at most this often
-	termTyping    = time.Second           // after a key, a pane not in focus waits
-	termFullEvery = 3 * time.Second       // and this often we compare all the cells, not only the touched rows
+	termFrame     = 60 * time.Millisecond  // at most this often we redraw from the emulator
+	termBackFrame = time.Second            // and a pane not in focus, at most this often
+	termTyping    = time.Second            // after a key, a pane not in focus waits
+	termUnseen    = 250 * time.Millisecond // a session off screen reads a trickle of output this often
+	termFullEvery = 3 * time.Second        // and this often we compare all the cells, not only the touched rows
 	maxSessions   = 9
 )
 
@@ -104,6 +105,7 @@ type termSession struct {
 	emu      *vt.SafeEmulator
 	mu       sync.Mutex // held while the emulator changes (write): its touched lines are read and cleared under it
 	dirty    atomic.Bool
+	seen     atomic.Bool // its cells show: its output is read as it comes, else in batches
 	title    string
 	keyAt    time.Time // a key last went to it
 	notifyAt time.Time // its last notice
@@ -1011,6 +1013,13 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 			if err != nil {
 				break
 			}
+			// Off screen, a trickle (a player's position, ten times a
+			// second) waits and comes in batches: each read wakes us,
+			// and the wakeups cost more than the parsing. A flood is
+			// read at once, so whatever writes it never waits on us.
+			if n < len(buf)/8 && !t.seen.Load() {
+				time.Sleep(termUnseen)
+			}
 		}
 		lost, how := back.ended()
 		a.Do(func() { a.termEnded(t, gen, err, lost, how) })
@@ -1089,6 +1098,7 @@ func (a *bro) termCloseAll() {
 func (a *bro) termTick() {
 	for _, g := range a.tv.groups {
 		for _, t := range g.sessions {
+			t.seen.Store(a.showing(t) && !a.Dozing())
 			if t.state == termWaiting && time.Now().After(t.retryAt) {
 				a.termConnect(t, t.target)
 			}
