@@ -131,13 +131,15 @@ type blitJob struct {
 
 // App is the app shell; a Program embeds it, and uses what's exported.
 type App struct {
-	C         Canvas // what's on screen, or about to be
-	F         Fonts
-	L         Layout
-	Tab       int
-	Full      bool          // the page has the whole screen
-	Keyboard  string        // the keyboard connected, if any
-	LightIdle time.Duration // the light goes off after this long untouched (0: never)
+	C          Canvas // what's on screen, or about to be
+	F          Fonts
+	L          Layout
+	Tab        int
+	Full       bool          // the page has the whole screen
+	Keyboard   string        // the keyboard connected, if any
+	LightIdle  time.Duration // the light goes off after this long untouched (0: never)
+	LightStart *int          // the light's level at start; nil: Nickel's
+	LightKept  func(int)     // the reader set the light to this
 
 	prog  Program
 	cfg   Config
@@ -243,7 +245,11 @@ func (a *App) Run() {
 		a.flush()
 	}
 	os.Unsetenv(restartedEnv)
-	a.light = openFrontlight(AppFile("light"))
+	start := -1
+	if a.LightStart != nil {
+		start = *a.LightStart
+	}
+	a.light = openFrontlight(start)
 	a.devs = inputDevices()
 	touches := make(chan TouchEv, 4096)
 	for _, d := range a.devs {
@@ -281,7 +287,7 @@ func (a *App) Run() {
 	a.scr.close()
 	if a.light != nil {
 		if !a.lightHideAt.IsZero() { // set by a key just now
-			a.light.keep()
+			a.keepLight()
 		}
 		if a.restart == "" { // a new build sets the kept level: no blink of Nickel's between
 			a.light.close()
@@ -452,7 +458,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			if !a.lightHideAt.IsZero() && time.Now().After(a.lightHideAt) {
 				a.lightHideAt = time.Time{}
 				a.hideGauge(&a.lightOverlay)
-				a.light.keep()
+				a.keepLight()
 			}
 			if !a.asleep {
 				a.prog.Tick()
@@ -731,7 +737,7 @@ func (a *App) onTouch(ev TouchEv) {
 		if g.light {
 			log.Printf("light swipe: %d%% → %d%%", g.lightFrom, a.light.level)
 			a.hideGauge(&a.lightOverlay)
-			a.light.keep()
+			a.keepLight()
 			return
 		}
 		if g.unfulled {

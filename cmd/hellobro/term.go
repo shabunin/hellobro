@@ -15,7 +15,6 @@ import (
 	"log"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -51,7 +50,7 @@ const (
 )
 
 // The terminal's font size in pixels: Ctrl+= and Ctrl+- step it, Ctrl+0
-// resets it, and it's remembered in term-font next to the binary.
+// resets it, and it's remembered in hellobro.json.
 const (
 	termFontDefault          = 26
 	termFontMin, termFontMax = 14, 56
@@ -700,11 +699,9 @@ func (a *bro) enterTerm() {
 	}
 	if v.cw == 0 {
 		v.fontPx = termFontDefault
-		if b, err := os.ReadFile(kobo.AppFile("term-font")); err == nil {
-			if px, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && px != v.fontPx {
-				v.fontPx = max(termFontMin, min(termFontMax, px))
-				a.tf.setSize(v.fontPx)
-			}
+		if px := a.mem.TermFont; px != 0 && px != v.fontPx {
+			v.fontPx = max(termFontMin, min(termFontMax, px))
+			a.tf.setSize(v.fontPx)
 		}
 		a.termGeometry()
 	}
@@ -852,7 +849,8 @@ func (a *bro) setTermFont(px int) {
 	a.tf.setSize(px)
 	v.glyphs = nil
 	a.termGeometry()
-	os.WriteFile(kobo.AppFile("term-font"), []byte(strconv.Itoa(px)+"\n"), 0o644)
+	a.mem.TermFont = px
+	a.mem.save()
 	if a.term() != nil {
 		a.drawTerm()
 		a.MarkFlash(a.termP.Outer) // every glyph changed: clean, not ghosted

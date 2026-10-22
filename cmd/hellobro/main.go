@@ -68,6 +68,7 @@ type bro struct {
 	sv       settingsView
 	fs       focusState // the keys' focus: focus.go
 	set      settings
+	mem      remembered // hellobro.json
 	doze     dozeState
 	share    shareState
 	relay    relayState
@@ -101,6 +102,7 @@ func main() {
 	a := &bro{media: mediaState{kick: make(chan struct{}, 1)}}
 	a.loadStatBar()
 	a.set = loadSettings()
+	a.mem = loadRemembered(kobo.AppFile(""))
 	radio.StateDir = kobo.AppFile("")
 	a.tabs = loadTabs()
 	a.folds = loadFolds()
@@ -108,6 +110,7 @@ func main() {
 	profileOn.Store(a.setting("profile") == "on")
 	alpineBus.Store(a.setting("alpine-bus") == "on")
 	a.applyLightIdle()
+	a.applyLightStart()
 	log.Printf("hellobro %s", version)
 	a.keys = loadKeys()
 	a.applyTabs()

@@ -54,8 +54,9 @@ func TestLightIdle(t *testing.T) {
 	}
 }
 
-// The level the reader chose is set at the next start, over Nickel's,
-// which is still the one put back on leaving.
+// A Program's level is set at start, over Nickel's, which is still the
+// one put back on leaving; the levels the reader sets reach LightKept,
+// each once.
 func TestLightKept(t *testing.T) {
 	dir := t.TempDir()
 	ntx := filepath.Join(dir, "ntx_io")
@@ -66,19 +67,25 @@ func TestLightKept(t *testing.T) {
 	was := nickelConf
 	nickelConf = conf
 	defer func() { nickelConf = was }()
-	save := filepath.Join(dir, "light")
 
-	l := openFrontlight(save)
+	l := openFrontlight(-1)
 	if l.level != 60 || l.kept != -1 {
-		t.Fatalf("first start: %d, kept %d", l.level, l.kept)
+		t.Fatalf("Nickel's: %d, kept %d", l.level, l.kept)
 	}
-	l.set(0)
-	l.keep()
 	l.close()
-
-	l = openFrontlight(save)
+	l = openFrontlight(0)
 	defer l.close()
 	if l.level != 0 || l.initial != 60 {
-		t.Fatalf("next start: %d, Nickel's %d", l.level, l.initial)
+		t.Fatalf("as last time: %d, Nickel's %d", l.level, l.initial)
+	}
+
+	var heard []int
+	a := &App{light: l, LightKept: func(n int) { heard = append(heard, n) }}
+	a.keepLight() // what it started at: nothing new
+	l.set(30)
+	a.keepLight()
+	a.keepLight()
+	if len(heard) != 1 || heard[0] != 30 {
+		t.Errorf("heard %v", heard)
 	}
 }

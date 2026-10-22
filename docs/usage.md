@@ -154,8 +154,9 @@ does what it does as well. The terminal's output doesn't count, only
 you. Settings, **Light off when idle**: after 10 s, 30 s, 1 min, 5 min,
 or never. Sleeping meanwhile wakes with the light as it was before.
 
-hellobro starts with the light as you last set it (kept in `light`,
-next to the app); until you set it once, it takes Nickel's. Leaving
+hellobro starts with the light as you last set it (remembered in
+`hellobro.json`); until you set it once, it takes Nickel's. Settings,
+**Light at start**: as you last set it, or as Nickel had it. Leaving
 gives Nickel its own level back.
 
 ## Sleep
@@ -214,7 +215,7 @@ minutes), the Kobo goes to sleep properly.
   opens it again. Esc on an idle one or `close` drops it.
 - Ctrl+Shift+F: fullscreen, the session in focus alone (Ctrl+Tab goes
   on to the next). Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
-  edge: font size (remembered in `term-font`).
+  edge: font size (remembered in `hellobro.json`).
 - A status bar along the bottom, fullscreen too: what's playing, and the
   battery (charge, temperature), CPU and memory use, every 5 s.
   Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it
@@ -464,7 +465,8 @@ Kobo's storage:
 | `known_hosts` | host keys trusted on first use |
 | `authorized_keys` | computers paired for file sharing |
 | `ssh_host_ed25519_key` | the Kobo's host key, for file sharing |
-| `settings`, `status-bar`, `term-font`, `tabs`, `folded` | settings |
+| `settings`, `status-bar`, `tabs`, `folded` | settings |
+| `hellobro.json` | how it was left: the light, the font size |
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |

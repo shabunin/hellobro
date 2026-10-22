@@ -3,8 +3,9 @@ package kobo
 // The frontlight, the way KOReader drives the Elipsa's: an ioctl on
 // /dev/ntx_io taking 0-100. It can't be read back, so we start from the
 // level Nickel saved, and put that back when we leave, since Nickel would
-// otherwise believe its own level is still on. Ours is kept too: the
-// level the reader last chose here is the one the next start sets.
+// otherwise believe its own level is still on. A Program may start it
+// somewhere else (LightStart), and hear of the levels the reader sets
+// (LightKept), to remember them.
 
 import (
 	"bufio"
@@ -28,17 +29,18 @@ type frontlight struct {
 	level   int // what we set last
 	initial int // Nickel's, restored on close
 	from    string
-	save    string // where the reader's level is kept
-	kept    int    // what's in it, -1 if nothing yet
+	kept    int // the reader's last, as LightKept heard it; -1: not yet
 }
 
-func openFrontlight(save string) *frontlight {
+// openFrontlight opens the light and sets it to start, if that's a
+// level (not -1).
+func openFrontlight(start int) *frontlight {
 	f, err := os.OpenFile(EnvOr("HELLOBRO_NTX_IO", "/dev/ntx_io"), os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		log.Printf("frontlight: %v", err)
 		return nil
 	}
-	l := &frontlight{f: f, level: 50, from: "a guess", save: save, kept: -1}
+	l := &frontlight{f: f, level: 50, from: "a guess", kept: -1}
 	if lvl, ok := nickelLightLevel(); ok {
 		l.level, l.from = lvl, "Nickel's settings"
 	} else if lvl, ok := sysfsBrightness(); ok {
@@ -46,30 +48,28 @@ func openFrontlight(save string) *frontlight {
 	}
 	l.initial = l.level
 	log.Printf("frontlight: %d%% (from %s)", l.level, l.from)
-	if b, err := os.ReadFile(save); err == nil {
-		if lvl, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil {
-			l.kept = max(0, min(100, lvl))
-			if err := l.set(l.kept); err != nil {
-				log.Print(err)
-			} else {
-				log.Printf("frontlight: %d%%, as last time", l.level)
-			}
+	if start >= 0 {
+		l.kept = min(100, start)
+		if err := l.set(l.kept); err != nil {
+			log.Print(err)
+		} else {
+			log.Printf("frontlight: %d%%, as last time", l.level)
 		}
 	}
 	return l
 }
 
-// keep writes down the level the reader chose, for the next start. Not
-// the idle's, a doze's or a notice's: those aren't the reader's.
-func (l *frontlight) keep() {
-	if l.save == "" || l.level == l.kept {
+// keepLight tells the Program the level the reader chose, once they're
+// done choosing. Not the idle's, a doze's or a notice's: those aren't
+// the reader's.
+func (a *App) keepLight() {
+	if a.light.level == a.light.kept {
 		return
 	}
-	if err := os.WriteFile(l.save, []byte(strconv.Itoa(l.level)+"\n"), 0o644); err != nil {
-		log.Printf("frontlight: %v", err)
-		return
+	a.light.kept = a.light.level
+	if a.LightKept != nil {
+		a.LightKept(a.light.level)
 	}
-	l.kept = l.level
 }
 
 // set changes the light, 0 (off) to 100.
