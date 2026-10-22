@@ -81,7 +81,7 @@ def start():
     time.sleep(1.5)
 
 tabs_y = 76 + 34
-TABS = int(os.environ.get('TABS', 5))  # hellobro: SSH Shell Music Settings Files; brotools: Keys Finger Stylus Net Sound System Info
+TABS = int(os.environ.get('TABS', 6))  # hellobro: SSH Shell Music Settings Files Power; brotools: Keys Finger Stylus Net Sound System Info
 tab_x = lambda i: (i + 0.5) * min(W // TABS, W // 4)
 land = W > H
 cx0, cy0 = (60, 200)

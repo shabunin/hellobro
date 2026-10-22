@@ -34,6 +34,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel.
 - **Files**: SFTP and SSH for a paired computer (`kobo.local`). Updates
   go over the air.
+- **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
+  what's using it, powertop style.
 - **From afar**: a relay through a VPS, so the Kobo and your PC reach
   each other away from home.
 
@@ -57,7 +59,7 @@ Eject the Kobo and open **hellobro** from NickelMenu. Then go wireless:
 
 | | |
 | --- | --- |
-| Ctrl+Alt+1–4 | tabs |
+| Ctrl+Alt+1–5 | tabs |
 | Ctrl+Shift+P | go to: sessions, tabs, hosts, commands |
 | Ctrl+Tab, Ctrl+Shift+Tab | next / previous panel (or session) |
 | Ctrl+Shift+M | minimize / open the panel in focus (Enter opens it too) |

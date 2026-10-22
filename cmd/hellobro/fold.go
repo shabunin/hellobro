@@ -39,6 +39,8 @@ var foldables = []foldable{
 	{"settings", "Settings", tabRadio},
 	{"sharing", "Sharing", tabFiles},
 	{"files", "On this Kobo", tabFiles},
+	{"battery", "Battery", tabPower},
+	{"usage", "What uses it", tabPower},
 }
 
 func loadFolds() map[string]bool {
@@ -100,6 +102,9 @@ func (a *bro) setFold(key string, on bool) {
 	case tabFiles:
 		a.fv.shareFocus = (key == "sharing") != on
 		a.layoutFiles(a.lay)
+	case tabPower:
+		a.pv.useFocus = (key == "usage") != on
+		a.layoutPower(a.lay)
 	}
 	if foldables[i].tab == a.Tab && !a.overlay() {
 		a.DrawPage()
@@ -124,6 +129,10 @@ func (a *bro) foldPanel(key string) kobo.Panel {
 		return a.fv.shareP
 	case "files":
 		return a.fv.listP
+	case "battery":
+		return a.pv.batP
+	case "usage":
+		return a.pv.useP
 	}
 	return kobo.Panel{}
 }
@@ -180,6 +189,7 @@ func foldCommands() []*command {
 
 type netState struct {
 	wifi    radio.WiFi // ours, till the Settings tab starts the radios
+	ws      radio.WiFiStatus
 	at      time.Time
 	polling bool
 }
@@ -201,7 +211,7 @@ func (a *bro) netTick() {
 	go func() {
 		ws := w.Status()
 		a.Do(func() {
-			n.polling, n.at = false, time.Now()
+			n.polling, n.at, n.ws = false, time.Now(), ws
 			a.SetNetwork(netText(ws))
 		})
 	}()
@@ -231,6 +241,8 @@ func (a *bro) stepPanel(d int) {
 		a.mv.nowFocus = !a.mv.nowFocus
 	case tabFiles:
 		a.fv.shareFocus = !a.fv.shareFocus
+	case tabPower:
+		a.pv.useFocus = !a.pv.useFocus
 	case tabRadio:
 		a.radioStep(d)
 		return
@@ -258,6 +270,9 @@ func (a *bro) focusMoved() {
 		a.drawFiles()
 	case tabRadio:
 		a.drawRadio()
+	case tabPower:
+		a.pv.shownBat, a.pv.shownUse = "", ""
+		a.drawPower()
 	}
 }
 
@@ -310,6 +325,8 @@ func (a *bro) focusKey() string {
 		return map[bool]string{true: "sharing", false: "files"}[a.fv.shareFocus]
 	case tabRadio:
 		return []string{"wifi", "bluetooth", "settings"}[a.rs.focus]
+	case tabPower:
+		return map[bool]string{false: "battery", true: "usage"}[a.pv.useFocus]
 	}
 	return ""
 }

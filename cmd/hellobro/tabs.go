@@ -1,7 +1,7 @@
 package main
 
 // The tabs: which are shown, and in what order. The tabs file keeps it,
-// "ssh -shell music settings files", a - hiding one. Shell starts
+// "ssh -shell music settings files power", a - hiding one. Shell starts
 // hidden; Settings can't be, it's where they're set. The Tabs dialog
 // (a row in Settings, or the switcher) changes them: a tap or Space
 // shows or hides one, Shift+↑ ↓ or the arrows move it.
@@ -20,7 +20,7 @@ import (
 
 const (
 	tabsTxt     = "tabs"
-	tabsDefault = "ssh -shell music settings files"
+	tabsDefault = "ssh -shell music settings files power"
 	tabsRowH    = 76
 )
 

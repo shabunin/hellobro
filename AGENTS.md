@@ -59,7 +59,7 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
 - Log: `OUT/stdout.txt`. App files: `OUT/app`.
 - `APP_EXTRA=dir` copies files into the app's dir first (settings,
   relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
-- The harness shows all five tabs, as the feeds' Ctrl+Alt+N count on
+- The harness shows all six tabs, as the feeds' Ctrl+Alt+N count on
   (the app hides Shell by default). `HB_TABS="ssh -shell music settings
   files"` sets the tabs file as you like: `harness/feeds/tabs.py` wants
   that one.
@@ -131,6 +131,9 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   was set. An older dead connection keeps its `-R` port for good: the
   relay is refused (`tcpip-forward request denied`) till its `sshd`
   process is killed on the VPS.
+- The battery's gauge (ricoh61x) gives `current_now` in tenths of a mA
+  (2708: 271 mA), not µA: its `time_to_empty_now` times that is a full
+  battery. The harness has a stand-in battery (`HELLOBRO_BATTERY`).
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 

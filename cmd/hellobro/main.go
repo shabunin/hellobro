@@ -37,9 +37,10 @@ const (
 	tabMusic
 	tabRadio
 	tabFiles
+	tabPower
 )
 
-var tabNames = []string{"SSH", "Shell", "Music", "Settings", "Files"}
+var tabNames = []string{"SSH", "Shell", "Music", "Settings", "Files", "Power"}
 
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
@@ -77,7 +78,9 @@ type bro struct {
 	upd      updateState
 	folds    map[string]bool // the panels folded, by key (fold.go)
 	net      netState        // the header's network
-	lay      kobo.Layout     // the last layout, to lay out again
+	pv       powerView
+	pw       powerState
+	lay      kobo.Layout // the last layout, to lay out again
 }
 
 // fontSwipe is a contact that started on the right edge.
@@ -129,6 +132,7 @@ func (a *bro) Layout(L kobo.Layout) {
 	a.layoutMusic(L)
 	a.layoutRadio(L)
 	a.layoutFiles(L)
+	a.layoutPower(L)
 }
 
 func (a *bro) Draw() {
@@ -140,6 +144,9 @@ func (a *bro) Draw() {
 		a.drawRadio()
 	case tabFiles:
 		a.drawFiles()
+	case tabPower:
+		a.pv.shownBat, a.pv.shownUse = "", ""
+		a.drawPower()
 	default:
 		a.drawTerm()
 	}
@@ -153,6 +160,8 @@ func (a *bro) Enter(tab int) {
 		a.enterRadio()
 	case tabFiles:
 		a.enterFiles()
+	case tabPower:
+		a.enterPower()
 	default:
 		a.enterTerm()
 	}
@@ -193,6 +202,8 @@ func (a *bro) Tap(p image.Point) {
 		a.radioTap(p)
 	case tabFiles:
 		a.filesTap(p)
+	case tabPower:
+		a.powerTap(p)
 	default:
 		a.termTap(p)
 	}
@@ -211,6 +222,7 @@ func (a *bro) Tick() {
 	a.radioTick()
 	a.shareTick()
 	a.filesTick()
+	a.powerTick()
 	a.updateTick()
 	a.trialTick()
 }
@@ -281,6 +293,8 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return a.radioKey(m.Code, m.Value)
 	case a.Tab == tabFiles:
 		return a.filesKey(m.Code, m.Value)
+	case a.Tab == tabPower:
+		return false
 	}
 	return a.termKey(m.Code, m.Value)
 }
@@ -331,7 +345,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		}
 	}
 	switch {
-	case g.Tap || g.Pen || a.overlay() || a.Tab == tabRadio || a.Tab == tabFiles:
+	case g.Tap || g.Pen || a.overlay() || a.Tab == tabRadio || a.Tab == tabFiles || a.Tab == tabPower:
 	case a.Tab == tabMusic:
 		a.musicSwipe(g.Start, g.Last)
 	default:

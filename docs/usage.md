@@ -7,7 +7,7 @@ bro!" as it hands the Kobo back.
 
 ## Tabs
 
-Tap a tab, or Ctrl+Alt+1–4 (by place; works everywhere, fullscreen and
+Tap a tab, or Ctrl+Alt+1–5 (by place; works everywhere, fullscreen and
 in a session too):
 
 - **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
@@ -27,6 +27,14 @@ in a session too):
 - **Files**: sharing with a computer over SFTP and SSH (how to reach the
   Kobo, pairing, who's connected and sending what), and the Kobo's
   storage: folders to open, files and folders to delete.
+- **Power**: a powertop of sorts. **Battery**: the charge, the current
+  it gives (mA, W), the gauge's time left, temperature, how fast it
+  went down lately (measured from its history, a sample a minute while
+  hellobro runs, kept in `battery-history`), and the last 12 hours on a
+  graph. **What uses it**, every 5 s: how busy the CPU is, at which
+  speeds and how deep it sleeps; the wakeups a second and whose; Wi-Fi,
+  Bluetooth, the light, sharing and the relay; and the processes that
+  keep the CPU busy (percent of one core).
 
 Which tabs show, and in what order, is up to you: Settings, the last
 row, **Tabs** (or "tabs" in the switcher) opens a list of them. A tap on

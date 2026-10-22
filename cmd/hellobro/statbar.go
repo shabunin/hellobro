@@ -136,6 +136,9 @@ func (s *statBar) sample() {
 
 // batteryDir is the power supply that is a battery.
 func batteryDir() string {
+	if d := os.Getenv("HELLOBRO_BATTERY"); d != "" { // the harness's stand-in
+		return d
+	}
 	dirs, _ := filepath.Glob("/sys/class/power_supply/*")
 	for _, d := range dirs {
 		if t, _ := os.ReadFile(d + "/type"); strings.TrimSpace(string(t)) == "Battery" {
