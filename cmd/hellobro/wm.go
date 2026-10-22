@@ -65,6 +65,8 @@ type wmState struct {
 	starts    []func()          // what the windows brought back run (wmRestore)
 	kept      string            // the layout as last kept, JSON
 	changed   time.Time         // the first change since
+	oriented  bool              // the workspaces laid along the screen once
+	tall      bool              // and it was portrait
 }
 
 type wmTab struct {

@@ -237,6 +237,20 @@ func (t *Tree) workspace(name string) *Node {
 	return w
 }
 
+// Orient lays the workspaces with a window or none along the screen's
+// longer side, as a new one is: for a screen turned, or first known.
+func (t *Tree) Orient() {
+	l := SplitH
+	if r := t.content.Rect; r.Dy() > r.Dx() {
+		l = SplitV
+	}
+	for _, w := range t.content.Nodes {
+		if len(w.Nodes) <= 1 && w.Layout.split() {
+			w.Layout, w.LastSplit = l, l
+		}
+	}
+}
+
 // wsNum is the number a workspace's name starts with ("3", "3:mail"),
 // or -1.
 func wsNum(name string) int {

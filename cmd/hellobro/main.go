@@ -136,6 +136,11 @@ func (a *bro) Layout(L kobo.Layout) {
 	if !L.Full && a.wm.tree.Fullscreen() != nil { // a swipe in from the edge left full screen
 		a.wm.tree.SetFullscreen(a.wm.tree.Fullscreen(), false)
 	}
+	if tall := L.Page.Dy() > L.Page.Dx(); !a.wm.oriented || tall != a.wm.tall { // first, or turned
+		a.wm.oriented, a.wm.tall = true, tall
+		a.wm.tree.SetRect(a.wm.area)
+		a.wm.tree.Orient()
+	}
 	a.wm.laid = ""
 	a.wmPlace()
 	a.wmFocusMoved()

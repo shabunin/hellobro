@@ -489,3 +489,12 @@ func TestSaveLoad(t *testing.T) {
 		}
 	}
 }
+
+func TestOrient(t *testing.T) {
+	tr := build(t, "1:splith[a*] | 2:splith[b, c] | 3:splith[tabbed[d]]")
+	tr.SetRect(image.Rect(0, 0, 900, 1200))
+	tr.Orient()
+	if got := tr.DumpAll(); got != "<1:splitv[a*]> 2:splith[b, c] 3:splitv[tabbed[d]]" {
+		t.Errorf("portrait: %s", got)
+	}
+}
