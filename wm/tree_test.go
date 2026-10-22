@@ -410,3 +410,37 @@ func descendFrom(n, stop *Node) *Node {
 	}
 	return n
 }
+
+func TestIPC(t *testing.T) {
+	tr := build(t, "1:splith[a, splitv[b*, c]] float[f] | 2:splith[d]")
+	tr.Render()
+	root := tr.IPCTree()
+	if root.Type != "root" || len(root.Nodes) != 2 || root.Nodes[1].Name == nil || *root.Nodes[1].Name != "kobo" {
+		t.Fatalf("root: %+v", root)
+	}
+	ws := root.Nodes[1].Nodes[0].Nodes[0]
+	if ws.Type != "workspace" || *ws.Name != "1" || *ws.Num != 1 || ws.Output != "kobo" || len(ws.FloatingNodes) != 1 {
+		t.Fatalf("workspace: %+v", ws)
+	}
+	split := ws.Nodes[1]
+	if split.Layout != "splitv" || split.Orientation != "vertical" || split.Name != nil || split.Window != nil {
+		t.Errorf("split: %+v", split)
+	}
+	b := split.Nodes[0]
+	if !b.Focused || *b.Name != "b" || b.WindowProperties.Instance != "b" || *b.Window != b.ID || b.Floating != "auto_off" {
+		t.Errorf("b: %+v", b)
+	}
+	if f := ws.FloatingNodes[0]; f.Type != "floating_con" || f.Nodes[0].Floating != "user_on" {
+		t.Errorf("floating: %+v", f)
+	}
+	if len(split.Focus) != 2 || split.Focus[0] != b.ID {
+		t.Errorf("focus: %v", split.Focus)
+	}
+	wss := tr.IPCWorkspaces()
+	if len(wss) != 2 || !wss[0].Focused || wss[1].Visible || wss[1].Name != "2" {
+		t.Errorf("workspaces: %+v", wss)
+	}
+	if o := tr.IPCOutputs(); *o[1].CurrentWorkspace != "1" {
+		t.Errorf("outputs: %+v", o)
+	}
+}

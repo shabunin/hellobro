@@ -208,8 +208,10 @@ func (a *bro) closeWin(w window) {
 
 // wmRun runs a line of i3 commands (a key's, the switcher's, the IPC's)
 // and shows what came of it.
-func (a *bro) wmRun(line string) []wm.Result {
-	rs := a.wm.tree.Run(line, wmHost{a})
+func (a *bro) wmRun(line string) []wm.Result { return a.wmRunWith(line, wmHost{a}) }
+
+func (a *bro) wmRunWith(line string, h wm.Host) []wm.Result {
+	rs := a.wm.tree.Run(line, h)
 	for _, r := range rs {
 		if !r.Success {
 			log.Printf("wm: %q: %s", line, r.Error)
@@ -307,6 +309,7 @@ func (h wmHost) Command(n *wm.Node, name string, args []string) (bool, error) {
 // or not, and the windows, drawn again where the layout changed, or only
 // their title strips where only the focus moved.
 func (a *bro) wmApply() {
+	defer a.ipcLook() // the events of what changed
 	t := a.wm.tree
 	a.wmBar()
 	if full := t.Fullscreen() != nil; full != a.Full && !a.Calibrating() {
@@ -713,6 +716,11 @@ const ownDrag = 3
 func (a *bro) setMode(name string) {
 	a.wm.mode = name
 	log.Printf("wm: mode %q", name)
+	change := name
+	if change == "" {
+		change = "default"
+	}
+	a.ipcSend("mode", map[string]any{"change": change, "pango_markup": false})
 	if name == "" {
 		a.SetStatus("")
 	} else {

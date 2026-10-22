@@ -299,6 +299,21 @@ func modsLabel(mods uint8) string {
 	return b.String()
 }
 
+// modsList is mods as i3 names them: "ctrl", "shift", "mod1" (Alt),
+// "mod4" (Meta).
+func modsList(mods uint8) []string {
+	ms := []string{}
+	for _, m := range []struct {
+		bit  uint8
+		name string
+	}{{modShift, "shift"}, {modCtrl, "ctrl"}, {modAlt, "mod1"}, {modMeta, "mod4"}} {
+		if mods&m.bit != 0 {
+			ms = append(ms, m.name)
+		}
+	}
+	return ms
+}
+
 func isAlnum(s string) bool { return s >= "a" && s <= "z" || s >= "0" && s <= "9" }
 
 // keyMap is what the keys run, as keys.conf has it.
@@ -628,6 +643,9 @@ func (a *bro) runKey(code uint16, value int32) bool {
 	if value == 1 || c.repeat {
 		if value == 1 {
 			log.Printf("key: %s", c.id)
+			a.ipcSend("binding", map[string]any{"change": "run", "binding": map[string]any{
+				"command": c.id, "event_state_mask": modsList(a.mods()), "input_code": 0,
+				"symbol": combo{code: code}.String(), "input_type": "keyboard"}})
 		}
 		c.run(a)
 	}

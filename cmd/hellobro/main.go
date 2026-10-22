@@ -20,6 +20,7 @@ import (
 	"image"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"hellobro/kobo"
@@ -34,6 +35,7 @@ const relayIdle = 24 * time.Hour         // with the relay on: as good as never
 type bro struct {
 	*kobo.App
 	wm     wmState
+	ipc    ipcState
 	tf     termFonts
 	tv     termView
 	font   *fontSwipe // a contact along the right edge, which may become a font swipe
@@ -72,6 +74,14 @@ type fontSwipe struct {
 const ownFont = 1 // a gesture that is a font swipe
 
 func main() {
+	if filepath.Base(os.Args[0]) == "hellobro-msg" { // in a jail (ipc.go)
+		msgMain(os.Args[1:])
+		return
+	}
+	if len(os.Args) >= 2 && os.Args[1] == "--msg" {
+		msgMain(os.Args[2:])
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--version" { // hellobro-update asks a new build this, screen untouched
 		fmt.Println("hellobro", version)
 		return
@@ -101,6 +111,7 @@ func main() {
 	a.applyFooter()
 	a.tf.setSize(termFontDefault)
 	a.wmInit()
+	a.ipcStart()
 	a.termInit()
 	a.shareApply()
 	go a.watchPlayers() // the buses may be slow: never in the way of starting
@@ -164,10 +175,12 @@ func (a *bro) Tick() {
 	a.powerTick()
 	a.updateTick()
 	a.trialTick()
+	a.ipcTick()
 	a.updateRing()
 }
 
 func (a *bro) Exit() {
+	a.ipcExit()
 	a.termCloseAll()
 	a.radioExit()
 	a.shareExit()

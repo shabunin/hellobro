@@ -20,6 +20,9 @@ package main
 // of its own, at /run/user/0/bus: the players' remote control (MPRIS)
 // is there, which hellobro sends the media keys to (mpris.go).
 //
+// The window manager's IPC socket is at /run/hellobro/ipc.sock (I3SOCK,
+// SWAYSOCK), with hellobro-msg to talk to it (ipc.go).
+//
 // With system bus access on (alpine.go), the jail gets the bus's socket,
 // and for sound the bluealsa 3.1 plugins in /usr/local/lib/alsa-lib and
 // an /etc/asound.conf that makes them ALSA's default (if it has none).
@@ -77,6 +80,10 @@ func alpineInit(command string) {
 	cmd.Env = []string{"TERM=xterm-256color", "HOME=/root", "USER=root", "LOGNAME=root", "SHELL=" + shell,
 		"LANG=C.UTF-8", "PATH=" + jailPath}
 	cmd.Env = append(cmd.Env, sessionBus()...)
+	if jailIPC {
+		sock := filepath.Join(ipcJailDir, ipcName)
+		cmd.Env = append(cmd.Env, "I3SOCK="+sock, "SWAYSOCK="+sock)
+	}
 	cmd.Dir = "/root"
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
 	if err := cmd.Start(); err != nil {
@@ -140,6 +147,7 @@ ctl.!default { type bluealsa; service "org.bluealsa"; battery "yes" }
 
 func alpineJail() error {
 	resolv, _ := os.ReadFile("/etc/resolv.conf") // the Kobo's, for the jail's
+	exe, _ := os.Executable()                    // hellobro, for hellobro-msg
 	bus := os.Getenv("HELLOBRO_ALPINE_BUS") == "1"
 	plugins := map[string][]byte{} // by the name in the jail; none if they couldn't be fetched
 	if bus {
@@ -209,6 +217,28 @@ func alpineJail() error {
 		}
 		if err := syscall.Mount("", "/mnt/hosts", "", syscall.MS_BIND|syscall.MS_REMOUNT|rdonly|nosuid|nodev, ""); err != nil {
 			return fmt.Errorf("mounting /mnt/hosts: %w", err)
+		}
+	}
+	// The window manager's socket (ipc.go), and hellobro-msg for it: this
+	// binary, read-only.
+	if _, err := os.Lstat("/.oldroot" + ipcDir); err == nil {
+		if err := jailBind("/.oldroot"+ipcDir, ipcJailDir, true); err != nil {
+			return err
+		}
+		jailIPC = true
+		if exe != "" {
+			if err := jailDir("/usr/local/bin"); err != nil {
+				return err
+			}
+			const msg = "/usr/local/bin/hellobro-msg"
+			if st, err := os.Lstat(msg); err != nil || !st.Mode().IsRegular() {
+				if err := writeNew(msg, ""); err != nil {
+					return err
+				}
+			}
+			if err := jailBind("/.oldroot"+exe, msg, false); err != nil {
+				return err
+			}
 		}
 	}
 	if bus {
@@ -301,6 +331,28 @@ func alpineJail() error {
 }
 
 // jailDir makes sure dir is a directory, with no symlink on the way to it.
+// jailIPC says the jail has the window manager's socket.
+var jailIPC bool
+
+// jailBind binds src (the Kobo's, under /.oldroot) at dst read-only: a
+// directory (made if need be), or a file onto one there.
+func jailBind(src, dst string, dir bool) error {
+	if dir {
+		if err := jailDir(dst); err != nil {
+			return err
+		}
+	} else if err := noSymlinkIn("/", dst); err != nil {
+		return err
+	}
+	if err := syscall.Mount(src, dst, "", syscall.MS_BIND, ""); err != nil {
+		return fmt.Errorf("mounting %s: %w", dst, err)
+	}
+	if err := syscall.Mount("", dst, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY|syscall.MS_NOSUID|syscall.MS_NODEV, ""); err != nil {
+		return fmt.Errorf("mounting %s read-only: %w", dst, err)
+	}
+	return nil
+}
+
 func jailDir(dir string) error {
 	if err := noSymlinkIn("/", dir); err != nil {
 		return err
