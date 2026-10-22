@@ -80,7 +80,11 @@ func (a *bro) openPicker() {
 		if c.hidden || c.when != nil && !c.when(a) {
 			continue
 		}
-		p.all = append(p.all, pickEntry{kind: "command", title: c.title, detail: a.keyLabels(c.id), do: func() { c.run(a) }})
+		detail := a.keyLabels(c.id)
+		if c.detail != nil {
+			detail = strings.TrimSuffix(c.detail(a)+" · "+detail, " · ")
+		}
+		p.all = append(p.all, pickEntry{kind: "command", title: c.title, detail: detail, do: func() { c.run(a) }})
 	}
 	p.title, p.hint = "Go to", "sessions, tabs, hosts, commands…"
 	a.showPicker(p)

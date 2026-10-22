@@ -789,6 +789,22 @@ func (a *bro) setSessionFold(t *termSession, on bool) {
 	}
 }
 
+// endSession is the session title's button: it disconnects the session
+// in focus (or kills its shell), or closes it if it's idle.
+func (a *bro) endSession() {
+	t := a.term()
+	switch {
+	case t == nil:
+	case t.state != termIdle:
+		a.termClose(t)
+		t.retries = 0
+		a.termNote(t, "disconnected")
+		a.drawPane(t)
+	default:
+		a.closeSession()
+	}
+}
+
 // closeSession ends the session on screen and drops it, unless it's the
 // tab's only one.
 func (a *bro) closeSession() {
@@ -1377,15 +1393,7 @@ func (a *bro) termTap(p image.Point) {
 		return
 	}
 	if kobo.Hit(p, a.termPanel(t).Button) {
-		switch {
-		case t.state != termIdle:
-			a.termClose(t)
-			t.retries = 0
-			a.termNote(t, "disconnected")
-			a.drawPane(t)
-		default:
-			a.closeSession()
-		}
+		a.endSession()
 		return
 	}
 	if kobo.Hit(p, t.pane.newR) {

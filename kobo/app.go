@@ -10,7 +10,7 @@
 // "rotate" button cycles through the others. Each orientation gets a
 // two-tap touch calibration the first time it's used.
 //
-// Esc, "exit", the power button, or a while without input quits.
+// Esc (but with Config.OwnKeys), "exit", or a while without input quits.
 //
 // Apps are launched through launch.sh, which keeps Nickel from drawing over them.
 package kobo
@@ -79,7 +79,8 @@ type Config struct {
 	Title string   // in the header
 	Tabs  []string // Ctrl+Alt+1, 2, …
 	// OwnKeys leaves Ctrl+Alt+1–9 (tabs) and Ctrl+Alt+S (sleep) to the
-	// Program's Key, for an app with keys of its own making.
+	// Program's Key, for an app with keys of its own making, and Esc
+	// doesn't quit: quitting is the Program's to do (App.Quit).
 	OwnKeys bool
 }
 
@@ -161,6 +162,7 @@ type App struct {
 	hints        []string    // in the tabs' corners, by place; nil: numbers
 	footerTabs   string      // the footer's word on the tabs; "": Ctrl+Alt+N
 	footerSleep  string      // and on sleep's key; "": Ctrl+Alt+S
+	footerQuit   string      // and on quit's; "": Esc
 	gaugeOverlay *image.Gray // the same for the Program's gauge
 
 	inputAt time.Time   // last touch or key
@@ -378,10 +380,10 @@ func (a *App) SetTabs(order []int, hints []string) {
 }
 
 // SetFooter has the footer say tabs on the tabs' keys ("tabs: tap or
-// Ctrl+Alt+1–4"), and sleep for sleep's key ("-": there's none); "" for
-// the defaults, which are the keys without Config.OwnKeys.
-func (a *App) SetFooter(tabs, sleep string) {
-	a.footerTabs, a.footerSleep = tabs, sleep
+// Ctrl+Alt+1–4"), and sleep and quit for their keys ("-": there's none);
+// "" for the defaults, which are the keys without Config.OwnKeys.
+func (a *App) SetFooter(tabs, sleep, quit string) {
+	a.footerTabs, a.footerSleep, a.footerQuit = tabs, sleep, quit
 	if a.C.Gray != nil && a.calib == nil {
 		a.drawFooter()
 	}
@@ -894,7 +896,7 @@ func (a *App) onKey(m KeyMsg) {
 	if a.prog.Key(m) {
 		return
 	}
-	if m.Code == KeyEsc && m.Value == 1 {
+	if m.Code == KeyEsc && m.Value == 1 && !a.cfg.OwnKeys {
 		log.Print("Esc pressed")
 		a.quit = true
 	}

@@ -1027,7 +1027,7 @@ func (a *bro) radioTap(pt image.Point) {
 	}
 }
 
-// radioKey takes a key on the tab; false leaves it to the app (Esc quits).
+// radioKey takes a key on the tab; false leaves it to the app.
 func (a *bro) radioKey(code uint16, value int32) bool {
 	if value == 0 {
 		return true

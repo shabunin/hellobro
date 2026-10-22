@@ -105,7 +105,11 @@ func (a *bro) applyTabs() {
 	if sleep == "" {
 		sleep = "-"
 	}
-	a.SetFooter(footer, sleep)
+	quit := a.keyLabel("quit")
+	if quit == "" {
+		quit = "-"
+	}
+	a.SetFooter(footer, sleep, quit)
 }
 
 // tabHints are the keys to the tabs shown, by place, and the footer's

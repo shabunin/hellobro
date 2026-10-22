@@ -27,6 +27,7 @@ const (
 // A label with a %s gets the key of command cmd there.
 type setting struct {
 	key, label, cmd string
+	title           string // in the switcher, if not the label
 	values          []string
 	shown           []string
 }
@@ -65,13 +66,13 @@ var settingList = []setting{
 	{key: "notify", label: "Terminal notifications",
 		values: []string{"all", "messages", "off"},
 		shown:  []string{"the bell and messages", "messages only (OSC 9, 777)", "off"}},
-	{key: "notify-light", label: "… the light, if it's off",
+	{key: "notify-light", label: "… the light, if it's off", title: "Notifications: the light, if it's off",
 		values: []string{"1", "3", "off"},
 		shown:  []string{"on for 1 s", "on for 3 s", "stays off"}},
-	{key: "notify-blink", label: "… the session's strip, if it shows",
+	{key: "notify-blink", label: "… the session's strip, if it shows", title: "Notifications: the session's strip, if it shows",
 		values: []string{"3", "1", "5", "off"},
 		shown:  []string{"blinks 3 times", "blinks once", "blinks 5 times", "stays still"}},
-	{key: "notify-note", label: "… a note in the corner, if it doesn't",
+	{key: "notify-note", label: "… a note in the corner, if it doesn't", title: "Notifications: a note in the corner, if it doesn't",
 		values: []string{"3", "5", "10", "off"},
 		shown:  []string{"for 3 s", "for 5 s", "for 10 s", "none"}},
 	{key: "profile", label: "CPU profiles (make push-profile)",
@@ -80,7 +81,7 @@ var settingList = []setting{
 	{key: "shell", label: "Shell tab runs",
 		values: []string{"kobo", "alpine"},
 		shown:  []string{"the Kobo's /bin/sh, as root", "Alpine Linux, in a jail"}},
-	{key: "alpine-bus", label: "… Alpine: system bus access",
+	{key: "alpine-bus", label: "… Alpine: system bus access", title: "Alpine: system bus access",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
@@ -95,6 +96,30 @@ var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
 // The defaults, by key: the index of a value.
 var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1}
+
+// settingCommands step the settings from the switcher, each to its next
+// value, as a tap on its row does, and a toast says what it is now. The
+// ones with commands of their own (sharing, the relay, the status bar,
+// tabs, keys) are left to those.
+func settingCommands() []*command {
+	var cs []*command
+	for i, st := range settingList {
+		switch st.key {
+		case "share", "relay", "status-bar", "tabs", "keys":
+			continue
+		}
+		title := st.title
+		if title == "" {
+			title = strings.ReplaceAll(st.label, "%s", "")
+		}
+		shown := func(a *bro) string { return st.shown[a.set[st.key]] }
+		cs = append(cs, &command{id: "set." + st.key, title: "Setting: " + title, detail: shown, run: func(a *bro) {
+			a.stepSetting(i, 1)
+			a.Toast(title+": "+shown(a), 4*time.Second)
+		}})
+	}
+	return cs
+}
 
 func settingIndex(key string) int {
 	for i, st := range settingList {

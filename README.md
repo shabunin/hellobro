@@ -56,8 +56,8 @@ installed. hellobro is built and tested on the Elipsa (N604, firmware
    a terminal: `unzip hellobro-<version>.zip -d /path/to/KOBOeReader`.
 4. Eject the Kobo. Open **Hello Bro** from NickelMenu (the menu at the
    bottom right of the home screen). The first start asks you to tap two
-   targets, to calibrate the touch screen. Esc or `exit` goes back to
-   Nickel.
+   targets, to calibrate the touch screen. Ctrl+Q or `exit` goes back
+   to Nickel.
 
 ### Updates over Wi-Fi
 
@@ -105,7 +105,7 @@ make dist            # a release's files, in dist/
 | Ctrl+Alt+S, power button | sleep |
 | swipe the left edge, Ctrl+Alt+Up / Down | frontlight |
 | Ctrl+Alt+L | frontlight on / off |
-| Esc, `exit` | back to Nickel |
+| Ctrl+Q, `exit` | back to Nickel |
 
 Every key can be changed in Settings (Keys) or `keys.conf`, and which tabs show (Shell
 starts hidden), and in what order, in Settings. See

@@ -705,7 +705,15 @@ func (a *App) drawFooter() {
 	if a.prog.IdleTimeout() >= 24*time.Hour { // the app wants to stay: say so
 		exit = "no auto-exit"
 	}
-	hints = append(hints, "sleep: "+sleep, "quit: Esc or exit", exit)
+	quit := "Esc or exit"
+	switch a.footerQuit {
+	case "":
+	case "-":
+		quit = "the exit button"
+	default:
+		quit = a.footerQuit + " or exit"
+	}
+	hints = append(hints, "sleep: "+sleep, "quit: "+quit, exit)
 	c.Text(a.F.Small, image.Rect(Pad, L.footer.Min.Y+2, L.W-Pad, L.footer.Max.Y), strings.Join(hints, "   ·   "), Dark, AlignCenter)
 	a.Mark(L.footer, true)
 }

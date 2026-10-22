@@ -26,8 +26,9 @@ const keysTxt = "keys.conf"
 
 type command struct {
 	id, title string
-	keys      []string        // the defaults
-	when      func(*bro) bool // nil: always
+	keys      []string          // the defaults
+	when      func(*bro) bool   // nil: always
+	detail    func(*bro) string // what the switcher says next to the keys, or nil
 	run       func(*bro)
 	hidden    bool // not in the switcher
 	repeat    bool // held, it goes on
@@ -73,6 +74,8 @@ func makeCommands() []*command {
 			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(1) }},
 		&command{id: "session.prev", title: "Previous session", keys: []string{"ctrl+pgup", "ctrl+shift+left"},
 			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(-1) }},
+		&command{id: "session.end", title: "Session in focus: disconnect, kill, or close", when: onTerm,
+			run: (*bro).endSession},
 		&command{id: "copy", title: "Copy the selection", keys: []string{"ctrl+shift+c"}, when: onTerm, run: (*bro).copySel},
 		&command{id: "copy.screen", title: "Copy the screen's text", when: onTerm, run: func(a *bro) {
 			if t := a.term(); t != nil && t.connected() {
@@ -96,17 +99,34 @@ func makeCommands() []*command {
 			run: func(a *bro) { a.mediaKey(kobo.KeyNextSong) }},
 		&command{id: "music.prev", title: "Previous track", keys: []string{"ctrl+shift+,"},
 			run: func(a *bro) { a.mediaKey(kobo.KeyPreviousSong) }},
+		&command{id: "music.stop", title: "Stop the music", run: func(a *bro) { a.mediaKey(kobo.KeyStopCD) }},
+		&command{id: "music.louder", title: "Louder (the player's volume)", repeat: true,
+			run: func(a *bro) { a.mediaKey(kobo.KeyVolumeUp) }},
+		&command{id: "music.quieter", title: "Quieter (the player's volume)", repeat: true,
+			run: func(a *bro) { a.mediaKey(kobo.KeyVolumeDown) }},
 		&command{id: "statusbar", title: "Status bar: show / hide", keys: []string{"ctrl+shift+b"}, run: (*bro).toggleStat},
 		&command{id: "sleep", title: "Sleep", keys: []string{"ctrl+alt+s"}, run: func(a *bro) { a.App.Sleep() }},
 		&command{id: "doze", title: "Light sleep", run: func(a *bro) { a.Doze() }},
 		&command{id: "wifi", title: "Wi-Fi on / off", run: func(a *bro) { a.radioToggle(panelWiFi) }},
 		&command{id: "bluetooth", title: "Bluetooth on / off", run: func(a *bro) { a.radioToggle(panelBT) }},
+		&command{id: "wifi.scan", title: "Wi-Fi: look for networks", run: onRadio(func(a *bro) { a.radioPoll(true) })},
+		&command{id: "wifi.join", title: "Wi-Fi: join a network by its name", run: onRadio(func(a *bro) {
+			a.radioAsk(&radioPrompt{panel: panelWiFi, kind: "ssid", text: "The network's name (SSID):"})
+		})},
+		&command{id: "wifi.info", title: "Wi-Fi: the network's details", run: onRadio((*bro).wifiInfo)},
+		&command{id: "bt.scan", title: "Bluetooth: look for devices (again: stop)", run: onRadio((*bro).btScan)},
 		&command{id: "sharing", title: "File sharing on / off", run: (*bro).shareToggle},
 		&command{id: "sharing.pair", title: "Pair a computer", run: (*bro).sharePair},
 		&command{id: "relay", title: "Relay on / off", run: func(a *bro) { a.stepSetting(settingIndex("relay"), 1) }},
 		&command{id: "tabs", title: "Tabs: show, hide, order", run: (*bro).openTabs},
 		&command{id: "keys", title: "Keys: set a command's", run: func(a *bro) { a.openKeys(nil) }},
+		&command{id: "files.hidden", title: "Files: show / hide hidden files", when: func(a *bro) bool { return a.Tab == tabFiles },
+			run: func(a *bro) {
+				a.fv.hidden = !a.fv.hidden
+				a.listFiles()
+			}},
 	)
+	cs = append(cs, settingCommands()...)
 	cs = append(cs, foldCommands()...)
 	for t, name := range tabNames {
 		if t == tabRadio {
@@ -132,9 +152,19 @@ func makeCommands() []*command {
 	}
 	cs = append(cs,
 		&command{id: "calibrate", title: "Touch calibration", run: func(a *bro) { a.Calibrate() }},
-		&command{id: "quit", title: "Quit, back to Nickel", run: func(a *bro) { a.Quit() }},
+		&command{id: "quit", title: "Quit, back to Nickel", keys: []string{"ctrl+q"}, run: func(a *bro) { a.Quit() }},
 	)
 	return cs
+}
+
+// onRadio has do done on the Settings tab, which starts the radios.
+func onRadio(do func(*bro)) func(*bro) {
+	return func(a *bro) {
+		if a.Tab != tabRadio {
+			a.SwitchTab(tabRadio)
+		}
+		do(a)
+	}
 }
 
 func commandByID(id string) *command {

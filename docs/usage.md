@@ -78,11 +78,16 @@ and a touch takes it away. The terminals keep Tab for the shell.
 
 Ctrl+Shift+P, anywhere, is a switcher in the manner of rofi (or VS
 Code's command palette): the sessions, the tabs, the saved hosts (a new
-session to one), a new shell, and the commands (Wi-Fi or Bluetooth on
-and off, sharing, pairing, the relay, showing or hiding a tab, light
-sleep, the light brighter, dimmer, on and off, the screen to portrait or
-landscape…), each with its keys. Typing narrows it (fuzzy);
-Up/Down and Enter, or 1–9 before typing.
+session to one), a new shell, and the commands, each with its keys:
+everything hellobro does on a key, a button or a page's letter. Among
+them: disconnecting or closing the session in focus; the player's play,
+pause, stop, tracks and volume; Wi-Fi or Bluetooth on and off, looking
+for networks or devices, joining a network by name, its details;
+sharing, pairing, the relay; showing or hiding a tab; hidden files on
+Files; light sleep, the light, the screen's way round; and every
+setting ("Setting: …", with its value now: Enter steps it, as a tap on
+its row does). Typing narrows it (fuzzy); Up/Down and Enter, or 1–9
+before typing.
 
 ## Copy and paste
 
@@ -211,7 +216,9 @@ minutes), the Kobo goes to sleep properly.
   Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it
   plays or pauses.
 - While connected, every other key goes to the remote, Esc included, but
-  for the music's keys below.
+  for hellobro's own (the commands' keys: Ctrl+Q quits, say). A program
+  there that wants one (micro quits on Ctrl+Q too) gets it if keys.conf
+  frees it: `ctrl+q -`.
 - A session calls out with the bell, or with a message as programs send a
   desktop notification (OSC 9 or 777: `make; printf '\e]9;make done\a'`).
   The light comes on a moment if it's off; the session's title strip
@@ -407,7 +414,9 @@ It's only installed when asked for: `make install-tools`.
 
 In both: swipe the left edge for the frontlight (in hellobro also
 Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Ctrl+Shift+F
-in hellobro): swipe in from the top or bottom edge to leave it. Esc or the exit button leave;
+in hellobro): swipe in from the top or bottom edge to leave it. The exit
+button leaves, and so does Esc in brotools, Ctrl+Q in hellobro (where Esc
+is the terminal's, or closes what's open);
 the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
 with a session up, 6 hours while music plays).
 
