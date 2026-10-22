@@ -4,7 +4,8 @@ package main
 // desktop one (OSC 9, iTerm2's; OSC 777, urxvt's: "notify;title;body").
 // The light comes on a moment if it's off; the session's title strip
 // blinks if it shows, and if not, a note says so in the corner. What of
-// it happens is up to Settings.
+// it happens is up to Settings. The notify command (keys.conf, the IPC:
+// hellobro-msg notify TEXT) puts up a note too.
 
 import (
 	"log"
@@ -91,3 +92,26 @@ func (a *bro) termNotify(t *termSession, msg string) {
 		a.Toast(name+": "+msg, time.Duration(s)*time.Second)
 	}
 }
+
+// notify calls out with msg, from no terminal (the notify command): the
+// light as for a terminal's message, and a note in the corner.
+func (a *bro) notify(msg string) {
+	if a.setting("notify") == "off" {
+		return
+	}
+	if r := []rune(msg); len(r) > notifyMax {
+		msg = string(r[:notifyMax-1]) + "…"
+	}
+	log.Printf("notify: %s", msg)
+	if s, err := strconv.Atoi(a.setting("notify-light")); err == nil {
+		a.FlashLight(max(2*lightStep, a.mem.LightOn), time.Duration(s)*time.Second)
+	}
+	if a.Dozing() {
+		return
+	}
+	if s, err := strconv.Atoi(a.setting("notify-note")); err == nil {
+		a.Toast(msg, time.Duration(s)*time.Second)
+	}
+}
+
+const notifyMax = 200 // runes of a notify command's message kept

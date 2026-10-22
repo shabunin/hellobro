@@ -338,6 +338,7 @@ func (a *bro) ipcWanted(event string) bool {
 func (a *bro) ipcTick() {
 	if time.Since(a.ipc.at) >= ipcEvery {
 		a.ipcLook()
+		a.wmBar() // a title changed, say
 	}
 }
 
@@ -450,6 +451,9 @@ var ipcCommands = map[string]bool{
 
 func (h ipcHost) Command(n *wm.Node, name string, args []string) (bool, error) {
 	ok := ipcCommands[name] && len(args) == 0
+	if name == "notify" { // only words on the screen
+		ok = true
+	}
 	if name == "open" && len(args) == 1 {
 		ok = args[0] == "launcher" || args[0] == "alpine" || guiName(args[0]) != ""
 	}

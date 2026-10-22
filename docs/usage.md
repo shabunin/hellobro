@@ -33,7 +33,8 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
   - **Battery**: the charge, the current it gives (mA, W), the gauge's
     time left, temperature, how fast it went down lately (measured from
     its history, a sample a minute while hellobro runs, kept in
-    `battery-history`), and the last 12 hours on a graph;
+    `battery-history`), the processes that keep the CPU busy (percent
+    of one core, the busiest five), and the last 12 hours on a graph;
   - **What uses it**, a powertop of sorts, every 5 s: how busy the CPU
     is, at which speeds and how deep it sleeps; the wakeups a second and
     whose; Wi-Fi, Bluetooth, the light, sharing and the relay; and the
@@ -53,11 +54,12 @@ whole screen (again, or a swipe in from the top or bottom edge, gives it
 back); Meta+Shift+Space floats it over the others (drag it by its strip;
 a floating window is put back with the same key).
 
-**Workspaces** are in the bar under the header, where tabs would be,
-numbered: Meta+1…Meta+0 go to one (made as you go there; an empty one
-goes once you leave it), Meta+Shift+1…0 send the window in focus to
-one, and a tap on one goes there. An empty workspace says how to open a
-window, and a tap on it does.
+**Workspaces** are in the bar at the top, numbered, each with its
+windows' titles after its number (`1 Alpine · Wi-Fi · Battery`), the one
+shown in white: Meta+1…Meta+0 go to one (made as you go there; an empty
+one goes once you leave it), Meta+Shift+1…0 send the window in focus to
+one, and a tap on one goes there. An empty workspace lists the keys (as
+they are, keys.conf's too), and a tap on it opens a window.
 
 Meta+Shift+Minus puts the window away (i3's scratchpad), Meta+Minus
 brings it back, floating, and puts it away again.
@@ -69,12 +71,17 @@ terminals, which start again: a shell anew, an SSH session connecting to
 its host. A launcher, or a terminal running what was typed in, comes
 back as a launcher.
 
-## The header and the keys' focus
+## The bar and the keys' focus
 
-The header says where the Kobo is on the network: the Wi-Fi's name and
-its address (`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`),
-then the battery and the time. It looks again every 15 s. In a binding
-mode (Meta+R, say) it says which.
+One bar at the top, as i3's: the workspaces at its left, and at its
+right where the Kobo is on the network, the Wi-Fi's name and its address
+(`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`), the battery
+and the time. It looks again every 15 s. In a binding mode (Meta+R,
+say) it says which, and what plays, and for a moment what was copied.
+
+**≡** at its end is the menu: rotate the
+screen, touch calibration, light sleep, sleep, the switcher, and quit,
+back to Nickel. Tap one, or type to narrow and Enter; Esc closes it.
 
 Meta and the arrows (or h j k l, as vim has them) move the focus
 between the windows; with Shift, the window itself moves. Meta+A
@@ -136,7 +143,7 @@ Enter, or 1–9 before typing.
   /mnt/onboard/.adds/hellobro/clipboard`, or write it over SFTP and
   paste on the Kobo.
 
-The header says what was copied or pasted, for a moment.
+The bar says what was copied or pasted, for a moment.
 
 ## Keys
 
@@ -159,6 +166,7 @@ The keys are hellobro's commands', i3's with Meta (the Win key):
 | Meta+Shift+Minus, Meta+Minus | put the window away, bring it back |
 | Meta+R | resize mode: arrows, then Enter or Esc |
 | Meta+Shift+C | read keys.conf again |
+| Meta+Shift+E | quit, back to Nickel (i3's exit) |
 
 To change one: Settings, the Keys row (or "keys" in the switcher),
 lists the commands with their keys. Pick one and press its new key, with
@@ -213,8 +221,15 @@ hellobro-msg workspace 2
 hellobro-msg '[instance="launcher"] kill'
 hellobro-msg -t get_tree | jq '..|.name? // empty'
 hellobro-msg -t subscribe -m '["window"]'   # what the windows do, as it happens
+hellobro-msg notify "the build is done"     # a note in the corner
 apk add i3wm && i3-msg -t get_workspaces    # i3's own, if you like
 ```
+
+`notify TEXT` is hellobro's, not i3's: a note in the corner, and the
+light a moment if it's off, as a terminal's notification (Settings,
+Terminal: off, the light, the note's seconds). From a script, a cron
+job, mpd's song change: `make && hellobro-msg notify "make: done"`.
+It's a command like any: `meta+n notify hi bro` in keys.conf works too.
 
 Commands, the tree, workspaces, outputs, marks, the version, binding
 modes and state, `keys.conf` as the config, ticks and sync; and the
@@ -227,7 +242,7 @@ What comes over the socket is a jail's, so it never runs as root on the
 Kobo: `exec` opens a new Alpine window, and of hellobro's own commands
 only what can't reach out of the jail runs (the music, the light, the
 font, the screen's way round, sleep, opening a launcher, an Alpine
-window or a settings' window); the Kobo's shell, SSH, the clipboard,
+window or a settings' window, a notification); the Kobo's shell, SSH, the clipboard,
 sharing, the radios, the settings and `exit` are refused. On the Kobo
 itself (root), the socket is `/tmp/hellobro-ipc/ipc.sock`.
 
@@ -247,7 +262,7 @@ gives Nickel its own level back.
 
 ## Sleep
 
-The power button, Ctrl+Alt+S, the header's `sleep`, or "Sleep"
+The power button, Ctrl+Alt+S, the bar's menu (≡), or "Sleep"
 in the switcher put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
 screen, the light off, suspend to RAM); the power button wakes it, and
 it's all as it was. A player that plays is paused first (Bluetooth goes off),
@@ -311,9 +326,9 @@ minutes), the Kobo goes to sleep properly.
   Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it
   plays or pauses.
 - While connected, every other key goes to the remote, Esc included, but
-  for hellobro's own (the commands' keys: Ctrl+Q quits, say). A program
-  there that wants one (micro quits on Ctrl+Q too) gets it if keys.conf
-  frees it: `ctrl+q -`.
+  for hellobro's own (the commands' keys: Meta+Shift+E quits, say). A
+  program there that wants one of them gets it if keys.conf frees it:
+  `ctrl+shift+v -`.
 - A session calls out with the bell, or with a message as programs send a
   desktop notification (OSC 9 or 777: `make; printf '\e]9;make done\a'`).
   The light comes on a moment if it's off; the session's title strip
@@ -435,7 +450,7 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
   headset's, a keyboard's) set the player's volume. A tap on the status
   bar plays or pauses. They go to the player that's playing, or else one
   that's paused.
-- What it plays shows in the header and the status bar, and in light
+- What it plays shows in the bar and the status bar, and in light
   sleep. While it plays, hellobro doesn't quit by itself.
 - Headphones' buttons work only when BlueZ sends them as keys, which it
   does while no media player is registered with it. On the Kobo, Nickel

@@ -79,6 +79,11 @@ type Config struct {
 	Title string   // in the header
 	About []string // at the foot of the cards, a line each: the version, where it's from
 	Tabs  []string // Ctrl+Alt+1, 2, …
+	// Bar puts the header and the tabs in one bar at the top: no title,
+	// the tabs with what's in them (SetTabNames' info), the status, and
+	// a menu button for the Program (MenuTapper) in place of the
+	// header's buttons.
+	Bar bool
 	// OwnKeys leaves Ctrl+Alt+1–9 (tabs) and Ctrl+Alt+S (sleep) to the
 	// Program's Key, for an app with keys of its own making, and Esc
 	// doesn't quit: quitting is the Program's to do (App.Quit).
@@ -163,6 +168,7 @@ type App struct {
 	noticeUntil  time.Time
 	order        []int       // the tabs shown, in order; nil: all
 	hints        []string    // in the tabs' corners, by place; nil: numbers
+	tabInfo      []string    // Config.Bar's: what's in each tab, by place
 	footerTabs   string      // the footer's word on the tabs; "": Ctrl+Alt+N
 	footerSleep  string      // and on sleep's key; "": Ctrl+Alt+S
 	footerQuit   string      // and on quit's; "": Esc
@@ -383,7 +389,7 @@ func (a *App) SetTabs(order []int, hints []string) {
 		}
 		return
 	}
-	a.L = makeLayout(a.scr.info.ViewW, a.scr.info.ViewH, a.F, a.cfg.Title, len(order), a.Full)
+	a.L = a.layout()
 	a.prog.Layout(a.L)
 	if !slices.Contains(order, a.Tab) {
 		a.Tab = order[0]
@@ -396,21 +402,27 @@ func (a *App) SetTabs(order []int, hints []string) {
 
 // SetTabNames names the tabs anew, for a Program whose tabs come and go
 // (hellobro's workspaces): all of them shown, in order, cur up, hints in
-// their corners. A Program that does this takes the taps on them
-// (TabTapper) and draws its page itself: this redraws the tab bar only.
-func (a *App) SetTabNames(names, hints []string, cur int) {
+// their corners, and with Config.Bar info after each name: what's in it.
+// A Program that does this takes the taps on them (TabTapper) and draws
+// its page itself: this redraws the tab bar only.
+func (a *App) SetTabNames(names, hints, info []string, cur int) {
 	if len(names) == 0 {
 		return
 	}
-	a.cfg.Tabs, a.order, a.hints = slices.Clone(names), nil, slices.Clone(hints)
+	a.cfg.Tabs, a.order, a.hints, a.tabInfo = slices.Clone(names), nil, slices.Clone(hints), slices.Clone(info)
 	a.Tab = max(0, min(cur, len(names)-1))
 	if a.C.Gray == nil || a.calib != nil {
 		return
 	}
 	full := a.L.Full
-	a.L = makeLayout(a.scr.info.ViewW, a.scr.info.ViewH, a.F, a.cfg.Title, len(names), a.Full)
+	a.L = a.layout()
 	a.L.Full = full
 	a.drawTabs()
+}
+
+// MenuTapper is a Program that has a menu for Config.Bar's ≡.
+type MenuTapper interface {
+	MenuTap()
 }
 
 // TabTapper is a Program that takes the taps on the tabs itself: i is
@@ -602,7 +614,7 @@ func bail(why string) {
 func (a *App) relayout() {
 	s := a.scr.info
 	a.C = Canvas{image.NewGray(image.Rect(0, 0, s.ViewW, s.ViewH))}
-	a.L = makeLayout(s.ViewW, s.ViewH, a.F, a.cfg.Title, len(a.Tabs()), a.Full)
+	a.L = a.layout()
 	a.prog.Layout(a.L)
 	if !a.entered {
 		a.entered = true
@@ -813,6 +825,10 @@ func (a *App) tapAt(p image.Point) {
 		}
 	}
 	switch {
+	case a.L.bar && p.In(a.L.btnMenu): // no margin: a window's × is just below
+		if m, ok := a.prog.(MenuTapper); ok {
+			m.MenuTap()
+		}
 	case Hit(p, a.L.btnExit):
 		log.Print("exit tapped")
 		a.quit = true

@@ -9,7 +9,7 @@ Kobo e-reader. Bring a Bluetooth keyboard.
 </p>
 <p align="center">
   <img src="docs/screenshots/ssh.png" width="32%" alt="An SSH session">
-  <img src="docs/screenshots/cmus.png" width="32%" alt="cmus in a shell, the header showing what plays">
+  <img src="docs/screenshots/cmus.png" width="32%" alt="cmus in a shell, the status bar showing what plays">
   <img src="docs/screenshots/light-sleep.png" width="32%" alt="Light sleep, the music playing on">
 </p>
 <p align="center">
@@ -26,7 +26,9 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 - **Windows, as i3 has them**: a tiling window manager with i3's keys
   (Meta+Enter, Meta+arrows, Meta+1…0), workspaces, splits, tabbed and
   stacked containers, floating windows, a scratchpad, binding modes, and
-  i3's IPC, so `i3-msg`, `swaymsg` and i3ipc scripts work. The windows
+  i3's IPC, so `i3-msg`, `swaymsg` and i3ipc scripts work, and
+  `hellobro-msg notify TEXT` puts up a note. One slim bar at the top
+  lists each workspace's windows. The windows
   come back as they were left.
 - **SSH**: an xterm-256color terminal, as many as you like, mouse,
   reconnects by itself. tmux, htop, helix, Claude Code all work.
@@ -34,7 +36,7 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   terminal on the Kobo itself.
 - **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to
   Bluetooth headphones. The media keys and the headphones' buttons work,
-  and the header shows what plays.
+  and the status bar shows what plays.
 - **Light sleep**: the screen shows what's playing, the light goes off,
   and the music keeps going.
 - **Host files**: a saved host's home mounted for Alpine, read-only or
@@ -64,8 +66,8 @@ installed. hellobro is built and tested on the Elipsa (N604, firmware
    a terminal: `unzip hellobro-<version>.zip -d /path/to/KOBOeReader`.
 4. Eject the Kobo. Open **Hello Bro** from NickelMenu (the menu at the
    bottom right of the home screen). The first start asks you to tap two
-   targets, to calibrate the touch screen. Ctrl+Q or `exit` goes back
-   to Nickel.
+   targets, to calibrate the touch screen. Meta+Shift+E (Meta is the
+   Win key), or quit in the bar's ≡ menu, goes back to Nickel.
 
 ### Updates over Wi-Fi
 
@@ -118,7 +120,7 @@ make dist            # a release's files, in dist/
 | Ctrl+Alt+S, power button | sleep |
 | swipe the left edge, Ctrl+Alt+Up / Down | frontlight |
 | Ctrl+Alt+L | frontlight on / off |
-| Ctrl+Q, `exit` | back to Nickel |
+| Meta+Shift+E, ≡ (the bar's menu) | back to Nickel |
 
 Every key can be changed in Settings (Keys) or `keys.conf`, which takes
 any i3 command line and binding modes. See [Keys](docs/usage.md#keys)

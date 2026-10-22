@@ -7,7 +7,9 @@ Back to the [README](../README.md). Agents: [AGENTS.md](../AGENTS.md).
 - `kobo/`: what the apps share. The screen through FBInk (the update queue
   and e-ink waveforms), touch with its calibration, keyboards and buttons,
   the frontlight, drawing, panels, and the app's frame (header, the
-  tab bar, footer). An app is a `kobo.Program` that fills in the pages.
+  tab bar, footer; or with `Config.Bar`, as hellobro, one bar for both,
+  its tabs with what's in them and a menu button). An app is a
+  `kobo.Program` that fills in the pages.
 - `audio/`: Bluetooth audio through the Kobo's bluez-alsa: finding the
   device and its PCM, MP3/WAV decoding, a player with pause, seeking and
   volume.

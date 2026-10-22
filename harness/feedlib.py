@@ -80,9 +80,10 @@ def start():
         tap(t[0] * W, t[1] * H); time.sleep(0.8)
     time.sleep(1.5)
 
-tabs_y = 76 + 34
-TABS = int(os.environ.get('TABS', 5))  # hellobro: SSH Shell Settings Files Power; brotools: Keys Finger Stylus Net Sound System Info
-tab_x = lambda i: (i + 0.5) * min(W // TABS, W // 4)
+TABS = int(os.environ.get('TABS', 5))  # hellobro: its workspaces (4 for the feeds of its tabs); brotools: Keys Finger Stylus Net Sound System Info
+BAR = TABS != 7                        # hellobro: one bar at the top, no header; its first workspace at its left end
+tabs_y = 23 if BAR else 76 + 34
+tab_x = lambda i: 40 if BAR else (i + 0.5) * min(W // TABS, W // 4)  # hellobro: its first workspace, whatever i
 land = W > H
 cx0, cy0 = (60, 200)
 cw, ch = ((W - 32) * 0.66 - 60, H - 76 - 68 - 46 - 32 - 100) if land else (W - 120, (H - 76 - 68 - 46 - 32) * 0.66 - 110)
@@ -115,8 +116,12 @@ def power():
     time.sleep(0.6)
 
 def exit_app():
-    """Taps the header's exit button."""
-    tap(W - 16 - 45, 38)
+    """Taps the header's exit button; in hellobro, the bar's menu, then Quit."""
+    if BAR:
+        tap(W - 30, 23); time.sleep(2)
+        keys("quit"); time.sleep(1); key(ENTER)
+    else:
+        tap(W - 16 - 45, 38)
     time.sleep(3)
 
 # The tabs that were, for the feeds written for them: Ctrl+Alt+1-4 go to

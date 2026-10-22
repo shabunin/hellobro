@@ -18,5 +18,5 @@ key(KEY_B, ctrl=True, shift=True); time.sleep(3)      # hidden
 key(KEY_B, ctrl=True, shift=True); time.sleep(3)      # back
 tap(300, H - 17); time.sleep(3)                       # a tap on it: paused
 fullscreen(); time.sleep(3)
-tap(tab_x(1), tabs_y); time.sleep(3)                  # the Shell tab has it too
+tab(2); time.sleep(3)                                 # the Shell tab's workspace has it too
 exit_app()

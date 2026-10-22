@@ -59,6 +59,7 @@ type wmState struct {
 	laid      string            // what was placed last: another layout is a new screen
 	focus     window            // the focus as drawn
 	names     []string          // the workspaces in the bar
+	info      []string          // and what's in each
 	empty     image.Rectangle   // an empty workspace's hint, for a tap
 	drag      *wmDrag           // a floating window being moved by its strip
 	composing bool              // drawing the floating windows over what was drawn
@@ -382,6 +383,13 @@ func (h wmHost) Command(n *wm.Node, name string, args []string) (bool, error) {
 		a.keys = loadKeys()
 		a.keysChanged()
 		return true, nil
+	case "notify":
+		msg := strings.TrimSpace(strings.Join(args, " "))
+		if msg == "" {
+			return true, fmt.Errorf("notify what?")
+		}
+		a.notify(msg)
+		return true, nil
 	case "open":
 		if len(args) == 0 {
 			return true, fmt.Errorf("open what?")
@@ -485,12 +493,20 @@ func (a *bro) wmFocusMoved() {
 	}
 }
 
-// wmBar puts the workspaces in the bar.
+// wmBar puts the workspaces in the bar, each with its windows' titles.
 func (a *bro) wmBar() {
-	var names, hints []string
+	var names, hints, info []string
 	cur := 0
+	wins := a.wm.tree.Windows()
 	for i, w := range a.wm.tree.Workspaces() {
 		names = append(names, w.Name)
+		var titles []string
+		for _, n := range wins {
+			if wm.WorkspaceOf(n) == w {
+				titles = append(titles, barTitle(a.wm.wins[n].Title()))
+			}
+		}
+		info = append(info, strings.Join(titles, " · "))
 		hint := ""
 		if w.Num >= 0 && w.Num <= 10 {
 			hint = a.keyLabel(fmt.Sprintf("workspace number %d", w.Num))
@@ -501,11 +517,39 @@ func (a *bro) wmBar() {
 			cur = i
 		}
 	}
-	if slices.Equal(names, a.wm.names) && cur == a.Tab {
+	if slices.Equal(names, a.wm.names) && slices.Equal(info, a.wm.info) && cur == a.Tab {
 		return
 	}
-	a.wm.names = names
-	a.SetTabNames(names, hints, cur)
+	a.wm.names, a.wm.info = names, info
+	a.SetTabNames(names, hints, info, cur)
+}
+
+// barTitle is a window's title, short enough for the bar.
+func barTitle(s string) string {
+	if s == "new window" {
+		return "new"
+	}
+	if r := []rune(s); len(r) > barTitleMax {
+		return string(r[:barTitleMax-1]) + "…"
+	}
+	return s
+}
+
+const barTitleMax = 18 // runes of a window's title in the bar
+
+// MenuTap is the bar's ≡: what the header's buttons were, and the rest
+// of the app's own.
+func (a *bro) MenuTap() {
+	if a.picker != nil { // another menu: this one in its place
+		a.closePicker()
+	}
+	var entries []pickEntry
+	for _, id := range []string{"rotate", "calibrate", "doze", "sleep", "palette", "quit"} {
+		if c := commandByID(id); c != nil {
+			entries = append(entries, pickEntry{kind: "command", title: c.title, detail: a.keyLabels(c.id), do: func() { c.run(a) }})
+		}
+	}
+	a.openMenu("hello bro", "type to narrow, or tap", entries, nil)
 }
 
 // TabTap goes to the workspace tapped in the bar.
@@ -712,22 +756,79 @@ func within(n, c *wm.Node) bool {
 	return false
 }
 
-// drawEmpty says what to do on an empty workspace.
+// drawEmpty says what to do on an empty workspace: tap it, or the keys,
+// as many of them as fit.
 func (a *bro) drawEmpty() {
 	r := a.wm.area.Inset(wmGap)
-	keys := a.keyHints("launcher", "a new window", "palette", "the switcher")
-	lines := []string{"Nothing here yet.", "Tap here, or " + keys + "."}
 	c := a.C
-	y := r.Min.Y + r.Dy()/3
-	for i, l := range lines {
-		f := a.F.Body
-		if i == 0 {
-			f = a.F.Panel
+	help := a.emptyHelp()
+	rowH := 38
+	h := 64 + 16 + len(help)*rowH
+	y := r.Min.Y + max(0, (r.Dy()-h)/3)
+	c.Text(a.F.Panel, image.Rect(r.Min.X, y, r.Max.X, y+60), "Nothing here yet: tap it for a new window, or the keys.", kobo.Dark, kobo.AlignCenter)
+	y += 64 + 16
+	keyW := 0
+	for _, l := range help {
+		keyW = max(keyW, kobo.TextWidth(a.F.Small, l[0]))
+	}
+	keyW = min(keyW, r.Dx()/2-kobo.Pad)
+	whatW := 0
+	for _, l := range help {
+		whatW = max(whatW, kobo.TextWidth(a.F.Small, l[1]))
+	}
+	left := r.Min.X + max(0, (r.Dx()-keyW-2*kobo.Pad-whatW)/2) // the table in the middle
+	for _, l := range help {
+		if y+rowH > r.Max.Y {
+			break
 		}
-		c.Text(f, image.Rect(r.Min.X, y, r.Max.X, y+60), l, kobo.Dark, kobo.AlignCenter)
-		y += 64
+		c.Text(a.F.Small, image.Rect(left, y, left+keyW, y+rowH), l[0], kobo.Black, kobo.AlignRight)
+		c.Text(a.F.Small, image.Rect(left+keyW+2*kobo.Pad, y, r.Max.X, y+rowH), l[1], kobo.Dark, kobo.AlignLeft)
+		y += rowH
 	}
 	a.wm.empty = r
+}
+
+// emptyHelp is the keys an empty workspace shows: the keys, what they do.
+func (a *bro) emptyHelp() [][2]string {
+	dirs := func(cmd string) []string {
+		return []string{cmd + " left", cmd + " down", cmd + " up", cmd + " right"}
+	}
+	var ws, mv []string
+	for n := 1; n <= 10; n++ {
+		ws = append(ws, fmt.Sprintf("workspace number %d", n))
+		mv = append(mv, fmt.Sprintf("move container to workspace number %d", n))
+	}
+	var help [][2]string
+	for _, row := range []struct {
+		ids  []string
+		what string
+	}{
+		{[]string{"launcher"}, "a new window: Alpine, the Kobo's sh, a host"},
+		{[]string{"palette"}, "the switcher: windows, hosts, settings, commands"},
+		{[]string{"kill"}, "close the window"},
+		{dirs("focus"), "focus the window there"},
+		{dirs("move"), "move the window there"},
+		{[]string{"focus next", "focus prev"}, "the next, the previous window"},
+		{ws, "go to a workspace"},
+		{mv, "send the window to one"},
+		{[]string{"split h", "split v"}, "the next window beside, below"},
+		{[]string{"layout toggle split", "layout tabbed", "layout stacking"}, "side by side / one above another, tabbed, stacked"},
+		{[]string{"fullscreen toggle"}, "fullscreen"},
+		{[]string{"floating toggle"}, "floating"},
+		{[]string{"move scratchpad", "scratchpad show"}, "put the window away, bring it back"},
+		{[]string{"mode resize"}, "resize: the arrows, then Enter"},
+		{[]string{"copy", "paste"}, "copy, paste"},
+		{[]string{"music.play"}, "play / pause the music"},
+		{[]string{"light.toggle"}, "the light on / off"},
+		{[]string{"sleep"}, "sleep"},
+		{[]string{"reload"}, "read keys.conf again"},
+		{[]string{"quit"}, "quit, back to Nickel"},
+	} {
+		if k := a.keysOf(row.ids...); k != "" {
+			help = append(help, [2]string{k, row.what})
+		}
+	}
+	return help
 }
 
 // --- input ---

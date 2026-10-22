@@ -1,7 +1,8 @@
 package main
 
-// The Power tab, a powertop of sorts. Battery: what it has, what it's
-// giving now, how fast it goes, and its last hours on a graph. What uses
+// The Battery and What uses it windows, a powertop of sorts. Battery:
+// what it has, what it's giving now, how fast it goes, the busiest
+// processes, and its last hours on a graph. What uses
 // it: the CPU (how busy, how fast, how deep it sleeps), the processes
 // that keep it busy, the wakeups and whose they are, the radios and the
 // light. It samples every few seconds while it shows; the battery's
@@ -35,6 +36,7 @@ type powerView struct {
 	batP, useP           kobo.Panel
 	useFocus             bool            // the keys go to What uses it, not Battery
 	text, graph, useText image.Rectangle // inside the panels
+	procs                image.Rectangle // Battery's: what keeps the CPU busy
 	shownBat, shownUse   string
 }
 
@@ -389,16 +391,32 @@ func mhz(khz int) string {
 func (a *bro) placeBattery(p kobo.Panel) {
 	v := &a.pv
 	v.batP, v.shownBat = p, ""
-	v.text, v.graph = image.Rectangle{}, image.Rectangle{}
+	v.text, v.procs, v.graph = image.Rectangle{}, image.Rectangle{}, image.Rectangle{}
 	if p.Outer.Empty() {
 		return
 	}
 	b := v.batP.Body.Inset(kobo.Pad)
 	v.text = image.Rect(b.Min.X, b.Min.Y, b.Max.X, min(b.Max.Y, b.Min.Y+64+4*40+8))
-	if g := image.Rect(b.Min.X, v.text.Max.Y+12, b.Max.X, b.Max.Y); g.Dy() >= 120 {
+	// The processes before the graph, as many as fit with room for it
+	// (batProcs at most, two at least), and none without room for two.
+	room := b.Max.Y - v.text.Max.Y - 12
+	n := min(batProcs, (room-graphMin)/40-1)
+	if n < 2 {
+		n = min(batProcs, room/40-1)
+	}
+	if n >= 2 {
+		v.procs = image.Rect(b.Min.X, v.text.Max.Y+4, b.Max.X, v.text.Max.Y+4+(n+1)*40)
+	}
+	top := max(v.text.Max.Y, v.procs.Max.Y)
+	if g := image.Rect(b.Min.X, top+12, b.Max.X, b.Max.Y); g.Dy() >= graphMin {
 		v.graph = g
 	}
 }
+
+const (
+	batProcs = 5   // the Battery window's busiest processes, at most
+	graphMin = 120 // px the graph wants, or it's left out
+)
 
 // placeUsage puts What uses it at p.
 func (a *bro) placeUsage(p kobo.Panel) {
@@ -533,14 +551,28 @@ func (a *bro) drawBattery() {
 			lines = append(lines, textLine{"measured: in a while (a sample a minute)", kobo.Mid, false})
 		}
 	}
+	var procs []textLine
+	if u := ps.use; !v.procs.Empty() && u.ok {
+		procs = append(procs, textLine{fmt.Sprintf("CPU %d%% busy · of one core:", int(u.busy*100+0.5)), kobo.Dark, false})
+		for _, p := range u.procs {
+			if p.v < 0.5 {
+				break
+			}
+			procs = append(procs, textLine{fmt.Sprintf("%6.1f%%   %s", p.v, p.name), kobo.Black, false})
+		}
+		if len(procs) == 1 {
+			procs = append(procs, textLine{"nothing busy", kobo.Mid, false})
+		}
+	}
 	focused := a.guiFocused("battery")
-	key := fmt.Sprint(status, lines, len(ps.hist), focused)
+	key := fmt.Sprint(status, lines, procs, len(ps.hist), focused)
 	if key == v.shownBat {
 		return
 	}
 	v.shownBat = key
 	a.DrawPanel(a.winPanel(v.batP, focused), status)
 	a.drawLines(v.text, lines)
+	a.drawLines(v.procs, procs)
 	a.drawGraph(v.graph, ps.hist)
 	a.Mark(v.batP.Outer, true)
 }

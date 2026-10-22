@@ -101,7 +101,7 @@ func main() {
 	a.mem = loadRemembered(kobo.AppFile(""))
 	a.tv.hosts = a.mem.hosts()
 	radio.StateDir = kobo.AppFile("")
-	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true}, a)
+	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true, Bar: true}, a)
 	profileOn.Store(a.setting("profile") == "on")
 	alpineBus.Store(a.setting("alpine-bus") == "on")
 	a.applyLightIdle()

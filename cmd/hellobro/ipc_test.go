@@ -62,6 +62,9 @@ func TestIPCHost(t *testing.T) {
 			t.Errorf("%s %v: %v %v, want refused", c.name, c.args, known, err)
 		}
 	}
+	if known, err := h.Command(nil, "notify", nil); !known || err == nil || strings.Contains(err.Error(), "not over IPC") {
+		t.Errorf("notify: %v %v, want let through (and nothing to say)", known, err)
+	}
 	if known, _ := h.Command(nil, "frobnicate", nil); known {
 		t.Error("frobnicate known")
 	}

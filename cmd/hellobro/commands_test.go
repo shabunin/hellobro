@@ -124,7 +124,8 @@ f6 [class="terminal"] focus
 		"meta+space":    "",                          // palette's default, gone
 		"meta+f":        "",                          // freed
 		"meta+enter":    "",                          // session.new is the launcher: named, its default goes
-		"ctrl+q":        "quit",                      // as by default
+		"meta+shift+e":  "quit",                      // as by default, as i3's exit
+		"ctrl+q":        "",                          // not ours: the terminal's
 		"ctrl+alt+1":    "workspace number 1",        // the old id
 		"meta+1":        "",                          // named in the file: its default goes
 		"ctrl+shift+t":  "launcher",
@@ -209,6 +210,28 @@ func TestRewriteKeys(t *testing.T) {
 		}
 		if _, errs := parseKeys(out); len(errs) > 0 {
 			t.Errorf("%s: %v", c.id, errs)
+		}
+	}
+}
+
+func TestKeysOf(t *testing.T) {
+	m, _ := parseKeys("meta+left workspace prev\nf1 workspace number 1")
+	a := &bro{keys: m}
+	for _, c := range []struct {
+		ids  []string
+		want string
+	}{
+		{[]string{"launcher"}, "Meta+Enter"},
+		{[]string{"focus left", "focus down", "focus up", "focus right"}, "Meta+H/Down/Up/Right"},
+		{[]string{"split h", "split v"}, "Meta+B/V"},
+		{[]string{"workspace number 2", "workspace number 3", "workspace number 4", "workspace number 5", "workspace number 10"}, "Meta+2…0"},
+		{[]string{"workspace number 1", "workspace number 2"}, "F1, Meta+2"},
+		{[]string{"copy", "launcher"}, "Ctrl+Shift+C, Meta+Enter"},
+		{[]string{"quit"}, "Shift+Meta+E"},
+		{[]string{"focus child"}, ""},
+	} {
+		if got := a.keysOf(c.ids...); got != c.want {
+			t.Errorf("keysOf(%v) = %q, want %q", c.ids, got, c.want)
 		}
 	}
 }

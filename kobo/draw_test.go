@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"slices"
 	"testing"
 
 	"golang.org/x/image/font"
@@ -96,6 +97,24 @@ func TestStampRing(t *testing.T) {
 			if got := img.GrayAt(x, y).Y; got != want {
 				t.Fatalf("%d,%d: %d, want %d", x, y, got, want)
 			}
+		}
+	}
+}
+
+func TestSqueeze(t *testing.T) {
+	for _, c := range []struct {
+		want []int
+		room int
+		got  []int
+	}{
+		{[]int{100, 200}, 1000, []int{100, 200}},          // they fit
+		{[]int{100, 600, 600}, 900, []int{100, 400, 400}}, // the small one keeps its own
+		{[]int{500, 500}, 600, []int{300, 300}},
+		{[]int{50, 300, 100, 400}, 600, []int{50, 225, 100, 225}},
+		{nil, 600, []int{}},
+	} {
+		if got := squeeze(c.want, c.room); !slices.Equal(got, c.got) && !(len(got) == 0 && len(c.got) == 0) {
+			t.Errorf("squeeze(%v, %d) = %v, want %v", c.want, c.room, got, c.got)
 		}
 	}
 }

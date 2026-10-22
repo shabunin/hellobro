@@ -165,7 +165,7 @@ func makeCommands() []*command {
 	}
 	cs = append(cs,
 		&command{id: "calibrate", title: "Touch calibration", run: func(a *bro) { a.Calibrate() }},
-		&command{id: "quit", title: "Quit, back to Nickel", keys: []string{"ctrl+q"}, run: func(a *bro) { a.Quit() }},
+		&command{id: "quit", title: "Quit, back to Nickel", keys: []string{"meta+shift+e"}, run: func(a *bro) { a.Quit() }}, // i3's exit
 	)
 	return cs
 }
@@ -654,7 +654,7 @@ func (a *bro) runKey(code uint16, value int32) bool {
 
 // keyLabel is the first key for command id, as shown; "" if none.
 func (a *bro) keyLabel(id string) string {
-	if ks := a.keys.keys[id]; len(ks) > 0 {
+	if ks := a.keys.reach(id); len(ks) > 0 {
 		return ks[0].label()
 	}
 	return ""
@@ -663,10 +663,52 @@ func (a *bro) keyLabel(id string) string {
 // keyLabels are all its keys.
 func (a *bro) keyLabels(id string) string {
 	var ls []string
-	for _, k := range a.keys.keys[id] {
+	for _, k := range a.keys.reach(id) {
 		ls = append(ls, k.label())
 	}
 	return strings.Join(ls, ", ")
+}
+
+// reach is id's keys (the default mode's) that run it: not those another
+// command has first, which always can (keys.conf's "meta+left workspace
+// prev" over focus left's default).
+func (m keyMap) reach(id string) []combo {
+	var ks []combo
+	for _, k := range m.keys[id] {
+		if b := m.bind[k]; len(b) > 0 && b[0].id != id && b[0].when == nil {
+			continue
+		}
+		ks = append(ks, k)
+	}
+	return ks
+}
+
+// keysOf is the first keys of ids, as one: "Meta+Left/Down/Up/Right"
+// where they differ in the key alone, "Meta+1…0" for more than four of
+// those; or each, after commas.
+func (a *bro) keysOf(ids ...string) string {
+	var ks []string
+	for _, id := range ids {
+		if k := a.keyLabel(id); k != "" {
+			ks = append(ks, k)
+		}
+	}
+	if len(ks) < 2 {
+		return strings.Join(ks, "")
+	}
+	pre := ks[0][:strings.LastIndex(ks[0][:len(ks[0])-1], "+")+1] // the last char may be a "+" key
+	var rest []string
+	for _, k := range ks {
+		r, ok := strings.CutPrefix(k, pre)
+		if !ok || pre == "" || r == "" || strings.Contains(r[:len(r)-1], "+") {
+			return strings.Join(ks, ", ")
+		}
+		rest = append(rest, r)
+	}
+	if len(rest) > 4 {
+		return pre + rest[0] + "…" + rest[len(rest)-1]
+	}
+	return pre + strings.Join(rest, "/")
 }
 
 // keyHints joins "key: what" for the commands that have a key.

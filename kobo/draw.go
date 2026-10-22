@@ -301,12 +301,15 @@ type Layout struct {
 	header, tabBar, footer, status, titleText image.Rectangle
 	tabs                                      []image.Rectangle
 	btnRotate, btnCalib, btnExit, btnSleep    image.Rectangle
+	bar                                       bool            // Config.Bar's: no header, the tabs and status in one
+	btnMenu                                   image.Rectangle // the bar's ≡
 }
 
 const (
 	Pad       = 16
 	headerH   = 76
 	tabH      = 68
+	barH      = 46 // Config.Bar's
 	footerH   = 46
 	titleH    = 48
 	border    = 3
@@ -314,21 +317,35 @@ const (
 	tapMargin = 12                // buttons accept taps a little outside their frame
 )
 
-// makeLayout places the frame; full gives the whole screen to the page.
-func makeLayout(w, h int, f Fonts, title string, tabs int, full bool) Layout {
-	L := Layout{W: w, H: h, Landscape: w > h, Full: full}
+// layout is makeLayout for the screen and tabs as they are.
+func (a *App) layout() Layout {
+	var labels []string
+	for _, t := range a.Tabs() {
+		labels = append(labels, a.cfg.Tabs[t])
+	}
+	return makeLayout(a.scr.info.ViewW, a.scr.info.ViewH, a.F, a.cfg, labels, a.tabInfo, a.Full)
+}
+
+// makeLayout places the frame for tabs (their labels, as shown, and with
+// Config.Bar what's in each); full gives the whole screen to the page.
+func makeLayout(w, h int, f Fonts, cfg Config, tabs, info []string, full bool) Layout {
+	L := Layout{W: w, H: h, Landscape: w > h, Full: full, bar: cfg.Bar}
 	if full { // no header, tabs or footer: nothing else to draw or tap
 		L.Page = image.Rect(0, 0, w, h)
 		L.Body = L.Page
 		return L
 	}
+	if cfg.Bar {
+		return makeBar(L, f, tabs, info)
+	}
+	title := cfg.Title
 	L.header = image.Rect(0, 0, w, headerH)
 	L.tabBar = image.Rect(0, headerH, w, headerH+tabH)
 	L.footer = image.Rect(0, h-footerH, w, h)
 	L.Page = image.Rect(0, L.tabBar.Max.Y, w, L.footer.Min.Y)
 	L.Body = L.Page.Inset(Pad)
 
-	n := max(1, tabs)
+	n := max(1, len(tabs))
 	tw := min(w/n, w/4) // a few tabs needn't stretch across
 	for i := range n {
 		L.tabs = append(L.tabs, image.Rect(i*tw, L.tabBar.Min.Y, (i+1)*tw, L.tabBar.Max.Y))
@@ -350,6 +367,78 @@ func makeLayout(w, h int, f Fonts, title string, tabs int, full bool) Layout {
 	L.titleText = image.Rect(24, 0, titleEnd, headerH)
 	L.status = image.Rect(titleEnd, 0, x-12, headerH)
 	return L
+}
+
+// makeBar is Config.Bar's frame: one bar at the top, the tabs at its left
+// as wide as their labels and what's in them want (squeezed when they
+// don't fit), the status after them, and the menu button at the end.
+func makeBar(L Layout, f Fonts, tabs, info []string) Layout {
+	w, h := L.W, L.H
+	L.tabBar = image.Rect(0, 0, w, barH)
+	L.footer = image.Rect(0, h-footerH, w, h)
+	L.Page = image.Rect(0, barH, w, L.footer.Min.Y)
+	L.Body = L.Page.Inset(Pad)
+	L.btnMenu = image.Rect(w-barH-16, 0, w, barH)
+	room := (L.btnMenu.Min.X - 2*Pad) * 7 / 10 // the rest is the status's
+	want := make([]int, len(tabs))
+	for i := range want {
+		want[i] = 2*barTabPad + TextWidth(f.Panel, tabs[i])
+		if i < len(info) && info[i] != "" {
+			want[i] += barInfoGap + TextWidth(f.Small, info[i])
+		}
+		want[i] = min(want[i], room/2) // one doesn't take the bar
+	}
+	x := 0
+	for _, tw := range squeeze(want, room) {
+		L.tabs = append(L.tabs, image.Rect(x, 0, x+tw, barH))
+		x += tw
+	}
+	L.status = image.Rect(x+Pad, 0, L.btnMenu.Min.X-Pad/2, barH)
+	return L
+}
+
+const (
+	barTabPad  = 14 // inside a bar tab, at either end
+	barInfoGap = 12 // between its label and what's in it
+)
+
+// squeeze fits widths into room: those that want less than a fair share
+// keep theirs, the others share what's left.
+func squeeze(want []int, room int) []int {
+	got := slices.Clone(want)
+	sum := 0
+	for _, w := range want {
+		sum += w
+	}
+	if sum <= room {
+		return got
+	}
+	big := len(want)
+	left := room
+	for {
+		fair := left / max(1, big)
+		changed := false
+		for i, w := range want {
+			if got[i] == w && w <= fair && w > 0 {
+				left -= w
+				big--
+				got[i] = -w // kept: marked till the end
+				changed = true
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+	fair := left / max(1, big)
+	for i := range got {
+		if got[i] < 0 {
+			got[i] = -got[i]
+		} else {
+			got[i] = fair
+		}
+	}
+	return got
 }
 
 // Split cuts r in two at frac of the way across (landscape) or down (portrait).
@@ -564,7 +653,7 @@ func (a *App) drawAll(flash bool) {
 }
 
 func (a *App) drawHeader() {
-	if a.Full {
+	if a.Full || a.L.bar { // the bar has it all: drawTabs
 		return
 	}
 	c, L := a.C, a.L
@@ -654,6 +743,10 @@ func (a *App) drawTabs() {
 	if a.Full {
 		return
 	}
+	if a.L.bar {
+		a.drawBar()
+		return
+	}
 	c, L := a.C, a.L
 	c.Fill(L.tabBar, Light)
 	order := a.Tabs()
@@ -686,6 +779,42 @@ func (a *App) drawTabs() {
 	a.Mark(L.tabBar, true)
 }
 
+// drawBar draws Config.Bar's bar: black, as i3's, the tab up white; each
+// tab its label, bold, and what's in it; then the status and ≡.
+func (a *App) drawBar() {
+	c, L := a.C, a.L
+	c.Fill(L.tabBar, Black)
+	order := a.Tabs()
+	for i, r := range L.tabs {
+		label, info := a.cfg.Tabs[order[i]], ""
+		if i < len(a.tabInfo) {
+			info = a.tabInfo[i]
+		}
+		fg, dim := uint8(White), uint8(Light)
+		if order[i] == a.Tab {
+			c.Fill(r, White)
+			fg, dim = Black, Dark
+		} else if i > 0 && order[i-1] != a.Tab {
+			c.Fill(image.Rect(r.Min.X, r.Min.Y+10, r.Min.X+1, r.Max.Y-10), Mid)
+		}
+		in := image.Rect(r.Min.X+barTabPad, r.Min.Y, r.Max.X-barTabPad, r.Max.Y)
+		c.Text(a.F.Panel, in, label, fg, AlignLeft)
+		if lw := TextWidth(a.F.Panel, label) + barInfoGap; info != "" && lw < in.Dx() {
+			in.Min.X += lw
+			c.Text(a.F.Small, in, info, dim, AlignLeft)
+		}
+	}
+	m := L.btnMenu
+	for i := -1; i <= 1; i++ { // ≡
+		y := (m.Min.Y+m.Max.Y)/2 + i*10
+		x := (m.Min.X + m.Max.X) / 2
+		c.Fill(image.Rect(x-15, y-2, x+15, y+2), White)
+	}
+	a.status = ""
+	a.drawStatus()
+	a.Mark(L.tabBar, true)
+}
+
 // DrawFooter redraws the footer, for an app whose idle timeout changed.
 func (a *App) DrawFooter() {
 	if a.calib == nil && a.C.Gray != nil && !a.L.footer.Empty() { // not before the first layout
@@ -712,6 +841,9 @@ func (a *App) drawFooter() {
 		ways = append(ways, a.footerSleep)
 	}
 	sleep := "the header's button"
+	if a.L.bar {
+		sleep = "the menu"
+	}
 	if len(ways) > 0 {
 		sleep = strings.Join(ways, " or ")
 	}
@@ -734,6 +866,9 @@ func (a *App) drawFooter() {
 		quit = "the exit button"
 	default:
 		quit = a.footerQuit + " or exit"
+	}
+	if a.L.bar {
+		quit = strings.Replace(strings.Replace(quit, "the exit button", "the menu", 1), " or exit", " or the menu", 1)
 	}
 	hints = append(hints, "sleep: "+sleep, "quit: "+quit, exit)
 	c.Text(a.F.Small, image.Rect(Pad, L.footer.Min.Y+2, L.W-Pad, L.footer.Max.Y), strings.Join(hints, "   ·   "), Dark, AlignCenter)
