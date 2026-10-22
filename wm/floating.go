@@ -238,6 +238,9 @@ func (t *Tree) toWorkspace(n, ws *Node) {
 		attach(q, n, indexAfter(q, after))
 		front(n, ws)
 	}
+	if ws == t.cur && !had {
+		t.focus(t.focused) // the shown workspace's focus is where it was
+	}
 	left := t.tidy(p)
 	if had {
 		if from != t.Current() || left == nil {

@@ -182,10 +182,7 @@ func (t *Tree) RenameWorkspace(from, to string) error {
 	// out and back in, so it's in order of its number
 	i := slices.Index(t.content.Nodes, w)
 	t.content.Nodes = slices.Delete(t.content.Nodes, i, i+1)
-	w.Name, w.Num = to, -1
-	if num, err := strconv.Atoi(to); err == nil && num >= 0 {
-		w.Num = num
-	}
+	w.Name, w.Num = to, wsNum(to)
 	i = slices.IndexFunc(t.content.Nodes, func(o *Node) bool {
 		return w.Num >= 0 && (o.Num < 0 || o.Num > w.Num)
 	})

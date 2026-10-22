@@ -25,7 +25,8 @@ func build(t *testing.T, spec string) *Tree {
 	var plus []*Node
 	shown := ""
 	for _, ws := range strings.Split(spec, " | ") {
-		name, rest, _ := strings.Cut(ws, ":")
+		i := strings.LastIndex(ws[:strings.Index(ws, "[")], ":")
+		name, rest := ws[:i], ws[i+1:]
 		w := tr.workspace(name)
 		if shown == "" {
 			shown = name

@@ -217,9 +217,7 @@ func (t *Tree) workspace(name string) *Node {
 	}
 	w := t.node(Workspace)
 	w.Name, w.Parent, w.Percent = name, t.content, 1
-	if n, err := strconv.Atoi(name); err == nil && n >= 0 {
-		w.Num = n
-	}
+	w.Num = wsNum(name)
 	w.Layout = SplitH
 	if r := t.content.Rect; r.Dy() > r.Dx() {
 		w.Layout = SplitV // as i3's default_orientation auto: along the longer side
@@ -234,6 +232,20 @@ func (t *Tree) workspace(name string) *Node {
 	t.content.Nodes = slices.Insert(t.content.Nodes, i, w)
 	t.content.Focus = append(t.content.Focus, w)
 	return w
+}
+
+// wsNum is the number a workspace's name starts with ("3", "3:mail"),
+// or -1.
+func wsNum(name string) int {
+	i := 0
+	for i < len(name) && name[i] >= '0' && name[i] <= '9' {
+		i++
+	}
+	n, err := strconv.Atoi(name[:i])
+	if err != nil {
+		return -1
+	}
+	return n
 }
 
 // focus makes n the focused node: it goes to the front of its parent's
@@ -464,7 +476,8 @@ func (t *Tree) WorkspaceStep(d int) {
 }
 
 // Focus moves the focus to n (a window's leaf, say, found by criteria),
-// on its workspace, shown if it isn't; a scratchpad window comes out.
+// on its workspace, shown if it isn't; a scratchpad window comes out, and
+// a window full screen in front of it goes back.
 func (t *Tree) Focus(n *Node) {
 	w := workspaceOf(n)
 	if w == nil {
@@ -473,6 +486,9 @@ func (t *Tree) Focus(n *Node) {
 	if w == t.scratch {
 		t.showScratch(floatOf(n))
 		return
+	}
+	if fs := t.fullscreenOn(w); fs != nil && !t.within(n, fs) {
+		fs.Fullscreen = false
 	}
 	if cur := t.Current(); w != cur {
 		t.prevWS = cur.Name
