@@ -77,6 +77,9 @@ var settingList = []setting{
 	{key: "alpine-bus", label: "… Alpine: system bus access",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
+	{key: "term-clean", label: "Terminal: clean redraw of typed text",
+		values: []string{"10", "30", "60", "off"},
+		shown:  []string{"a flash, 10 s after (once it's still)", "a flash, 30 s after", "a flash, 1 min after", "off: it stays faint"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
@@ -172,6 +175,12 @@ func (a *bro) setting(key string) string {
 func (a *bro) settingMinutes(key string) time.Duration {
 	n, _ := strconv.Atoi(a.setting(key))
 	return time.Duration(n) * time.Minute
+}
+
+// settingSeconds is key's value as a time; 0 for off.
+func (a *bro) settingSeconds(key string) time.Duration {
+	n, _ := strconv.Atoi(a.setting(key))
+	return time.Duration(n) * time.Second
 }
 
 // stepSetting moves setting i on (or back) a value.

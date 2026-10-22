@@ -10,10 +10,10 @@ start()
 key(5, ctrl=True, alt=True); time.sleep(3)            # Settings
 tap(300, H - 101); time.sleep(2)                      # the hint: the rest
 tap(300, H - 101); time.sleep(2)                      # and back to the top (the taps gave it the focus)
-for _ in range(12):
+for _ in range(20):
     key(DOWN); time.sleep(0.2)
 time.sleep(2)                                         # down at Keys
-for _ in range(12):
+for _ in range(20):
     key(UP); time.sleep(0.2)
 time.sleep(2)
 exit_app()
