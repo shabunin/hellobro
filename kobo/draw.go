@@ -285,6 +285,9 @@ type Panel struct {
 	ButtonLabel        string
 	Fold               image.Rectangle // the − / + box at the strip's end, if it folds
 	Folded             bool            // only the title strip shows
+	Close              image.Rectangle // a window's ×, at the strip's end
+	New                image.Rectangle // a window's +, after its name: a window next to it
+	Focused            bool            // the keys go to it: its strip is black
 }
 
 // Layout is where things go on the screen.
@@ -394,6 +397,9 @@ func WithButton(f Fonts, p Panel, label string) Panel {
 		if !p.Fold.Empty() {
 			end = p.Fold.Min.X - 12
 		}
+		if !p.Close.Empty() {
+			end = p.Close.Min.X - 12
+		}
 		bw := TextWidth(f.Small, label) + 36
 		p.Button = image.Rect(end-bw, p.Title.Min.Y+6, end, p.Title.Max.Y-8)
 	}
@@ -406,6 +412,22 @@ func WithFold(f Fonts, p Panel, folded bool) Panel {
 	s := p.Title.Dy() - 14
 	p.Fold = image.Rect(p.Title.Max.X-10-s, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
 	p.Folded = folded
+	return WithButton(f, p, p.ButtonLabel)
+}
+
+// WithWindow is p as a window's: a × at the end of its strip that
+// closes it, and with newBox a + after its name, for a window next to it.
+func WithWindow(f Fonts, p Panel, focused, newBox bool) Panel {
+	if p.Title.Empty() {
+		return p
+	}
+	s := p.Title.Dy() - 14
+	p.Close = image.Rect(p.Title.Max.X-10-s, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
+	p.New, p.Focused = image.Rectangle{}, focused
+	if newBox {
+		x := p.Title.Min.X + 16 + TextWidth(f.Panel, p.Name) + 24
+		p.New = image.Rect(x, p.Title.Min.Y+6, x+44, p.Title.Max.Y-8)
+	}
 	return WithButton(f, p, p.ButtonLabel)
 }
 
@@ -743,9 +765,26 @@ func (a *App) DrawPanelTitle(p Panel, status string) {
 		return
 	}
 	c := a.C
-	c.Fill(p.Title, Light)
+	bg, ink, dim := uint8(Light), uint8(Black), uint8(Dark)
+	if p.Focused {
+		bg, ink, dim = Black, White, Light
+	}
+	c.Fill(p.Title, bg)
 	c.Fill(image.Rect(p.Title.Min.X, p.Title.Max.Y-2, p.Title.Max.X, p.Title.Max.Y), Black)
 	t := image.Rect(p.Title.Min.X+16, p.Title.Min.Y, p.Title.Max.X-16, p.Title.Max.Y-2)
+	box := func(r image.Rectangle) {
+		c.Fill(r, White)
+		c.Frame(r, 2, Black)
+	}
+	if f := p.Close; !f.Empty() {
+		box(f)
+		m := f.Min.Add(f.Max).Div(2)
+		for d := -8; d <= 8; d++ { // ×
+			c.Fill(image.Rect(m.X+d-1, m.Y+d-1, m.X+d+2, m.Y+d+2), Black)
+			c.Fill(image.Rect(m.X+d-1, m.Y-d-1, m.X+d+2, m.Y-d+2), Black)
+		}
+		t.Max.X = f.Min.X - 16
+	}
 	if f := p.Fold; !f.Empty() {
 		c.Fill(f, White)
 		c.Frame(f, 2, Black)
@@ -763,8 +802,15 @@ func (a *App) DrawPanelTitle(p Panel, status string) {
 		t.Max.X = p.Button.Min.X - 16
 	}
 	nameW := TextWidth(a.F.Panel, p.Name)
-	c.Text(a.F.Panel, image.Rect(t.Min.X, t.Min.Y, t.Min.X+nameW+2, t.Max.Y), p.Name, Black, AlignLeft)
-	c.Text(a.F.Small, image.Rect(t.Min.X+nameW+28, t.Min.Y, t.Max.X, t.Max.Y), status, Dark, AlignRight)
+	c.Text(a.F.Panel, image.Rect(t.Min.X, t.Min.Y, t.Min.X+nameW+2, t.Max.Y), p.Name, ink, AlignLeft)
+	if n := p.New; !n.Empty() {
+		box(n)
+		m := n.Min.Add(n.Max).Div(2)
+		c.Fill(image.Rect(m.X-9, m.Y-1, m.X+10, m.Y+2), Black) // +
+		c.Fill(image.Rect(m.X-1, m.Y-9, m.X+2, m.Y+10), Black)
+		nameW = n.Max.X - t.Min.X - 12
+	}
+	c.Text(a.F.Small, image.Rect(t.Min.X+nameW+28, t.Min.Y, t.Max.X, t.Max.Y), status, dim, AlignRight)
 	a.Mark(p.Title, true)
 }
 

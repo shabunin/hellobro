@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/vt"
 
 	"hellobro/kobo"
+	"hellobro/wm"
 )
 
 // HELLOBRO_TERM_RAW=in.raw HELLOBRO_TERM_PNG=out.png go test -run TestRenderRecording
@@ -31,11 +32,8 @@ func TestRenderRecording(t *testing.T) {
 	a.tf.setSize(termFontDefault)
 	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1872, 1404))}
 	a.C.Fill(a.C.Bounds(), kobo.White)
-	a.termP = kobo.NewPanel(a.F, "Terminal", image.Rect(16, 160, 1856, 1342), "") // where landscape puts it
-	a.termGeometry()
-	tr := &termSession{}
-	a.tv.groups[kindSSH].sessions = []*termSession{tr}
-	tr.pane.p = a.termP
+	tr := testTerm(a)
+	tr.pane.p = kobo.NewPanel(a.F, "Terminal", image.Rect(16, 160, 1856, 1342), "") // where landscape puts it
 	a.paneGeometry(tr)
 	v := &tr.pane
 	tr.emu = vt.NewSafeEmulator(v.cols, v.rows)
@@ -143,11 +141,8 @@ func TestRenderTouched(t *testing.T) {
 	a.tf.setSize(termFontDefault)
 	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1000, 700))}
 	a.C.Fill(a.C.Bounds(), kobo.White)
-	a.termP = kobo.NewPanel(a.F, "Terminal", image.Rect(10, 10, 990, 690), "")
-	a.termGeometry()
-	tr := &termSession{}
-	a.tv.groups[kindSSH].sessions = []*termSession{tr}
-	tr.pane.p = a.termP
+	tr := testTerm(a)
+	tr.pane.p = kobo.NewPanel(a.F, "Terminal", image.Rect(10, 10, 990, 690), "")
 	a.paneGeometry(tr)
 	v := &tr.pane
 	tr.emu = vt.NewSafeEmulator(v.cols, v.rows)
@@ -224,4 +219,15 @@ func TestRenderTouched(t *testing.T) {
 		}
 		v.shown, v.fullAt = shown, time.Now() // as it was: the next round is incremental again
 	}
+}
+
+// testTerm is a terminal window, the only one, and the terminals' cells
+// sized.
+func testTerm(a *bro) *termSession {
+	a.wm.tree = wm.New(a.C.Bounds(), wmTabH)
+	a.wm.wins = map[*wm.Node]window{}
+	tr := &termSession{}
+	a.wm.wins[a.wm.tree.Open(tr)] = tr
+	a.termGeometry()
+	return tr
 }

@@ -191,7 +191,7 @@ func (a *bro) shareTick() {
 	}
 	a.sharePoll()
 	a.drawShare()
-	if s.code != "" || a.Tab == tabRadio {
+	if s.code != "" || a.guiShows("settings") {
 		a.drawSettings() // the countdown
 	}
 }

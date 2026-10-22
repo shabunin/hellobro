@@ -72,11 +72,9 @@ func (a *bro) Wake() {
 
 // termKick has the sessions waiting to reconnect try now, from the start.
 func (a *bro) termKick() {
-	for _, g := range a.tv.groups {
-		for _, t := range g.sessions {
-			if t.state == termWaiting {
-				t.retries, t.retryAt = 0, time.Now()
-			}
+	for _, t := range a.terms() {
+		if t.state == termWaiting {
+			t.retries, t.retryAt = 0, time.Now()
 		}
 	}
 }

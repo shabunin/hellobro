@@ -9,6 +9,7 @@ package main
 import (
 	"image"
 	"log"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -174,26 +175,55 @@ func rewriteKeys(conf string, m keyMap, id string, keys []combo, reset bool) str
 			}
 		}
 	}
-	lines := slices.DeleteFunc(strings.Split(strings.TrimRight(conf, "\n"), "\n"), func(l string) bool {
+	// The default mode's lines go; the new ones come where they were, before
+	// the first other mode's.
+	var lines []string
+	at, mode := -1, ""
+	for _, l := range strings.Split(strings.TrimRight(conf, "\n"), "\n") {
 		line, _, _ := strings.Cut(l, "#")
 		f := strings.Fields(line)
-		if len(f) != 2 {
-			return false
+		if name, ok := strings.CutPrefix(strings.Join(f, " "), "["); ok && len(f) == 1 && strings.HasSuffix(name, "]") {
+			if mode = strings.TrimSuffix(name, "]"); mode == "default" {
+				mode = ""
+			} else if at < 0 {
+				at = len(lines)
+			}
 		}
-		_, changed := set[f[1]]
-		return f[1] == id || changed
-	})
+		if mode == "" && len(f) >= 2 {
+			_, cid := keyID(strings.Join(f[1:], " "))
+			if _, changed := set[cid]; cid == id || changed {
+				continue
+			}
+		}
+		lines = append(lines, l)
+	}
+	if at < 0 {
+		at = len(lines)
+	}
+	var add []string
+	ids := []string{}
 	for _, c := range commands {
-		ks, ok := set[c.id]
+		ids = append(ids, c.id)
+	}
+	for _, o := range slices.Sorted(maps.Keys(set)) { // keys.conf's own i3 lines
+		if !slices.Contains(ids, o) {
+			ids = append(ids, o)
+		}
+	}
+	for _, cid := range ids {
+		ks, ok := set[cid]
 		switch {
 		case !ok:
 		case len(ks) == 0:
-			lines = append(lines, "none "+c.id)
+			if commandByID(cid) != nil { // keys.conf's own just goes
+				add = append(add, "none "+cid)
+			}
 		default:
 			for _, k := range ks {
-				lines = append(lines, k.String()+" "+c.id)
+				add = append(add, k.String()+" "+cid)
 			}
 		}
 	}
+	lines = slices.Insert(lines, at, add...)
 	return strings.Join(lines, "\n") + "\n"
 }

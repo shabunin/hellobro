@@ -1,19 +1,16 @@
-// hellobro is a terminal for the Kobo Elipsa, for a Bluetooth keyboard.
+// hellobro is a terminal for the Kobo Elipsa, for a Bluetooth keyboard,
+// and a tiling window manager after i3 (wm.go): workspaces of windows,
+// side by side, tabbed, stacked or floating. A window is a terminal
+// (SSH, Alpine in a jail, the Kobo's own sh; a launcher till it runs
+// one: term.go) or one of the settings' (gui.go): Kobo's Wi-Fi and
+// Bluetooth, sharing with a computer (SFTP, ssh, mDNS), hellobro's
+// settings, the battery and what uses it.
 //
-// Tabs:
-//   - SSH: terminals (xterm emulation, PTY) over SSH, several at once,
-//     and the saved hosts' files, mounted (mount.go);
-//   - Shell: terminals with a shell on the Kobo itself;
-//   - Settings: Kobo's Wi-Fi and Bluetooth, sharing with a computer
-//     (SFTP, ssh, mDNS), and hellobro's sleep, status bar and the rest;
-//   - Power: the battery, and what uses it.
-//
-// A swipe along the right edge sets the font size, Ctrl+Shift+F gives
-// the session in focus the whole screen. Which tabs show, and in what order, is up
-// to the user (tabs.go), and so are the keys (commands.go). The music is
-// a Linux player's, in an Alpine session (mpris.go). The rest
-// (the screen, touch, the frontlight on the left edge, quitting) is the
-// kobo package's.
+// A swipe along the right edge sets the font size. The keys are i3's,
+// with Meta, and the user's to change (commands.go); i3's commands come
+// in on a socket too (ipc.go). The music is a Linux player's, in an
+// Alpine session (mpris.go). The rest (the screen, touch, the frontlight
+// on the left edge, quitting) is the kobo package's.
 //
 // Launch it through launch.sh, which keeps Nickel from drawing over us.
 package main
@@ -29,35 +26,22 @@ import (
 	"hellobro/radio"
 )
 
-const (
-	tabSSH = iota
-	tabShell
-	tabRadio
-	tabPower
-)
-
-var tabNames = []string{"SSH", "Shell", "Settings", "Power"}
-
-func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
-
 const termIdleTimeout = 20 * time.Minute // with a session up: reading a remote screen takes longer
 const relayIdle = 24 * time.Hour         // with the relay on: as good as never
 
-// bro is the app: the kobo.App, the terminals, the radios, and the
-// Linux players' remote control.
+// bro is the app: the kobo.App, the windows, the radios, and the Linux
+// players' remote control.
 type bro struct {
 	*kobo.App
+	wm     wmState
 	tf     termFonts
-	termP  kobo.Panel
 	tv     termView
 	font   *fontSwipe // a contact along the right edge, which may become a font swipe
 	media  mediaState
-	stat   statBar     // the terminal tabs' status bar
-	picker *picker     // the switcher, while it's up
-	asking *askBox     // a question, while it's up
-	info   *infoBox    // facts to read, while they're up
-	tabsEd *tabsEditor // the Tabs dialog, while it's up
-	tabs   tabsConf
+	stat   statBar  // the terminal tabs' status bar
+	picker *picker  // the switcher, while it's up
+	asking *askBox  // a question, while it's up
+	info   *infoBox // facts to read, while they're up
 	keys   keyMap
 	keyset *keySet // Settings' Keys: a key being asked for
 	rv     [2]radioPanelView
@@ -73,8 +57,7 @@ type bro struct {
 	share  shareState
 	relay  relayState
 	upd    updateState
-	folds  map[string]bool // the panels folded, by key (fold.go)
-	net    netState        // the header's network
+	net    netState // the header's network
 	pv     powerView
 	pw     powerState
 	lay    kobo.Layout // the last layout, to lay out again
@@ -108,17 +91,17 @@ func main() {
 	a.mem = loadRemembered(kobo.AppFile(""))
 	a.tv.hosts = a.mem.hosts()
 	radio.StateDir = kobo.AppFile("")
-	a.tabs = loadTabs()
-	a.folds = loadFolds()
-	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: tabNames, OwnKeys: true}, a)
+	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true}, a)
 	profileOn.Store(a.setting("profile") == "on")
 	alpineBus.Store(a.setting("alpine-bus") == "on")
 	a.applyLightIdle()
 	a.applyLightStart()
 	log.Printf("hellobro %s", version)
 	a.keys = loadKeys()
-	a.applyTabs()
+	a.applyFooter()
 	a.tf.setSize(termFontDefault)
+	a.wmInit()
+	a.termInit()
 	a.shareApply()
 	go a.watchPlayers() // the buses may be slow: never in the way of starting
 	a.Run()
@@ -126,80 +109,43 @@ func main() {
 
 func (a *bro) Layout(L kobo.Layout) {
 	a.lay = L
-	// The terminals' area: the sessions' panels go in it, the status bar
-	// under them. Fullscreen, no frames: the cells get it all.
+	// The windows' area: the page, less the gaps at its edges and the
+	// status bar under it. Full screen, the window has it all.
+	a.wm.area = L.Page.Inset(wmGap / 2)
 	if L.Full {
-		a.termP = kobo.Panel{Name: "Terminal", Outer: L.Page, Body: L.Page}
-	} else {
-		a.termP = kobo.Panel{Name: "Terminal", Outer: L.Body, Body: L.Body}
+		a.wm.area = L.Page
 	}
 	a.layoutStat()
 	if a.tv.cw != 0 {
-		a.termGeometry() // the terminal follows the new size
+		a.termGeometry() // the cells' size
 	}
-	a.layoutRadio(L)
-	a.layoutPower(L)
+	if a.wm.tree == nil {
+		return
+	}
+	if !L.Full && a.wm.tree.Fullscreen() != nil { // a swipe in from the edge left full screen
+		a.wm.tree.SetFullscreen(a.wm.tree.Fullscreen(), false)
+	}
+	a.wm.laid = ""
+	a.wmPlace()
+	a.wmFocusMoved()
 }
 
-func (a *bro) Draw() {
-	switch a.Tab {
-	case tabRadio:
-		a.rv[panelWiFi].shown, a.rv[panelBT].shown, a.sv.shown, a.shp.shown = "", "", "", ""
-		a.drawRadio()
-	case tabPower:
-		a.pv.shownBat, a.pv.shownUse = "", ""
-		a.drawPower()
-	default:
-		a.drawTerm()
-	}
-}
-
-func (a *bro) Enter(tab int) {
-	switch tab {
-	case tabRadio:
-		a.enterRadio()
-	case tabPower:
-		a.enterPower()
-	default:
-		a.enterTerm()
-	}
-}
+func (a *bro) Enter(tab int) {}
 
 func (a *bro) Tap(p image.Point) {
-	if a.asking != nil {
+	switch {
+	case a.asking != nil:
 		a.askTap(p)
-		return
-	}
-	if a.info != nil {
+	case a.info != nil:
 		a.infoTap(p)
-		return
-	}
-	if a.tabsEd != nil {
-		a.tabsTap(p)
-		return
-	}
-	if a.keyset != nil {
+	case a.keyset != nil:
 		a.keySetTap(p)
-		return
-	}
-	if a.picker != nil {
+	case a.picker != nil:
 		a.pickerTap(p)
-		return
-	}
-	if a.foldTap(p) {
-		return
-	}
-	if isTermTab(a.Tab) && p.In(a.stat.r) {
+	case p.In(a.stat.r):
 		a.mediaKey(kobo.KeyPlayPause)
-		return
-	}
-	switch a.Tab {
-	case tabRadio:
-		a.radioTap(p)
-	case tabPower:
-		a.powerTap(p)
 	default:
-		a.termTap(p)
+		a.wmTap(p)
 	}
 }
 
@@ -250,7 +196,7 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 			a.tv.mods = termMods{caps: a.tv.mods.caps}
 		}
 		return true
-	case kobo.IsMediaKey(m.Code): // the music's, on any tab, dozing too
+	case kobo.IsMediaKey(m.Code): // the music's, dozing too
 		if m.Value == 1 || m.Value == 2 && (m.Code == kobo.KeyVolumeUp || m.Code == kobo.KeyVolumeDown) {
 			log.Printf("media key %d from %s", m.Code, m.Dev)
 			a.mediaKey(m.Code)
@@ -264,32 +210,22 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 	case a.info != nil:
 		a.infoKey(m.Code, m.Value)
 		return true
-	case a.tabsEd != nil:
-		a.tabsKey(m.Code, m.Value)
-		return true
 	case a.keyset != nil:
 		a.keySetKey(m.Code, m.Value)
 		return true
 	case a.picker != nil:
 		a.pickerKey(m.Code, m.Value)
 		return true
-	case a.termMod(m.Code, m.Value): // kept track of on every tab, for the terminals
+	case a.termMod(m.Code, m.Value): // kept track of always, for the terminals
 		return true
 	case a.runKey(m.Code, m.Value): // ours, never the remote's
 		return true
+	case a.wm.mode != "": // a mode has its keys, and only those
+		return true
 	case a.focusKeyed(m.Code, m.Value): // Tab, and Enter on a button
 		return true
-	case a.focusFolded(): // a panel folded to its strip: Enter opens it, the rest waits
-		if m.Value == 1 && m.Code == kobo.KeyEnter {
-			a.foldFocused()
-		}
-		return true
-	case a.Tab == tabRadio:
-		return a.radioKey(m.Code, m.Value)
-	case a.Tab == tabPower:
-		return false
 	}
-	return a.termKey(m.Code, m.Value)
+	return a.wmKey(m.Code, m.Value)
 }
 
 func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
@@ -298,9 +234,10 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	case ev.Kind == kobo.TouchDown:
 		a.focusTouched(p)
 		switch {
-		case !isTermTab(a.Tab):
+		case a.overlay():
 		case !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth:
 			a.font = &fontSwipe{g: g}
+		case a.wmTouch(p, g):
 		default:
 			a.selStart(p, g)
 		}
@@ -319,7 +256,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 }
 
 func (a *bro) Lift(g *kobo.Gesture) {
-	if a.selLift(g) {
+	if a.selLift(g) || a.wmDragLift(g) {
 		return
 	}
 	if f := a.font; f != nil && f.g == g {
@@ -330,9 +267,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 			return
 		}
 	}
-	switch {
-	case g.Tap || g.Pen || a.overlay() || a.Tab == tabRadio || a.Tab == tabPower:
-	default:
+	if !g.Tap && !g.Pen && !a.overlay() {
 		a.termSwipe(g.Start, g.Last)
 	}
 }

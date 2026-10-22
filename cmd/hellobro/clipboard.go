@@ -81,10 +81,10 @@ func (a *bro) paste(text, what string) {
 		a.drawPicker()
 	case a.overlay():
 		return
-	case a.Tab == tabRadio && a.rs.prompt != nil:
+	case a.rs.prompt != nil && (a.guiFocused("wifi") || a.guiFocused("bluetooth")):
 		a.rs.prompt.answer += line
 		a.drawRadioPanel(a.rs.prompt.panel)
-	case !isTermTab(a.Tab) || t == nil:
+	case t == nil:
 		a.Notify("nothing to paste into here")
 		return
 	case t.prompt != nil:

@@ -76,7 +76,7 @@ var settingList = []setting{
 	{key: "notify-light", label: "… the light, if it's off", title: "Notifications: the light, if it's off",
 		values: []string{"1", "3", "off"},
 		shown:  []string{"on for 1 s", "on for 3 s", "stays off"}},
-	{key: "notify-blink", label: "… the session's strip, if it shows", title: "Notifications: the session's strip, if it shows",
+	{key: "notify-blink", label: "… the window's strip, if it shows", title: "Notifications: the window's strip, if it shows",
 		values: []string{"3", "1", "5", "off"},
 		shown:  []string{"blinks 3 times", "blinks once", "blinks 5 times", "stays still"}},
 	{key: "notify-note", label: "… a note in the corner, if it doesn't", title: "Notifications: a note in the corner, if it doesn't",
@@ -84,17 +84,13 @@ var settingList = []setting{
 		shown:  []string{"for 3 s", "for 5 s", "for 10 s", "none"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
-		shown:  []string{"shown on the terminals", "hidden"}},
-	{key: "shell", group: "Shell", label: "Shell tab runs",
-		values: []string{"kobo", "alpine"},
-		shown:  []string{"the Kobo's /bin/sh, as root", "Alpine Linux, in a jail"}},
-	{key: "alpine-bus", label: "… Alpine: system bus access", title: "Alpine: system bus access",
+		shown:  []string{"shown", "hidden"}},
+	{key: "alpine-bus", group: "Alpine", label: "System bus access", title: "Alpine: system bus access",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
-	{key: "alpine-remove", label: "… Alpine: remove it", title: "Alpine: remove it",
+	{key: "alpine-remove", label: "Remove it", title: "Alpine: remove it",
 		values: []string{""}, shown: []string{""}}, // the question: alpine.go
-	{key: "tabs", group: "Tabs and keys", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
-	{key: "keys", label: "Keys", values: []string{""}, shown: []string{""}},                         // the Keys menu: keyset.go
+	{key: "keys", group: "Keys", label: "Keys", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
 }
 
 // setLine is a line of the panel: a group's heading, or setting i.
@@ -226,8 +222,6 @@ func (a *bro) setting(key string) string {
 			switch key {
 			case "status-bar":
 				return map[bool]string{false: "on", true: "off"}[a.stat.off]
-			case "tabs":
-				return a.tabs.String()
 			case "keys":
 				return fmt.Sprint(a.keys.named)
 			}
@@ -247,9 +241,6 @@ func (a *bro) settingMinutes(key string) time.Duration {
 func (a *bro) stepSetting(i, d int) {
 	st := settingList[i]
 	switch st.key {
-	case "tabs":
-		a.openTabs()
-		return
 	case "keys":
 		a.openKeys(nil)
 		return
@@ -291,12 +282,13 @@ func (a *bro) stepSetting(i, d int) {
 	a.drawSettings()
 }
 
-func (a *bro) layoutSettings(K kobo.Layout, r image.Rectangle, folded bool) {
+// placeSettings puts the Settings window at p.
+func (a *bro) placeSettings(p kobo.Panel) {
 	v := &a.sv
-	v.p = a.pagePanel(K, "Settings", r, folded)
+	v.p = p
 	b := v.p.Body.Inset(kobo.Pad)
 	v.rows = v.rows[:0]
-	if folded {
+	if p.Outer.Empty() || b.Dy() < 120 {
 		v.hint, v.shown = image.Rectangle{}, ""
 		return
 	}
@@ -313,11 +305,11 @@ func (a *bro) layoutSettings(K kobo.Layout, r image.Rectangle, folded bool) {
 }
 
 func (a *bro) drawSettings() {
-	if !a.showingRadio() {
+	v, c := &a.sv, a.C
+	if !a.guiShows("settings") || len(v.rows) == 0 {
 		return
 	}
-	v, c := &a.sv, a.C
-	focused := a.rs.focus == panelSet
+	focused := a.guiFocused("settings")
 	var vals []string
 	for _, st := range settingList {
 		vals = append(vals, a.setting(st.key))
@@ -339,10 +331,7 @@ func (a *bro) drawSettings() {
 		return
 	}
 	v.shown = key
-	p := v.p
-	if focused {
-		p.Name = "► " + p.Name
-	}
+	p := a.winPanel(v.p, focused)
 	a.DrawPanel(p, "")
 	for k, rr := range v.rows {
 		if l := settingLines[v.top+k]; l.head != "" {
@@ -370,8 +359,6 @@ func (a *bro) drawSettings() {
 		switch {
 		case st.key == "share" && a.share.code != "":
 			shown = "pairing: code " + a.share.code
-		case st.key == "tabs":
-			shown = a.tabsSummary()
 		case st.key == "alpine-remove":
 			shown = alpineSummary()
 		case st.key == "keys" && len(a.keys.named) == 0:
@@ -385,7 +372,7 @@ func (a *bro) drawSettings() {
 		t.Max.X -= vw + 20
 		c.Text(a.F.Body, t, a.settingLabel(st), fg, kobo.AlignLeft)
 	}
-	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Ctrl+Tab: the next panel."
+	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter)."
 	switch {
 	case v.top+n < len(settingLines): // a short screen
 		hint = fmt.Sprintf("▼ %d more: tap here, or ↓", len(settingLines)-v.top-n)

@@ -99,43 +99,30 @@ type radioReply struct {
 
 var factsOnce sync.Once
 
-func (a *bro) layoutRadio(K kobo.Layout) {
-	v := &a.rv
-	fw, fb, fh, fs := a.folded("wifi"), a.folded("bluetooth"), a.folded("sharing"), a.folded("settings")
-	rows := []kobo.Row{ // Bluetooth and sharing side by side: room for most of the settings
-		{Height: 30, Folded: []bool{fw}}, {Height: 34, Widths: []int{50, 50}, Folded: []bool{fb, fh}}, {Height: 36, Folded: []bool{fs}}}
-	if K.Landscape { // the radios side by side, sharing and the settings under them
-		rows = []kobo.Row{{Height: 50, Widths: []int{50, 50}, Folded: []bool{fw, fb}}, {Height: 50, Widths: []int{45, 55}, Folded: []bool{fh, fs}}}
+// placeRadio puts Wi-Fi's window (i panelWiFi) or Bluetooth's at p.
+func (a *bro) placeRadio(i int, p kobo.Panel) {
+	pv := &a.rv[i]
+	pv.p, pv.shown = p, ""
+	if p.Outer.Empty() || p.Body.Dy() < 300 { // nothing in it to draw or tap
+		pv.ctl, pv.info, pv.list, pv.acts, pv.rowsOn = nil, image.Rectangle{}, image.Rectangle{}, image.Rectangle{}, 1
+		pv.rows, pv.buttons, pv.input = nil, nil, image.Rectangle{}
+		return
 	}
-	at, f := tile(K, a.rs.focus, rows...)
-	a.layoutShare(K, at[panelShare], f[panelShare])
-	a.layoutSettings(K, at[panelSet], f[panelSet])
-	v[panelWiFi].p = a.pagePanel(K, "Wi-Fi", at[0], f[0])
-	v[panelBT].p = a.pagePanel(K, "Bluetooth", at[1], f[1])
-	for i := range v {
-		pv := &v[i]
-		if pv.p.Folded { // nothing in it to draw or tap
-			pv.ctl, pv.info, pv.list, pv.acts, pv.rowsOn, pv.shown = nil, image.Rectangle{}, image.Rectangle{}, image.Rectangle{}, 1, ""
-			pv.rows, pv.buttons, pv.input = nil, nil, image.Rectangle{}
-			continue
-		}
-		b := pv.p.Body.Inset(kobo.Pad)
-		n := 4
-		if i == panelBT {
-			n = 2
-		}
-		pv.ctl = pv.ctl[:0]
-		bw := min(250, (b.Dx()-12*(n-1))/n)
-		for j := range n {
-			x := b.Min.X + j*(bw+12)
-			pv.ctl = append(pv.ctl, image.Rect(x, b.Min.Y, x+bw, b.Min.Y+64))
-		}
-		pv.info = image.Rect(b.Min.X, b.Min.Y+76, b.Max.X, b.Min.Y+76+72)
-		pv.acts = image.Rect(b.Min.X, b.Max.Y-118, b.Max.X, b.Max.Y)
-		pv.list = image.Rect(b.Min.X, pv.info.Max.Y+8, b.Max.X, pv.acts.Min.Y-8)
-		pv.rowsOn = max(1, pv.list.Dy()/radioRowH)
-		pv.shown = ""
+	b := pv.p.Body.Inset(kobo.Pad)
+	n := 4
+	if i == panelBT {
+		n = 2
 	}
+	pv.ctl = pv.ctl[:0]
+	bw := min(250, (b.Dx()-12*(n-1))/n)
+	for j := range n {
+		x := b.Min.X + j*(bw+12)
+		pv.ctl = append(pv.ctl, image.Rect(x, b.Min.Y, x+bw, b.Min.Y+64))
+	}
+	pv.info = image.Rect(b.Min.X, b.Min.Y+76, b.Max.X, b.Min.Y+76+72)
+	pv.acts = image.Rect(b.Min.X, b.Max.Y-118, b.Max.X, b.Max.Y)
+	pv.list = image.Rect(b.Min.X, pv.info.Max.Y+8, b.Max.X, pv.acts.Min.Y-8)
+	pv.rowsOn = max(1, pv.list.Dy()/radioRowH)
 }
 
 func (a *bro) enterRadio() {
@@ -144,9 +131,8 @@ func (a *bro) enterRadio() {
 	a.sharePoll()
 }
 
-func (a *bro) showingRadio() bool {
-	return a.Tab == tabRadio && !a.Calibrating() && !a.overlay() && !a.Dozing()
-}
+// showingRadio says whether Wi-Fi's or Bluetooth's window shows.
+func (a *bro) showingRadio() bool { return a.guiShows("wifi") || a.guiShows("bluetooth") }
 
 // radioPoll reads both radios' state, off the UI, and redraws what
 // changed; scan also asks Wi-Fi for the networks around.
@@ -236,7 +222,7 @@ func (a *bro) radioTick() {
 	if !r.discoverTo.IsZero() {
 		every = 1500 * time.Millisecond // devices turn up
 	}
-	if a.Tab == tabRadio && !r.polling && time.Since(r.polledAt) > every {
+	if a.showingRadio() && !r.polling && time.Since(r.polledAt) > every {
 		a.radioPoll(false)
 	}
 }
@@ -475,6 +461,7 @@ func (a *bro) radioAsk(p *radioPrompt) {
 	}
 	a.rs.prompt = p
 	a.rs.focus = p.panel
+	a.openGUI([]string{"wifi", "bluetooth"}[p.panel]) // where it's asked
 	a.drawRadio()
 }
 
@@ -567,36 +554,9 @@ func (a *bro) drawRadio() {
 	a.drawSettings()
 }
 
-func (a *bro) radioFolded(i int) bool {
-	switch i {
-	case panelSet:
-		return a.sv.p.Folded
-	case panelShare:
-		return a.shp.p.Folded
-	}
-	return a.rv[i].p.Folded
-}
-
-// radioStep moves the focus to the next panel (d -1: the one before),
-// folded or not.
-func (a *bro) radioStep(d int) {
-	a.rs.focus = (a.rs.focus + d + 4) % 4
-	a.focusMoved()
-}
-
-// radioFocusOpen moves the focus off a folded panel, to an open one.
-func (a *bro) radioFocusOpen() {
-	r := &a.rs
-	for range 4 {
-		if !a.radioFolded(r.focus) {
-			return
-		}
-		r.focus = (r.focus + 1) % 4
-	}
-}
-
 func (a *bro) drawRadioPanel(i int) {
-	if !a.showingRadio() {
+	win := []string{"wifi", "bluetooth"}[i]
+	if !a.guiShows(win) || a.rv[i].list.Empty() {
 		return
 	}
 	r, pv, c := &a.rs, &a.rv[i], a.C
@@ -757,7 +717,7 @@ func (a *bro) drawRadioPanel(i int) {
 		*top = *sel - pv.rowsOn + 1
 	}
 	*top = max(0, min(*top, len(rows)-pv.rowsOn))
-	focused := r.focus == i
+	focused := a.guiFocused(win)
 	prompt := r.prompt
 	if prompt != nil && prompt.panel != i {
 		prompt = nil
@@ -776,15 +736,8 @@ func (a *bro) drawRadioPanel(i int) {
 	}
 	pv.shown, pv.input, pv.typed = key, image.Rectangle{}, "\x00"
 
-	p := pv.p
-	if focused {
-		p.Name = "► " + p.Name
-	}
+	p := a.winPanel(pv.p, focused)
 	a.DrawPanel(p, status)
-	if p.Folded {
-		pv.rows, pv.buttons = nil, nil
-		return
-	}
 	for j, label := range ctl {
 		b := pv.ctl[j]
 		c.Fill(b, kobo.White)
@@ -871,7 +824,7 @@ func (a *bro) drawRadioPanel(i int) {
 			a.drawRadioInput(pv, prompt)
 		}
 	} else {
-		hint := "Tap a row, or ↑ ↓ and Enter; Ctrl+Tab: the next panel; f: forget; s: scan; o: on/off."
+		hint := "Tap a row, or ↑ ↓ and Enter; f: forget; s: scan; o: on/off."
 		if i == panelWiFi {
 			hint = strings.TrimSuffix(hint, ".") + "; i: info."
 		}
@@ -962,19 +915,11 @@ func (a *bro) radioPromptButton(label string) {
 
 func (a *bro) radioTap(pt image.Point) {
 	r := &a.rs
-	if pt.In(a.sv.p.Outer) && r.prompt == nil {
-		if r.focus != panelSet {
-			r.focus = panelSet
-			defer a.drawRadio()
-		}
+	if pt.In(a.sv.p.Outer) {
 		a.settingsTap(pt)
 		return
 	}
-	if pt.In(a.shp.p.Outer) && r.prompt == nil {
-		if r.focus != panelShare {
-			r.focus = panelShare
-			defer a.drawRadio()
-		}
+	if pt.In(a.shp.p.Outer) {
 		a.shareTap(pt)
 		return
 	}
@@ -982,10 +927,6 @@ func (a *bro) radioTap(pt image.Point) {
 		pv := &a.rv[i]
 		if !pt.In(pv.p.Outer) {
 			continue
-		}
-		if r.focus != i && r.prompt == nil {
-			r.focus = i
-			defer a.drawRadio()
 		}
 		for _, b := range pv.buttons {
 			if kobo.Hit(pt, b.r) {

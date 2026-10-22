@@ -8,7 +8,6 @@ package main
 
 import (
 	"log"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -73,8 +72,7 @@ func (a *bro) termNotify(t *termSession, msg string) {
 		return
 	}
 	t.notifyAt = time.Now()
-	g := &a.tv.groups[t.kind]
-	name := sessionName(t.kind, slices.Index(g.sessions, t))
+	name := t.name()
 	if msg == "" {
 		msg = "bell"
 	}

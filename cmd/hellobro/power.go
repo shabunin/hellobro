@@ -385,33 +385,31 @@ func mhz(khz int) string {
 
 // --- the tab ---
 
-func (a *bro) layoutPower(K kobo.Layout) {
+// placeBattery puts the Battery window at p.
+func (a *bro) placeBattery(p kobo.Panel) {
 	v := &a.pv
-	fb, fu := a.folded("battery"), a.folded("usage")
-	rows := []kobo.Row{{Height: 45, Folded: []bool{fb}}, {Height: 55, Folded: []bool{fu}}}
-	if K.Landscape {
-		rows = []kobo.Row{{Height: 100, Widths: []int{50, 50}, Folded: []bool{fb, fu}}}
+	v.batP, v.shownBat = p, ""
+	v.text, v.graph = image.Rectangle{}, image.Rectangle{}
+	if p.Outer.Empty() {
+		return
 	}
-	at, f := tile(K, map[bool]int{false: 0, true: 1}[v.useFocus], rows...)
-	v.batP = a.pagePanel(K, "Battery", at[0], f[0])
-	v.useP = a.pagePanel(K, "What uses it", at[1], f[1])
-	v.shownBat, v.shownUse = "", ""
-	v.text, v.graph, v.useText = image.Rectangle{}, image.Rectangle{}, image.Rectangle{}
-	if !f[0] {
-		b := v.batP.Body.Inset(kobo.Pad)
-		v.text = image.Rect(b.Min.X, b.Min.Y, b.Max.X, min(b.Max.Y, b.Min.Y+64+4*40+8))
-		if g := image.Rect(b.Min.X, v.text.Max.Y+12, b.Max.X, b.Max.Y); g.Dy() >= 120 {
-			v.graph = g
-		}
+	b := v.batP.Body.Inset(kobo.Pad)
+	v.text = image.Rect(b.Min.X, b.Min.Y, b.Max.X, min(b.Max.Y, b.Min.Y+64+4*40+8))
+	if g := image.Rect(b.Min.X, v.text.Max.Y+12, b.Max.X, b.Max.Y); g.Dy() >= 120 {
+		v.graph = g
 	}
-	if !f[1] {
+}
+
+// placeUsage puts What uses it at p.
+func (a *bro) placeUsage(p kobo.Panel) {
+	v := &a.pv
+	v.useP, v.shownUse, v.useText = p, "", image.Rectangle{}
+	if !p.Outer.Empty() {
 		v.useText = v.useP.Body.Inset(kobo.Pad)
 	}
 }
 
-func (a *bro) showingPower() bool {
-	return a.Tab == tabPower && !a.Calibrating() && !a.overlay() && !a.Dozing()
-}
+func (a *bro) showingPower() bool { return a.guiShows("battery") || a.guiShows("usage") }
 
 func (a *bro) enterPower() {
 	a.powerSample()
@@ -467,9 +465,6 @@ func (a *bro) powerSample() {
 }
 
 func (a *bro) drawPower() {
-	if !a.showingPower() {
-		return
-	}
 	a.drawBattery()
 	a.drawUsage()
 }
@@ -498,6 +493,9 @@ func (a *bro) drawLines(r image.Rectangle, lines []textLine) {
 
 func (a *bro) drawBattery() {
 	v, ps := &a.pv, &a.pw
+	if !a.guiShows("battery") {
+		return
+	}
 	b := ps.bat
 	var lines []textLine
 	status := ""
@@ -535,15 +533,13 @@ func (a *bro) drawBattery() {
 			lines = append(lines, textLine{"measured: in a while (a sample a minute)", kobo.Mid, false})
 		}
 	}
-	key := fmt.Sprint(status, lines, len(ps.hist), v.useFocus)
+	focused := a.guiFocused("battery")
+	key := fmt.Sprint(status, lines, len(ps.hist), focused)
 	if key == v.shownBat {
 		return
 	}
 	v.shownBat = key
-	a.DrawPanel(focusMark(v.batP, !v.useFocus), status)
-	if v.batP.Folded {
-		return
-	}
+	a.DrawPanel(a.winPanel(v.batP, focused), status)
 	a.drawLines(v.text, lines)
 	a.drawGraph(v.graph, ps.hist)
 	a.Mark(v.batP.Outer, true)
@@ -599,6 +595,9 @@ func (a *bro) drawGraph(r image.Rectangle, h []batSample) {
 
 func (a *bro) drawUsage() {
 	v, ps := &a.pv, &a.pw
+	if !a.guiShows("usage") {
+		return
+	}
 	u := ps.use
 	var lines []textLine
 	add := func(g uint8, format string, args ...any) {
@@ -627,15 +626,13 @@ func (a *bro) drawUsage() {
 			add(kobo.Black, "%6.1f%%   %s", p.v, p.name)
 		}
 	}
-	key := fmt.Sprint(lines, v.useFocus)
+	focused := a.guiFocused("usage")
+	key := fmt.Sprint(lines, focused)
 	if key == v.shownUse {
 		return
 	}
 	v.shownUse = key
-	a.DrawPanel(focusMark(v.useP, v.useFocus), fmt.Sprintf("every %d s", int(powerEvery.Seconds())))
-	if v.useP.Folded {
-		return
-	}
+	a.DrawPanel(a.winPanel(v.useP, focused), fmt.Sprintf("every %d s", int(powerEvery.Seconds())))
 	a.drawLines(v.useText, lines)
 	a.Mark(v.useP.Outer, true)
 }
@@ -698,10 +695,4 @@ func nonEmpty(ss ...string) []string {
 	return slices.DeleteFunc(ss, func(s string) bool { return s == "" })
 }
 
-func (a *bro) powerTap(p image.Point) {
-	v := &a.pv
-	if use := p.In(v.useP.Outer); use != v.useFocus && (use || p.In(v.batP.Outer)) { // the panel tapped takes the focus
-		v.useFocus = use
-		a.drawPower()
-	}
-}
+func (a *bro) powerTap(p image.Point) {}

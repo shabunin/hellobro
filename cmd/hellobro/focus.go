@@ -1,15 +1,13 @@
 package main
 
-// The keys' focus, as on a desktop: Tab moves it through the page's
-// controls (the tab strip, the buttons, the lists), Shift+Tab back, and
-// a dashed ring shows where it is. Ctrl+Tab goes to the next panel. On
-// a panel's − box ← folds it (as Enter does), and on a folded one's strip
-// → opens it.
-// Enter or Space presses the button in focus (it's a tap on it); a list
-// takes the arrows, PgUp/PgDn and the page's letters, as before; on the
-// tab strip ← → change tabs. The ring shows once Tab is used; a touch
-// takes it away (and the focus goes where it touched). The terminals keep
-// Tab: it's the shell's.
+// The keys' focus within a settings' window, as on a desktop: Tab moves
+// it through the window's controls (the buttons, the lists), Shift+Tab
+// back, and a dashed ring shows where it is. Enter or Space presses the
+// button in focus (it's a tap on it); a list takes the arrows, PgUp/PgDn
+// and the window's letters, as before. The ring shows once Tab is used;
+// a touch takes it away (and the focus goes where it touched). The
+// terminals keep Tab: it's the shell's. Between the windows the focus
+// moves with Meta and the arrows (wm.go).
 
 import (
 	"image"
@@ -21,138 +19,90 @@ import (
 
 // control is a stop for Tab.
 type control struct {
-	id    string          // the same from one draw to the next: "wifi.list", "files.open"
-	r     image.Rectangle // as drawn
-	panel string          // the foldable it's in; "" for the tab strip
-	list  bool            // its keys are the page's: the arrows move in it, Enter picks
+	id   string          // the same from one draw to the next: "wifi.list", "wifi.scan"
+	r    image.Rectangle // as drawn
+	list bool            // its keys are the window's: the arrows move in it, Enter picks
 }
 
 type focusState struct {
-	at   map[int]string // the control in focus, by tab
-	ring bool           // shown: Tab was used, and no touch since
+	at   string // the control in focus
+	win  window // whose it is
+	ring bool   // shown: Tab was used, and no touch since
 }
 
-// controls are the current page's, in Tab's order: the tab strip, then
-// each panel's, left to right and down. A folded panel is its strip, and
-// Enter opens it.
-func (a *bro) controls() []control {
+// controls are w's, in Tab's order: left to right and down.
+func (a *bro) controls(w window) []control {
+	g, ok := w.(*guiWin)
+	if !ok || g.panel(a).Outer.Empty() {
+		return nil
+	}
 	var cs []control
-	add := func(panel, id string, r image.Rectangle, list bool) {
+	add := func(id string, r image.Rectangle, list bool) {
 		if !r.Empty() {
-			cs = append(cs, control{id, r, panel, list})
+			cs = append(cs, control{g.key + "." + id, r, list})
 		}
 	}
-	add("", "tabs", a.TabRect(a.Tab), false)
-	// panel adds a panel's title button and its − box, or its strip if
-	// folded: true if that's all of it.
-	panel := func(key string) bool {
-		p := a.foldPanel(key)
-		if p.Folded {
-			add(key, key+".strip", p.Title, false)
-			return true
-		}
-		add(key, key+".button", p.Button, false)
-		add(key, key+".fold", p.Fold, false)
-		return false
-	}
-	buttons := func(key string, bs []radioButton) {
+	buttons := func(bs []radioButton) {
 		for _, b := range bs {
-			add(key, key+"."+b.label, b.r, false)
+			add(b.label, b.r, false)
 		}
 	}
-	switch a.Tab {
-	case tabRadio:
-		if p := a.rs.prompt; p != nil { // a question: its box and buttons, till it's answered
-			cs = cs[:0]
-			key := []string{"wifi", "bluetooth"}[p.panel]
-			pv := &a.rv[p.panel]
-			add(key, key+".input", pv.input, true)
+	switch g.key {
+	case "wifi", "bluetooth":
+		i := radioPanelOf(g.key)
+		pv := &a.rv[i]
+		if p := a.rs.prompt; p != nil && p.panel == i { // a question: its box and buttons, till it's answered
+			add("input", pv.input, true)
 			bs := slices.Clone(pv.buttons) // drawn from the right
 			slices.Reverse(bs)
-			buttons(key, bs)
-			return cs
+			buttons(bs)
+			break
 		}
-		for i, key := range []string{"wifi", "bluetooth"} {
-			if panel(key) {
-				continue
-			}
-			pv := &a.rv[i]
-			for j, r := range pv.ctl {
-				add(key, key+".ctl"+strconv.Itoa(j), r, false)
-			}
-			add(key, key+".list", pv.list, true)
-			buttons(key, pv.buttons)
+		for j, r := range pv.ctl {
+			add("ctl"+strconv.Itoa(j), r, false)
 		}
-		if !panel("sharing") {
-			buttons("sharing", a.shp.btns)
+		add("list", pv.list, true)
+		buttons(pv.buttons)
+	case "sharing":
+		buttons(a.shp.btns)
+	case "settings":
+		if len(a.sv.rows) > 0 {
+			add("list", a.sv.rows[0].Union(a.sv.rows[len(a.sv.rows)-1]), true)
 		}
-		if !panel("settings") && len(a.sv.rows) > 0 {
-			add("settings", "settings.list", a.sv.rows[0].Union(a.sv.rows[len(a.sv.rows)-1]), true)
-		}
-	case tabPower:
-		panel("battery")
-		panel("usage")
 	}
 	return cs
 }
 
-// focused is the control in focus among cs: the one Tab got to, or else
-// the panel in focus's list (or its first control). -1: none.
-func (a *bro) focused(cs []control) int {
-	if i := slices.IndexFunc(cs, func(c control) bool { return c.id == a.fs.at[a.Tab] }); i >= 0 {
-		return i
-	}
-	k, first := a.focusKey(), -1
-	for i, c := range cs {
-		if c.panel == k && c.list {
+// focused is the control in focus among cs, w's: the one Tab got to, or
+// else w's list (or its first control). -1: none.
+func (a *bro) focused(w window, cs []control) int {
+	if a.fs.win == w {
+		if i := slices.IndexFunc(cs, func(c control) bool { return c.id == a.fs.at }); i >= 0 {
 			return i
 		}
-		if c.panel == k && first < 0 {
-			first = i
-		}
 	}
-	if first < 0 && len(cs) > 0 {
-		first = 0
+	if i := slices.IndexFunc(cs, func(c control) bool { return c.list }); i >= 0 {
+		return i
 	}
-	return first
-}
-
-// focusTo moves the focus to c, and the panel focus with it.
-func (a *bro) focusTo(c control) {
-	if a.fs.at == nil {
-		a.fs.at = map[int]string{}
+	if len(cs) > 0 {
+		return 0
 	}
-	a.fs.at[a.Tab] = c.id
-	if c.panel == "" || c.panel == a.focusKey() {
-		return
-	}
-	switch c.panel {
-	case "battery", "usage":
-		a.pv.useFocus = c.panel == "usage"
-	default:
-		if a.rs.prompt != nil { // the question's panel keeps it
-			return
-		}
-		a.rs.focus = radioPanelOf(c.panel)
-	}
-	a.focusMoved()
+	return -1
 }
 
 // focusKeyed takes the keys that move the focus or press what's in it;
-// false leaves a key to the page.
+// false leaves a key to the window.
 func (a *bro) focusKeyed(code uint16, value int32) bool {
-	if isTermTab(a.Tab) || value == 0 {
+	w := a.focusedWin()
+	cs := a.controls(w)
+	if value == 0 || len(cs) == 0 {
 		return false
 	}
 	m := &a.tv.mods
-	cs := a.controls()
-	i := a.focused(cs)
-	if i < 0 {
-		return false
-	}
-	// Only a control moved to (or touched) takes Enter or the arrows: the
-	// one in focus by default may be a button nobody meant to press.
-	c, chosen := cs[i], cs[i].id == a.fs.at[a.Tab]
+	i := a.focused(w, cs)
+	// Only a control moved to (or touched) takes Enter: the one in focus by
+	// default may be a button nobody meant to press.
+	c, chosen := cs[i], a.fs.win == w && cs[i].id == a.fs.at
 	switch {
 	case code == kobo.KeyTab && !m.ctrl && !m.alt && !m.meta:
 		d := 1
@@ -160,42 +110,11 @@ func (a *bro) focusKeyed(code uint16, value int32) bool {
 			d = -1
 		}
 		a.fs.ring = true
-		a.focusTo(cs[(i+d+len(cs))%len(cs)])
+		a.fs.at, a.fs.win = cs[(i+d+len(cs))%len(cs)].id, w
 		a.updateRing()
 		return true
 	case !chosen:
 		return false
-	case c.id == "tabs":
-		tabs := a.Tabs()
-		at := slices.Index(tabs, a.Tab)
-		to := at
-		switch code {
-		case keyLeft:
-			to = max(0, at-1)
-		case keyRight:
-			to = min(len(tabs)-1, at+1)
-		case keyHome:
-			to = 0
-		case keyEnd:
-			to = len(tabs) - 1
-		default:
-			return false
-		}
-		if to != at {
-			a.SwitchTab(tabs[to])
-			if !isTermTab(a.Tab) { // the strip keeps the focus; a terminal takes the keys
-				a.focusTo(control{id: "tabs"})
-			}
-		}
-		return true
-	case c.id == c.panel+".fold" && code == keyLeft, c.id == c.panel+".strip" && code == keyRight:
-		if value == 1 {
-			fold := code == keyLeft
-			a.setFold(c.panel, fold)
-			a.focusTo(control{id: c.panel + map[bool]string{true: ".strip", false: ".fold"}[fold], panel: c.panel})
-			a.updateRing()
-		}
-		return true
 	case !c.list && (code == kobo.KeyEnter || code == kobo.KeySpace):
 		if value == 1 {
 			a.Tap(c.r.Min.Add(c.r.Size().Div(2)))
@@ -208,12 +127,13 @@ func (a *bro) focusKeyed(code uint16, value int32) bool {
 // focusTouched moves the focus to what was touched, and hides the ring.
 func (a *bro) focusTouched(p image.Point) {
 	a.fs.ring = false
-	if isTermTab(a.Tab) || a.overlay() {
+	if a.overlay() {
 		return
 	}
-	for _, c := range a.controls() {
+	w := a.windowAt(p)
+	for _, c := range a.controls(w) {
 		if p.In(c.r) {
-			a.focusTo(c)
+			a.fs.at, a.fs.win = c.id, w
 			return
 		}
 	}
@@ -223,13 +143,11 @@ func (a *bro) focusTouched(p image.Point) {
 // go. It's looked at every tick.
 func (a *bro) updateRing() {
 	var r image.Rectangle
-	if a.fs.ring && !isTermTab(a.Tab) && !a.overlay() && !a.Calibrating() && !a.Dozing() {
-		cs := a.controls()
-		if i := a.focused(cs); i >= 0 {
+	if a.fs.ring && !a.overlay() && !a.Calibrating() && !a.Dozing() {
+		w := a.focusedWin()
+		cs := a.controls(w)
+		if i := a.focused(w, cs); i >= 0 {
 			r = cs[i].r.Inset(-kobo.RingOut)
-			if cs[i].id == "tabs" { // tabs touch: inside it
-				r = cs[i].r.Inset(kobo.RingOut)
-			}
 		}
 	}
 	a.SetRing(r)

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"slices"
 	"strings"
 	"testing"
 )
@@ -51,7 +50,7 @@ func TestDefaultKeys(t *testing.T) {
 		t.Fatal(errs)
 	}
 	for _, c := range commands {
-		if len(m.keys[c.id]) != len(c.keys) {
+		if c.mode == "" && len(m.keys[c.id]) != len(c.keys) {
 			t.Errorf("%s: keys %v, want %v", c.id, m.keys[c.id], c.keys)
 		}
 	}
@@ -62,85 +61,101 @@ func TestDefaultKeys(t *testing.T) {
 		}
 		ids[c.id] = true
 	}
+	// No key runs two commands by default: the first would hide the other.
+	for k, cs := range m.bind {
+		if len(cs) > 1 && cs[0].when == nil {
+			t.Errorf("%s: %s and %s", k, cs[0].id, cs[1].id)
+		}
+	}
+	if b := m.modes["resize"]; len(b) != 11 {
+		t.Errorf("resize mode: %d keys, want 11", len(b))
+	}
+	// Uncommented, every line of the defaults reads as it says.
+	var lines []string
+	for _, l := range strings.Split(defaultKeysConf(), "\n") {
+		if l, ok := strings.CutPrefix(l, "# "); ok && (strings.Contains(l, " # ") || l == "[resize]") {
+			lines = append(lines, l)
+		}
+	}
+	if _, errs := parseKeys(strings.Join(lines, "\n")); len(errs) > 0 {
+		t.Errorf("uncommented: %v", errs)
+	}
 }
 
 func TestParseKeys(t *testing.T) {
 	m, errs := parseKeys(`
 # a comment
-f5 tab.next  # a comment too
-ctrl+tab tab.next
+f5 workspace next  # a comment too
+meta+tab workspace next
 ctrl+shift+p palette
-ctrl+shift+p -
-ctrl+shift+f -
+meta+d -
+meta+f -
 ctrl+alt+9 nope
 oops
+ctrl+alt+1 tab.1
+ctrl+shift+t session.new
+meta+t layout tabbed; focus parent
+[resize]
+x mode default
+meta+r -
+[default]
+f6 [class="terminal"] focus
 `)
 	if len(errs) != 2 {
 		t.Errorf("errors: %q, want 2", errs)
 	}
-	ids := func(s string) []string {
+	ids := func(mode, s string) []string {
 		k, _ := parseKey(s)
+		b := m.bind
+		if mode != "" {
+			b = m.modes[mode]
+		}
 		var out []string
-		for _, c := range m.bind[k] {
+		for _, c := range b[k] {
 			out = append(out, c.id)
 		}
 		return out
 	}
 	for key, want := range map[string]string{
-		"f5":           "tab.next",
-		"ctrl+tab":     "tab.next panel.next", // the file's first
-		"ctrl+shift+p": "palette",             // named, and freed of its default (which it is too)
-		"ctrl+shift+f": "",                    // freed
-		"ctrl+shift+t": "session.new",         // as by default
-		"ctrl+alt+9":   "tab.9",
+		"f5":            "workspace next",
+		"meta+tab":      "workspace next focus next", // the file's first
+		"ctrl+shift+p":  "palette",                   // named: its defaults go
+		"meta+d":        "",                          // freed
+		"meta+space":    "",                          // palette's default, gone
+		"meta+f":        "",                          // freed
+		"meta+enter":    "",                          // session.new is the launcher: named, its default goes
+		"ctrl+q":        "quit",                      // as by default
+		"ctrl+alt+1":    "workspace number 1",        // the old id
+		"meta+1":        "",                          // named in the file: its default goes
+		"ctrl+shift+t":  "launcher",
+		"meta+t":        "layout tabbed; focus parent",
+		"f6":            `[class="terminal"] focus`,
+		"resize x":      "mode default",
+		"resize meta+r": "",
+		"resize esc":    "",            // named in resize: its defaults there go
+		"meta+r":        "mode resize", // but not the default mode's
+		"resize left":   "resize shrink width 50 px or 5 ppt",
 	} {
-		if got := strings.Join(ids(key), " "); got != want {
+		mode, k, ok := strings.Cut(key, " ")
+		if !ok {
+			mode, k = "", key
+		}
+		if got := strings.Join(ids(mode, k), " "); got != want {
 			t.Errorf("%s: %q, want %q", key, got, want)
 		}
 	}
-	if !slices.Equal(m.keys["fullscreen"], nil) {
-		t.Errorf("fullscreen: %v, want no key", m.keys["fullscreen"])
-	}
 }
 
-func TestParseTabs(t *testing.T) {
-	for in, want := range map[string]string{
-		"":                                    tabsDefault,
-		tabsDefault:                           tabsDefault,
-		"music ssh":                           "ssh -shell settings power", // the Music tab is gone
-		"-settings -music files ssh shell":    "settings ssh shell power",  // and Files
-		"SSH SSH bogus -Files":                "ssh -shell settings power",
-		"files settings music shell ssh more": "settings shell ssh power",
+func TestFooter(t *testing.T) {
+	for conf, want := range map[string]string{
+		"":                         "workspaces: tap or Meta+1–9",
+		"alt+1 workspace number 1": "workspaces: tap",
+		"none workspace number 9":  "workspaces: tap",
 	} {
-		if got := parseTabs(in).String(); got != want {
-			t.Errorf("%q: %q, want %q", in, got, want)
-		}
-	}
-	if got := parseTabs(tabsDefault).shown(); !slices.Equal(got, []int{tabSSH, tabRadio, tabPower}) {
-		t.Errorf("shown: %v", got)
-	}
-}
-
-func TestTabHints(t *testing.T) {
-	four := "ssh shell settings power"
-	for _, c := range []struct {
-		conf, tabs string
-		hints      []string
-		footer     string
-	}{
-		{"", tabsDefault, []string{"1", "2", "3"}, "tabs: tap or Ctrl+Alt+1–3"},
-		{"", four, []string{"1", "2", "3", "4"}, "tabs: tap or Ctrl+Alt+1–4"},
-		{"alt+1 tab.1\nalt+2 tab.2\nalt+3 tab.3\nalt+4 tab.4", four, []string{"1", "2", "3", "4"}, "tabs: tap or Alt+1–4"},
-		{"f1 tab.shell", four, []string{"1", "F1", "3", "4"}, "tabs: tap or Ctrl+Alt+corner key"},
-		{"ctrl+alt+m tab.shell", four, []string{"1", "M", "3", "4"}, "tabs: tap or Ctrl+Alt+corner key"},
-		{"f1 tab.1\nf2 tab.2\nctrl+alt+3 -\nctrl+alt+4 -", four, []string{"F1", "F2", "", ""}, "tabs: tap or the corner key"},
-		{"ctrl+alt+1 -\nctrl+alt+2 -\nctrl+alt+3 -\nctrl+alt+4 -", four, []string{"", "", "", ""}, "tabs: tap"},
-	} {
-		a := &bro{tabs: parseTabs(c.tabs)}
-		a.keys, _ = parseKeys(c.conf)
-		hints, footer := a.tabHints()
-		if !slices.Equal(hints, c.hints) || footer != c.footer {
-			t.Errorf("%q: %q, %q; want %q, %q", c.conf, hints, footer, c.hints, c.footer)
+		m, _ := parseKeys(conf)
+		got := m.footer()
+		if got != want {
+			t.Errorf("%q: %q, want %q", conf, got, want)
 		}
 	}
 }
@@ -161,7 +176,7 @@ func TestKeyString(t *testing.T) {
 }
 
 func TestRewriteKeys(t *testing.T) {
-	conf := "# the defaults\n# ctrl+tab session.next\nf5 tab.next\nnone doze\n"
+	conf := "# the defaults\n# meta+tab focus next\nf5 workspace next\nnone doze\nf7 layout tabbed; focus parent\n[resize]\nx mode default\n"
 	k := func(s string) combo { c, _ := parseKey(s); return c }
 	for _, c := range []struct {
 		id    string
@@ -169,14 +184,16 @@ func TestRewriteKeys(t *testing.T) {
 		reset bool
 		want  string // the lines that aren't comments
 	}{
-		{"tab.next", []combo{k("f6")}, false, "none doze|f6 tab.next"},
-		{"tab.next", nil, true, "none doze"},
-		{"tab.next", []combo{}, false, "none doze|none tab.next"},
-		{"doze", []combo{k("ctrl+alt+d")}, false, "f5 tab.next|ctrl+alt+d doze"},
-		// Ctrl+PgDn was session.next's: it keeps its other.
-		{"doze", []combo{k("ctrl+pgdn")}, false, "f5 tab.next|ctrl+shift+right session.next|ctrl+pgdn doze"},
-		// Ctrl+Tab was panel.next's only key: it has none then.
-		{"doze", []combo{k("ctrl+tab")}, false, "f5 tab.next|none panel.next|ctrl+tab doze"},
+		{"workspace next", []combo{k("f6")}, false, "none doze|f7 layout tabbed; focus parent|f6 workspace next|[resize]|x mode default"},
+		{"workspace next", nil, true, "none doze|f7 layout tabbed; focus parent|[resize]|x mode default"},
+		{"workspace next", []combo{}, false, "none doze|f7 layout tabbed; focus parent|none workspace next|[resize]|x mode default"},
+		{"doze", []combo{k("ctrl+alt+d")}, false, "f5 workspace next|f7 layout tabbed; focus parent|ctrl+alt+d doze|[resize]|x mode default"},
+		// Meta+K was focus up's: it keeps its other.
+		{"doze", []combo{k("meta+k")}, false, "f5 workspace next|f7 layout tabbed; focus parent|focus up's|meta+k doze|[resize]|x mode default"},
+		// Meta+A was focus parent's only key: it has none then.
+		{"doze", []combo{k("meta+a")}, false, "f5 workspace next|f7 layout tabbed; focus parent|none focus parent|meta+a doze|[resize]|x mode default"},
+		// F7 was keys.conf's own line: it goes.
+		{"doze", []combo{k("f7")}, false, "f5 workspace next|f7 doze|[resize]|x mode default"},
 	} {
 		m, _ := parseKeys(conf)
 		out := rewriteKeys(conf, m, c.id, c.keys, c.reset)
@@ -186,8 +203,9 @@ func TestRewriteKeys(t *testing.T) {
 				got = append(got, l)
 			}
 		}
-		if g := strings.Join(got, "|"); g != c.want {
-			t.Errorf("%s %v %v: %q, want %q", c.id, c.keys, c.reset, g, c.want)
+		want := strings.ReplaceAll(c.want, "focus up's", "meta+up focus up")
+		if g := strings.Join(got, "|"); g != want {
+			t.Errorf("%s %v %v: %q, want %q", c.id, c.keys, c.reset, g, want)
 		}
 		if _, errs := parseKeys(out); len(errs) > 0 {
 			t.Errorf("%s: %v", c.id, errs)

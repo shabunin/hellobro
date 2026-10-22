@@ -81,7 +81,7 @@ func (q *askBox) ready() bool { return q.typed == q.want }
 
 // overlay says whether something is up over the page.
 func (a *bro) overlay() bool {
-	return a.picker != nil || a.asking != nil || a.info != nil || a.tabsEd != nil || a.keyset != nil
+	return a.picker != nil || a.asking != nil || a.info != nil || a.keyset != nil
 }
 
 func (a *bro) drawAsk() {

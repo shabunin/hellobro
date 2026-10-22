@@ -1,18 +1,24 @@
 package main
 
 // Commands: what hellobro does on a key, or from the switcher. Each has
-// an id for keys.conf, a title for the switcher, and default keys.
+// an id for keys.conf, a title for the switcher, and default keys. The
+// window manager's are i3's command lines ("focus left"), and keys.conf
+// takes any of those, as i3's bindsym does.
+//
 // keys.conf, next to hellobro, changes them: a line is a key and a
-// command ("ctrl+alt+1 tab.1"), a key and "-", which frees it (a
-// terminal gets it then), or "none" and a command, which has no key
-// then. A command named there loses its defaults. The file is written
-// the first time, every default in it commented out, and read again
-// when it's saved; Settings' Keys row writes it too (keyset.go).
+// command ("meta+1 workspace number 1"), a key and "-", which frees it
+// (a terminal gets it then), or "none" and a command, which has no key
+// then. A command named there loses its defaults. "[resize]" starts the
+// keys of a binding mode, i3's: in a mode only its keys count, till one
+// runs "mode default". The file is written the first time, every default
+// in it commented out, and read again when it's saved; Settings' Keys row
+// writes it too (keyset.go).
 
 import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -27,6 +33,7 @@ const keysTxt = "keys.conf"
 type command struct {
 	id, title string
 	keys      []string          // the defaults
+	mode      string            // the binding mode they're in: "" is the default
 	when      func(*bro) bool   // nil: always
 	detail    func(*bro) string // what the switcher says next to the keys, or nil
 	run       func(*bro)
@@ -34,48 +41,71 @@ type command struct {
 	repeat    bool // held, it goes on
 }
 
-func onTerm(a *bro) bool { return isTermTab(a.Tab) }
+func onTerm(a *bro) bool { return a.term() != nil }
 
 var commands []*command
 
 func init() { commands = makeCommands() } // the switcher, one of them, lists them
 
+// wmCommand is i3's command line as a command: its id is the line.
+func wmCommand(line, title string, repeat bool, keys ...string) *command {
+	return &command{id: line, title: title, keys: keys, repeat: repeat, run: func(a *bro) { a.wmRun(line) }}
+}
+
 func makeCommands() []*command {
 	cs := []*command{
-		{id: "palette", title: "Go to…", keys: []string{"ctrl+shift+p"}, run: (*bro).openPicker, hidden: true},
+		{id: "launcher", title: "A new window", keys: []string{"meta+enter"}, run: (*bro).openLauncher},
+		{id: "palette", title: "Go to…", keys: []string{"meta+d", "meta+space"}, run: (*bro).openPicker, hidden: true},
+		wmCommand("kill", "Close the window in focus", false, "meta+shift+q"),
 	}
-	for n := 1; n <= 9; n++ {
-		cs = append(cs, &command{id: fmt.Sprintf("tab.%d", n), title: fmt.Sprintf("Tab %d", n),
-			keys: []string{fmt.Sprintf("ctrl+alt+%d", n)}, hidden: true,
-			run: func(a *bro) {
-				if tabs := a.Tabs(); n <= len(tabs) {
-					a.SwitchTab(tabs[n-1])
-				}
-			}})
-	}
-	for t, name := range tabNames {
-		cs = append(cs, &command{id: "tab." + tabKey(t), title: name + " tab", hidden: true,
-			run: func(a *bro) { a.SwitchTab(t) }})
+	for _, d := range []struct{ dir, arrow, letter string }{
+		{"left", "left", "h"}, {"down", "down", "j"}, {"up", "up", "k"}, {"right", "right", "l"},
+	} {
+		cs = append(cs,
+			wmCommand("focus "+d.dir, "Focus: the window "+d.dir+"wards", true, "meta+"+d.arrow, "meta+"+d.letter),
+			wmCommand("move "+d.dir, "Move the window "+d.dir, true, "meta+shift+"+d.arrow, "meta+shift+"+d.letter))
 	}
 	cs = append(cs,
-		&command{id: "tab.next", title: "Next tab", run: func(a *bro) { a.stepTab(1) }},
-		&command{id: "tab.prev", title: "Previous tab", run: func(a *bro) { a.stepTab(-1) }},
-		&command{id: "session.new", title: "New session", keys: []string{"ctrl+shift+t"}, when: onTerm,
-			run: func(a *bro) {
-				a.newSession(true)
-				a.drawTerm()
-				a.MarkFlash(a.termP.Outer)
-			}},
-		&command{id: "panel.next", title: "Next panel", keys: []string{"ctrl+tab"}, repeat: true,
-			run: func(a *bro) { a.stepPanel(1) }},
-		&command{id: "panel.prev", title: "Previous panel", keys: []string{"ctrl+shift+tab"}, repeat: true,
-			run: func(a *bro) { a.stepPanel(-1) }},
-		&command{id: "session.next", title: "Next session", keys: []string{"ctrl+pgdn", "ctrl+shift+right"},
-			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(1) }},
-		&command{id: "session.prev", title: "Previous session", keys: []string{"ctrl+pgup", "ctrl+shift+left"},
-			when: onTerm, repeat: true, run: func(a *bro) { a.stepSession(-1) }},
-		&command{id: "session.end", title: "Session in focus: disconnect, kill, or close", when: onTerm,
-			run: (*bro).endSession},
+		wmCommand("focus next", "Focus: the next window", true, "meta+tab"),
+		wmCommand("focus prev", "Focus: the window before", true, "meta+shift+tab"),
+		wmCommand("focus parent", "Focus: the container around", false, "meta+a"),
+		wmCommand("focus child", "Focus: back into the container", false),
+		wmCommand("focus mode_toggle", "Focus: floating / tiled windows", false),
+		wmCommand("split h", "Split: the next window to the right", false, "meta+b"),
+		wmCommand("split v", "Split: the next window below", false, "meta+v"),
+		wmCommand("layout toggle split", "Layout: side by side / one above another", false, "meta+e"),
+		wmCommand("layout stacking", "Layout: stacked", false, "meta+s"),
+		wmCommand("layout tabbed", "Layout: tabbed", false, "meta+w"),
+		wmCommand("fullscreen toggle", "Fullscreen: the window in focus", false, "meta+f"),
+		wmCommand("floating toggle", "Floating: the window in focus", false, "meta+shift+space"),
+		wmCommand("move scratchpad", "Put the window away (the scratchpad)", false, "meta+shift+minus"),
+		wmCommand("scratchpad show", "Bring back a window put away", false, "meta+minus"),
+		wmCommand("mode resize", "Resize the windows: the arrows", false, "meta+r"),
+		wmCommand("workspace back_and_forth", "Workspace: the one before", false),
+		wmCommand("workspace next", "Workspace: the next", false),
+		wmCommand("workspace prev", "Workspace: the one before in the bar", false),
+	)
+	for n := 1; n <= 10; n++ {
+		k := strconv.Itoa(n % 10)
+		ws := wmCommand(fmt.Sprintf("workspace number %d", n), fmt.Sprintf("Workspace %d", n), false, "meta+"+k)
+		mv := wmCommand(fmt.Sprintf("move container to workspace number %d", n), fmt.Sprintf("Move the window to workspace %d", n), false, "meta+shift+"+k)
+		ws.hidden, mv.hidden = true, true
+		cs = append(cs, ws, mv)
+	}
+	// The resize mode's.
+	for _, d := range []struct{ how, title, arrow, letter string }{
+		{"shrink width", "narrower", "left", "h"}, {"grow height", "taller", "down", "j"},
+		{"shrink height", "shorter", "up", "k"}, {"grow width", "wider", "right", "l"},
+	} {
+		c := wmCommand("resize "+d.how+" 50 px or 5 ppt", "Resize: "+d.title, true, d.arrow, d.letter)
+		c.mode, c.hidden = "resize", true
+		cs = append(cs, c)
+	}
+	back := wmCommand("mode default", "Resize: done", false, "enter", "esc", "meta+r")
+	back.mode, back.hidden = "resize", true
+	cs = append(cs, back)
+
+	cs = append(cs,
 		&command{id: "copy", title: "Copy the selection", keys: []string{"ctrl+shift+c"}, when: onTerm, run: (*bro).copySel},
 		&command{id: "copy.screen", title: "Copy the screen's text", when: onTerm, run: func(a *bro) {
 			if t := a.term(); t != nil && t.connected() {
@@ -85,8 +115,7 @@ func makeCommands() []*command {
 		&command{id: "paste", title: "Paste", keys: []string{"ctrl+shift+v"}, run: func(a *bro) { a.paste(readClip(), "") }},
 		&command{id: "copy.key", title: "Copy the Kobo's SSH key", run: (*bro).copyKoboKey},
 		&command{id: "paste.key", title: "Paste the Kobo's SSH key", run: (*bro).pasteKoboKey},
-		&command{id: "fullscreen", title: "Fullscreen: the panel in focus", keys: []string{"ctrl+shift+f"},
-			run: func(a *bro) { a.SetFull(!a.Full) }},
+		&command{id: "session.end", title: "Terminal in focus: disconnect or kill", when: onTerm, run: (*bro).endSession},
 		&command{id: "font.bigger", title: "Bigger font", keys: []string{"ctrl+="}, when: onTerm, repeat: true,
 			run: func(a *bro) { a.setTermFont(a.tv.fontPx + termFontStep) }},
 		&command{id: "font.smaller", title: "Smaller font", keys: []string{"ctrl+-"}, when: onTerm, repeat: true,
@@ -109,30 +138,19 @@ func makeCommands() []*command {
 		&command{id: "doze", title: "Light sleep", run: func(a *bro) { a.Doze() }},
 		&command{id: "wifi", title: "Wi-Fi on / off", run: func(a *bro) { a.radioToggle(panelWiFi) }},
 		&command{id: "bluetooth", title: "Bluetooth on / off", run: func(a *bro) { a.radioToggle(panelBT) }},
-		&command{id: "wifi.scan", title: "Wi-Fi: look for networks", run: onRadio(func(a *bro) { a.radioPoll(true) })},
-		&command{id: "wifi.join", title: "Wi-Fi: join a network by its name", run: onRadio(func(a *bro) {
+		&command{id: "wifi.scan", title: "Wi-Fi: look for networks", run: onRadio("wifi", func(a *bro) { a.radioPoll(true) })},
+		&command{id: "wifi.join", title: "Wi-Fi: join a network by its name", run: onRadio("wifi", func(a *bro) {
 			a.radioAsk(&radioPrompt{panel: panelWiFi, kind: "ssid", text: "The network's name (SSID):"})
 		})},
-		&command{id: "wifi.info", title: "Wi-Fi: the network's details", run: onRadio((*bro).wifiInfo)},
-		&command{id: "bt.scan", title: "Bluetooth: look for devices (again: stop)", run: onRadio((*bro).btScan)},
+		&command{id: "wifi.info", title: "Wi-Fi: the network's details", run: onRadio("wifi", (*bro).wifiInfo)},
+		&command{id: "bt.scan", title: "Bluetooth: look for devices (again: stop)", run: onRadio("bluetooth", (*bro).btScan)},
 		&command{id: "sharing", title: "File sharing on / off", run: (*bro).shareToggle},
 		&command{id: "sharing.pair", title: "Pair a computer", run: (*bro).sharePair},
 		&command{id: "relay", title: "Relay on / off", run: func(a *bro) { a.stepSetting(settingIndex("relay"), 1) }},
-		&command{id: "tabs", title: "Tabs: show, hide, order", run: (*bro).openTabs},
 		&command{id: "keys", title: "Keys: set a command's", run: func(a *bro) { a.openKeys(nil) }},
+		wmCommand("reload", "Keys: read keys.conf again", false, "meta+shift+c"),
 	)
 	cs = append(cs, settingCommands()...)
-	cs = append(cs, foldCommands()...)
-	for t, name := range tabNames {
-		if t == tabRadio {
-			continue // where tabs are set: always there
-		}
-		cs = append(cs,
-			&command{id: "tabs.show." + tabKey(t), title: "Show the " + name + " tab",
-				when: func(a *bro) bool { return a.tabs.hidden[t] }, run: func(a *bro) { a.showTab(t, true) }},
-			&command{id: "tabs.hide." + tabKey(t), title: "Hide the " + name + " tab",
-				when: func(a *bro) bool { return !a.tabs.hidden[t] }, run: func(a *bro) { a.showTab(t, false) }})
-	}
 	cs = append(cs,
 		&command{id: "light.up", title: "Light: brighter", keys: []string{"ctrl+alt+up", "brightnessup"}, repeat: true,
 			run: func(a *bro) { a.stepLight(lightStep) }},
@@ -152,12 +170,11 @@ func makeCommands() []*command {
 	return cs
 }
 
-// onRadio has do done on the Settings tab, which starts the radios.
-func onRadio(do func(*bro)) func(*bro) {
+// onRadio has do done in the settings' window key, which it opens (and
+// that starts the radios).
+func onRadio(key string, do func(*bro)) func(*bro) {
 	return func(a *bro) {
-		if a.Tab != tabRadio {
-			a.SwitchTab(tabRadio)
-		}
+		a.openGUI(key)
 		do(a)
 	}
 }
@@ -286,20 +303,23 @@ func isAlnum(s string) bool { return s >= "a" && s <= "z" || s >= "0" && s <= "9
 
 // keyMap is what the keys run, as keys.conf has it.
 type keyMap struct {
-	bind      map[combo][]*command // the first that can, runs
-	keys      map[string][]combo   // by command
-	named     map[string]bool      // the commands keys.conf sets, not left at their defaults
-	down      map[uint16]bool      // keys pressed for a command, their releases ours too
+	bind      map[combo][]*command            // the default mode's: the first that can, runs
+	modes     map[string]map[combo][]*command // the other modes', by name
+	keys      map[string][]combo              // by command, in the default mode
+	named     map[string]bool                 // the commands keys.conf sets, not left at their defaults
+	down      map[uint16]bool                 // keys pressed for a command, their releases ours too
 	mtime     time.Time
 	checkedAt time.Time
 }
 
 // loadKeys reads keys.conf; the defaults if there's none, which it writes.
+// One with nothing but comments is the defaults of a hellobro before:
+// it's written again, with these.
 func loadKeys() keyMap {
 	path := kobo.AppFile(keysTxt)
 	b, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(path, []byte(defaultKeysConf()), 0o644); err != nil {
+	if def := defaultKeysConf(); errors.Is(err, os.ErrNotExist) || err == nil && string(b) != def && onlyComments(string(b)) {
+		if err := os.WriteFile(path, []byte(def), 0o644); err != nil {
 			log.Printf("keys: %v", err)
 		}
 	}
@@ -313,32 +333,107 @@ func loadKeys() keyMap {
 	return m
 }
 
-func parseKeys(conf string) (keyMap, []string) {
-	named := map[string]bool{}
-	m := keyMap{bind: map[combo][]*command{}, keys: map[string][]combo{}, named: named, down: map[uint16]bool{}}
-	var errs []string
-	freed := map[combo]bool{}
-	add := func(k combo, c *command) {
-		if !slices.Contains(m.bind[k], c) {
-			m.bind[k] = append(m.bind[k], c)
-			m.keys[c.id] = append(m.keys[c.id], k)
+func onlyComments(conf string) bool {
+	for _, line := range strings.Split(conf, "\n") {
+		if line, _, _ = strings.Cut(line, "#"); strings.TrimSpace(line) != "" {
+			return false
 		}
 	}
+	return true
+}
+
+// keyIDs are commands' ids as they were once, by what they are now.
+var keyIDs = map[string]string{
+	"session.new": "launcher", "fullscreen": "fullscreen toggle",
+	"session.next": "focus next", "session.prev": "focus prev", "panel.next": "focus next", "panel.prev": "focus prev",
+	"tab.next": "workspace next", "tab.prev": "workspace prev",
+}
+
+// keyID is the command a keys.conf line names: one of ours, or i3's, which
+// the window manager runs. "" if there's none.
+func keyID(line string) (*command, string) {
+	if now, ok := keyIDs[line]; ok {
+		line = now
+	}
+	if n, ok := strings.CutPrefix(line, "tab."); ok {
+		if _, err := strconv.Atoi(n); err == nil {
+			line = "workspace number " + n
+		}
+	}
+	if c := commandByID(line); c != nil {
+		return c, line
+	}
+	w, _, _ := strings.Cut(line, " ")
+	if !wmWords[w] && !strings.HasPrefix(w, "[") {
+		return nil, line
+	}
+	return wmCommand(line, line, false), line
+}
+
+// wmWords start i3's commands.
+var wmWords = map[string]bool{
+	"nop": true, "exec": true, "mode": true, "kill": true, "focus": true, "split": true, "layout": true,
+	"floating": true, "fullscreen": true, "border": true, "workspace": true, "rename": true, "move": true,
+	"swap": true, "resize": true, "mark": true, "unmark": true, "scratchpad": true, "exit": true,
+	"reload": true, "open": true,
+}
+
+// keyName is how named has command id in mode.
+func keyName(mode, id string) string {
+	if mode == "" {
+		return id
+	}
+	return mode + ":" + id
+}
+
+func parseKeys(conf string) (keyMap, []string) {
+	named := map[string]bool{}
+	m := keyMap{bind: map[combo][]*command{}, modes: map[string]map[combo][]*command{}, keys: map[string][]combo{},
+		named: named, down: map[uint16]bool{}}
+	var errs []string
+	freed := map[string]bool{} // mode and key
+	add := func(mode string, k combo, c *command) {
+		b := m.bind
+		if mode != "" {
+			if m.modes[mode] == nil {
+				m.modes[mode] = map[combo][]*command{}
+			}
+			b = m.modes[mode]
+		}
+		if !slices.ContainsFunc(b[k], func(o *command) bool { return o.id == c.id }) {
+			b[k] = append(b[k], c)
+			if mode == "" {
+				m.keys[c.id] = append(m.keys[c.id], k)
+			}
+		}
+	}
+	mode := ""
 	for n, line := range strings.Split(conf, "\n") {
 		line, _, _ = strings.Cut(line, "#") // no key is # (it's shift+3)
 		f := strings.Fields(line)
 		if len(f) == 0 {
 			continue
 		}
-		if len(f) != 2 {
+		if name, ok := strings.CutPrefix(f[0], "["); ok && len(f) == 1 && strings.HasSuffix(name, "]") {
+			mode = strings.TrimSuffix(name, "]")
+			if mode == "default" {
+				mode = ""
+			}
+			if mode != "" && m.modes[mode] == nil {
+				m.modes[mode] = map[combo][]*command{}
+			}
+			continue
+		}
+		if len(f) < 2 {
 			errs = append(errs, fmt.Sprintf("line %d: a key and a command, not %q", n+1, line))
 			continue
 		}
+		c, id := keyID(strings.Join(f[1:], " "))
 		if f[0] == "none" {
-			if c := commandByID(f[1]); c != nil {
-				named[c.id] = true
+			if c != nil {
+				named[keyName(mode, c.id)] = true
 			} else {
-				errs = append(errs, fmt.Sprintf("line %d: no command %q", n+1, f[1]))
+				errs = append(errs, fmt.Sprintf("line %d: no command %q", n+1, id))
 			}
 			continue
 		}
@@ -347,20 +442,19 @@ func parseKeys(conf string) (keyMap, []string) {
 			errs = append(errs, fmt.Sprintf("line %d: %v", n+1, err))
 			continue
 		}
-		if f[1] == "-" {
-			freed[k] = true
+		if id == "-" {
+			freed[keyName(mode, k.String())] = true
 			continue
 		}
-		c := commandByID(f[1])
 		if c == nil {
-			errs = append(errs, fmt.Sprintf("line %d: no command %q", n+1, f[1]))
+			errs = append(errs, fmt.Sprintf("line %d: no command %q", n+1, id))
 			continue
 		}
-		named[c.id] = true
-		add(k, c)
+		named[keyName(mode, c.id)] = true
+		add(mode, k, c)
 	}
 	for _, c := range commands { // after the file's: those come first
-		if named[c.id] {
+		if named[keyName(c.mode, c.id)] {
 			continue
 		}
 		for _, s := range c.keys {
@@ -368,43 +462,68 @@ func parseKeys(conf string) (keyMap, []string) {
 			if err != nil {
 				panic(err) // a default: a bug
 			}
-			if !freed[k] {
-				add(k, c)
+			if !freed[keyName(c.mode, k.String())] {
+				add(c.mode, k, c)
 			}
 		}
 	}
 	return m, errs
 }
 
+// keyModes are the binding modes keys.conf and the defaults have.
+func (a *bro) keyModes() []string {
+	return slices.Sorted(maps.Keys(a.keys.modes))
+}
+
 func defaultKeysConf() string {
 	var b strings.Builder
-	b.WriteString(`# hellobro's keys. A line is a key and a command, "ctrl+alt+1 tab.1",
+	b.WriteString(`# hellobro's keys. A line is a key and a command, "meta+1 workspace number 1",
 # a key and -, "f11 -": the key isn't ours then, a terminal gets it, or
-# none and a command, "none session.new": it has no key. A command named
-# here loses its default keys; the rest keep theirs. Settings, Keys, sets
-# them too, and writes here.
+# none and a command, "none launcher": it has no key. A command named
+# here loses its default keys; the rest keep theirs. The window manager's
+# commands are i3's, any of them: "meta+t layout tabbed; focus parent".
+# Settings, Keys, sets them too, and writes here.
 #
-# Modifiers: ctrl shift alt meta. Keys: a-z 0-9 f1-f12 tab space enter esc
-# backspace up down left right pgup pgdn home end insert delete, the marks
-# (minus or -, = [ ] ; ' ` + "`" + ` \ , . /), brightnessup brightnessdown,
-# and any other by its Linux code: key183.
+# [name] starts a binding mode's keys (i3's "mode"): while it's on, only
+# those count. [default] goes back to the default's.
+#
+# Modifiers: ctrl shift alt meta (the Win key). Keys: a-z 0-9 f1-f12 tab
+# space enter esc backspace up down left right pgup pgdn home end insert
+# delete, the marks (minus or -, = [ ] ; ' ` + "`" + ` \ , . /), brightnessup
+# brightnessdown, and any other by its Linux code: key183.
 # Saved, it's read again at once.
 #
 # The defaults:
 #
 `)
+	line := func(k string, c *command) {
+		fmt.Fprintf(&b, "# %-18s %-38s # %s\n", k, c.id, c.title)
+	}
 	var none []*command
+	modes := map[string][]*command{}
 	for _, c := range commands {
+		if c.mode != "" {
+			modes[c.mode] = append(modes[c.mode], c)
+			continue
+		}
 		if len(c.keys) == 0 {
 			none = append(none, c)
 		}
 		for _, k := range c.keys {
-			fmt.Fprintf(&b, "# %-18s %-16s %s\n", k, c.id, c.title)
+			line(k, c)
 		}
 	}
 	b.WriteString("#\n# With no key, till you give them one:\n#\n")
 	for _, c := range none {
-		fmt.Fprintf(&b, "# %-18s %-16s %s\n", "", c.id, c.title)
+		line("none", c)
+	}
+	for _, mode := range slices.Sorted(maps.Keys(modes)) {
+		fmt.Fprintf(&b, "#\n# [%s]\n", mode)
+		for _, c := range modes[mode] {
+			for _, k := range c.keys {
+				line(k, c)
+			}
+		}
 	}
 	return b.String()
 }
@@ -428,12 +547,38 @@ func (a *bro) keysTick() {
 
 // keysChanged has what shows the keys show the new ones.
 func (a *bro) keysChanged() {
-	a.applyTabs()
-	if isTermTab(a.Tab) && !a.overlay() {
-		a.drawTerm()
+	if a.wm.mode != "" && a.keys.modes[a.wm.mode] == nil {
+		a.setMode("")
 	}
-	a.sv.shown = ""
-	a.drawSettings()
+	a.applyFooter()
+	a.wm.names = nil // the workspaces' keys
+	a.wmBar()
+	if !a.overlay() && !a.Calibrating() {
+		a.DrawPage()
+		a.MarkFlash(a.lay.Page)
+	}
+}
+
+// applyFooter has the footer say the workspaces', sleep's and quit's keys.
+func (a *bro) applyFooter() {
+	sleep := a.keyLabel("sleep")
+	if sleep == "" {
+		sleep = "-"
+	}
+	quit := a.keyLabel("quit")
+	if quit == "" {
+		quit = "-"
+	}
+	a.SetFooter(a.keys.footer(), sleep, quit)
+}
+
+// footer is what the footer says of the workspaces' keys.
+func (m keyMap) footer() string {
+	one, nine := m.keys["workspace number 1"], m.keys["workspace number 9"]
+	if len(one) > 0 && len(nine) > 0 && one[0].mods == nine[0].mods && one[0].code == kobo.Key1 && nine[0].code == kobo.Key1+8 {
+		return "workspaces: tap or " + modsLabel(one[0].mods) + "1–9"
+	}
+	return "workspaces: tap"
 }
 
 // mods is the modifiers held now.
@@ -451,9 +596,14 @@ func (a *bro) mods() uint8 {
 	return b
 }
 
-// keyCommand is the command code runs now, with the modifiers held.
+// keyCommand is the command code runs now, with the modifiers held, in
+// the binding mode on.
 func (a *bro) keyCommand(code uint16) *command {
-	for _, c := range a.keys.bind[combo{a.mods(), code}] {
+	b := a.keys.bind
+	if a.wm.mode != "" {
+		b = a.keys.modes[a.wm.mode]
+	}
+	for _, c := range b[combo{a.mods(), code}] {
 		if c.when == nil || c.when(a) {
 			return c
 		}
@@ -535,26 +685,10 @@ func (a *bro) toggleLight() {
 	}
 }
 
-func (a *bro) stepTab(d int) {
-	tabs := a.Tabs()
-	if i := slices.Index(tabs, a.Tab); i >= 0 {
-		a.SwitchTab(tabs[(i+d+len(tabs))%len(tabs)])
-	}
-}
-
-// stepSession moves the focus to the next session (d -1: the one
-// before), folded or not: Enter opens a folded one.
-func (a *bro) stepSession(d int) {
-	if g := a.termGroup(); g != nil && len(g.sessions) > 1 {
-		n := len(g.sessions)
-		a.focusSession((g.cur+d+n)%n, false)
-	}
-}
-
 // radioToggle turns Wi-Fi or Bluetooth on or off, as it is now (which
-// the panel may not know yet: it's read first). Settings shows it going.
+// the window may not know yet: it's read first). Its window shows it going.
 func (a *bro) radioToggle(panel int) {
-	a.SwitchTab(tabRadio)
+	a.openGUI([]string{"wifi", "bluetooth"}[panel])
 	a.radioStart()
 	r := &a.rs
 	wifi, bt := r.wifi, r.bt

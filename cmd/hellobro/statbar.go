@@ -1,6 +1,6 @@
 package main
 
-// The terminal tabs' status bar, along the bottom, fullscreen too: what's
+// The status bar, along the bottom, fullscreen too: what's
 // playing on the left; the battery, its temperature, CPU and memory use
 // on the right. Ctrl+Shift+B (or its key in keys.conf) shows or hides it
 // (remembered in status-bar), a tap on it plays or pauses.
@@ -38,16 +38,16 @@ func (a *bro) loadStatBar() {
 	a.stat.off = strings.TrimSpace(string(b)) == "off"
 }
 
-// layoutStat takes the bar's strip off the bottom of the terminal panel.
+// layoutStat takes the bar's strip off the bottom of the windows' area.
 func (a *bro) layoutStat() {
 	s := &a.stat
 	s.r, s.shown = image.Rectangle{}, ""
 	if s.off {
 		return
 	}
-	b := &a.termP.Body
+	b := &a.wm.area
 	s.r = image.Rect(b.Min.X, b.Max.Y-statH, b.Max.X, b.Max.Y)
-	b.Max.Y = s.r.Min.Y
+	b.Max.Y = s.r.Min.Y - wmGap/2
 }
 
 func (a *bro) toggleStat() {
@@ -58,9 +58,9 @@ func (a *bro) toggleStat() {
 	}
 	os.WriteFile(kobo.AppFile(statBarTxt), []byte(state+"\n"), 0o644)
 	a.Layout(a.lay)
-	if a.term() != nil {
-		a.drawTerm()
-		a.MarkFlash(a.termP.Outer)
+	if !a.overlay() && !a.Calibrating() {
+		a.DrawPage()
+		a.MarkFlash(a.lay.Page)
 	}
 }
 
@@ -75,7 +75,7 @@ func (a *bro) statTick() {
 // drawStat draws the bar if what it says changed, or anyway.
 func (a *bro) drawStat(force bool) {
 	s := &a.stat
-	if s.r.Empty() || !isTermTab(a.Tab) || a.Calibrating() || a.GaugeUp() || a.overlay() {
+	if s.r.Empty() || a.Calibrating() || a.GaugeUp() || a.overlay() {
 		return
 	}
 	if s.at.IsZero() {

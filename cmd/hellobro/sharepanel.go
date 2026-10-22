@@ -23,12 +23,12 @@ type sharePanel struct {
 	shown string
 }
 
-// layoutShare places the panel at r.
-func (a *bro) layoutShare(K kobo.Layout, r image.Rectangle, folded bool) {
+// placeShare puts the Sharing window at p.
+func (a *bro) placeShare(p kobo.Panel) {
 	v := &a.shp
-	v.p = a.pagePanel(K, "Sharing", r, folded)
+	v.p = p
 	v.shown, v.text, v.btns = "", image.Rectangle{}, v.btns[:0]
-	if v.p.Folded {
+	if p.Outer.Empty() || p.Body.Dy() < 160 {
 		return
 	}
 	b := v.p.Body.Inset(kobo.Pad)
@@ -41,7 +41,7 @@ func (a *bro) layoutShare(K kobo.Layout, r image.Rectangle, folded bool) {
 }
 
 func (a *bro) drawShare() {
-	if !a.showingRadio() {
+	if !a.guiShows("sharing") || a.shp.text.Empty() {
 		return
 	}
 	v, s, c := &a.shp, &a.share, a.C
@@ -110,15 +110,13 @@ func (a *bro) drawShare() {
 	if s.note != "" {
 		add(kobo.Mid, "%s", s.note)
 	}
-	key := fmt.Sprint(status, lines, a.rs.focus == panelShare)
+	focused := a.guiFocused("sharing")
+	key := fmt.Sprint(status, lines, focused)
 	if key == v.shown {
 		return
 	}
 	v.shown = key
-	a.DrawPanel(focusMark(v.p, a.rs.focus == panelShare), status)
-	if v.p.Folded {
-		return
-	}
+	a.DrawPanel(a.winPanel(v.p, focused), status)
 	y := v.text.Min.Y
 	for _, l := range lines {
 		f, h := a.F.Small, 40

@@ -394,6 +394,31 @@ func (a *App) SetTabs(order []int, hints []string) {
 	}
 }
 
+// SetTabNames names the tabs anew, for a Program whose tabs come and go
+// (hellobro's workspaces): all of them shown, in order, cur up, hints in
+// their corners. A Program that does this takes the taps on them
+// (TabTapper) and draws its page itself: this redraws the tab bar only.
+func (a *App) SetTabNames(names, hints []string, cur int) {
+	if len(names) == 0 {
+		return
+	}
+	a.cfg.Tabs, a.order, a.hints = slices.Clone(names), nil, slices.Clone(hints)
+	a.Tab = max(0, min(cur, len(names)-1))
+	if a.C.Gray == nil || a.calib != nil {
+		return
+	}
+	full := a.L.Full
+	a.L = makeLayout(a.scr.info.ViewW, a.scr.info.ViewH, a.F, a.cfg.Title, len(names), a.Full)
+	a.L.Full = full
+	a.drawTabs()
+}
+
+// TabTapper is a Program that takes the taps on the tabs itself: i is
+// the tab's place in the bar.
+type TabTapper interface {
+	TabTap(i int)
+}
+
 // SetFooter has the footer say tabs on the tabs' keys ("tabs: tap or
 // Ctrl+Alt+1–4"), and sleep and quit for their keys ("-": there's none);
 // "" for the defaults, which are the keys without Config.OwnKeys.
@@ -779,7 +804,11 @@ func (a *App) tapAt(p image.Point) {
 	}
 	for i, r := range a.L.tabs {
 		if p.In(r) {
-			a.SwitchTab(a.Tabs()[i])
+			if t, ok := a.prog.(TabTapper); ok {
+				t.TabTap(i)
+			} else {
+				a.SwitchTab(a.Tabs()[i])
+			}
 			return
 		}
 	}

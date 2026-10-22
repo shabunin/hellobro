@@ -1,14 +1,13 @@
 package main
 
-// The switcher, a fuzzy menu in the manner of rofi's combi mode:
-// Ctrl+Shift+P (as VS Code's palette), on any tab, lists the terminal
-// sessions, the tabs, the saved SSH hosts (a new session to one) and the
-// commands (commands.go). Typing narrows the list, Up/Down (or Tab,
+// The switcher, a fuzzy menu in the manner of rofi's combi mode: Meta+D
+// or Meta+Space (dmenu's key in i3) lists the windows, the workspaces,
+// the saved SSH hosts (a new terminal to one), new shells, the settings'
+// windows and the commands (commands.go). Typing narrows the list, Up/Down (or Tab,
 // Shift+Tab) move, Enter goes; with nothing typed, 1-9 go straight to
 // that row. Esc, its key again or a tap outside close it. The page under it holds still meanwhile.
 
 import (
-	"fmt"
 	"image"
 	"slices"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	"unicode"
 
 	"hellobro/kobo"
+	"hellobro/wm"
 )
 
 const (
@@ -42,22 +42,23 @@ type picker struct {
 
 func (a *bro) openPicker() {
 	p := &picker{}
-	shown := a.Tabs()
-	for tab := range a.tv.groups {
-		if !slices.Contains(shown, tab) {
-			continue
+	t := a.wm.tree
+	focus := a.focusedWin()
+	for _, n := range t.Windows() {
+		w := a.wm.wins[n]
+		detail := "workspace " + wm.WorkspaceOf(n).Name
+		if ws := wm.WorkspaceOf(n); ws == t.Scratchpad() {
+			detail = "put away"
 		}
-		for i, t := range a.tv.groups[tab].sessions {
-			p.all = append(p.all, pickEntry{
-				kind: "session", title: fmt.Sprintf("%s %d", tabNames[tab], i+1), detail: t.status(&a.tv),
-				current: a.Tab == tab && a.tv.groups[tab].cur == i,
-				do:      func() { a.goSession(tab, i) },
-			})
+		if s, ok := w.(*termSession); ok {
+			detail += " · " + s.status(&a.tv)
 		}
+		p.all = append(p.all, pickEntry{kind: "window", title: w.Title(), detail: detail, current: w == focus,
+			do: func() { a.wm.tree.Focus(n); a.wmApply() }})
 	}
-	for _, tab := range shown {
-		p.all = append(p.all, pickEntry{kind: "tab", title: tabNames[tab], detail: a.keyLabels("tab." + tabKey(tab)),
-			current: a.Tab == tab, do: func() { a.SwitchTab(tab) }})
+	for _, ws := range t.Workspaces() {
+		p.all = append(p.all, pickEntry{kind: "workspace", title: "Workspace " + ws.Name, detail: a.keyLabels("workspace number " + ws.Name),
+			current: ws == t.Current(), do: func() { a.wmRun("workspace " + strconv.Quote(ws.Name)) }})
 	}
 	for _, h := range a.tv.hosts {
 		cmd := ""
@@ -66,12 +67,11 @@ func (a *bro) openPicker() {
 		}
 		p.all = append(p.all, pickEntry{kind: "ssh", title: h.name, detail: h.String() + cmd, do: func() { a.goHost(h) }})
 	}
-	if slices.Contains(shown, tabShell) {
-		detail := "/bin/sh on this Kobo"
-		if a.setting("shell") == "alpine" {
-			detail = "Alpine, in a jail"
-		}
-		p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: detail, do: func() { a.goNewShell() }})
+	p.all = append(p.all,
+		pickEntry{kind: "new", title: "Alpine", detail: "a shell in Alpine, in a jail", do: func() { a.goNewShell(true) }},
+		pickEntry{kind: "new", title: "Kobo shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell(false) }})
+	for _, k := range guiKeys {
+		p.all = append(p.all, pickEntry{kind: "window", title: guiName(k), detail: "settings", do: func() { a.openGUI(k) }})
 	}
 	for _, c := range commands {
 		if c.hidden || c.when != nil && !c.when(a) {
@@ -83,7 +83,7 @@ func (a *bro) openPicker() {
 		}
 		p.all = append(p.all, pickEntry{kind: "command", title: c.title, detail: detail, do: func() { c.run(a) }})
 	}
-	p.title, p.hint = "Go to", "sessions, tabs, hosts, commands…"
+	p.title, p.hint = "Go to", "windows, workspaces, hosts, commands…"
 	a.showPicker(p)
 }
 
@@ -131,40 +131,31 @@ func (a *bro) pick(n int) {
 	e.do()
 }
 
-func (a *bro) goSession(tab, i int) {
-	if a.Tab != tab {
-		a.tv.groups[tab].cur = i // shown as the tab comes up
-		a.SwitchTab(tab)
-		return
-	}
-	a.switchSession(i)
-}
-
-// goHost connects to h: in the SSH tab's session on screen if it's doing
-// nothing, else in a new one.
+// goHost connects to h: in the launcher in focus, else in a new window.
 func (a *bro) goHost(h sshHost) {
-	a.SwitchTab(tabSSH)
 	t := a.term()
-	if t == nil || t.state != termIdle || t.emu != nil {
-		a.newSession(false)
-		a.drawTerm()
-		a.MarkFlash(a.termP.Outer)
-		t = a.term()
+	if t == nil || !t.launcher() {
+		t = &termSession{}
+		a.openWin(t)
+		if a.nodeOf(t) == nil { // too many
+			return
+		}
 	}
-	if t != nil && t.state == termIdle {
-		a.termConnect(t, h)
-	}
+	a.termConnect(t, h)
 }
 
-func (a *bro) goNewShell() {
-	a.SwitchTab(tabShell)
-	if t := a.term(); t != nil && t.state == termIdle {
-		a.termStartShell(t)
-		return
+// goNewShell starts a shell (Alpine's, or the Kobo's): in the launcher in
+// focus, else in a new window.
+func (a *bro) goNewShell(alpine bool) {
+	t := a.term()
+	if t == nil || !t.launcher() {
+		t = &termSession{}
+		a.openWin(t)
+		if a.nodeOf(t) == nil {
+			return
+		}
 	}
-	a.newSession(true)
-	a.drawTerm()
-	a.MarkFlash(a.termP.Outer)
+	a.termStartShell(t, alpine)
 }
 
 // filterPicker narrows the list to what matches the query, best first.

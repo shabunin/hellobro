@@ -200,6 +200,9 @@ func (t *Tree) Workspaces() []*Node { return t.content.Nodes }
 // Scratchpad is the hidden workspace.
 func (t *Tree) Scratchpad() *Node { return t.scratch }
 
+// WorkspaceOf is the workspace n is on (the scratchpad's, put away).
+func WorkspaceOf(n *Node) *Node { return workspaceOf(n) }
+
 func workspaceOf(n *Node) *Node {
 	for n != nil && n.Type != Workspace {
 		n = n.Parent

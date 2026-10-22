@@ -272,6 +272,36 @@ func (t *Tree) FocusDir(d Dir) {
 	}
 }
 
+// FocusStep moves the focus to the next window on the workspace (d -1:
+// the one before), round, in the tree's order, the floating ones last:
+// i3's focus next and prev, which hellobro has go through the windows
+// rather than the siblings. With sibling, it's the next of the focused
+// container's siblings, as i3 has it.
+func (t *Tree) FocusStep(d int, sibling bool) {
+	n := t.focused
+	if n == nil || n.Type == Workspace {
+		return
+	}
+	if sibling {
+		ns := n.Parent.Nodes
+		if n.Type == FloatingCon {
+			ns = n.Parent.Floating
+		}
+		if i := slices.Index(ns, n); i >= 0 && len(ns) > 1 {
+			t.focus(ns[(i+d+len(ns))%len(ns)])
+		}
+		return
+	}
+	ws := workspaceOf(n)
+	if fs := t.fullscreenOn(ws); fs != nil {
+		ws = fs
+	}
+	ns := t.find(ws, (*Node).leaf)
+	if i := slices.Index(ns, n); i >= 0 && len(ns) > 1 {
+		t.focus(ns[(i+d+len(ns))%len(ns)])
+	}
+}
+
 func step(d Dir) int {
 	if d.back() {
 		return -1

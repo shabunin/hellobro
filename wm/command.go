@@ -522,9 +522,15 @@ func (t *Tree) focusCmd(ws []word, arg func(int) string, targets []*Node, crit b
 		t.FocusTiling()
 	case "mode_toggle":
 		t.FocusModeToggle()
+	case "next", "prev":
+		d := 1
+		if arg(1) == "prev" {
+			d = -1
+		}
+		t.FocusStep(d, arg(2) == "sibling")
 	case "output":
 	default:
-		return bad("focus left, right, up, down, parent, child, floating, tiling or mode_toggle")
+		return bad("focus left, right, up, down, next, prev, parent, child, floating, tiling or mode_toggle")
 	}
 	return nil
 }

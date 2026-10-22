@@ -56,8 +56,8 @@ FAKE_SNAP_AREA=${FAKE_SNAP_AREA:-40000} FAKE_SCREEN_DIR=$OUT/screen FAKE_GYRO=$R
 	HELLOBRO_INPUT_DIR=$OUT/input HELLOBRO_DEVICES=$H/devices INTERFACE=$IFACE HELLOBRO_MUSIC_DIR=${MUSIC:-$H/music} HELLOBRO_FAKE_PCM=$OUT/pcm.raw HELLOBRO_FAKE_RADIO=${FAKE_RADIO-1} HELLOBRO_FAKE_SLEEP=1 \
 	HELLOBRO_NTX_IO=$OUT/ntx_io HELLOBRO_GPIO=$OUT/gpio HELLOBRO_BATTERY=$OUT/battery HELLOBRO_NICKEL_CONF=$H/nickel.conf HELLOBRO_HOSTS=$OUT/hosts \
 	HELLOBRO_SHARE_ADDR=127.0.0.1:${SHARE_PORT:-2022} HELLOBRO_SHARE_ROOT=$OUT/onboard HELLOBRO_NO_MDNS=1 HELLOBRO_FAKE_PAIR_CODE=246810 \
-	env $MPRIS_ENV timeout "${TIMEOUT:-170}" qemu-arm "$OUT/app/$NAME" > "$OUT/stdout.txt" 2>&1 || echo "app exit: $?"
-wait $FEEDPID || true
+	env $MPRIS_ENV timeout "${TIMEOUT:-170}" qemu-arm "$OUT/app/$NAME" > "$OUT/stdout.txt" 2>&1 || { echo "app exit: $?"; kill $FEEDPID 2>/dev/null; }
+wait $FEEDPID || true # the feed would wait for the app forever, if it crashed
 if [ -n "$MPRIS_ENV" ]; then
 	kill "$MPRISPID" "$(cat "$OUT/bus.pid")" 2>/dev/null || true
 fi
