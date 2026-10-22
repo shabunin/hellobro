@@ -26,7 +26,7 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 - **SSH**: an xterm-256color terminal, several sessions, mouse,
   reconnects by itself. tmux, htop, helix, Claude Code all work.
 - **Shell**: the same terminal on the Kobo itself (turn it on in
-  Settings, Tabs).
+  Settings, Tabs), or Alpine Linux in a jail, with `apk` for tools.
 - **Music**: albums, folders and playlists, shuffle and repeat, to
   Bluetooth headphones. Media keys work.
 - **Light sleep**: the screen shows what's playing, the light goes off,

@@ -89,6 +89,7 @@ type termBackend interface {
 // termSession is one terminal: an SSH connection or a shell.
 type termSession struct {
 	kind   int
+	alpine bool   // a shell in the Alpine jail (alpine.go)
 	input  string // the ssh> line
 	notes  []string
 	state  int
@@ -346,7 +347,7 @@ func (t *termSession) status(v *termView) string {
 	case termConnected:
 		where := t.target.String()
 		if t.kind == kindShell {
-			where = "sh on this Kobo"
+			where = map[bool]string{false: "sh on this Kobo", true: "Alpine, in a jail"}[t.alpine]
 		}
 		s := fmt.Sprintf("%s · %d×%d · %d px", where, t.size.X, t.size.Y, v.fontPx)
 		if t.title != "" {
@@ -451,7 +452,7 @@ func (a *bro) drawConnect(t *termSession) {
 		if a.setting("shell") == "alpine" {
 			lines[0] = "Alpine Linux " + alpineVersion + ", in a jail on this Kobo: Enter or tap here to start it."
 			if _, err := os.Stat(alpineImg); err != nil {
-				lines[0] += " The first time sets it up: a 1 GB disk image, and 3 MB from the net."
+				lines = append(lines[:1], append([]string{"The first time sets it up: a 1 GB disk image, and 3 MB from the net."}, lines[1:]...)...)
 			}
 		}
 		if t.state == termIdle && len(a.tv.groups[t.kind].sessions) > 1 {
@@ -954,7 +955,7 @@ func (a *bro) termStartShell(t *termSession) {
 	t.notes, t.title = nil, ""
 	size := t.startSize()
 	start := func() (*localShell, error) { return startShell(size.X, size.Y) }
-	if a.setting("shell") == "alpine" {
+	if t.alpine = a.setting("shell") == "alpine"; t.alpine {
 		start = func() (*localShell, error) { return startAlpine(size.X, size.Y, "") }
 	}
 	s, err := start()

@@ -14,7 +14,8 @@ in a session too):
   Claude Code…), mouse taps and scrolling; several sessions at once, side
   by side.
 - **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
-  several too. Hidden at first: turn it on in Settings, Tabs.
+  several too. Hidden at first: turn it on in Settings, Tabs. Or Alpine
+  Linux in a jail instead ([The Alpine shell](#the-alpine-shell)).
 - **Music**: a player for the music on the Kobo (folders of MP3/WAV, with
   their covers), to Bluetooth headphones or a DAC: by album, by folder
   (subfolders and all) or by playlist, in order or shuffled. It goes on
@@ -226,6 +227,39 @@ minutes), the Kobo goes to sleep properly.
   notifications** and the three under it: the bell too or messages only,
   how long the light stays on, how often the strip blinks, how long the
   note stays (each can be off).
+
+## The Alpine shell
+
+Settings, **Shell tab runs**: the Kobo's own `/bin/sh`, as root (the
+default), or **Alpine Linux, in a jail**: a small Linux of its own, with
+its own tools and `apk add` for more (git, python3, vim, tmux…), kept
+away from the Kobo's system.
+
+- The first Alpine session sets it up, in the session: a 1 GB disk image
+  (`.adds/hellobro/alpine.img`, ext2), and Alpine's minirootfs
+  (3.24.3, 3 MB, needs Wi-Fi). It's fetched over plain HTTP, as the Kobo
+  has no CA certificates, and checked against the SHA-256 pinned in
+  `alpine.go`; inside, apk goes over HTTPS with Alpine's own.
+- In the jail you're root, as the storage is FAT and only root writes
+  there, but root over the jail only:
+  - `/mnt/onboard` is the Kobo's storage, writable, but its `.adds` and
+    `.kobo` are read-only: what's there runs as root outside (the
+    launcher, NickelMenu, `KoboRoot.tgz`).
+  - Its own processes only (no Nickel, no hellobro), its own `/dev` (no
+    screen, keys, frontlight or disks), its own `/tmp`; `/sys` and
+    `/proc/sys` read-only.
+  - No mount, modules, raw devices, mknod, reboot, ptrace, clock or
+    network setup, and no way to get them back (no_new_privs). The
+    network itself works.
+- Each session is a jail of its own on the same image: when its shell
+  exits, everything it started goes too (tmux's server included).
+- From a computer: `ssh -t -p 2022 kobo.local hellobro-alpine`, or
+  `… hellobro-alpine COMMAND`. A plain `ssh kobo.local` is still the
+  Kobo's root shell (`make push` needs it).
+- The image is mounted at `/tmp/hellobro-alpine` while hellobro runs and
+  let go of when it quits, so USB still works. ext2 has no journal: after
+  a crash, check it on a computer (`e2fsck -f alpine.img`, copied over
+  with hellobro not running). Removing `alpine.img` starts over.
 
 ## Music
 

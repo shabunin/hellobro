@@ -139,6 +139,13 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   Ctrl+Alt+S's Ctrl and Alt come up after it dozed, and missed, they
   stayed down (`tv.mods`), so every key after waking was Ctrl+Alt+key.
   `onKey` hands them to the Program anyway (`IsModifier`).
+- The Alpine jail (`alpine.go`, `alpineinit.go`): no user namespaces in
+  this kernel, so it's root with capabilities dropped (FAT: only uid 0
+  writes `/mnt/onboard`). Mount or write nothing in the jail before
+  `pivot_root`: its absolute symlinks would be the Kobo's paths then.
+  Keep `DAC_READ_SEARCH` out (`open_by_handle_at` goes around the
+  read-only `.adds`). Test escapes with `ssh -tt -p 2022 kobo.local
+  'hellobro-alpine COMMAND'`; never `echo b` at sysrq-trigger to check it.
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 
