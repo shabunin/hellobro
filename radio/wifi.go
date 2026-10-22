@@ -86,6 +86,8 @@ type WiFi interface {
 	// Restore puts the power back as it was before the first SetPower:
 	// what Nickel expects when it wakes.
 	Restore()
+	// Keep makes the power as it is now the one Restore puts back.
+	Keep()
 }
 
 // NewWiFi is the Kobo's Wi-Fi, or the stand-in.
@@ -582,6 +584,11 @@ func (w *wpaWiFi) Down(progress func(string)) error {
 		return nil
 	}
 	return w.powerOff(progress, true)
+}
+
+func (w *wpaWiFi) Keep() {
+	on := w.running()
+	w.initial = &on
 }
 
 func (w *wpaWiFi) Restore() {

@@ -134,8 +134,6 @@ type termPane struct {
 	drawnAt      time.Time         // its output was last drawn
 	fastArea     image.Rectangle   // drawn with the fast (DU) waveform since the last clean refresh
 	fastAt       time.Time         // when fastArea got its first update
-	dimArea      image.Rectangle   // drawn fast since the last flash: faint till one
-	dimAt        time.Time         // when dimArea got its first update
 }
 
 // write puts the remote's output into the emulator.
@@ -561,7 +559,6 @@ func (a *bro) renderTerm(t *termSession) {
 	pn.alt, pn.selShown = alt, sel
 	if len(pn.shown) != pn.rows || (pn.rows > 0 && len(pn.shown[0]) != pn.cols) {
 		full = true
-		pn.dimArea = image.Rectangle{} // all of it is drawn again
 		pn.shown = make([][]cellKey, pn.rows)
 		for y := range pn.shown {
 			pn.shown[y] = make([]cellKey, pn.cols)
@@ -619,10 +616,6 @@ func (a *bro) renderTerm(t *termSession) {
 				pn.fastAt = time.Now()
 			}
 			pn.fastArea = pn.fastArea.Union(c.r)
-			if pn.dimArea.Empty() {
-				pn.dimAt = time.Now()
-			}
-			pn.dimArea = pn.dimArea.Union(c.r)
 		}
 		a.Mark(c.r, c.gray || big)
 	}
@@ -1145,28 +1138,13 @@ func (a *bro) termTick() {
 			break // one a tick: each is an update of its own
 		}
 	}
-	// That cleanup leaves text the fast waveform drew faint and thin (the
-	// panel drives only the pixels that change, and those don't), till a
-	// flash or another page over it. So what was drawn fast gets a flash
-	// of its own, every so often (the setting) while there's any: typing
-	// or not, as asked.
-	if every := a.settingSeconds("term-clean"); every > 0 {
-		for _, t := range g.sessions {
-			pn := &t.pane
-			if !pn.dimArea.Empty() && time.Since(pn.dimAt) >= every && a.showing(t) {
-				a.MarkFlash(pn.dimArea)
-				pn.dimArea, pn.fastArea = image.Rectangle{}, image.Rectangle{}
-				break
-			}
-		}
-	}
 	// Grayscale updates leave ghosts too, slowly: after a few screenfuls
 	// of change, flash the terminal clean once it settles (a clock or a
 	// spinner may still tick), as e-readers do every few pages.
 	if v.churn > 4*kobo.Area(a.termP.Body) && time.Since(v.bigAt) > 2500*time.Millisecond {
 		v.churn = 0
 		for _, t := range g.sessions {
-			t.pane.fastArea, t.pane.dimArea = image.Rectangle{}, image.Rectangle{}
+			t.pane.fastArea = image.Rectangle{}
 		}
 		a.MarkFlash(a.termP.Body)
 	}

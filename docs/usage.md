@@ -346,7 +346,11 @@ away from the Kobo's system.
   settings, where a tap (or ←/→, Enter) changes one; ↑ ↓ and PgUp/PgDn
   go through them. They're kept in `settings`.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
-  since Nickel wakes up thinking so; networks and devices added stay. On
+  since Nickel wakes up thinking so; networks and devices added stay.
+  "Wi-Fi and Bluetooth at start", turned on, has hellobro turn both on
+  as it starts and leave them on when it quits (or restarts into a new
+  build). Nickel may still turn them off soon after, if you were in
+  hellobro a while: its idle timers run out while it's frozen. On
   the first visit to the tab, what's found of the setup (Kobo's variables,
   processes, modules, rfkill) goes to `hellobro.log`.
 
@@ -434,9 +438,7 @@ both up).
 DU can't show gray, so what it draws is sent rounded to black and white:
 crisp, if without smooth edges till the GL16 cleanup puts them in. (Sent
 the grays, DU left them faint, and the cleanup, sending the same pixels,
-didn't touch them.) Settings, "Terminal: clean redraw of typed text", adds
-a small flash of what was drawn fast every 10 s, 30 s or 1 min, in SSH and
-Shell sessions alike; it's off at first.
+didn't touch them.)
 
 ## Files on the Kobo
 

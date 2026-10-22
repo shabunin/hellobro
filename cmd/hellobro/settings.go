@@ -47,6 +47,9 @@ var settingList = []setting{
 	{key: "doze-deep", label: "Music stopped in light sleep",
 		values: []string{"5", "10", "30", "off"},
 		shown:  []string{"deep sleep after 5 min", "deep sleep after 10 min", "deep sleep after 30 min", "stay in light sleep"}},
+	{key: "radios", label: "Wi-Fi and Bluetooth at start",
+		values: []string{"kobo", "on"},
+		shown:  []string{"as Kobo had them, and put back so", "turned on, and left on"}},
 	{key: "share", label: "File sharing (SFTP, port 2022)",
 		values: []string{"off", "on", "pair"},
 		shown:  []string{"off", "on (Files tab)", "pair a computer"}},
@@ -77,9 +80,6 @@ var settingList = []setting{
 	{key: "alpine-bus", label: "… Alpine: system bus access",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
-	{key: "term-clean", label: "Terminal: clean redraw of typed text",
-		values: []string{"10", "30", "60", "off"},
-		shown:  []string{"a flash every 10 s", "a flash every 30 s", "a flash every 1 min", "off: it stays faint"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
@@ -91,7 +91,7 @@ var settingList = []setting{
 var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
 // The defaults, by key: the index of a value.
-var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1, "term-clean": 3}
+var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1}
 
 func settingIndex(key string) int {
 	for i, st := range settingList {
@@ -177,12 +177,6 @@ func (a *bro) settingMinutes(key string) time.Duration {
 	return time.Duration(n) * time.Minute
 }
 
-// settingSeconds is key's value as a time; 0 for off.
-func (a *bro) settingSeconds(key string) time.Duration {
-	n, _ := strconv.Atoi(a.setting(key))
-	return time.Duration(n) * time.Second
-}
-
 // stepSetting moves setting i on (or back) a value.
 func (a *bro) stepSetting(i, d int) {
 	st := settingList[i]
@@ -217,6 +211,9 @@ func (a *bro) stepSetting(i, d int) {
 			profileOn.Store(a.setting(st.key) == "on")
 		case "alpine-bus":
 			alpineBus.Store(a.setting(st.key) == "on")
+		case "radios":
+			a.rs.onDone = false
+			a.radiosOn()
 		case "light-idle":
 			a.applyLightIdle()
 		}

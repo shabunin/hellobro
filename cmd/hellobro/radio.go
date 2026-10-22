@@ -8,6 +8,7 @@ package main
 // Nickel left it, since Nickel wakes up thinking so.
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"log"
@@ -54,6 +55,7 @@ type radioButton struct {
 
 type radioState struct {
 	started bool
+	onDone  bool // radiosOn ran
 	wifi    radio.WiFi
 	bt      radio.Bluetooth
 	focus   int
@@ -217,6 +219,7 @@ func (r *radioState) keepSelected(w, b string) {
 
 func (a *bro) radioTick() {
 	r := &a.rs
+	a.radiosOn()
 	if !r.started {
 		return
 	}
@@ -280,6 +283,33 @@ func (a *bro) radioRun(panel int, busy string, do func(progress func(string)) er
 			a.drawRadioPanel(panel)
 		})
 	}()
+}
+
+// radiosOn turns Wi-Fi and Bluetooth on, once, when the setting asks
+// for it, and has them left on when we quit: on is then how they're put
+// back. A restart into a new build finds them on and leaves them so.
+func (a *bro) radiosOn() {
+	r := &a.rs
+	if r.onDone || a.setting("radios") != "on" {
+		return
+	}
+	r.onDone = true
+	a.radioStart()
+	wifi, bt := r.wifi, r.bt
+	a.radioRun(panelWiFi, "turning Wi-Fi and Bluetooth on…", func(p func(string)) error {
+		var errs []error
+		if bs, _ := bt.Status(); !bs.Powered {
+			if err := bt.SetPower(true); err != nil {
+				errs = append(errs, fmt.Errorf("bluetooth: %w", err))
+			}
+		}
+		if err := wifi.SetPower(true, p); err != nil {
+			errs = append(errs, err)
+		}
+		bt.Keep()
+		wifi.Keep()
+		return errors.Join(errs...)
+	})
 }
 
 func (a *bro) wifiPower() {

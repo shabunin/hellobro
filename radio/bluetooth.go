@@ -86,6 +86,8 @@ type Bluetooth interface {
 	Forget(d BTDevice) error
 	// Restore puts the power back as it was, and drops the agent.
 	Restore()
+	// Keep makes the power as it is now the one Restore puts back.
+	Keep()
 }
 
 // NewBluetooth is BlueZ, or the stand-in.
@@ -389,6 +391,11 @@ func (b *bluez) Forget(d BTDevice) error {
 	}
 	log.Printf("bluetooth: removing %s %s", d.Name, d.Addr)
 	return btError(bus.Object("org.bluez", b.adapter).Call("org.bluez.Adapter1.RemoveDevice", 0, d.Path).Err)
+}
+
+func (b *bluez) Keep() {
+	st, _ := b.Status()
+	b.initial = &st.Powered
 }
 
 func (b *bluez) Restore() {
