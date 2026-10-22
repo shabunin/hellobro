@@ -7,7 +7,7 @@ from feedlib import *
 
 start()
 tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab: connect screen
-keys("1"); key(ENTER); time.sleep(5)                             # saved host 1: a login shell
+keys("3"); key(ENTER); time.sleep(5)                                     # saved host 3, connect: a login shell
 keys("tmux attach\n"); time.sleep(8)
 fullscreen(); time.sleep(8)                              # fullscreen
 fullscreen(); time.sleep(3)

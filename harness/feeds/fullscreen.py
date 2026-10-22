@@ -7,7 +7,7 @@ from feedlib import *
 start()
 tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
 fullscreen(); time.sleep(2)                              # fullscreen connect screen
-keys("1"); key(ENTER); time.sleep(5)                             # connect, fullscreen
+keys("3"); key(ENTER); time.sleep(5)                                     # connect, fullscreen
 key(DOWN); key(DOWN); key(DOWN); key(ENTER); time.sleep(2.5)  # Showcase
 fullscreen(); time.sleep(2.5)                            # back to the framed terminal
 fullscreen(); time.sleep(2.5)                            # and full again
