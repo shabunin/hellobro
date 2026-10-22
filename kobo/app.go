@@ -843,6 +843,8 @@ func (a *App) onKey(m KeyMsg) {
 		} else {
 			log.Printf("keyboard gone: %s", m.Gone)
 			a.Keyboard = ""
+			// What it held won't come up now.
+			a.ctrl, a.alt = [2]bool{}, [2]bool{}
 			a.SetFull(false) // the keys are the way back, so don't strand the user there
 		}
 		a.devs = inputDevices()
@@ -855,8 +857,12 @@ func (a *App) onKey(m KeyMsg) {
 	case keyLeftAlt, keyRightAlt:
 		a.alt[b2i(m.Code == keyRightAlt)] = m.Value != 0
 	}
-	// Ctrl+Alt+N: tab N, whatever the page does with keys (a terminal
-	// would send it on), fullscreen too.
+	// Asleep or dozing, the modifiers still go to the Program, so it knows
+	// what's held: Ctrl+Alt+S's Ctrl and Alt come up once it's dozing, and
+	// missed, they'd stay down after.
+	if (a.asleep || a.dozing) && IsModifier(m.Code) {
+		a.prog.Key(m)
+	}
 	if a.asleep {
 		return
 	}
@@ -868,6 +874,8 @@ func (a *App) onKey(m KeyMsg) {
 		}
 		return
 	}
+	// Ctrl+Alt+N: tab N, whatever the page does with keys (a terminal
+	// would send it on), fullscreen too.
 	if n := int(m.Code) - Key1; !a.cfg.OwnKeys && (a.ctrl[0] || a.ctrl[1]) && (a.alt[0] || a.alt[1]) && n >= 0 && n < min(9, len(a.Tabs())) {
 		if m.Value == 1 {
 			a.SwitchTab(a.Tabs()[n])

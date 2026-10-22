@@ -258,6 +258,9 @@ func (a *bro) IdleTimeout() time.Duration {
 func (a *bro) Key(m kobo.KeyMsg) bool {
 	switch {
 	case m.Connected != "" || m.Gone != "":
+		if m.Gone != "" { // what it held won't come up now
+			a.tv.mods = termMods{caps: a.tv.mods.caps}
+		}
 		return true
 	case kobo.IsMediaKey(m.Code): // the music's, on any tab, dozing too
 		if m.Value == 1 || m.Value == 2 && (m.Code == kobo.KeyVolumeUp || m.Code == kobo.KeyVolumeDown) {

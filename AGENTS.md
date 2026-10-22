@@ -135,6 +135,10 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 - The battery's gauge (ricoh61x) gives `current_now` in tenths of a mA
   (2708: 271 mA), not µA: its `time_to_empty_now` times that is a full
   battery. The harness has a stand-in battery (`HELLOBRO_BATTERY`).
+- Keys dropped while asleep or dozing must not include the modifiers:
+  Ctrl+Alt+S's Ctrl and Alt come up after it dozed, and missed, they
+  stayed down (`tv.mods`), so every key after waking was Ctrl+Alt+key.
+  `onKey` hands them to the Program anyway (`IsModifier`).
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 

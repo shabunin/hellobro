@@ -25,6 +25,8 @@ const (
 	keyS          = 31
 	keyLeftAlt    = 56
 	keyRightAlt   = 100
+	keyLeftMeta   = 125
+	keyRightMeta  = 126
 )
 
 var (
@@ -97,6 +99,16 @@ const (
 	KeyVolumeDown   = 114
 	KeyVolumeUp     = 115
 )
+
+// IsModifier says whether code is Shift, Ctrl, Alt or Meta: held down
+// with other keys, so the app has to know at all times whether it's down.
+func IsModifier(code uint16) bool {
+	switch code {
+	case KeyLeftShift, KeyRightShift, KeyLeftCtrl, KeyRightCtrl, keyLeftAlt, keyRightAlt, keyLeftMeta, keyRightMeta:
+		return true
+	}
+	return false
+}
 
 func IsMediaKey(code uint16) bool {
 	switch code {
