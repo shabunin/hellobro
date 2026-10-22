@@ -45,7 +45,7 @@ restrict,port-forwarding,permitlisten="127.0.0.1:2222",permitopen="127.0.0.1:202
   Or from the Kobo itself, in an SSH session to the VPS (as root, say),
   in an editor on that file: type the line's start, `restrict,…` up to
   the space before the key, then "Paste the Kobo's SSH key" in the
-  switcher (Ctrl+Shift+P) types the key in.
+  switcher (Meta+D) types the key in.
 - The PC's key is its `~/.ssh/id_ed25519.pub` (`ssh-keygen -t ed25519`
   if there's none).
 
@@ -81,9 +81,9 @@ shows how it is, `journalctl --user -u hellobro-tunnel` why it isn't.
 ## 3. The Kobo
 
 Two files next to hellobro, in `.adds/hellobro/` (send them over SFTP,
-or edit them in the Shell tab):
+or edit them in a shell):
 
-- a saved host for the PC (type it at the SSH tab's prompt, or a
+- a saved host for the PC (type it at a launcher's prompt, or a
   saved host's **edit**; or an `ssh.conf` with this line, which
   hellobro takes in at start):
 
@@ -113,8 +113,8 @@ hellobro has to be running for any of it.
 
 ## Using it
 
-**On the Kobo**, the PC: `home` in the switcher (Ctrl+Shift+P) or the
-SSH tab.
+**On the Kobo**, the PC: `home` in the switcher (Meta+D) or a
+launcher.
 
 **On the PC**, the Kobo (the pairing from home still holds):
 

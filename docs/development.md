@@ -6,8 +6,8 @@ Back to the [README](../README.md). Agents: [AGENTS.md](../AGENTS.md).
 
 - `kobo/`: what the apps share. The screen through FBInk (the update queue
   and e-ink waveforms), touch with its calibration, keyboards and buttons,
-  the frontlight, drawing, panels, and the app's frame (header, tabs,
-  footer). An app is a `kobo.Program` that fills in the pages.
+  the frontlight, drawing, panels, and the app's frame (header, the
+  tab bar, footer). An app is a `kobo.Program` that fills in the pages.
 - `audio/`: Bluetooth audio through the Kobo's bluez-alsa: finding the
   device and its PCM, MP3/WAV decoding, a player with pause, seeking and
   volume.
@@ -16,8 +16,14 @@ Back to the [README](../README.md). Agents: [AGENTS.md](../AGENTS.md).
   pairing agent.
 - `share/`: the SSH server for a computer: SFTP, a shell, commands, and
   pairing by a code on the screen; the mDNS responder that advertises it.
-- `cmd/hellobro/`: the terminal (the emulator view, SSH, the local shell),
-  the status bar, the switcher, the Settings and Power tabs, sleep
+- `wm/`: the window manager's tree, after i3's: workspaces, splits,
+  tabbed and stacked containers, floating windows, the scratchpad,
+  focus, moves and resizes, i3's command language, the tree as i3's IPC
+  shows it, and as kept between runs. No drawing: tested on its own.
+- `cmd/hellobro/`: the windows (`wm.go`: placing, drawing, taps and
+  keys; `gui.go`: the settings' windows; `ipc.go`: i3's IPC and
+  hellobro-msg), the terminal (the emulator view, SSH, the local shell),
+  the status bar, the switcher, the settings' and power windows, sleep
   and light sleep, the Linux players' remote control (MPRIS), the hosts'
   files mounted (FUSE over SFTP), updates over the air.
 - `cmd/brotools/`: the diagnostics pages.
@@ -91,15 +97,17 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     make
     harness/run.sh /tmp/hb 0 demo           # brotools: a tour of the tabs, in portrait
     harness/run.sh /tmp/hb 1 ssh            # hellobro: landscape, a session with the server
-    SRV=$PWD/server/hellobro-server SRV_DIR=/tmp/srv harness/run.sh /tmp/hb 0 sessions
-                                            # two sessions, password + key install, reconnect, shells
+    harness/run.sh /tmp/hb 0 tiling         # the window manager: splits, tabbed, workspaces, floating, resize, scratchpad
+    HELLOBRO_MSG=path/hellobro-msg harness/run.sh /tmp/hb 1 ipc   # i3's IPC: commands, events, the tree; hellobro-msg and swaymsg
+    harness/run.sh /tmp/hb 1 layout && APP_EXTRA=dir harness/run.sh /tmp/hb2 1 restore
+                                            # the windows kept, and back (dir: the first run's hellobro.json)
     MPRIS=1 harness/run.sh /tmp/hb 0 statbar           # the status bar, the media keys, a stand-in player
-    harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
+    harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, sleep
     harness/run.sh /tmp/hb 0 share                     # pairing, scp, make push's update and restart (ssh, scp on the PC)
     MPRIS=1 harness/run.sh /tmp/hb 0 doze              # settings, light sleep with music, media keys
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 tmux       # saved host 1 (dir/ssh.conf, dir/id_ed25519): tmux attach, framed and fullscreen
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 btop       # the same, btop
-    CMUS=cmd HELLOBRO_MPRIS_BUS=addr harness/run.sh /tmp/hb 0 cmus  # cmd (cmus, say in a container with music) in the Shell tab, a track playing
+    CMUS=cmd HELLOBRO_MPRIS_BUS=addr harness/run.sh /tmp/hb 0 cmus  # cmd (cmus, say in a container with music) in a shell, a track playing
     harness/relay.sh /tmp/hb                           # the relay: sshd as the VPS, both ways through it, an update (with the server)
 
 `MPRIS=1` starts a session bus in `OUT/bus` with a stand-in mpv on it
@@ -113,7 +121,10 @@ would play. Wi-Fi and Bluetooth are stand-ins (`HELLOBRO_FAKE_RADIO`;
 and no mDNS (it would claim kobo.local on the real network). The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
 (`calls.txt` there lists every update with its waveform). The feeds live in
 `harness/feeds`, each with an `# app:` line naming the app it drives, and
-their shared helpers in `harness/feedlib.py`.
+their shared helpers in `harness/feedlib.py` (`mod()` for Meta and a key,
+`gui()` for a settings' window). Feeds written for the tabs that were
+still run: Ctrl+Alt+1–4 there go to a workspace laid out as the tab was,
+but their taps may land elsewhere.
 
 `harness/record.py` records what a terminal program prints, for
 `termrender_test.go`:

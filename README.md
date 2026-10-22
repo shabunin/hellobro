@@ -9,12 +9,12 @@ Kobo e-reader. Bring a Bluetooth keyboard.
 </p>
 <p align="center">
   <img src="docs/screenshots/ssh.png" width="32%" alt="An SSH session">
-  <img src="docs/screenshots/cmus.png" width="32%" alt="cmus in the Shell tab, the header showing what plays">
+  <img src="docs/screenshots/cmus.png" width="32%" alt="cmus in a shell, the header showing what plays">
   <img src="docs/screenshots/light-sleep.png" width="32%" alt="Light sleep, the music playing on">
 </p>
 <p align="center">
-  <img src="docs/screenshots/switcher.png" width="48.5%" alt="The switcher">
-  <img src="docs/screenshots/settings.png" width="48.5%" alt="Wi-Fi, Bluetooth and settings">
+  <img src="docs/screenshots/tiling.png" width="48.5%" alt="Wi-Fi, Sharing, Bluetooth and Settings, tiled">
+  <img src="docs/screenshots/switcher.png" width="48.5%" alt="The switcher, over them">
 </p>
 
 hellobro takes the screen over from Nickel, draws its own e-ink UI through
@@ -23,10 +23,15 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 
 ## What it does
 
-- **SSH**: an xterm-256color terminal, several sessions, mouse,
+- **Windows, as i3 has them**: a tiling window manager with i3's keys
+  (Meta+Enter, Meta+arrows, Meta+1…0), workspaces, splits, tabbed and
+  stacked containers, floating windows, a scratchpad, binding modes, and
+  i3's IPC, so `i3-msg`, `swaymsg` and i3ipc scripts work. The windows
+  come back as they were left.
+- **SSH**: an xterm-256color terminal, as many as you like, mouse,
   reconnects by itself. tmux, htop, helix, Claude Code all work.
-- **Shell**: the same terminal on the Kobo itself (turn it on in
-  Settings, Tabs), or Alpine Linux in a jail, with `apk` for tools.
+- **Shell**: Alpine Linux in a jail, with `apk` for tools, or the same
+  terminal on the Kobo itself.
 - **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to
   Bluetooth headphones. The media keys and the headphones' buttons work,
   and the header shows what plays.
@@ -97,27 +102,31 @@ make dist            # a release's files, in dist/
 
 | | |
 | --- | --- |
-| Ctrl+Alt+1–4 | tabs |
-| Ctrl+Shift+P | go to: sessions, tabs, hosts, commands |
-| Ctrl+Tab, Ctrl+Shift+Tab | next / previous panel (or session) |
-| Ctrl+Shift+M | minimize / open the panel in focus (Enter opens it too) |
-| Ctrl+Shift+T | new session |
+| Meta+Enter | a new window: 1 Alpine, 2 the Kobo's sh, 3… a saved host |
+| Meta+D, Meta+Space | go to: windows, workspaces, hosts, settings, commands |
+| Meta+arrows (or H J K L), with Shift | focus the window there, move it there |
+| Meta+1…0, with Shift | go to a workspace, send the window there |
+| Meta+B, Meta+V | split: the next window beside, below |
+| Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
+| Meta+F | fullscreen (swipe in from the top or bottom edge to leave) |
+| Meta+Shift+Space | floating |
+| Meta+R | resize: the arrows, then Esc |
+| Meta+Shift+Q | close the window |
 | pen across text, Ctrl+Shift+V | copy, paste |
-| Ctrl+Shift+F | fullscreen, the panel in focus (swipe in from the top or bottom edge to leave) |
-| Ctrl+Shift+Space | play / pause, on any tab |
+| Ctrl+Shift+Space | play / pause, anywhere |
 | Ctrl+Shift+< / > | previous / next track |
 | Ctrl+Alt+S, power button | sleep |
 | swipe the left edge, Ctrl+Alt+Up / Down | frontlight |
 | Ctrl+Alt+L | frontlight on / off |
 | Ctrl+Q, `exit` | back to Nickel |
 
-Every key can be changed in Settings (Keys) or `keys.conf`, and which tabs show (Shell
-starts hidden), and in what order, in Settings. See
-[Keys](docs/usage.md#keys).
+Every key can be changed in Settings (Keys) or `keys.conf`, which takes
+any i3 command line and binding modes. See [Keys](docs/usage.md#keys)
+and [i3's IPC](docs/usage.md#i3s-ipc).
 
 ## Docs
 
-- [Using hellobro](docs/usage.md): every tab, sleep, sharing, updates
+- [Using hellobro](docs/usage.md): the windows, every one of them, sleep, sharing, updates
 - [From afar](docs/relay.md): the relay through a VPS
 - [Developing](docs/development.md): code, building, the test harness
 - [AGENTS.md](AGENTS.md): for coding agents

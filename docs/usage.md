@@ -6,76 +6,92 @@ It starts on a "hello bro" screen while it gets going, and says "bye
 bro!" as it hands the Kobo back; both have its version and where it's
 from (github.com/shabunin/hellobro) at the foot.
 
-## Tabs
+## Windows
 
-Tap a tab, or Ctrl+Alt+1–4 (by place; works everywhere, fullscreen and
-in a session too):
+hellobro is a tiling window manager, after [i3](https://i3wm.org): the
+screen is split between windows, side by side or one above another,
+tabbed or stacked, or floating over them, on workspaces. A window is:
 
-- **SSH**: an SSH client with an xterm-256color terminal (tmux, helix, htop,
-  Claude Code…), mouse taps and scrolling; several sessions at once, side
-  by side. A saved host's files can be mounted too, for Alpine
-  ([Host files](#host-files)).
-- **Shell**: the same terminal with `/bin/sh` on the Kobo itself, in a PTY;
-  several too. Hidden at first: turn it on in Settings, Tabs. Or Alpine
-  Linux in a jail instead ([The Alpine shell](#the-alpine-shell)).
-- **Settings**: Wi-Fi and Bluetooth without going back to Nickel: on and
-  off, networks (join, with a password; leave; forget; one by name), and
-  devices (scan, pair, connect, disconnect, forget); **Sharing** with a
-  computer over SFTP and SSH (how to reach the Kobo, pairing, who's
-  connected and sending what); and hellobro's own settings, in groups:
-  Light; Sleep and music; At start (Nickel, the radios); Sharing (file
-  sharing, the relay, mDNS, CPU profiles); Terminal (notifications, the
-  status bar); Shell (Alpine); Tabs and keys.
-- **Power**: a powertop of sorts. **Battery**: the charge, the current
-  it gives (mA, W), the gauge's time left, temperature, how fast it
-  went down lately (measured from its history, a sample a minute while
-  hellobro runs, kept in `battery-history`), and the last 12 hours on a
-  graph. **What uses it**, every 5 s: how busy the CPU is, at which
-  speeds and how deep it sleeps; the wakeups a second and whose; Wi-Fi,
-  Bluetooth, the light, sharing and the relay; and the processes that
-  keep the CPU busy (percent of one core).
+- **a terminal**: an SSH session (an xterm-256color terminal: tmux,
+  helix, htop, Claude Code…, mouse taps and scrolling), a shell on the
+  Kobo itself (`/bin/sh`, as root, in a PTY), or Alpine Linux in a jail
+  ([The Alpine shell](#the-alpine-shell)). A new one is a **launcher**
+  till it runs something: **1** Alpine, **2** the Kobo's sh, **3** and
+  on the saved hosts, or `user@host` typed in ([Terminal](#terminal)).
+  A saved host's files can be mounted too ([Host files](#host-files)).
+- **a settings' window**, one of each, opened from a launcher's
+  "Settings, in a window" row or the switcher:
+  - **Wi-Fi** and **Bluetooth**, without going back to Nickel: on and
+    off, networks (join, with a password; leave; forget; one by name),
+    and devices (scan, pair, connect, disconnect, forget);
+  - **Sharing** with a computer over SFTP and SSH (how to reach the
+    Kobo, pairing, who's connected and sending what);
+  - **Settings**, hellobro's own, in groups: Light; Sleep and music; At
+    start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
+    CPU profiles); Terminal (notifications, the status bar); Alpine;
+    Keys;
+  - **Battery**: the charge, the current it gives (mA, W), the gauge's
+    time left, temperature, how fast it went down lately (measured from
+    its history, a sample a minute while hellobro runs, kept in
+    `battery-history`), and the last 12 hours on a graph;
+  - **What uses it**, a powertop of sorts, every 5 s: how busy the CPU
+    is, at which speeds and how deep it sleeps; the wakeups a second and
+    whose; Wi-Fi, Bluetooth, the light, sharing and the relay; and the
+    processes that keep the CPU busy (percent of one core).
 
-Which tabs show, and in what order, is up to you: Settings, the last
-row, **Tabs** (or "tabs" in the switcher) opens a list of them. A tap on
-one, or Space, shows or hides it; the arrows, or Shift+Up/Down, move it.
-Settings itself can't be hidden. It's kept in `tabs`
-(`ssh -shell settings power`: a `-` hides one).
+A window's title strip has its name (white on black when it has the
+focus), a **+** for a launcher next to it, and a **×** that closes it (a
+terminal's shell or connection ends with it). A tap on a window gives it
+the focus; the keys go to the one that has it.
 
-## The header and the panels
+New windows open next to the one in focus, along its container: side
+by side, or one above another after Meta+V (split vertically; Meta+B,
+horizontally, side by side). Meta+E turns a container round, Meta+W
+tabs it (a row of tabs, one window shown), Meta+S stacks it (a title
+each, one above another, one window shown). Meta+F gives the window the
+whole screen (again, or a swipe in from the top or bottom edge, gives it
+back); Meta+Shift+Space floats it over the others (drag it by its strip;
+a floating window is put back with the same key).
+
+**Workspaces** are in the bar under the header, where tabs would be,
+numbered: Meta+1…Meta+0 go to one (made as you go there; an empty one
+goes once you leave it), Meta+Shift+1…0 send the window in focus to
+one, and a tap on one goes there. An empty workspace says how to open a
+window, and a tap on it does.
+
+Meta+Shift+Minus puts the window away (i3's scratchpad), Meta+Minus
+brings it back, floating, and puts it away again.
+
+The windows are kept as they're left, in `hellobro.json`, and come back
+when hellobro starts (an update's restart too): the workspaces, the
+layouts, the floating windows' places, the settings' windows, and the
+terminals, which start again: a shell anew, an SSH session connecting to
+its host. A launcher, or a terminal running what was typed in, comes
+back as a launcher.
+
+## The header and the keys' focus
 
 The header says where the Kobo is on the network: the Wi-Fi's name and
 its address (`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`),
-then the battery and the time. It looks again every 15 s.
+then the battery and the time. It looks again every 15 s. In a binding
+mode (Meta+R, say) it says which.
 
-A panel folds: the − at the end of its title strip folds it to the
-strip, and the other panels on the page take the room. The + (or a tap
-anywhere on the strip) opens it again. From the keys, Ctrl+Shift+M
-folds the panel in focus or opens it, and the switcher can too ("Wi-Fi
-panel: minimize", "… open"). They stay folded, kept in `folded` (a
-session's fold lasts as long as the session).
+Meta and the arrows (or h j k l, as vim has them) move the focus
+between the windows; with Shift, the window itself moves. Meta+A
+focuses the container around the window (its whole tabbed group, say,
+to move it all), Meta+Tab and Meta+Shift+Tab the next and the previous
+window on the workspace.
 
-One panel on a page has the focus, marked ►: the keys go to it.
-Ctrl+Tab moves it to the next panel, Ctrl+Shift+Tab back; a tap on a
-panel gives it the focus too. A folded one takes the focus as well, on
-its strip: there the keys wait, and Enter (or Ctrl+Shift+M) opens it.
-Folding the one in focus moves the focus to an open one.
+Meta+R is the resize mode: the arrows (or h j k l) make the window in
+focus wider or narrower, taller or shorter; Enter, Esc or Meta+R again
+ends it. In a mode only its keys count.
 
-Ctrl+Shift+F gives the panel in focus the whole screen, as a tiling
-window manager does, on any tab: Ctrl+Tab then goes on to the next
-panel, which has the screen in turn. Ctrl+Shift+F again, or a swipe in
-from the top or bottom edge, brings the others back. Like every key
-here, these are set in `keys.conf` (or Settings → Keys): `fullscreen`,
-`panel.next`, `panel.prev`, `panel.fold`.
-
-Tab moves the keys' focus through the page's controls, as on a desktop:
-the tab strip, the buttons and the lists, panel by panel; Shift+Tab goes
-back. A dashed frame shows where it is. Enter or Space presses the
-button in focus; a list takes ↑ ↓, PgUp/PgDn, Home/End and Enter; on
-the tab strip ← → change tabs. A panel's − box is a stop too: ← (or
-Enter) there folds the panel, and → on a folded panel's strip opens it.
-Ctrl+Tab, as before, goes to the next panel (its list, or its first
-button). The frame shows once Tab is used, and a touch takes it away.
-The terminals keep Tab for the shell.
+In a settings' window, Tab moves the keys' focus through its controls,
+as on a desktop: the buttons and the lists; Shift+Tab goes back. A
+dashed frame shows where it is. Enter or Space presses the button in
+focus; a list takes ↑ ↓, PgUp/PgDn, Home/End and Enter. The frame shows
+once Tab is used, and a touch takes it away. The terminals keep Tab for
+the shell.
 
 A question over the page (a saved host's menu, read-only or
 read-write, restart into a new build) has its answers as buttons: the
@@ -84,17 +100,19 @@ button's letter picks it, Esc closes the question.
 
 ## The switcher
 
-Ctrl+Shift+P, anywhere, is a switcher in the manner of rofi (or VS
-Code's command palette): the sessions, the tabs, the saved hosts (a new
-session to one), a new shell, and the commands, each with its keys:
-everything hellobro does on a key, a button or a page's letter. Among
-them: disconnecting or closing the session in focus; the player's play,
+Meta+D or Meta+Space, anywhere, is a switcher in the manner of rofi (or
+dmenu, which i3 has there): the windows (and where they are), the
+workspaces, the saved hosts (a new terminal to one), a new Alpine or
+Kobo shell, the settings' windows, and the commands, each with its
+keys: everything hellobro does on a key, a button or a window's letter.
+Among them: the window manager's (focus, move, layouts, fullscreen,
+floating); disconnecting the terminal in focus; the player's play,
 pause, stop, tracks and volume; Wi-Fi or Bluetooth on and off, looking
 for networks or devices, joining a network by name, its details;
-sharing, pairing, the relay; showing or hiding a tab; light sleep, the light, the screen's way round; and every
-setting ("Setting: …", with its value now: Enter steps it, as a tap on
-its row does). Typing narrows it (fuzzy); Up/Down and Enter, or 1–9
-before typing.
+sharing, pairing, the relay; light sleep, the light, the screen's way
+round; and every setting ("Setting: …", with its value now: Enter steps
+it, as a tap on its row does). Typing narrows it (fuzzy); Up/Down and
+Enter, or 1–9 before typing.
 
 ## Copy and paste
 
@@ -122,35 +140,96 @@ The header says what was copied or pasted, for a moment.
 
 ## Keys
 
-The keys are hellobro's commands'. To change one: Settings, the last
-row, **Keys** (or "keys" in the switcher), lists the commands with
-their keys. Pick one and press its new key, with Ctrl, Alt or Meta (an
-F-key alone will do): it takes the place of the ones it had, and a
-command that had that key lets it go. Backspace leaves it no key,
-Delete puts its defaults back, Esc leaves it be.
+The keys are hellobro's commands', i3's with Meta (the Win key):
+
+| Key | |
+| --- | --- |
+| Meta+Enter | a new window: a launcher |
+| Meta+D, Meta+Space | the switcher |
+| Meta+Shift+Q | close the window in focus |
+| Meta+arrows, Meta+H/J/K/L | focus the window there |
+| Meta+Shift+arrows, Meta+Shift+H/J/K/L | move the window there |
+| Meta+Tab, Meta+Shift+Tab | the next, the previous window |
+| Meta+1…0, Meta+Shift+1…0 | go to a workspace, send the window there |
+| Meta+B, Meta+V | split: the next window beside, below |
+| Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
+| Meta+F | fullscreen |
+| Meta+Shift+Space | floating |
+| Meta+A | focus the container around |
+| Meta+Shift+Minus, Meta+Minus | put the window away, bring it back |
+| Meta+R | resize mode: arrows, then Enter or Esc |
+| Meta+Shift+C | read keys.conf again |
+
+To change one: Settings, the Keys row (or "keys" in the switcher),
+lists the commands with their keys. Pick one and press its new key, with
+Ctrl, Alt or Meta (an F-key alone will do): it takes the place of the
+ones it had, and a command that had that key lets it go. Backspace
+leaves it no key, Delete puts its defaults back, Esc leaves it be.
 
 It all goes into `keys.conf`, which can be edited too. It's written the
 first time hellobro runs, every command in it with its default keys,
-commented out. A line is a key and a command:
+commented out (a `keys.conf` of an older hellobro with nothing but its
+defaults is written again). A line is a key and a command, hellobro's
+or any of [i3's](https://i3wm.org/docs/userguide.html#list_of_commands),
+as i3's `bindsym`:
 
 ```
-ctrl+alt+f   tab.files        # a tab of its own
-f1           tab.1            # the first tab, whichever it is
-ctrl+shift+n session.new
-f12          -                # not ours: the terminal gets F12
-none         session.prev     # no key at all
+meta+t       layout tabbed; focus parent  # i3's, any line of them
+f1           workspace number 1
+ctrl+alt+1   workspace number 1           # as the tabs' keys were
+meta+o       [class="hellobro" instance="wifi"] focus
+meta+x       exec htop                    # in a new Alpine window
+ctrl+shift+n launcher
+f12          -                            # not ours: the terminal gets F12
+none         focus prev                   # no key at all
+
+[resize]                                  # a binding mode: mode resize
+x            mode default
 ```
 
-A command named there loses its default keys; the others keep theirs.
-`KEY -` frees a key, so it goes on to the terminal (or the page). Keys
-are a-z, 0-9, f1-f12, tab, space, enter, esc, backspace, up, down,
-left, right, pgup, pgdn, home, end, insert, delete, the marks
-(`- = [ ] ; ' , . /`, and `minus` for `-`), brightnessup and
-brightnessdown (a keyboard's light keys), and any other by its Linux
-code (`key183`), with any of ctrl, shift, alt and meta. Saved (over
-SFTP, say), it takes effect at once; the log says what it didn't
-understand. The tabs' corners, the footer and the hints show the keys as
-they are.
+A command named there loses its default keys (in its mode); the others
+keep theirs. `KEY -` frees a key, so it goes on to the terminal (or the
+window). `[name]` starts a binding mode's keys, `[default]` goes back:
+`mode NAME` enters one, and in it only its keys count. Keys are a-z,
+0-9, f1-f12, tab, space, enter, esc, backspace, up, down, left, right,
+pgup, pgdn, home, end, insert, delete, the marks (`- = [ ] ; ' , . /`,
+and `minus` for `-`), brightnessup and brightnessdown (a keyboard's
+light keys), and any other by its Linux code (`key183`), with any of
+ctrl, shift, alt and meta. Saved (over SFTP, say), it takes effect at
+once; the log says what it didn't understand. The workspaces' corners,
+the footer and the hints show the keys as they are. The ids of an older
+hellobro that have a match now are read as it (`tab.1` as `workspace
+number 1`, `session.new` as `launcher`).
+
+## i3's IPC
+
+hellobro speaks i3's IPC, so what's written for i3 works: `i3-msg`,
+`swaymsg`, i3ipc's Python and its scripts, i3blocks-like loops. Every
+Alpine shell has the socket at `/run/hellobro/ipc.sock`, with `I3SOCK`
+and `SWAYSOCK` set to it, and `hellobro-msg`, which works as `i3-msg`:
+
+```sh
+hellobro-msg workspace 2
+hellobro-msg '[instance="launcher"] kill'
+hellobro-msg -t get_tree | jq '..|.name? // empty'
+hellobro-msg -t subscribe -m '["window"]'   # what the windows do, as it happens
+apk add i3wm && i3-msg -t get_workspaces    # i3's own, if you like
+```
+
+Commands, the tree, workspaces, outputs, marks, the version, binding
+modes and state, `keys.conf` as the config, ticks and sync; and the
+events: workspace, window, mode, binding, tick and shutdown. A window's
+class is `terminal` or `hellobro`, its instance `launcher`, `alpine`,
+`sh`, `ssh` or the settings' window (`wifi`, `bluetooth`, `sharing`,
+`settings`, `battery`, `usage`).
+
+What comes over the socket is a jail's, so it never runs as root on the
+Kobo: `exec` opens a new Alpine window, and of hellobro's own commands
+only what can't reach out of the jail runs (the music, the light, the
+font, the screen's way round, sleep, opening a launcher, an Alpine
+window or a settings' window); the Kobo's shell, SSH, the clipboard,
+sharing, the radios, the settings and `exit` are refused. On the Kobo
+itself (root), the socket is `/tmp/hellobro-ipc/ipc.sock`.
 
 ## The light
 
@@ -199,6 +278,9 @@ minutes), the Kobo goes to sleep properly.
 
 ## Terminal
 
+- A launcher (Meta+Enter, or a window's +) asks what to run: **1**
+  Alpine, **2** the Kobo's sh (Enter alone: Alpine), **3** and on a
+  saved host, or a host typed in. Esc closes it.
 - Type `user@host[:port] [command]` and Enter; the prompt also takes
   `ssh -p PORT [-J user@jumphost] user@host [command]`. A host typed
   there is saved once it connects (in `hellobro.json`), and listed under
@@ -219,18 +301,12 @@ minutes), the Kobo goes to sleep properly.
 - Keepalives every 15 s notice a dead connection; a dropped one (not one the
   remote closed) is made again, after 2, 4, 8… up to 30 s, with the password
   typed earlier (kept in memory only). Esc stops it.
-- Sessions are panels: each has its own, and the open ones share the
-  tab (portrait: one above the other; landscape: two abreast), each with
-  its own size. Ctrl+Shift+T or the `+` in the focused one's title adds
-  one; Ctrl+Tab and Ctrl+Shift+Tab (or Ctrl+PgUp/PgDn,
-  Ctrl+Shift+Left/Right, or a tap on it) move the focus, and the keys,
-  to the next and previous one, folded ones too. − or Ctrl+Shift+M folds
-  one to its strip; Enter on the strip, or picking it in the switcher,
-  opens it again. Esc on an idle one or `close` drops it.
-- Ctrl+Shift+F: fullscreen, the session in focus alone (Ctrl+Tab goes
-  on to the next). Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right
-  edge: font size (remembered in `hellobro.json`).
-- A status bar along the bottom, fullscreen too: what's playing, and the
+- Each terminal is a window, with its own size: the remote (or the
+  shell) is told when it changes. The title strip's `disconnect` or
+  `kill` ends what runs, and the window is a launcher again; × closes it.
+- Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right edge: font size,
+  all the terminals' (remembered in `hellobro.json`).
+- A status bar along the bottom, under the windows, fullscreen too: what's playing, and the
   battery (charge, temperature), CPU and memory use, every 5 s.
   Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it
   plays or pauses.
@@ -242,7 +318,7 @@ minutes), the Kobo goes to sleep properly.
   desktop notification (OSC 9 or 777: `make; printf '\e]9;make done\a'`).
   The light comes on a moment if it's off; the session's title strip
   blinks if it shows, and if not, a note in the lower right corner says
-  which and what (`SSH 2: make done`). A bell within 2 s of a key typed
+  which and what (`Alpine: make done`). A bell within 2 s of a key typed
   into it doesn't count (that's the shell's answer to the key), and a
   session calls out at most every 5 s. Settings, **Terminal
   notifications** and the three under it: the bell too or messages only,
@@ -251,7 +327,7 @@ minutes), the Kobo goes to sleep properly.
 
 ## Host files
 
-A saved host's menu (the SSH tab) has **mount its files**: it asks
+A saved host's menu (in a launcher) has **mount its files**: it asks
 **read-only** or **read-write** each time, logs in as connecting does
 (the Kobo's key, or a password asked on the page), and the host's home
 is then a folder:
@@ -282,10 +358,10 @@ update see `/mnt/hosts` from their next start.
 
 ## The Alpine shell
 
-Settings, **Shell tab runs**: the Kobo's own `/bin/sh`, as root (the
-default), or **Alpine Linux, in a jail**: a small Linux of its own, with
-its own tools and `apk add` for more (git, python3, vim, tmux…), kept
-away from the Kobo's system.
+A launcher's **1** (or Enter) is **Alpine Linux, in a jail**: a small
+Linux of its own, with its own tools and `apk add` for more (git,
+python3, vim, tmux…), kept away from the Kobo's system. (**2** is the
+Kobo's own `/bin/sh`, as root.)
 
 - The first Alpine session sets it up, in the session: a disk image
   (`.adds/hellobro/alpine.img`, ext2), as big as you say there, in MB
@@ -300,7 +376,7 @@ away from the Kobo's system.
   - `/mnt/onboard` is the Kobo's storage, writable, but its `.adds` and
     `.kobo` are read-only: what's there runs as root outside (the
     launcher, NickelMenu, `KoboRoot.tgz`).
-  - `/mnt/hosts` has the hosts mounted from the SSH tab ([Host
+  - `/mnt/hosts` has the hosts mounted from a launcher ([Host
     files](#host-files)); it's read-only itself, the mounts in it are as
     they were mounted.
   - Its own processes only (no Nickel, no hellobro), its own `/dev` (no
@@ -309,6 +385,8 @@ away from the Kobo's system.
   - No mount, modules, raw devices, mknod, reboot, ptrace, clock or
     network setup, and no way to get them back (no_new_privs). The
     network itself works.
+  - The window manager's socket, `/run/hellobro/ipc.sock`, and
+    `hellobro-msg` ([i3's IPC](#i3s-ipc)).
 - System bus access: off by default. Settings, **… Alpine: system bus
   access** gives the jail the Kobo's D-Bus, for what talks to its
   services. Sound is the first of those: the Kobo has no sound card,
@@ -334,8 +412,8 @@ away from the Kobo's system.
 - Settings, **… Alpine: remove it** (or "Alpine: remove it…" in the
   switcher) deletes the image and all in it, once you type `yes delete
   it bro` in the question (a keyboard is needed). The Alpine sessions
-  have to be closed first. The Shell tab stays on Alpine: its next
-  session starts over, asking the size anew.
+  have to be closed first. The next Alpine window starts over, asking
+  the size anew.
 
 ## Music
 
@@ -352,7 +430,7 @@ Then a new Alpine shell has a session bus (`/run/user/0/bus`, in
 Sound needs "Alpine: system bus access" on ([The Alpine
 shell](#the-alpine-shell)); mplayer has no MPRIS.
 
-- On any tab: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
+- Anywhere: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
   the previous and next track; so do media keys, and the volume keys (a
   headset's, a keyboard's) set the player's volume. A tap on the status
   bar plays or pauses. They go to the player that's playing, or else one
@@ -387,7 +465,7 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
   signal, address, gateway, DNS, the interface and its MAC; c copies
   them, Esc closes.
 - Bluetooth: `scan` (s) looks for 40 s; a new device pairs (with a code to
-  confirm, or to type on a keyboard, shown in the panel), then gets trusted
+  confirm, or to type on a keyboard, shown in the window), then gets trusted
   and connected. Paired ones connect, disconnect, and are forgotten with f.
   Pairing goes through hellobro's own agent while Nickel is frozen.
   Kobo turns the Bluetooth chip itself off, not only the adapter; turning
@@ -395,16 +473,15 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
   Realtek UART chip), and starts bluetoothd and bluealsa if they aren't
   running, as [bluetooth.koplugin](https://github.com/Tharavol/bluetooth.koplugin)
   does on the Sage; off undoes it.
-- Ctrl+Tab moves between the panels: Wi-Fi, Bluetooth, and the
-  settings, where a tap (or ←/→, Enter) changes one; ↑ ↓ and PgUp/PgDn
-  go through them. They're kept in `settings`.
+- The Settings window: a tap (or ←/→, Enter) changes one; ↑ ↓ and
+  PgUp/PgDn go through them. They're kept in `settings`.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
   since Nickel wakes up thinking so; networks and devices added stay.
   "Wi-Fi and Bluetooth at start", turned on, has hellobro turn both on
   as it starts and leave them on when it quits (or restarts into a new
   build). Nickel may still turn them off soon after, if you were in
   hellobro a while: its idle timers run out while it's frozen. On
-  the first visit to the tab, what's found of the setup (Kobo's variables,
+  the first opening of their windows, what's found of the setup (Kobo's variables,
   processes, modules, rfkill) goes to `hellobro.log`.
 
 ## Sharing with a computer
@@ -474,8 +551,8 @@ It's only installed when asked for: `make install-tools`.
 ## In both apps
 
 In both: swipe the left edge for the frontlight (in hellobro also
-Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Ctrl+Shift+F
-in hellobro): swipe in from the top or bottom edge to leave it. The exit
+Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Meta+F in
+hellobro): swipe in from the top or bottom edge to leave it. The exit
 button leaves, and so does Esc in brotools, Ctrl+Q in hellobro (where Esc
 is the terminal's, or closes what's open);
 the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
@@ -520,8 +597,8 @@ Kobo's storage:
 | `known_hosts` | host keys trusted on first use |
 | `authorized_keys` | computers paired for file sharing |
 | `ssh_host_ed25519_key` | the Kobo's host key, for file sharing |
-| `settings`, `status-bar`, `tabs`, `folded` | settings |
-| `hellobro.json` | the saved SSH hosts, and how it was left: the light, the font size |
+| `settings`, `status-bar` | settings |
+| `hellobro.json` | the saved SSH hosts, and how it was left: the windows, the light, the font size |
 | `ssh.conf.old` | the hosts as kept before, taken in once |
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |

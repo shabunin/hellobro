@@ -17,10 +17,8 @@
 #      INTERFACE (for the Net tab, default: the one with the default route),
 #      FAKE_RADIO (default 1: stand-in Wi-Fi and Bluetooth; empty: the real ones),
 #      APP_EXTRA (a directory copied into the app's, over what's there:
-#      settings, relay.conf, keys, keys.conf),
-#      HB_TABS (hellobro's tabs file; default all five shown, as the
-#      feeds' Ctrl+Alt+N and tab taps count on; one it leaves out is
-#      shown at the end, as the app does with Power)
+#      settings, relay.conf, keys, keys.conf, hellobro.json),
+#      HELLOBRO_MSG (the ipc feed's hellobro-msg: a PC build of hellobro by that name)
 #
 # The ssh, fullscreen, stress, connect, flash, zoom and fontswipe feeds want
 # the server running: (cd server && go run .); the relay feed wants
@@ -30,13 +28,10 @@ H=$(cd "$(dirname "$0")" && pwd); OUT=$1; ROTA=$2; FEED=${3:-demo}
 NAME=$(sed -n 's/^# app: //p' "$H/feeds/$FEED.py" | head -n 1)
 APP=${APP:-$H/../${NAME:-hellobro}}
 NAME=$(basename "$APP")
-HB_TABS=${HB_TABS:-ssh shell settings power}
-case " $HB_TABS " in *" power "* | *" -power "*) ;; *) HB_TABS="$HB_TABS power" ;; esac
-case $NAME in brotools*) TABS=7 ;; *) TABS=$(echo "$HB_TABS" | tr ' ' '\n' | grep -vc '^-') ;; esac
+case $NAME in brotools*) TABS=7 ;; *) TABS=4 ;; esac # the bar's places, for the feeds' tab_x
 IFACE=${INTERFACE:-$(ip route show default 2>/dev/null | awk '{print $5; exit}')}
 rm -rf "$OUT"; mkdir -p "$OUT/screen" "$OUT/input" "$OUT/app" "$OUT/onboard/Music"
 cp "$APP" "$OUT/app/$NAME"; cp "$H/ssh.conf" "$OUT/app/"
-case $NAME in brotools*) ;; *) echo "$HB_TABS" > "$OUT/app/tabs" ;; esac
 [ -z "${APP_EXTRA:-}" ] || cp -r "$APP_EXTRA/." "$OUT/app/"
 mkdir "$OUT/battery"; for f in capacity=71 status=Discharging health=Good type=Battery current_now=2708 voltage_now=4057300 temp=310 time_to_empty_now=25800 time_to_full_now=3932100; do
 	echo "${f#*=}" > "$OUT/battery/${f%%=*}"

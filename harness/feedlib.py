@@ -88,6 +88,8 @@ cx0, cy0 = (60, 200)
 cw, ch = ((W - 32) * 0.66 - 60, H - 76 - 68 - 46 - 32 - 100) if land else (W - 120, (H - 76 - 68 - 46 - 32) * 0.66 - 110)
 
 def key(code, shift=False, ctrl=False, alt=False, meta=False):
+    if not meta and legacy(code, shift, ctrl, alt):
+        return
     mods = [m for m, on in ((125, meta), (29, ctrl), (42, shift), (56, alt)) if on]
     for m in mods: kbd.write(ev(1, m, 1) + SYN)
     kbd.write(ev(1, code, 1) + SYN + ev(1, code, 0) + SYN)
@@ -100,7 +102,7 @@ HOME, END = 102, 107
 MINUS = 12
 def mod(code, **kv): key(code, meta=True, **kv)       # Meta+key: the window manager's
 
-def fullscreen(): key(KEY_F, ctrl=True, shift=True)  # on and off
+def fullscreen(): mod(KEY_F)                           # on and off
 F = lambda n: 58 + n                                  # F1..F10
 
 def power():
@@ -116,3 +118,43 @@ def exit_app():
     """Taps the header's exit button."""
     tap(W - 16 - 45, 38)
     time.sleep(3)
+
+# The tabs that were, for the feeds written for them: Ctrl+Alt+1-4 go to
+# a workspace laid out as the tab was (opened the first time), and the
+# keys that moved about the tabs and panels are the window manager's
+# now. Taps at the tabs' places may land elsewhere.
+def gui(name):
+    """Opens (or focuses) a settings' window by its name, through the switcher."""
+    mod(32); time.sleep(1.2); keys(name); time.sleep(0.6); key(ENTER); time.sleep(2.5)
+made = set()
+def tab(n):
+    """Workspace n, as tab n was: 1 SSH (a launcher), 2 Shell (the Kobo's sh), 3 Settings, 4 Power."""
+    mod(1 + n); time.sleep(1.5)
+    if n in made or n == 1:
+        return
+    made.add(n)
+    if n == 2:
+        mod(ENTER); time.sleep(1.5); keys("2"); time.sleep(1.5)
+    elif n == 3:                                      # Wi-Fi and Sharing above, Bluetooth and Settings below
+        gui("wi-fi"); mod(48); gui("sharing")         # Meta+B: beside it
+        mod(105); mod(47); gui("bluetooth")           # Meta+Left, Meta+V
+        mod(106); mod(47); gui("settings")
+        mod(105); mod(103)                            # back to Wi-Fi
+    elif n == 4:
+        gui("battery"); mod(48); gui("what uses")
+        mod(105)
+def legacy(code, shift, ctrl, alt):
+    if ctrl and alt and not shift and 2 <= code <= 5:
+        tab(code - 1)
+    elif ctrl and not alt and code == TAB:
+        mod(TAB, shift=shift)                         # the next window
+    elif ctrl and shift and not alt and code == KEY_P:
+        mod(32)                                       # the switcher
+    elif ctrl and shift and not alt and code == KEY_T:
+        mod(ENTER)                                    # a new window
+    elif ctrl and shift and not alt and code == KEY_F:
+        mod(KEY_F)
+    else:
+        return False
+    time.sleep(0.15)
+    return True

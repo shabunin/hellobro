@@ -10,8 +10,10 @@ run they freeze Nickel and draw an e-ink UI through FBInk.
 
 - `cmd/hellobro/`: the main app (terminal, Alpine, settings, sharing,
   relay, the Linux players' remote control, hosts' files mounted).
-  Its keys are commands (`commands.go`, changed in `keys.conf`); which
-  tabs show is `tabs.go`
+  It's a tiling window manager after i3 (`wm.go`): its keys are
+  commands (`commands.go`, changed in `keys.conf`), i3's among them
+- `wm/`: the window manager's tree and i3's commands, IPC views and
+  saving: no drawing, tested on its own
 - `cmd/brotools/`: diagnostics, only installed when asked for
 - `kobo/`: screen, input, frame, sleep: what the apps share
 - `audio/`, `radio/`, `share/`: Bluetooth audio, Wi-Fi/BT, the SSH/SFTP server
@@ -60,12 +62,14 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
 - Log: `OUT/stdout.txt`. App files: `OUT/app`.
 - `APP_EXTRA=dir` copies files into the app's dir first (settings,
   relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
-- The harness shows all four tabs, as the feeds' Ctrl+Alt+N count on
-  (the app hides Shell by default). `HB_TABS="ssh -shell settings"`
-  sets the tabs file as you like: `harness/feeds/tabs.py` wants
-  that one.
+- Feeds drive the window manager with Meta (`mod()` in feedlib) and
+  open settings' windows through the switcher (`gui()`). The feeds
+  written for the tabs that were still run: their Ctrl+Alt+1–4 go to a
+  workspace laid out as the tab was, but their taps may land elsewhere.
+  `tiling`, `ipc` (`HELLOBRO_MSG=` a PC build of hellobro named
+  hellobro-msg), `layout` then `restore` are the window manager's.
 - Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`,
-  `panes`, `foldkeys`, `fontswipe` and `relay` need the test server:
+  `fontswipe` and `relay` need the test server:
   `cd server && go run .` (port 2222).
 - Put outputs in your scratch directory, not the repo.
 
@@ -179,18 +183,23 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 - A new key is a command in `commands.go` (with its default keys), not
   a case in a Key function: then keys.conf, the switcher and the hints
   know of it.
-- A page's panels are placed with `tile` (`Layout.Arrange`, or
-  fullscreen the one in focus alone) and made with `pagePanel` (foldable,
-  listed in `fold.go`). A folded panel's inner rects are
-  zeroed in its layout and its draw stops after `DrawPanel`, so nothing
-  of it is drawn or tapped.
-- Each terminal session has its own panel and cells (`termPane`: grid,
-  cols, rows, what's drawn); `a.term()` is the one in focus, which the
-  keys and the selection go to. `layoutSessions` places a tab's
-  sessions; the emulator and the remote are resized only when a pane
-  that shows changes size (`t.size`). Ctrl+Tab moves the focus on any
-  page through `stepPanel`; the panel in focus gets `focusMark`'s ►.
-- A new button or list on a page goes into `controls()` (`focus.go`), so
+- A window is a leaf of `wm`'s tree holding a `window` (`wm.go`): a
+  terminal (`termSession`) or a settings' window (`guiWin`, `gui.go`).
+  `wmApply` shows the tree as it is after a change: placed (`place`,
+  with an empty panel for one that doesn't show), drawn again where the
+  layout changed, or only the title strips where the focus moved.
+  Floating windows are drawn again over whatever a tiled one marks under
+  them (`Mark`). An i3 command goes through `wmRun`; what isn't the
+  tree's is `wmHost.Command`.
+- What comes over the IPC socket is a jail's: it goes through
+  `ipcHost`, which runs only the commands in `ipcCommands`, and `exec`
+  opens an Alpine window. Never let it run anything as root on the Kobo.
+- Each terminal has its own panel and cells (`termPane`: grid, cols,
+  rows, what's drawn); `a.term()` is the one in focus, if a terminal
+  is, which the keys and the selection go to. The emulator and the
+  remote are resized only when a window that shows changes size
+  (`t.size`).
+- A new button or list in a settings' window goes into `controls()` (`focus.go`), so
   Tab reaches it; Enter on a button is a tap on it. The focus ring is
   stamped at blit time (`kobo/ring.go`), never drawn into the canvas.
 - Tests sit next to the code (`*_test.go`). Parsers and logic get table
