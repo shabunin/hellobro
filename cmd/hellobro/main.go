@@ -97,6 +97,10 @@ func main() {
 		fmt.Println("hellobro", version)
 		return
 	}
+	if len(os.Args) == 3 && os.Args[1] == "--alpine-init" { // a jail's first process (alpineinit.go), screen untouched
+		alpineInit(os.Args[2])
+		return
+	}
 	updateTrial() // before anything that might hang
 	a := &bro{mus: musicState{lib: &library{}, gain: 40}}
 	if g, err := strconv.Atoi(readMusicState()["gain"]); err == nil {
@@ -237,6 +241,7 @@ func (a *bro) Exit() {
 	a.musicStop()
 	a.radioExit()
 	a.shareExit()
+	alpineExit()
 }
 
 func (a *bro) IdleTimeout() time.Duration {

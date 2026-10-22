@@ -68,4 +68,16 @@ if [ "$app" = hellobro ] && [ "$status" -ne 0 ] && [ -f update-trial ] && [ -f h
 	"./$app"
 	say "$app exited ($?)"
 fi
+# The Alpine jails (alpineinit.go) go with the app, and their image lets
+# go of the storage, which Nickel may hand to a computer over USB.
+for pid in $(pidof hellobro); do
+	if tr '\0' ' ' <"/proc/$pid/cmdline" | grep -q -- --alpine-init; then
+		say "ending the Alpine jail $pid"
+		kill -KILL "$pid"
+	fi
+done
+if grep -q " /tmp/hellobro-alpine " /proc/mounts; then
+	say "unmounting the Alpine image"
+	umount -l /tmp/hellobro-alpine
+fi
 exit 0

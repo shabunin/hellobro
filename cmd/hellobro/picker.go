@@ -72,7 +72,11 @@ func (a *bro) openPicker() {
 		p.all = append(p.all, pickEntry{kind: "ssh", title: h.name, detail: h.String() + cmd, do: func() { a.goHost(h) }})
 	}
 	if slices.Contains(shown, tabShell) {
-		p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: "/bin/sh on this Kobo", do: func() { a.goNewShell() }})
+		detail := "/bin/sh on this Kobo"
+		if a.setting("shell") == "alpine" {
+			detail = "Alpine, in a jail"
+		}
+		p.all = append(p.all, pickEntry{kind: "new", title: "new shell", detail: detail, do: func() { a.goNewShell() }})
 	}
 	for _, c := range commands {
 		if c.hidden || c.when != nil && !c.when(a) {

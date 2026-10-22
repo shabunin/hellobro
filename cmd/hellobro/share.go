@@ -57,7 +57,11 @@ func (a *bro) shareApply() {
 		srv, err := share.Start(share.Config{
 			Addr: shareAddr, StateDir: kobo.AppFile(""), Root: shareRoot,
 			StartShell: func(cmd string, cols, rows int) (share.Shell, error) {
-				sh, err := startShell(cols, rows, cmd)
+				start := func() (*localShell, error) { return startShell(cols, rows, cmd) }
+				if rest, ok := strings.CutPrefix(cmd, "hellobro-alpine"); ok && (rest == "" || rest[0] == ' ') {
+					start = func() (*localShell, error) { return startAlpine(cols, rows, strings.TrimSpace(rest)) }
+				}
+				sh, err := start()
 				if err != nil {
 					return nil, err
 				}

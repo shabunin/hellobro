@@ -448,6 +448,12 @@ func (a *bro) drawConnect(t *termSession) {
 	var lines []string
 	if t.kind == kindShell {
 		lines = []string{"A shell on this Kobo (/bin/sh, as " + whoami() + "): Enter or tap here to start it.", keys, music}
+		if a.setting("shell") == "alpine" {
+			lines[0] = "Alpine Linux " + alpineVersion + ", in a jail on this Kobo: Enter or tap here to start it."
+			if _, err := os.Stat(alpineImg); err != nil {
+				lines[0] += " The first time sets it up: a 1 GB disk image, and 3 MB from the net."
+			}
+		}
 		if t.state == termIdle && len(a.tv.groups[t.kind].sessions) > 1 {
 			lines = append(lines, "Esc: close this session.")
 		}
@@ -947,7 +953,11 @@ func (a *bro) termStartShell(t *termSession) {
 	}
 	t.notes, t.title = nil, ""
 	size := t.startSize()
-	s, err := startShell(size.X, size.Y)
+	start := func() (*localShell, error) { return startShell(size.X, size.Y) }
+	if a.setting("shell") == "alpine" {
+		start = func() (*localShell, error) { return startAlpine(size.X, size.Y, "") }
+	}
+	s, err := start()
 	if err != nil {
 		a.termNote(t, "couldn't start a shell: "+err.Error())
 		return

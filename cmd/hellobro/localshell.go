@@ -12,6 +12,7 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -21,36 +22,48 @@ import (
 
 type localShell struct {
 	pty  *os.File // the master side
-	cmd  *exec.Cmd
+	mu   sync.Mutex
+	cmd  *exec.Cmd     // once it's started
+	shut bool          // closed: nothing more is started
 	exit chan struct{} // closed once the shell is gone
 	err  error         // how it went, once exit is closed
 }
 
-// startShell runs a login-ish shell on a new PTY of cols×rows; or, given
-// a command, the shell runs that.
-func startShell(cols, rows int, command ...string) (*localShell, error) {
+// openPTY makes a new PTY of cols×rows: our side, and the shell's.
+func openPTY(cols, rows int) (pty, tty *os.File, err error) {
 	ptmx, err := ptyMaster()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// O_NOCTTY: the PTY becomes the shell's controlling terminal, not ours.
-	pty, err := os.OpenFile(ptmx, os.O_RDWR|syscall.O_NOCTTY, 0)
+	pty, err = os.OpenFile(ptmx, os.O_RDWR|syscall.O_NOCTTY, 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var n uint32
 	unlock := int32(0)
 	if err := ioctl(pty, syscall.TIOCSPTLCK, unsafe.Pointer(&unlock)); err != nil {
 		pty.Close()
-		return nil, fmt.Errorf("unlockpt: %w", err)
+		return nil, nil, fmt.Errorf("unlockpt: %w", err)
 	}
 	if err := ioctl(pty, syscall.TIOCGPTN, unsafe.Pointer(&n)); err != nil {
 		pty.Close()
-		return nil, fmt.Errorf("ptsname: %w", err)
+		return nil, nil, fmt.Errorf("ptsname: %w", err)
 	}
-	tty, err := os.OpenFile(fmt.Sprintf("/dev/pts/%d", n), os.O_RDWR|syscall.O_NOCTTY, 0)
+	tty, err = os.OpenFile(fmt.Sprintf("/dev/pts/%d", n), os.O_RDWR|syscall.O_NOCTTY, 0)
 	if err != nil {
 		pty.Close()
+		return nil, nil, err
+	}
+	setWinsize(pty, cols, rows)
+	return pty, tty, nil
+}
+
+// startShell runs a login-ish shell on a new PTY of cols×rows; or, given
+// a command, the shell runs that.
+func startShell(cols, rows int, command ...string) (*localShell, error) {
+	pty, tty, err := openPTY(cols, rows)
+	if err != nil {
 		return nil, err
 	}
 	defer tty.Close() // the shell has its own copies
@@ -70,17 +83,36 @@ func startShell(cols, rows int, command ...string) (*localShell, error) {
 			break
 		}
 	}
-	s := &localShell{pty: pty, cmd: cmd, exit: make(chan struct{})}
-	s.resize(cols, rows)
-	if err := cmd.Start(); err != nil {
+	s := &localShell{pty: pty, exit: make(chan struct{})}
+	if err := s.start(cmd); err != nil {
 		pty.Close()
 		return nil, err
 	}
+	return s, nil
+}
+
+// start runs cmd as the shell, unless it was closed meanwhile.
+func (s *localShell) start(cmd *exec.Cmd) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.shut {
+		return errors.New("closed")
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	s.cmd = cmd
 	go func() {
 		s.err = cmd.Wait()
 		close(s.exit)
 	}()
-	return s, nil
+	return nil
+}
+
+// fail ends a shell that never started.
+func (s *localShell) fail(err error) {
+	s.err = err
+	close(s.exit)
 }
 
 // ptyMaster finds the PTY multiplexer. The Kobo has neither /dev/ptmx nor
@@ -166,14 +198,21 @@ func (s *localShell) Read(p []byte) (int, error) {
 
 func (s *localShell) Write(p []byte) (int, error) { return s.pty.Write(p) }
 
-func (s *localShell) resize(cols, rows int) {
+func (s *localShell) resize(cols, rows int) { setWinsize(s.pty, cols, rows) }
+
+func setWinsize(pty *os.File, cols, rows int) {
 	ws := struct{ row, col, x, y uint16 }{uint16(rows), uint16(cols), 0, 0}
-	ioctl(s.pty, syscall.TIOCSWINSZ, unsafe.Pointer(&ws))
+	ioctl(pty, syscall.TIOCSWINSZ, unsafe.Pointer(&ws))
 }
 
 // close hangs up on the shell and everything it started.
 func (s *localShell) close() {
-	if p := s.cmd.Process; p != nil {
+	s.mu.Lock()
+	s.shut = true
+	cmd := s.cmd
+	s.mu.Unlock()
+	if cmd != nil && cmd.Process != nil {
+		p := cmd.Process
 		syscall.Kill(-p.Pid, syscall.SIGHUP)
 		go func() {
 			select {
