@@ -23,7 +23,7 @@ in a session too):
   off, networks (join, with a password; leave; forget; one by name), and
   devices (scan, pair, connect, disconnect, forget); and hellobro's own
   settings: light sleep, sleep with music on, file sharing, the relay,
-  mDNS, the status bar, changing tabs, the tabs.
+  mDNS, CPU profiles, the status bar, the tabs.
 - **Files**: sharing with a computer over SFTP and SSH (how to reach the
   Kobo, pairing, who's connected and sending what), and the Kobo's
   storage: folders to open, files and folders to delete.
@@ -41,11 +41,6 @@ row, **Tabs** (or "tabs" in the switcher) opens a list of them. A tap on
 one, or Space, shows or hides it; the arrows, or Shift+Up/Down, move it.
 Settings itself can't be hidden. It's kept in `tabs`
 (`ssh -shell music settings files`: a `-` hides one).
-
-**Changing tabs**, in Settings, makes a new tab come up faster: with it
-on, the page goes up in black and white (the panel's quick DU update),
-and once you stop switching, a moment later, its grays fill in (GL16).
-Off, the default, it comes up in grays at once.
 
 ## The header and the panels
 

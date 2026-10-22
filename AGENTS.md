@@ -77,6 +77,7 @@ in landscape when the layout is involved.
 make push         # scp hellobro.new + launch.sh, then hellobro-update (restarts at once)
 make push-log     # the device log
 make push-rollback
+make push-profile # a CPU profile (PROFILE_SECS, 30) to cpu.pprof; Settings, CPU profiles on first
 ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 ```
 

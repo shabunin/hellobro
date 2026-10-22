@@ -53,12 +53,12 @@ var settingList = []setting{
 	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
 		values: []string{"on", "off"},
 		shown:  []string{"yes, while sharing", "no"}},
+	{key: "profile", label: "CPU profiles (make push-profile)",
+		values: []string{"off", "on"},
+		shown:  []string{"off", "on, for a paired computer"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
-	{key: "fast-tabs", label: "Changing tabs",
-		values: []string{"off", "on"},
-		shown:  []string{"in grays at once", "fast in black and white, grays after"}},
 	{key: "tabs", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
 	{key: "keys", label: "Keys", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
 }
@@ -80,6 +80,7 @@ type settingsView struct {
 	rows  []image.Rectangle
 	hint  image.Rectangle
 	sel   int
+	top   int // the first row shown, when not all fit
 	shown string
 }
 
@@ -176,8 +177,8 @@ func (a *bro) stepSetting(i, d int) {
 		switch st.key {
 		case "mdns", "relay":
 			a.shareApply()
-		case "fast-tabs":
-			a.FastTabs = a.setting(st.key) == "on"
+		case "profile":
+			profileOn.Store(a.setting(st.key) == "on")
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))
@@ -215,7 +216,15 @@ func (a *bro) drawSettings() {
 	for _, st := range settingList {
 		vals = append(vals, a.setting(st.key))
 	}
-	key := fmt.Sprint(vals, v.sel, focused, a.share.code)
+	n := len(v.rows)
+	if v.sel < v.top {
+		v.top = v.sel
+	}
+	if v.sel >= v.top+n {
+		v.top = v.sel - n + 1
+	}
+	v.top = max(0, min(v.top, len(settingList)-n))
+	key := fmt.Sprint(vals, v.sel, v.top, n, focused, a.share.code)
 	if key == v.shown {
 		return
 	}
@@ -225,7 +234,8 @@ func (a *bro) drawSettings() {
 		p.Name = "► " + p.Name
 	}
 	a.DrawPanel(p, "")
-	for i, rr := range v.rows {
+	for k, rr := range v.rows {
+		i := v.top + k
 		st := settingList[i]
 		fg, dim := uint8(kobo.Black), uint8(kobo.Dark)
 		if i == v.sel {
@@ -256,7 +266,14 @@ func (a *bro) drawSettings() {
 		t.Max.X -= vw + 20
 		c.Text(a.F.Body, t, a.settingLabel(st), fg, kobo.AlignLeft)
 	}
-	c.Text(a.F.Small, v.hint, "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Tab: the next panel.", kobo.Dark, kobo.AlignLeft)
+	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter); Tab: the next panel."
+	switch {
+	case v.top+n < len(settingList): // a short screen
+		hint = fmt.Sprintf("▼ %d more: tap here, or ↓", len(settingList)-v.top-n)
+	case v.top > 0:
+		hint = "▲ back to the top: tap here, or ↑"
+	}
+	c.Text(a.F.Small, v.hint, hint, kobo.Dark, kobo.AlignLeft)
 	a.Mark(p.Outer, true)
 }
 
@@ -283,10 +300,21 @@ func indexOf(vs []string, v string) int {
 
 // settingsTap changes the setting tapped.
 func (a *bro) settingsTap(pt image.Point) {
-	for i, rr := range a.sv.rows {
+	v := &a.sv
+	if pt.In(v.hint) && len(v.rows) < len(settingList) { // the rest of a list that doesn't fit, or back
+		if v.top+len(v.rows) < len(settingList) {
+			v.top = len(settingList) - len(v.rows)
+		} else {
+			v.top = 0
+		}
+		v.sel = v.top
+		a.drawSettings()
+		return
+	}
+	for k, rr := range v.rows {
 		if pt.In(rr) {
-			a.sv.sel = i
-			a.stepSetting(i, 1)
+			v.sel = v.top + k
+			a.stepSetting(v.sel, 1)
 			return
 		}
 	}
@@ -299,7 +327,7 @@ func (a *bro) settingsKey(code uint16) {
 	case keyUp:
 		v.sel = max(0, v.sel-1)
 	case keyDown:
-		v.sel = min(len(v.rows)-1, v.sel+1)
+		v.sel = min(len(settingList)-1, v.sel+1)
 	case keyLeft:
 		a.stepSetting(v.sel, -1)
 		return

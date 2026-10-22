@@ -89,7 +89,8 @@ push-rollback:
 # cpu.pprof here: go tool pprof -http=: cpu.pprof for the whole of it.
 PROFILE_SECS ?= 30
 push-profile:
-	ssh $(SSH_TO) $(KOBO_HOST) hellobro-profile $(PROFILE_SECS) > cpu.pprof
+	ssh $(SSH_TO) $(KOBO_HOST) hellobro-profile $(PROFILE_SECS) > cpu.pprof || \
+		{ cat cpu.pprof; rm -f $(CURDIR)/cpu.pprof; exit 1; }
 	go tool pprof -top -nodecount=30 cpu.pprof
 
 # The log, over Wi-Fi.

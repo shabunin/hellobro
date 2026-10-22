@@ -16,6 +16,7 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"hellobro/kobo"
@@ -228,6 +229,10 @@ func (a *bro) builtin(cmd string, out io.Writer) (int, bool) {
 		return 0, true
 	}
 	if f := strings.Fields(cmd); len(f) > 0 && f[0] == "hellobro-profile" { // make push-profile: a CPU profile, to stdout
+		if !profileOn.Load() {
+			fmt.Fprintln(out, "hellobro-profile: off (Settings, CPU profiles)")
+			return 1, true
+		}
 		secs := 30
 		if len(f) > 1 {
 			secs, _ = strconv.Atoi(f[1])
@@ -236,6 +241,9 @@ func (a *bro) builtin(cmd string, out io.Writer) (int, bool) {
 	}
 	return 0, false
 }
+
+// profileOn is the setting, for the share server's goroutines.
+var profileOn atomic.Bool
 
 // profileCPU writes a CPU profile of the next d to out (pprof's format,
 // the function names in it: our build has no symbols for pprof to read).
