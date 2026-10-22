@@ -1,7 +1,7 @@
 package main
 
-// Sleep and wake, around kobo.App's suspend: the music stops where it
-// was, the radios go off for the night as Nickel has them do, and come
+// Sleep and wake, around kobo.App's suspend: the players pause where
+// they are, the radios go off for the night as Nickel has them do, and come
 // back on waking, the SSH sessions reconnecting once Wi-Fi is up.
 
 import (
@@ -17,12 +17,8 @@ type sleepState struct {
 }
 
 func (a *bro) Sleep() func() {
-	a.picker = nil // the sleep screen goes over it; waking draws the page
-	if a.mus.player != nil {
-		a.musicStop() // the Bluetooth audio goes with the radio: start afresh after
-		a.saveMusicState()
-		a.musicHeader()
-	}
+	a.picker = nil   // the sleep screen goes over it; waking draws the page
+	a.pausePlayers() // the Bluetooth audio goes with the radio: on again after, where it was
 	a.radioStart()
 	r, s := &a.rs, &a.slp
 	r.discoverTo = time.Time{}

@@ -1,7 +1,7 @@
-# The terminal tabs' status bar (portrait) and the music hotkeys: play
-# from the SSH tab before the Music tab was ever up, next and previous,
-# fullscreen with the bar, hiding and showing it, a tap on it to pause.
-# Wants MUSIC=a folder of albums.
+# The terminal tabs' status bar (portrait) and the music hotkeys, for a
+# Linux player: play from the SSH tab, next and previous, fullscreen
+# with the bar, hiding and showing it, a tap on it to pause. Wants
+# MPRIS=1 (the stand-in mpv).
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -10,7 +10,7 @@ from feedlib import *
 COMMA, DOT, KEY_B = 51, 52, 48
 
 start(); time.sleep(6)                                # SSH tab, the bar with the battery, CPU, RAM
-key(SPACE, ctrl=True, shift=True); time.sleep(6)      # play: the albums are found first
+key(SPACE, ctrl=True, shift=True); time.sleep(6)      # play
 key(DOT, ctrl=True, shift=True); time.sleep(4)        # next track
 key(COMMA, ctrl=True, shift=True); time.sleep(4)      # back to the first
 fullscreen(); time.sleep(4)                               # fullscreen: the bar stays

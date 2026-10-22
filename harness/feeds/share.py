@@ -1,7 +1,7 @@
 # File sharing with a computer, the computer played by OpenSSH on this
 # PC (on 127.0.0.1, and with the pairing code the harness fixes:
 # HELLOBRO_FAKE_PAIR_CODE): the Files tab, sharing on, pairing, an album
-# sent with scp (it shows up in the list and the Music tab rescans), a
+# sent with scp (it shows up in the list), a
 # command, then make push's way: hellobro.new, hellobro-update, and the
 # restart into it. Wants ssh, scp and ssh-keygen.
 # app: hellobro
@@ -9,7 +9,7 @@ import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K5 = 6
+K4 = 5  # Files
 OUT = os.path.dirname(os.path.abspath(sys.argv[1]))
 PC = os.path.join(OUT, "pc")
 os.makedirs(PC, exist_ok=True)
@@ -33,7 +33,7 @@ def pc(*cmd, ask=False):
     return r
 
 start()
-key(K5, ctrl=True, alt=True); time.sleep(4)            # Files: sharing off
+key(K4, ctrl=True, alt=True); time.sleep(4)            # Files: sharing off
 keys("o"); time.sleep(3)                               # on
 keys("p"); time.sleep(3)                               # pairing: the code
 pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "echo paired; uname -m", ask=True); time.sleep(3)
@@ -50,6 +50,6 @@ pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "hellobro-version"); time.sleep(
 app = os.path.join(OUT, "app")
 pc("scp", *OPTS, "-P", "2022", os.path.join(app, "hellobro"), "bro@127.0.0.1:" + os.path.join(app, "hellobro.new"))
 pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "hellobro-update"); time.sleep(12)   # restarted into it
-key(K5, ctrl=True, alt=True); time.sleep(4)            # sharing is on again, after the restart
+key(K4, ctrl=True, alt=True); time.sleep(4)            # sharing is on again, after the restart
 pc("ssh", *OPTS, "-p", "2022", "bro@127.0.0.1", "hellobro-version"); time.sleep(2)
 exit_app()

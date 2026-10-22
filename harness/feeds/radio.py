@@ -8,10 +8,10 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K1, K4, KS = 2, 5, 31
+K1, K3, KS = 2, 4, 31  # SSH, Settings, S
 
 start()
-key(K4, ctrl=True, alt=True); time.sleep(5)           # the tab: status, then the scan
+key(K3, ctrl=True, alt=True); time.sleep(5)           # the tab: status, then the scan
 key(DOWN); time.sleep(1)                              # BroLab
 key(ENTER); time.sleep(1)                             # its password, asked
 keys("wrongpass"); key(TAB); time.sleep(1)            # typed, shown
@@ -27,13 +27,13 @@ key(DOWN); key(ENTER); time.sleep(3)                  # the FiiO (paired, below 
 key(TAB); key(TAB); keys("o"); time.sleep(4)          # past the settings to Wi-Fi: off
 keys("o"); time.sleep(6)                              # and on
 key(KEY_P, ctrl=True, shift=True); time.sleep(2)        # the switcher
-keys("mus"); time.sleep(1)
-key(ENTER); time.sleep(3)                             # the Music tab
+keys("files"); time.sleep(1)
+key(ENTER); time.sleep(3)                             # the Files tab
 key(K1, ctrl=True, alt=True); time.sleep(3)           # the SSH tab
 fullscreen(); time.sleep(2)
 key(KEY_P, ctrl=True, shift=True); time.sleep(2)        # the switcher, fullscreen
 key(ESC); time.sleep(2)
-key(K4, ctrl=True, alt=True); time.sleep(3)           # out of fullscreen, to Settings
+key(K3, ctrl=True, alt=True); time.sleep(3)           # out of fullscreen, to Settings
 key(KS, ctrl=True, alt=True); time.sleep(1)           # sleep: the screen, the radios off
 keys("o"); time.sleep(8)                              # ignored while asleep; awake, radios back on
 exit_app()

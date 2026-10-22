@@ -10,5 +10,5 @@ start()
 key(3, ctrl=True, alt=True); time.sleep(3)            # Shell
 keys("printf '\\033]9;build done\\007'\n"); time.sleep(4)   # shows: the strip blinks
 keys("sleep 4; printf '\\a'\n"); time.sleep(0.5)
-key(5, ctrl=True, alt=True); time.sleep(7)            # Settings: the bell comes, a note
+key(4, ctrl=True, alt=True); time.sleep(7)            # Settings: the bell comes, a note
 exit_app()

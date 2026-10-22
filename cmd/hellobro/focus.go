@@ -83,25 +83,6 @@ func (a *bro) controls() []control {
 		if !panel("settings") && len(a.sv.rows) > 0 {
 			add("settings", "settings.list", a.sv.rows[0].Union(a.sv.rows[len(a.sv.rows)-1]), true)
 		}
-	case tabMusic:
-		v := &a.mv
-		if !panel("now") {
-			for i, r := range v.buttons {
-				add("now", "now.button"+strconv.Itoa(i), r, false)
-			}
-			for i, r := range v.chips {
-				add("now", "now.chip"+strconv.Itoa(i), r, false)
-			}
-		}
-		if !panel("library") {
-			for i, r := range v.segs {
-				add("library", "library.view"+strconv.Itoa(i), r, false)
-			}
-			add("library", "library.list", v.listR, true)
-			for _, b := range a.mus.acts {
-				add("library", "library."+b.label, b.r, false)
-			}
-		}
 	case tabFiles:
 		v := &a.fv
 		if !panel("sharing") {
@@ -149,8 +130,6 @@ func (a *bro) focusTo(c control) {
 		return
 	}
 	switch c.panel {
-	case "now", "library":
-		a.mv.nowFocus = c.panel == "now"
 	case "sharing", "files":
 		a.fv.shareFocus = c.panel == "sharing"
 	case "battery", "usage":

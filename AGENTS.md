@@ -8,7 +8,8 @@ How to work on this repo as a coding agent. People start at the
 Go apps for a Kobo Elipsa (N604, sunxi B300, firmware 4.38). While they
 run they freeze Nickel and draw an e-ink UI through FBInk.
 
-- `cmd/hellobro/`: the main app (terminal, music, settings, files, relay).
+- `cmd/hellobro/`: the main app (terminal, Alpine, settings, files, relay,
+  the Linux players' remote control).
   Its keys are commands (`commands.go`, changed in `keys.conf`); which
   tabs show is `tabs.go`
 - `cmd/brotools/`: diagnostics, only installed when asked for
@@ -51,7 +52,7 @@ FBInk, input FIFOs, stand-in Wi-Fi/Bluetooth and pretend sleep:
 
 ```sh
 harness/run.sh OUT ROTA FEED          # ROTA 0-3 (1, 3 landscape); FEED from harness/feeds
-MUSIC=dir TIMEOUT=60 harness/run.sh OUT 0 playlists
+MPRIS=1 harness/run.sh OUT 0 doze      # a session bus with a stand-in mpv (harness/mpris)
 harness/relay.sh OUT                  # the relay, sshd playing the VPS
 ```
 
@@ -59,8 +60,8 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
 - Log: `OUT/stdout.txt`. App files: `OUT/app`.
 - `APP_EXTRA=dir` copies files into the app's dir first (settings,
   relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
-- The harness shows all six tabs, as the feeds' Ctrl+Alt+N count on
-  (the app hides Shell by default). `HB_TABS="ssh -shell music settings
+- The harness shows all five tabs, as the feeds' Ctrl+Alt+N count on
+  (the app hides Shell by default). `HB_TABS="ssh -shell settings
   files"` sets the tabs file as you like: `harness/feeds/tabs.py` wants
   that one.
 - Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`,
@@ -108,14 +109,16 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   `/sys/kernel/debug/gpio` (`kobo/powerkey.go`).
 - Wi-Fi and Bluetooth share one RTL8821CS chip. `ntx_io 208 0` (chip
   power off) kills Bluetooth too: with BT on, Wi-Fi only goes `Down()`.
-- Nickel registers a BlueZ media player, so headphone buttons arrive as
-  D-Bus calls to it, not as keys. `audio/avrcp.go` watches for them as a
-  bus monitor, but the Kobo's dbus-daemon is 1.6.30: no `BecomeMonitor`
-  (it's 1.9.10+), and its policy forbids `eavesdrop='true'`, even for
-  root. BlueZ 5.63 also always gives a connection the *first* registered
-  player (Nickel's), so a player of our own never gets presses. The user
-  chose to leave it (2026-10-21). With godbus `Eavesdrop`, a method reply
-  goes to the eavesdrop channel: `Call` blocks forever, so use `Go`.
+- hellobro has no player: the music is a Linux player's in an Alpine
+  session, reached over MPRIS (`mpris.go`). Each session's jail runs a
+  session bus at `/run/user/0/bus` (once `dbus` is installed there), which
+  hellobro reaches as `/proc/PID/root/run/user/0/bus` of the jail's first
+  process. Nothing polls the players: their signals, and a look every
+  5 s for new buses. The Kobo's own (system) bus is left alone.
+- Nickel registers a BlueZ media player, so with Nickel frozen the
+  headphones' buttons go to it and are lost (the Kobo's dbus-daemon,
+  1.6.30, can't be eavesdropped on). With Nickel closed BlueZ sends them
+  as keys (AVRCP's uinput device), and they reach the player.
 - e-ink: never overlap an update with one still in flight. Small changes
   use DU, then a GL16 cleanup; a GC16 flash now and then. DU blits are
   rounded to black and white (`blackWhite`): sent grays, DU leaves them

@@ -8,10 +8,10 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K4, KJ, KA, KL = 5, 36, 30, 38
+K3, KJ, KA, KL = 4, 36, 30, 38
 
 start(); time.sleep(3)
-key(K4, ctrl=True, alt=True); time.sleep(4)           # Settings
+key(K3, ctrl=True, alt=True); time.sleep(4)           # Settings
 key(TAB); key(TAB); time.sleep(1)                     # the settings panel
 for _ in range(9): key(DOWN)
 time.sleep(1)                                         # its last row: Keys

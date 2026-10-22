@@ -424,7 +424,6 @@ func (a *bro) fileDelete() {
 					a.share.note = "deleting: " + err.Error()
 				}
 				a.listFiles()
-				a.rescanMusic()
 			})
 		}()
 	})

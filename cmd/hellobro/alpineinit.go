@@ -15,6 +15,10 @@ package main
 // reboot, ptrace, clock or network setup, and no way to get them back
 // (no_new_privs).
 //
+// If the jail has D-Bus (apk add dbus), the session gets a session bus
+// of its own, at /run/user/0/bus: the players' remote control (MPRIS)
+// is there, which hellobro sends the media keys to (mpris.go).
+//
 // With system bus access on (alpine.go), the jail gets the bus's socket,
 // and for sound the bluealsa 3.1 plugins in /usr/local/lib/alsa-lib and
 // an /etc/asound.conf that makes them ALSA's default (if it has none).
@@ -70,7 +74,8 @@ func alpineInit(command string) {
 	}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	cmd.Env = []string{"TERM=xterm-256color", "HOME=/root", "USER=root", "LOGNAME=root", "SHELL=" + shell,
-		"LANG=C.UTF-8", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+		"LANG=C.UTF-8", "PATH=" + jailPath}
+	cmd.Env = append(cmd.Env, sessionBus()...)
 	cmd.Dir = "/root"
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
 	if err := cmd.Start(); err != nil {
@@ -93,6 +98,30 @@ func alpineInit(command string) {
 			os.Exit(ws.ExitStatus())
 		}
 	}
+}
+
+const jailPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+// sessionBus starts the session's bus, if the jail has D-Bus, and is
+// what the shell's environment needs to find it. The bus goes with the
+// jail, as everything in it does.
+func sessionBus() []string {
+	const daemon, dir = "/usr/bin/dbus-daemon", "/run/user/0"
+	if _, err := os.Stat(daemon); err != nil {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		fmt.Fprintf(os.Stderr, "alpine: session bus: %v\r\n", err)
+		return nil
+	}
+	d := exec.Command(daemon, "--session", "--address=unix:path="+dir+"/bus", "--nofork", "--nopidfile")
+	d.Env = []string{"PATH=" + jailPath, "HOME=/root"}
+	d.Dir = "/"
+	if err := d.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "alpine: session bus: %v\r\n", err)
+		return nil
+	}
+	return []string{"XDG_RUNTIME_DIR=" + dir, "DBUS_SESSION_BUS_ADDRESS=unix:path=" + dir + "/bus"}
 }
 
 // alsaConf is the jail's /etc/asound.conf, with the bus.

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-key(5, ctrl=True, alt=True); time.sleep(3)            # Settings
+key(4, ctrl=True, alt=True); time.sleep(3)            # Settings
 key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # the settings panel
 for _ in range(13):
     key(DOWN); time.sleep(0.2)

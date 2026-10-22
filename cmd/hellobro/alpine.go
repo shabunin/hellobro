@@ -107,7 +107,11 @@ func startAlpine(cols, rows int, command string) (*localShell, error) {
 			s.fail(err)
 			return
 		}
-		log.Printf("alpine: a session (pid %d)", cmd.Process.Pid)
+		pid := cmd.Process.Pid
+		log.Printf("alpine: a session (pid %d)", pid)
+		jailStarted(pid) // its players' bus (mpris.go)
+		<-s.exit
+		jailEnded(pid)
 	}()
 	return s, nil
 }

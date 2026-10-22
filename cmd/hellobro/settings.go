@@ -40,7 +40,7 @@ var settingList = []setting{
 		shown:  []string{"never by itself", "after 1 min idle", "after 2 min idle", "after 5 min idle", "after 10 min idle", "after 20 min idle"}},
 	{key: "sleep-music", label: "Sleep%s with music on", cmd: "sleep",
 		values: []string{"light", "deep"},
-		shown:  []string{"light: the music plays on", "deep: the music stops"}},
+		shown:  []string{"light: the music plays on", "deep: the music pauses"}},
 	{key: "doze-wifi", label: "Wi-Fi in light sleep",
 		values: []string{"off", "on"},
 		shown:  []string{"off after 3 min (the battery lasts)", "stays on"}},

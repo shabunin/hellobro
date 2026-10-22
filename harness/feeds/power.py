@@ -7,10 +7,10 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K6 = 7
+K5 = 6  # Power
 
 start(); time.sleep(3)
-key(K6, ctrl=True, alt=True); time.sleep(12)          # Power: two samples in
+key(K5, ctrl=True, alt=True); time.sleep(12)          # Power: two samples in
 key(TAB, ctrl=True); time.sleep(2)                    # the focus: What uses it
 fullscreen(); time.sleep(7)                           # it alone
 key(TAB, ctrl=True); time.sleep(3)                    # the battery alone

@@ -1,7 +1,7 @@
 package main
 
 // The tabs: which are shown, and in what order. The tabs file keeps it,
-// "ssh -shell music settings files power", a - hiding one. Shell starts
+// "ssh -shell settings files power", a - hiding one. Shell starts
 // hidden; Settings can't be, it's where they're set. The Tabs dialog
 // (a row in Settings, or the switcher) changes them: a tap or Space
 // shows or hides one, Shift+↑ ↓ or the arrows move it.
@@ -9,6 +9,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"log"
 	"os"
 	"slices"
@@ -20,7 +21,7 @@ import (
 
 const (
 	tabsTxt     = "tabs"
-	tabsDefault = "ssh -shell music settings files power"
+	tabsDefault = "ssh -shell settings files power"
 	tabsRowH    = 76
 )
 
@@ -108,7 +109,7 @@ func (a *bro) applyTabs() {
 }
 
 // tabHints are the keys to the tabs shown, by place, and the footer's
-// word on them. A tab's key is its own (tab.music) or its place's
+// word on them. A tab's key is its own (tab.shell) or its place's
 // (tab.3). The corners have little room: keys with the modifiers most
 // of them have show without, which the footer gives.
 func (a *bro) tabHints() ([]string, string) {
@@ -349,5 +350,20 @@ func (a *bro) tabsTap(p image.Point) {
 			continue
 		}
 		return
+	}
+}
+
+// triangle fills the triangle p, q, s.
+func triangle(c kobo.Canvas, p, q, s image.Point, g uint8) {
+	b := image.Rectangle{p, p.Add(image.Pt(1, 1))}.Union(image.Rectangle{q, q.Add(image.Pt(1, 1))}).Union(image.Rectangle{s, s.Add(image.Pt(1, 1))})
+	edge := func(a, b, x image.Point) int { return (b.X-a.X)*(x.Y-a.Y) - (b.Y-a.Y)*(x.X-a.X) }
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			pt := image.Pt(x, y)
+			e1, e2, e3 := edge(p, q, pt), edge(q, s, pt), edge(s, p, pt)
+			if (e1 >= 0 && e2 >= 0 && e3 >= 0) || (e1 <= 0 && e2 <= 0 && e3 <= 0) {
+				c.SetGray(x, y, color.Gray{g})
+			}
+		}
 	}
 }

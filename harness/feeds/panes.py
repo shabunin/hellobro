@@ -3,13 +3,13 @@
 # Ctrl+Tab moves the focus, and the keys follow it. The second folds to
 # its strip and the first has it all; the switcher opens it again. Ctrl+Shift+F
 # gives the one in focus the whole screen. Then Ctrl+Tab on the other
-# tabs: Music (to Now playing: Up turns the volume up), Settings, Files.
+# tabs: Settings, Files.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K3, K4, K5 = 4, 5, 6
+K3, K4 = 4, 5  # Settings, Files
 L = W > H
 X0, Y0, X1, Y1 = 16, 160, W - 16, H - 62 - 36   # the page's body, less the status bar
 
@@ -33,12 +33,9 @@ key(ENTER); time.sleep(3)                             # open again, in focus
 fullscreen(); time.sleep(3)                               # fullscreen: session 2 alone
 key(TAB, ctrl=True); time.sleep(3)                    # session 1, alone
 fullscreen(); time.sleep(3)
-key(K3, ctrl=True, alt=True); time.sleep(3)           # Music
-key(TAB, ctrl=True); time.sleep(2)                    # Now playing in focus
-key(UP); time.sleep(2)                                # the volume up
-key(K4, ctrl=True, alt=True); time.sleep(4)           # Settings
+key(K3, ctrl=True, alt=True); time.sleep(4)           # Settings
 key(TAB, ctrl=True); time.sleep(2)                    # Bluetooth
 key(TAB, ctrl=True, shift=True); time.sleep(2)        # Wi-Fi again
-key(K5, ctrl=True, alt=True); time.sleep(3)           # Files
+key(K4, ctrl=True, alt=True); time.sleep(3)           # Files
 key(TAB, ctrl=True); time.sleep(2)                    # Sharing in focus
 exit_app()

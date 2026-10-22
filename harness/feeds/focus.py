@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-key(5, ctrl=True, alt=True); time.sleep(3)            # Settings
+key(4, ctrl=True, alt=True); time.sleep(3)            # Settings
 key(TAB); time.sleep(1)                               # Wi-Fi's first button (the list was in focus)...
 for _ in range(5):
     key(TAB); time.sleep(0.8)                         # ...and on: scan, other network, info, the list, Bluetooth
@@ -25,10 +25,7 @@ key(TAB); time.sleep(1)                               # pair
 key(ENTER); time.sleep(3)                             # pressed: pairing
 tap(W // 2, 76 + 68 + 120); time.sleep(2)            # a touch (Sharing's text): no ring
 key(LEFT); time.sleep(1.5)                            # not on the strip now: the page's
-key(4, ctrl=True, alt=True); time.sleep(3)            # Music
-for _ in range(4):
-    key(TAB); time.sleep(0.8)                         # the library's Up and views, the player's buttons
-key(7, ctrl=True, alt=True); time.sleep(3)            # Power
+key(6, ctrl=True, alt=True); time.sleep(3)            # Power
 key(TAB); time.sleep(1)                               # the strip, Battery has nothing
 key(TAB, ctrl=True); time.sleep(1)
 exit_app()

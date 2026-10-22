@@ -5,9 +5,7 @@ package main
 // sessions, the tabs, the saved SSH hosts (a new session to one) and the
 // commands (commands.go). Typing narrows the list, Up/Down (or Tab,
 // Shift+Tab) move, Enter goes; with nothing typed, 1-9 go straight to
-// that row. Esc, its key again or a tap outside close it. The page under it holds still meanwhile. The Music tab puts up the
-// same menu to pick a playlist, with an entry for a new one, named as
-// typed.
+// that row. Esc, its key again or a tap outside close it. The page under it holds still meanwhile.
 
 import (
 	"fmt"

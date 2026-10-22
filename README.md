@@ -1,16 +1,15 @@
 # hello bro
 
-A terminal, a music player and a way in for your computer, on a Kobo
-e-reader. Bring a Bluetooth keyboard.
+A terminal, a Linux in your pocket and a way in for your computer, on a
+Kobo e-reader. Bring a Bluetooth keyboard.
 
 <p align="center">
   <img src="docs/screenshots/tmux.png" width="48.5%" alt="Claude Code in tmux on the PC, over SSH">
   <img src="docs/screenshots/btop.png" width="48.5%" alt="btop on the PC, over SSH">
 </p>
 <p align="center">
-  <img src="docs/screenshots/ssh.png" width="32%" alt="An SSH session">
-  <img src="docs/screenshots/music.png" width="32%" alt="The music player">
-  <img src="docs/screenshots/light-sleep.png" width="32%" alt="Light sleep, the music playing on">
+  <img src="docs/screenshots/ssh.png" width="48.5%" alt="An SSH session">
+  <img src="docs/screenshots/light-sleep.png" width="48.5%" alt="Light sleep, the music playing on">
 </p>
 <p align="center">
   <img src="docs/screenshots/switcher.png" width="48.5%" alt="The switcher">
@@ -27,8 +26,9 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   reconnects by itself. tmux, htop, helix, Claude Code all work.
 - **Shell**: the same terminal on the Kobo itself (turn it on in
   Settings, Tabs), or Alpine Linux in a jail, with `apk` for tools.
-- **Music**: albums, folders and playlists, shuffle and repeat, to
-  Bluetooth headphones. Media keys work.
+- **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to
+  Bluetooth headphones. The media keys and the headphones' buttons work,
+  and the header shows what plays.
 - **Light sleep**: the screen shows what's playing, the light goes off,
   and the music keeps going.
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel.

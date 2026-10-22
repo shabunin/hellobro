@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-key(5, ctrl=True, alt=True); time.sleep(3)            # Settings
+key(4, ctrl=True, alt=True); time.sleep(3)            # Settings
 tap(300, H - 101); time.sleep(2)                      # the hint: the rest
 tap(300, H - 101); time.sleep(2)                      # and back to the top (the taps gave it the focus)
 for _ in range(20):

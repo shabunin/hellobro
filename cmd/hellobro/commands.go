@@ -90,7 +90,7 @@ func makeCommands() []*command {
 			run: func(a *bro) { a.setTermFont(a.tv.fontPx - termFontStep) }},
 		&command{id: "font.reset", title: "Font size back", keys: []string{"ctrl+0"}, when: onTerm,
 			run: func(a *bro) { a.setTermFont(termFontDefault) }},
-		&command{id: "music.play", title: "Play / pause", keys: []string{"ctrl+shift+space"},
+		&command{id: "music.play", title: "Play / pause (the Linux player)", keys: []string{"ctrl+shift+space"},
 			run: func(a *bro) { a.mediaKey(kobo.KeyPlayPause) }},
 		&command{id: "music.next", title: "Next track", keys: []string{"ctrl+shift+."},
 			run: func(a *bro) { a.mediaKey(kobo.KeyNextSong) }},

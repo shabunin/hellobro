@@ -1,9 +1,9 @@
 package main
 
 // Light sleep (kobo's doze) for listening: the light off and the screen
-// still on what's playing, while the music plays on and the headphones'
-// buttons (or a keyboard's media keys) play, pause, skip and set the
-// volume. It comes after a while without input while music plays, or
+// still on what a Linux player plays (mpris.go), while it plays on and
+// the headphones' buttons (or a keyboard's media keys) play, pause, skip
+// and set the volume. It comes after a while without input while music plays, or
 // from Sleep with music on (the settings say); a tap or a key wakes it.
 // Wi-Fi goes off once it's lasted a few minutes, unless the settings keep
 // it: Wi-Fi and Bluetooth share the chip, and Wi-Fi coming back (a scan,
@@ -15,7 +15,7 @@ import (
 	"image"
 	"log"
 	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,12 +34,6 @@ type dozeState struct {
 	wifiAsk  bool      // this doze asked for it off
 	wifiBusy bool      // the Wi-Fi panel shows it coming back
 	jobs     chan string
-}
-
-// musicPlaying says whether music plays (or is about to).
-func (a *bro) musicPlaying() bool {
-	m := &a.mus
-	return m.starting || m.player != nil && !m.player.Paused()
 }
 
 func (a *bro) DozeInstead() bool {
@@ -156,12 +150,8 @@ func (a *bro) dozeWiFiBusy(what string) {
 
 // dozeKey is what the doze screen shows, to redraw it only for a change.
 func (a *bro) dozeKey() string {
-	m := &a.mus
-	key := fmt.Sprint(a.playing(), a.musicPlaying(), m.player != nil, m.shuffle)
-	if m.q != nil {
-		key += fmt.Sprint(m.q.pos, m.covers[a.playingCover()] != nil)
-	}
-	return key
+	p, ok := a.target()
+	return fmt.Sprint(ok, p.identity, p.status, p.title, p.artist, p.album)
 }
 
 // redoze redraws the doze screen if what it shows changed.
@@ -172,7 +162,7 @@ func (a *bro) redoze() {
 }
 
 func (a *bro) DrawDoze() {
-	m, z, c := &a.mus, &a.doze, a.C
+	z, c := &a.doze, a.C
 	z.shown = a.dozeKey()
 	b := c.Bounds()
 	c.Fill(b, kobo.White)
@@ -181,50 +171,21 @@ func (a *bro) DrawDoze() {
 	}
 	y := b.Min.Y + b.Dy()/10
 	line(y, 60, a.F.Title, "hello bro · light sleep", kobo.Black)
-	y += 100
+	y += b.Dy() / 5
 
-	side := min(a.mv.coverSide, b.Dx()-160, b.Dy()*2/5)
-	if m.q != nil && side > 0 {
-		r := image.Rect(b.Min.X+(b.Dx()-side)/2, y, b.Min.X+(b.Dx()+side)/2, y+side)
-		var img *image.Gray
-		if path := a.playingCover(); path != "" {
-			if img = m.covers[path]; img == nil {
-				a.loadCover(path) // redozes once it's in
-			}
-		}
-		if img != nil && img.Bounds().Dx() >= side {
-			drawImage(c, r, img)
-		} else {
-			c.Fill(r, kobo.Light)
-			c.Text(a.F.Huge, r, "♪", kobo.Mid, kobo.AlignCenter)
-		}
-		c.Frame(r, 2, kobo.Black)
-		y = r.Max.Y + 50
-	}
-
-	if m.q == nil {
+	if p, ok := a.target(); !ok || p.status == "Stopped" || p.title == "" {
 		line(y, 60, a.F.Panel, "Nothing playing.", kobo.Dark)
-		y += 80
 	} else {
-		line(y, 60, a.F.Panel, trackName(filepath.Base(a.playing())), kobo.Black)
-		y += 64
-		line(y, 50, a.F.Body, a.playingAlbum(), kobo.Dark)
-		y += 56
-		state := "playing"
-		switch {
-		case m.player != nil && m.player.Paused():
-			state = "paused"
-		case !a.musicPlaying():
-			state = "stopped"
+		line(y, 70, a.F.Title, p.title, kobo.Black)
+		y += 80
+		if who := strings.Join(slices.DeleteFunc([]string{p.artist, p.album}, func(s string) bool { return s == "" }), " · "); who != "" {
+			line(y, 50, a.F.Body, who, kobo.Dark)
+			y += 56
 		}
-		if m.shuffle {
-			state += " · shuffled"
-		}
-		line(y, 44, a.F.Small, a.queueLine()+" · "+state, kobo.Dark)
-		y += 70
+		line(y, 44, a.F.Small, p.identity+" · "+strings.ToLower(p.status), kobo.Dark)
 	}
 
-	y = max(y, b.Max.Y-b.Dy()/6)
+	y = b.Max.Y - b.Dy()/6
 	line(y, 44, a.F.Small, "Media keys: play/pause, next, previous, volume.", kobo.Dark)
 	wake := "Press the power button or a key to wake up."
 	switch {

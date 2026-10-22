@@ -32,8 +32,6 @@ type foldable struct {
 }
 
 var foldables = []foldable{
-	{"now", "Now playing", tabMusic},
-	{"library", "Library", tabMusic},
 	{"wifi", "Wi-Fi", tabRadio},
 	{"bluetooth", "Bluetooth", tabRadio},
 	{"settings", "Settings", tabRadio},
@@ -86,9 +84,6 @@ func (a *bro) setFold(key string, on bool) {
 	log.Printf("folds: %s %s", key, map[bool]string{true: "folded", false: "open"}[on])
 	// The focus goes to the panel opened, or off the one folded.
 	switch foldables[i].tab {
-	case tabMusic:
-		a.mv.nowFocus = (key == "now") != on
-		a.layoutMusic(a.lay)
 	case tabRadio:
 		if p := a.rs.prompt; on && p != nil && p.panel == radioPanelOf(key) {
 			a.radioAnswer(false) // nowhere to answer it now
@@ -115,10 +110,6 @@ func (a *bro) setFold(key string, on bool) {
 // foldPanel is the panel as drawn, with its button, for taps.
 func (a *bro) foldPanel(key string) kobo.Panel {
 	switch key {
-	case "now":
-		return a.nowPanel()
-	case "library":
-		return a.libPanel()
 	case "wifi":
 		return a.rv[panelWiFi].p
 	case "bluetooth":
@@ -238,8 +229,6 @@ func netText(ws radio.WiFiStatus) string {
 func (a *bro) stepPanel(d int) {
 	delete(a.fs.at, a.Tab) // to the new panel's list, or its first control
 	switch a.Tab {
-	case tabMusic:
-		a.mv.nowFocus = !a.mv.nowFocus
 	case tabFiles:
 		a.fv.shareFocus = !a.fv.shareFocus
 	case tabPower:
@@ -264,8 +253,6 @@ func (a *bro) focusMoved() {
 		return
 	}
 	switch a.Tab {
-	case tabMusic:
-		a.redrawMusic()
 	case tabFiles:
 		a.fv.shownShare, a.fv.shownList = "", ""
 		a.drawFiles()
@@ -320,8 +307,6 @@ func focusMark(p kobo.Panel, focused bool) kobo.Panel {
 // focusKey is the foldable panel in focus; "" on a terminal tab.
 func (a *bro) focusKey() string {
 	switch a.Tab {
-	case tabMusic:
-		return map[bool]string{true: "now", false: "library"}[a.mv.nowFocus]
 	case tabFiles:
 		return map[bool]string{true: "sharing", false: "files"}[a.fv.shareFocus]
 	case tabRadio:

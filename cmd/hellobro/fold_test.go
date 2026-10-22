@@ -16,7 +16,7 @@ func TestParseFolds(t *testing.T) {
 	}{
 		{"", nil},
 		{"wifi\n", []string{"wifi"}},
-		{" wifi \r\nnow\n\nbogus\nsettings", []string{"now", "settings", "wifi"}},
+		{" wifi \r\nusage\n\nnow\nsettings", []string{"settings", "usage", "wifi"}}, // now: the Music tab's, gone
 	} {
 		got := slices.Sorted(maps.Keys(parseFolds(c.in)))
 		if !slices.Equal(got, c.want) {

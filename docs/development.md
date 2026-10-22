@@ -17,8 +17,8 @@ Back to the [README](../README.md). Agents: [AGENTS.md](../AGENTS.md).
 - `share/`: the SSH server for a computer: SFTP, a shell, commands, and
   pairing by a code on the screen; the mDNS responder that advertises it.
 - `cmd/hellobro/`: the terminal (the emulator view, SSH, the local shell),
-  the status bar, the switcher, the Music, Settings and Files tabs, sleep
-  and light sleep, updates over the air.
+  the status bar, the switcher, the Settings, Files and Power tabs, sleep
+  and light sleep, the Linux players' remote control (MPRIS), updates over the air.
 - `cmd/brotools/`: the diagnostics pages.
 
 ## Building
@@ -91,17 +91,17 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     harness/run.sh /tmp/hb 1 ssh            # hellobro: landscape, a session with the server
     SRV=$PWD/server/hellobro-server SRV_DIR=/tmp/srv harness/run.sh /tmp/hb 0 sessions
                                             # two sessions, password + key install, reconnect, shells
-    MUSIC=~/Music harness/run.sh /tmp/hb 0 music      # the Music tab
-    MUSIC=~/Music harness/run.sh /tmp/hb 0 statbar    # the status bar, the music hotkeys
-    MUSIC=/tmp/lib harness/run.sh /tmp/hb 0 playlists  # folders, shuffle, repeat, playlists (/tmp/lib/Music/<folder>/<album>; it writes a playlist there)
+    MPRIS=1 harness/run.sh /tmp/hb 0 statbar           # the status bar, the media keys, a stand-in player
     harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, Ctrl+Alt+N, sleep
     harness/run.sh /tmp/hb 0 share                     # pairing, scp, make push's update and restart (ssh, scp on the PC)
-    MUSIC=~/Music harness/run.sh /tmp/hb 0 doze        # settings, light sleep with music, media keys
+    MPRIS=1 harness/run.sh /tmp/hb 0 doze              # settings, light sleep with music, media keys
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 tmux       # saved host 1 (dir/ssh.conf, dir/id_ed25519): tmux attach, framed and fullscreen
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 btop       # the same, btop
     harness/relay.sh /tmp/hb                           # the relay: sshd as the VPS, both ways through it, an update (with the server)
 
-`MUSIC` is the music folder (default `harness/music`); the sound goes to
+`MPRIS=1` starts a session bus in `OUT/bus` with a stand-in mpv on it
+(`harness/mpris`, three tracks; what it's asked goes to `OUT/mpris.txt`).
+brotools' sound test plays from `MUSIC` (default `harness/music`) to
 `OUT/pcm.raw` (`HELLOBRO_FAKE_PCM`: 48 kHz, 16-bit stereo), at the pace it
 would play. Wi-Fi and Bluetooth are stand-ins (`HELLOBRO_FAKE_RADIO`;
 `FAKE_RADIO=` for the PC's own, careful), and sleeping is pretended

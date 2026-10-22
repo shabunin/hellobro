@@ -1300,9 +1300,13 @@ const (
 	keyT         = 20
 	keyF11       = 87
 	keyF12       = 88
+	keyUp        = 103
 	keyPgUp      = 104
 	keyLeft      = 105
 	keyRight     = 106
+	keyHome      = 102
+	keyEnd       = 107
+	keyDown      = 108
 	keyPgDn      = 109
 )
 

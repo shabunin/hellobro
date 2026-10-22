@@ -3,22 +3,22 @@
 # (next, volume) while dozing, a key to wake, dozing by itself after a
 # minute without input, a tap that doesn't wake it, the power button that
 # does (and dozes it again, and wakes it), fullscreen left by a swipe in
-# from the top; then paused, the power button sleeps (pretended). Wants
-# MUSIC=a folder of albums.
+# from the top; then paused, the power button sleeps (pretended). The
+# music is a Linux player's: wants MPRIS=1 (the stand-in mpv).
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K1, K4, KS, KX = 2, 5, 31, 45
+K1, K3, KS, KX = 2, 4, 31, 45  # SSH, Settings, S, X
 NEXT, VOLUP = 163, 115
 LEFT = 105
 
 start(); time.sleep(4)
 key(SPACE, ctrl=True, shift=True); time.sleep(6)      # play, from the SSH tab
-key(K4, ctrl=True, alt=True); time.sleep(4)           # Settings
-key(TAB); key(TAB); time.sleep(2)                     # the settings panel
-key(LEFT); key(LEFT); time.sleep(2)                   # light sleep after 1 min idle
+key(K3, ctrl=True, alt=True); time.sleep(4)           # Settings
+key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # past Bluetooth: the settings panel
+key(DOWN); key(LEFT); key(LEFT); time.sleep(2)        # its second row: light sleep after 1 min idle
 key(KS, ctrl=True, alt=True); time.sleep(5)           # dozes: the music plays on
 key(NEXT); time.sleep(5)                              # the next track, on the doze screen
 key(VOLUP); time.sleep(2)

@@ -3,8 +3,6 @@
 // Tabs:
 //   - SSH: terminals (xterm emulation, PTY) over SSH, several at once;
 //   - Shell: terminals with a shell on the Kobo itself;
-//   - Music: a player for the albums on the Kobo, over Bluetooth; it
-//     goes on playing on the other tabs;
 //   - Settings: Kobo's Wi-Fi and Bluetooth, and hellobro's sleep, sharing
 //     and status bar;
 //   - Files: sharing with a computer (SFTP, ssh, mDNS), and the Kobo's
@@ -12,7 +10,8 @@
 //
 // A swipe along the right edge sets the font size, Ctrl+Shift+F gives
 // the session in focus the whole screen. Which tabs show, and in what order, is up
-// to the user (tabs.go), and so are the keys (commands.go). The rest
+// to the user (tabs.go), and so are the keys (commands.go). The music is
+// a Linux player's, in an Alpine session (mpris.go). The rest
 // (the screen, touch, the frontlight on the left edge, quitting) is the
 // kobo package's.
 //
@@ -24,7 +23,6 @@ import (
 	"image"
 	"log"
 	"os"
-	"strconv"
 	"time"
 
 	"hellobro/kobo"
@@ -34,29 +32,27 @@ import (
 const (
 	tabSSH = iota
 	tabShell
-	tabMusic
 	tabRadio
 	tabFiles
 	tabPower
 )
 
-var tabNames = []string{"SSH", "Shell", "Music", "Settings", "Files", "Power"}
+var tabNames = []string{"SSH", "Shell", "Settings", "Files", "Power"}
 
 func isTermTab(t int) bool { return t == tabSSH || t == tabShell }
 
 const termIdleTimeout = 20 * time.Minute // with a session up: reading a remote screen takes longer
 const relayIdle = 24 * time.Hour         // with the relay on: as good as never
 
-// bro is the app: the kobo.App, the terminal, the music player and the
-// radios.
+// bro is the app: the kobo.App, the terminals, the radios, and the
+// Linux players' remote control.
 type bro struct {
 	*kobo.App
 	tf       termFonts
 	termP    kobo.Panel
 	tv       termView
 	font     *fontSwipe // a contact along the right edge, which may become a font swipe
-	mv       musicView
-	mus      musicState
+	media    mediaState
 	stat     statBar     // the terminal tabs' status bar
 	picker   *picker     // the switcher, while it's up
 	asking   *askBox     // a question, while it's up
@@ -102,10 +98,7 @@ func main() {
 		return
 	}
 	updateTrial() // before anything that might hang
-	a := &bro{mus: musicState{lib: &library{}, gain: 40}}
-	if g, err := strconv.Atoi(readMusicState()["gain"]); err == nil {
-		a.mus.gain = max(0, min(gainMax, g))
-	}
+	a := &bro{media: mediaState{kick: make(chan struct{}, 1)}}
 	a.loadStatBar()
 	a.set = loadSettings()
 	radio.StateDir = kobo.AppFile("")
@@ -120,7 +113,7 @@ func main() {
 	a.applyTabs()
 	a.tf.setSize(termFontDefault)
 	a.shareApply()
-	go a.watchHeadphones() // the bus may be slow: never in the way of starting
+	go a.watchPlayers() // the buses may be slow: never in the way of starting
 	a.Run()
 }
 
@@ -137,7 +130,6 @@ func (a *bro) Layout(L kobo.Layout) {
 	if a.tv.cw != 0 {
 		a.termGeometry() // the terminal follows the new size
 	}
-	a.layoutMusic(L)
 	a.layoutRadio(L)
 	a.layoutFiles(L)
 	a.layoutPower(L)
@@ -145,8 +137,6 @@ func (a *bro) Layout(L kobo.Layout) {
 
 func (a *bro) Draw() {
 	switch a.Tab {
-	case tabMusic:
-		a.drawMusic()
 	case tabRadio:
 		a.rv[panelWiFi].shown, a.rv[panelBT].shown, a.sv.shown = "", "", ""
 		a.drawRadio()
@@ -162,8 +152,6 @@ func (a *bro) Draw() {
 
 func (a *bro) Enter(tab int) {
 	switch tab {
-	case tabMusic:
-		a.enterMusic()
 	case tabRadio:
 		a.enterRadio()
 	case tabFiles:
@@ -204,8 +192,6 @@ func (a *bro) Tap(p image.Point) {
 		return
 	}
 	switch a.Tab {
-	case tabMusic:
-		a.musicTap(p)
 	case tabRadio:
 		a.radioTap(p)
 	case tabFiles:
@@ -238,19 +224,14 @@ func (a *bro) Tick() {
 
 func (a *bro) Exit() {
 	a.termCloseAll()
-	a.saveMusicState()
-	a.musicStop()
 	a.radioExit()
 	a.shareExit()
 	alpineExit()
 }
 
 func (a *bro) IdleTimeout() time.Duration {
-	if a.Dozing() { // dozeTick sleeps when the music's over
+	if a.Dozing() || a.musicPlaying() { // dozeTick sleeps when the music's over
 		return playingIdle
-	}
-	if d, ok := a.musicIdleTimeout(); ok {
-		return d
 	}
 	if a.relayOn() { // a computer may come in from afar any time
 		return relayIdle
@@ -302,8 +283,6 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 			a.foldFocused()
 		}
 		return true
-	case a.Tab == tabMusic:
-		return a.musicKey(m.Code, m.Value)
 	case a.Tab == tabRadio:
 		return a.radioKey(m.Code, m.Value)
 	case a.Tab == tabFiles:
@@ -312,14 +291,6 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return false
 	}
 	return a.termKey(m.Code, m.Value)
-}
-
-func (a *bro) mediaKey(code uint16) {
-	if !a.mus.scanned { // the Music tab hasn't been up yet: find the albums first
-		a.scanMusic(func() { a.musicMediaKey(code) })
-		return
-	}
-	a.musicMediaKey(code)
 }
 
 func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
@@ -362,8 +333,6 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	}
 	switch {
 	case g.Tap || g.Pen || a.overlay() || a.Tab == tabRadio || a.Tab == tabFiles || a.Tab == tabPower:
-	case a.Tab == tabMusic:
-		a.musicSwipe(g.Start, g.Last)
 	default:
 		a.termSwipe(g.Start, g.Last)
 	}

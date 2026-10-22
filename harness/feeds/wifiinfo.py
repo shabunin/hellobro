@@ -6,12 +6,12 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K4, KI, KC = 5, 23, 46
+K3, KI, KC = 4, 23, 46  # Settings, I, C
 L = W > H
 X0, Y0, X1 = 16, 160, W - 16
 
 start(); time.sleep(3)
-key(K4, ctrl=True, alt=True); time.sleep(5)           # Settings, Wi-Fi in focus
+key(K3, ctrl=True, alt=True); time.sleep(5)           # Settings, Wi-Fi in focus
 key(KI); time.sleep(3)                                # the details
 key(KC); time.sleep(2)                                # copied
 key(ESC); time.sleep(2)

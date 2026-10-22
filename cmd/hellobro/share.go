@@ -147,7 +147,6 @@ func (a *bro) shareEvent(e share.Event) {
 	case "closed":
 		s.note = fmt.Sprintf("%s@%s left (%s in, %s out)", c.User, c.Addr, humanBytes(c.In), humanBytes(c.Out))
 		if c.WroteSFTP {
-			a.rescanMusic()
 			a.fv.listAt = time.Time{} // look again
 		}
 	case "paired":
