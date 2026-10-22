@@ -22,7 +22,7 @@ in a session too):
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel: on and
   off, networks (join, with a password; leave; forget; one by name), and
   devices (scan, pair, connect, disconnect, forget); and hellobro's own
-  settings: light sleep, sleep with music on, file sharing, the relay,
+  settings: the light off when idle, light sleep, sleep with music on, file sharing, the relay,
   mDNS, terminal notifications, CPU profiles, the status bar, the tabs.
 - **Files**: sharing with a computer over SFTP and SSH (how to reach the
   Kobo, pairing, who's connected and sending what), and the Kobo's
@@ -143,6 +143,15 @@ code (`key183`), with any of ctrl, shift, alt and meta. Saved (over
 SFTP, say), it takes effect at once; the log says what it didn't
 understand. The tabs' corners, the footer and the hints show the keys as
 they are.
+
+## The light
+
+A swipe up or down the left edge sets it (and keys: see `keys.conf`).
+When nothing's touched or typed for 30 s, the light goes off by itself,
+and the next touch or key brings it back as it was; that touch or key
+does what it does as well. The terminal's output doesn't count, only
+you. Settings, **Light off when idle**: after 10 s, 30 s, 1 min, 5 min,
+or never. Sleeping meanwhile wakes with the light as it was before.
 
 ## Sleep
 

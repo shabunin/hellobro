@@ -32,6 +32,9 @@ type setting struct {
 }
 
 var settingList = []setting{
+	{key: "light-idle", label: "Light off when idle",
+		values: []string{"10", "30", "60", "300", "off"},
+		shown:  []string{"after 10 s untouched", "after 30 s untouched", "after 1 min untouched", "after 5 min untouched", "stays on"}},
 	{key: "doze-after", label: "Light sleep while music plays",
 		values: []string{"off", "1", "2", "5", "10", "20"},
 		shown:  []string{"never by itself", "after 1 min idle", "after 2 min idle", "after 5 min idle", "after 10 min idle", "after 20 min idle"}},
@@ -76,7 +79,7 @@ var settingList = []setting{
 }
 
 // The defaults, by key: the index of a value.
-var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1}
+var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1}
 
 func settingIndex(key string) int {
 	for i, st := range settingList {
@@ -191,6 +194,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.shareApply()
 		case "profile":
 			profileOn.Store(a.setting(st.key) == "on")
+		case "light-idle":
+			a.applyLightIdle()
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))
@@ -356,4 +361,10 @@ func (a *bro) settingsKey(code uint16) {
 		return
 	}
 	a.drawSettings()
+}
+
+// applyLightIdle tells the App when the light goes off by itself.
+func (a *bro) applyLightIdle() {
+	n, _ := strconv.Atoi(a.setting("light-idle")) // "off": 0, never
+	a.LightIdle = time.Duration(n) * time.Second
 }

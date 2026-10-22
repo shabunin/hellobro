@@ -130,12 +130,13 @@ type blitJob struct {
 
 // App is the app shell; a Program embeds it, and uses what's exported.
 type App struct {
-	C        Canvas // what's on screen, or about to be
-	F        Fonts
-	L        Layout
-	Tab      int
-	Full     bool   // the page has the whole screen
-	Keyboard string // the keyboard connected, if any
+	C         Canvas // what's on screen, or about to be
+	F         Fonts
+	L         Layout
+	Tab       int
+	Full      bool          // the page has the whole screen
+	Keyboard  string        // the keyboard connected, if any
+	LightIdle time.Duration // the light goes off after this long untouched (0: never)
 
 	prog  Program
 	cfg   Config
@@ -193,6 +194,7 @@ type App struct {
 	blinks     []blinking // notice.go
 	toast      *toast
 	lightOffAt time.Time // FlashLight's light goes off
+	lightIdled int       // the light's level before idling turned it off; 0: it didn't
 }
 
 // New opens the log and the screen. The Program, which embeds the App, is
@@ -395,6 +397,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			if a.asleep {
 				continue
 			}
+			a.lightBack()
 			if a.dozing || a.eatTouch {
 				a.dozeTouch(ev)
 				continue
@@ -407,6 +410,9 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 				a.stats.event("keyboard", 0) // a keyboard came or went
 			} else {
 				a.stats.event("key", time.Since(m.at))
+				if m.Connected == "" && m.Gone == "" {
+					a.lightBack()
+				}
 			}
 			a.onKey(m)
 			if m.Connected == "" && m.Gone == "" {
@@ -437,6 +443,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			if !a.asleep {
 				a.prog.Tick()
 				a.noticeTick()
+				a.lightIdle()
 			}
 			a.flush()
 		case <-clock.C:

@@ -134,6 +134,7 @@ func (a *App) lightLabelRect() image.Rectangle {
 
 func (a *App) setLight(level int) {
 	a.lightOffAt = time.Time{} // a hand on it: FlashLight's off is off
+	a.lightIdled = 0           // and what idling turned off stays off
 	level = max(0, min(100, level))
 	if level == a.light.level && a.lightOverlay != nil {
 		return
@@ -150,6 +151,44 @@ func (a *App) setLight(level int) {
 	a.C.Frame(r, 3, Black)
 	a.C.Text(a.F.Panel, r, fmt.Sprintf("light %d%%", a.light.level), Black, AlignCenter)
 	a.Mark(r, false) // black & white only, so the fast waveform is fine
+}
+
+// The light goes off when nothing's touched or typed for LightIdle (0:
+// never), and the next touch or key brings it back. A night with it left
+// on is a night's battery.
+
+// lightLevel is the light as the reader has it: as it was before idling
+// turned it off.
+func (a *App) lightLevel() int {
+	if a.lightIdled > 0 {
+		l := a.lightIdled
+		a.lightIdled = 0 // it's in the caller's hands now
+		return l
+	}
+	return a.light.level
+}
+
+// lightIdle turns the light off once idle long enough.
+func (a *App) lightIdle() {
+	if a.LightIdle <= 0 || a.light == nil || a.light.level == 0 || a.lightIdled > 0 ||
+		!a.lightOffAt.IsZero() || a.dozing || a.asleep || a.calib != nil || time.Since(a.inputAt) < a.LightIdle {
+		return
+	}
+	log.Printf("light: off after %s idle (was %d%%)", a.LightIdle, a.light.level)
+	a.lightIdled = a.light.level
+	a.light.set(0)
+}
+
+// lightBack brings back the light idling turned off: a touch or a key.
+func (a *App) lightBack() {
+	if a.lightIdled == 0 || a.light == nil {
+		return
+	}
+	log.Printf("light: back to %d%%", a.lightIdled)
+	if a.light.level == 0 {
+		a.light.set(a.lightIdled)
+	}
+	a.lightIdled = 0
 }
 
 // Light is the frontlight's level, 0 (off) to 100; false if there's none.

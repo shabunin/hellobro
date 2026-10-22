@@ -42,7 +42,7 @@ func (a *App) Sleep() {
 	}
 	light := -1
 	if a.light != nil {
-		light = a.light.level
+		light = a.lightLevel()
 	}
 	if a.dozing { // from a doze: the page's canvas back, the light as before it
 		a.endDoze()

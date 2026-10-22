@@ -43,7 +43,7 @@ func (a *App) Doze() {
 	a.dirty, a.flashR = nil, image.Rectangle{} // of the page: shown again on waking
 	a.dozeLight = -1
 	if a.light != nil {
-		a.dozeLight = a.light.level
+		a.dozeLight = a.lightLevel()
 		a.light.set(0)
 	}
 	// The page goes on in a copy; the panel's canvas gets the doze screen.
