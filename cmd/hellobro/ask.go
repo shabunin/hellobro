@@ -2,7 +2,8 @@ package main
 
 // A question over the page: yes or no ("restart into the new hellobro?"),
 // or one of a few things to do (a saved host's menu). Enter picks the
-// first, a choice's letter that one, Esc none; or tap a button. The page
+// one selected (the first, till the arrows or Tab move it), a choice's
+// letter that one, Esc none; or tap a button. The page
 // holds still under it, like under the switcher. For what can't be
 // undone, the yes waits for words typed first (askTyped).
 
@@ -24,6 +25,7 @@ type askBox struct {
 	opts        []askOpt
 	box         image.Rectangle
 	optR        []image.Rectangle
+	sel         int    // the answer Enter picks
 	want, typed string // askTyped's: the words wanted, and what's typed so far
 	field       image.Rectangle
 }
@@ -102,7 +104,7 @@ func (a *bro) drawAsk() {
 	for i, o := range q.opts {
 		r, label := q.optR[i], o.label
 		switch {
-		case i == 0:
+		case i == q.sel:
 			label += "  (Enter)"
 		case o.do == nil:
 			label += "  (Esc)"
@@ -112,9 +114,9 @@ func (a *bro) drawAsk() {
 		fg := uint8(kobo.Black)
 		switch {
 		case i == 0 && !q.ready(): // not yet
-			c.Frame(r, 2, kobo.Mid)
+			c.Frame(r, map[bool]int{false: 2, true: 4}[i == q.sel], kobo.Mid)
 			fg = kobo.Mid
-		case i == 0:
+		case i == q.sel:
 			c.Fill(r, kobo.Black)
 			fg = kobo.White
 		default:
@@ -144,12 +146,18 @@ func (a *bro) askKey(code uint16, value int32) {
 	if a.termMod(code, value) || value != 1 {
 		return
 	}
-	if q := a.asking; q.want != "" {
+	q := a.asking
+	if d := askStep(code, a.tv.mods.shift); d != 0 { // the arrows, Tab: another answer
+		q.sel = (q.sel + d + len(q.opts)) % len(q.opts)
+		a.drawAsk()
+		return
+	}
+	if q.want != "" {
 		m := &a.tv.mods
 		ch, printable := kobo.KeyChar(code, m.shift, m.caps)
 		switch {
 		case code == kobo.KeyEnter:
-			a.answer(0)
+			a.answer(q.sel)
 		case code == kobo.KeyEsc:
 			a.answer(-1)
 		case code == kobo.KeyBackspace:
@@ -166,17 +174,29 @@ func (a *bro) askKey(code uint16, value int32) {
 	ch, _ := kobo.KeyChar(code, false, false)
 	switch {
 	case code == kobo.KeyEnter:
-		a.answer(0)
+		a.answer(q.sel)
 	case code == kobo.KeyEsc:
 		a.answer(-1)
 	case ch != "":
-		for i, o := range a.asking.opts {
+		for i, o := range q.opts {
 			if o.key == ch {
 				a.answer(i)
 				return
 			}
 		}
 	}
+}
+
+// askStep is how far a key moves the selection: ← ↑ and Shift+Tab back,
+// → ↓ and Tab on.
+func askStep(code uint16, shift bool) int {
+	switch {
+	case code == keyLeft, code == keyUp, code == kobo.KeyTab && shift:
+		return -1
+	case code == keyRight, code == keyDown, code == kobo.KeyTab:
+		return 1
+	}
+	return 0
 }
 
 func (a *bro) askTap(p image.Point) {

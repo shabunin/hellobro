@@ -2,7 +2,9 @@ package main
 
 // The keys' focus, as on a desktop: Tab moves it through the page's
 // controls (the tab strip, the buttons, the lists), Shift+Tab back, and
-// a dashed ring shows where it is. Ctrl+Tab goes to the next panel.
+// a dashed ring shows where it is. Ctrl+Tab goes to the next panel. On
+// a panel's − box ← folds it (as Enter does), and on a folded one's strip
+// → opens it.
 // Enter or Space presses the button in focus (it's a tap on it); a list
 // takes the arrows, PgUp/PgDn and the page's letters, as before; on the
 // tab strip ← → change tabs. The ring shows once Tab is used; a touch
@@ -41,8 +43,8 @@ func (a *bro) controls() []control {
 		}
 	}
 	add("", "tabs", a.TabRect(a.Tab), false)
-	// panel adds a panel's title button, or its strip if folded: true if
-	// that's all of it.
+	// panel adds a panel's title button and its − box, or its strip if
+	// folded: true if that's all of it.
 	panel := func(key string) bool {
 		p := a.foldPanel(key)
 		if p.Folded {
@@ -50,6 +52,7 @@ func (a *bro) controls() []control {
 			return true
 		}
 		add(key, key+".button", p.Button, false)
+		add(key, key+".fold", p.Fold, false)
 		return false
 	}
 	buttons := func(key string, bs []radioButton) {
@@ -183,6 +186,14 @@ func (a *bro) focusKeyed(code uint16, value int32) bool {
 			if !isTermTab(a.Tab) { // the strip keeps the focus; a terminal takes the keys
 				a.focusTo(control{id: "tabs"})
 			}
+		}
+		return true
+	case c.id == c.panel+".fold" && code == keyLeft, c.id == c.panel+".strip" && code == keyRight:
+		if value == 1 {
+			fold := code == keyLeft
+			a.setFold(c.panel, fold)
+			a.focusTo(control{id: c.panel + map[bool]string{true: ".strip", false: ".fold"}[fold], panel: c.panel})
+			a.updateRing()
 		}
 		return true
 	case !c.list && (code == kobo.KeyEnter || code == kobo.KeySpace):

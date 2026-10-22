@@ -71,9 +71,16 @@ Tab moves the keys' focus through the page's controls, as on a desktop:
 the tab strip, the buttons and the lists, panel by panel; Shift+Tab goes
 back. A dashed frame shows where it is. Enter or Space presses the
 button in focus; a list takes ↑ ↓, PgUp/PgDn, Home/End and Enter; on
-the tab strip ← → change tabs. Ctrl+Tab, as before, goes to the next
-panel (its list, or its first button). The frame shows once Tab is used,
-and a touch takes it away. The terminals keep Tab for the shell.
+the tab strip ← → change tabs. A panel's − box is a stop too: ← (or
+Enter) there folds the panel, and → on a folded panel's strip opens it.
+Ctrl+Tab, as before, goes to the next panel (its list, or its first
+button). The frame shows once Tab is used, and a touch takes it away.
+The terminals keep Tab for the shell.
+
+A question over the page (a saved host's menu, read-only or
+read-write, restart into a new build) has its answers as buttons: the
+arrows or Tab move between them, Enter picks the one in black, a
+button's letter picks it, Esc closes the question.
 
 ## The switcher
 
