@@ -325,8 +325,8 @@ away from the Kobo's system.
 - Settings, **… Alpine: remove it** (or "Alpine: remove it…" in the
   switcher) deletes the image and all in it, once you type `yes delete
   it bro` in the question (a keyboard is needed). The Alpine sessions
-  have to be closed first. The Shell tab goes back to the Kobo's shell;
-  choosing Alpine again starts over, asking the size anew.
+  have to be closed first. The Shell tab stays on Alpine: its next
+  session starts over, asking the size anew.
 
 ## Music
 

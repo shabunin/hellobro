@@ -330,11 +330,7 @@ func (a *bro) alpineRemoveAsk() {
 					a.Toast("Alpine not removed: "+err.Error(), 6*time.Second)
 					return
 				}
-				if a.setting("shell") == "alpine" { // there's none to run
-					a.set["shell"] = indexOf(settingList[settingIndex("shell")].values, "kobo")
-					a.set.save()
-				}
-				a.Toast("Alpine removed; the Shell tab runs the Kobo's shell", 5*time.Second)
+				a.Toast("Alpine removed; the next Alpine session sets it up anew", 5*time.Second)
 				a.sv.shown = ""
 				a.drawSettings()
 			})

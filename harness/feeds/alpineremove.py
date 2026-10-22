@@ -2,7 +2,7 @@
 # The question's yes waits for "yes delete it bro": half of it and Enter
 # do nothing, all of it and Enter delete the image. Then the switcher's
 # "Alpine: remove it…" finds none. Run it with a stand-in image and
-# shell=alpine (APP_EXTRA), which goes back to kobo.
+# shell=alpine (APP_EXTRA), which stays so.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
