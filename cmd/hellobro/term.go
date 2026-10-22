@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
@@ -41,8 +42,9 @@ const (
 )
 
 const (
-	termFrame   = 60 * time.Millisecond // at most this often we redraw from the emulator
-	maxSessions = 9
+	termFrame     = 60 * time.Millisecond // at most this often we redraw from the emulator
+	termFullEvery = 3 * time.Second       // and this often we compare all the cells, not only the touched rows
+	maxSessions   = 9
 )
 
 // The terminal's font size in pixels: Ctrl+= and Ctrl+- step it, Ctrl+0
@@ -97,6 +99,7 @@ type termSession struct {
 
 	back  termBackend
 	emu   *vt.SafeEmulator
+	mu    sync.Mutex // held while the emulator changes (write): its touched lines are read and cleared under it
 	dirty atomic.Bool
 	title string
 
@@ -119,6 +122,34 @@ type termPane struct {
 	shownStatus  string
 	hostRows     []image.Rectangle // where the saved hosts are listed, for taps
 	newR         image.Rectangle   // "+", a new session: in the focused one's title strip
+	cursorY      int               // the row the cursor was drawn on
+	alt          bool              // the alternate screen was drawn
+	selShown     bool              // a selection was drawn
+	fullAt       time.Time         // all the cells were last compared
+}
+
+// write puts the remote's output into the emulator.
+func (t *termSession) write(p []byte) {
+	t.mu.Lock()
+	t.emu.Write(p)
+	t.mu.Unlock()
+}
+
+// touchedRows are the rows the emulator changed since the last call, and
+// whether it's on its alternate screen. vt keeps them but has no way to
+// clear them, so we clear its list ourselves, under t.mu.
+func (t *termSession) touchedRows(rows int) ([]bool, bool) {
+	touched := make([]bool, rows)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	ls := t.emu.Touched()
+	for y, l := range ls {
+		if l != nil && y < rows {
+			touched[y] = true
+		}
+		ls[y] = nil
+	}
+	return touched, t.emu.IsAltScreen()
 }
 
 func (t *termSession) connected() bool { return t.state == termConnected }
@@ -263,7 +294,9 @@ func (a *bro) paneGeometry(t *termSession) {
 	pn.grid = image.Rectangle{at, at.Add(image.Pt(gw, gh))}
 	if size := image.Pt(pn.cols, pn.rows); t.connected() && size != t.size {
 		t.size = size
+		t.mu.Lock()
 		t.emu.Resize(pn.cols, pn.rows)
+		t.mu.Unlock()
 		t.back.resize(pn.cols, pn.rows)
 	}
 }
@@ -505,7 +538,16 @@ func (a *bro) renderTerm(t *termSession) {
 	}
 	t.dirty.Store(false)
 	v.drawnAt = time.Now()
+	// Only the rows that may have changed are compared: the emulator's
+	// touched ones, where the cursor was and is. All of them after a
+	// redraw, a switch of screens, with a selection, and every few
+	// seconds, in case something changed that vt didn't mark.
+	touched, alt := t.touchedRows(pn.rows)
+	sel := t == a.term() && v.sel != nil
+	full := alt != pn.alt || sel || pn.selShown || time.Since(pn.fullAt) > termFullEvery
+	pn.alt, pn.selShown = alt, sel
 	if len(pn.shown) != pn.rows || (pn.rows > 0 && len(pn.shown[0]) != pn.cols) {
+		full = true
 		pn.shown = make([][]cellKey, pn.rows)
 		for y := range pn.shown {
 			pn.shown[y] = make([]cellKey, pn.cols)
@@ -520,8 +562,14 @@ func (a *bro) renderTerm(t *termSession) {
 		r    image.Rectangle
 		gray bool
 	}
+	if full {
+		pn.fullAt = time.Now()
+	}
 	var rows []changed
 	for y := 0; y < pn.rows; y++ {
+		if !full && !touched[y] && y != pn.cursorY && y != cur.Y {
+			continue
+		}
 		from, to, gray := -1, -1, false
 		for x := 0; x < pn.cols; x++ {
 			k := t.cellKeyAt(x, y, showCursor && cur.X == x && cur.Y == y)
@@ -542,6 +590,7 @@ func (a *bro) renderTerm(t *termSession) {
 			rows = append(rows, changed{r.Inset(-1).Intersect(pn.grid), gray})
 		}
 	}
+	pn.cursorY = cur.Y
 	// Black & white changes to a row or three (typing, a spinner) take the
 	// fast waveform. It ghosts, though, so scrolls and redraws, where a
 	// moment more doesn't matter, get the clean grayscale one.
@@ -938,7 +987,7 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 			var n int
 			n, err = back.Read(buf)
 			if n > 0 {
-				emu.Write(buf[:n])
+				t.write(buf[:n])
 				t.dirty.Store(true)
 			}
 			if err != nil {

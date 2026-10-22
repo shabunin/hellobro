@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/vt"
 
@@ -131,5 +132,96 @@ func TestTermKeys(t *testing.T) {
 			t.Errorf("%d %+v: %q, want %q", c.code, c.m, s, c.want)
 		}
 		emu.Close()
+	}
+}
+
+// Drawing only the touched rows ends where a full redraw would: through
+// scrolls, clears, inserted and deleted lines and cells, the alternate
+// screen, colors, wide characters and a cursor jumping about.
+func TestRenderTouched(t *testing.T) {
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	a.tf.setSize(termFontDefault)
+	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1000, 700))}
+	a.C.Fill(a.C.Bounds(), kobo.White)
+	a.termP = kobo.NewPanel(a.F, "Terminal", image.Rect(10, 10, 990, 690), "")
+	a.termGeometry()
+	tr := &termSession{}
+	a.tv.groups[kindSSH].sessions = []*termSession{tr}
+	tr.pane.p = a.termP
+	a.paneGeometry(tr)
+	v := &tr.pane
+	tr.emu = vt.NewSafeEmulator(v.cols, v.rows)
+	tr.size = image.Pt(v.cols, v.rows)
+	tr.state = termConnected
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			if _, err := tr.emu.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+	rng := rand.New(rand.NewPCG(3, 4))
+	var stream []byte
+	add := func(s string) { stream = append(stream, s...) }
+	for i := range 400 {
+		switch rng.IntN(16) {
+		case 0:
+			add("\x1b[2J") // clear the screen
+		case 1:
+			add("\x1b[K") // the rest of the line
+		case 2:
+			add("\x1b[" + strconv.Itoa(1+rng.IntN(3)) + "L") // insert lines
+		case 3:
+			add("\x1b[" + strconv.Itoa(1+rng.IntN(3)) + "M") // delete lines
+		case 4:
+			add("\x1b[" + strconv.Itoa(1+rng.IntN(5)) + "P") // delete cells
+		case 5:
+			add("\x1b[" + strconv.Itoa(1+rng.IntN(5)) + "@") // insert cells
+		case 6:
+			add("\x1b[?1049h") // the alternate screen
+		case 7:
+			add("\x1b[?1049l")
+		case 8:
+			add("\x1b[" + strconv.Itoa(1+rng.IntN(v.rows)) + ";" + strconv.Itoa(1+rng.IntN(v.cols)) + "H") // the cursor, anywhere
+		case 9:
+			add("\x1b[7mreverse\x1b[0m \x1b[1mbold\x1b[0m \x1b[4munder\x1b[0m")
+		case 10:
+			add("\x1b[S\x1b[T") // scroll up, down
+		case 11:
+			add("\x1b[J") // to the end of the screen
+		case 12:
+			add("\x1b[?25l") // the cursor hidden
+		case 13:
+			add("\x1b[?25h")
+		case 14:
+			add("\x1b[" + strconv.Itoa(5+rng.IntN(5)) + ";" + strconv.Itoa(10+rng.IntN(5)) + "r\x1b[1;1H") // a scroll region
+		default:
+			add("line " + strconv.Itoa(i) + " 日本 ok\r\n")
+		}
+	}
+	add("\x1b[r")
+	for len(stream) > 0 {
+		n := min(len(stream), 1+rng.IntN(40))
+		tr.write(stream[:n])
+		stream = stream[n:]
+		a.renderTerm(tr)
+		if tr.pane.fullAt.IsZero() {
+			t.Fatal("no full compare at first")
+		}
+		// What a full compare would show now.
+		inc := image.NewGray(v.grid)
+		draw.Draw(inc, v.grid, a.C.Gray, v.grid.Min, draw.Src)
+		shown := v.shown
+		v.shown = nil
+		a.renderTerm(tr)
+		for y := v.grid.Min.Y; y < v.grid.Max.Y; y++ {
+			for x := v.grid.Min.X; x < v.grid.Max.X; x++ {
+				if inc.GrayAt(x, y) != a.C.GrayAt(x, y) {
+					t.Fatalf("pixel %d,%d differs from a full redraw, with %d bytes to go", x, y, len(stream))
+				}
+			}
+		}
+		v.shown, v.fullAt = shown, time.Now() // as it was: the next round is incremental again
 	}
 }
