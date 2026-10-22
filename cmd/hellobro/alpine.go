@@ -13,9 +13,10 @@ package main
 // The image is unmounted when we leave (and launch.sh makes sure), so
 // that Nickel can hand the storage to a computer over USB.
 //
-// Sound, if Settings says so: the Kobo has no sound card, only Bluetooth
-// through its bluealsa (3.1), which a client reaches over the system bus.
-// The jail gets the bus, and ALSA a plugin that speaks to that bluealsa:
+// The system bus, if Settings says so; sound is what it's for first: the
+// Kobo has no sound card, only Bluetooth through its bluealsa (3.1),
+// which a client reaches over the bus. The jail gets the bus, and ALSA
+// a plugin that speaks to that bluealsa:
 // Alpine's own bluez-alsa is 4.x, whose API the Kobo's lacks, so it's
 // the 3.1.0 one of Alpine 3.15, checked against its pinned hash too.
 // The bus is the price: root on it reaches BlueZ and dhcpcd (Bluetooth
@@ -67,7 +68,7 @@ var (
 		"usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so": kobo.AppFile("alpine-bluealsa-pcm.so"),
 		"usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so": kobo.AppFile("alpine-bluealsa-ctl.so"),
 	}
-	alpineSound atomic.Bool // the setting, for the share server's goroutines too
+	alpineBus atomic.Bool // the setting, for the share server's goroutines too
 )
 
 // startAlpine starts a session in the jail on a new PTY: a login shell,
@@ -90,13 +91,12 @@ func startAlpine(cols, rows int, command string) (*localShell, error) {
 		cmd := exec.Command("/proc/self/exe", "--alpine-init", command)
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 		cmd.Env = []string{"TERM=xterm-256color"}
-		if alpineSound.Load() {
-			if err := bluealsaReady(tty); err != nil {
+		if alpineBus.Load() {
+			if err := bluealsaReady(tty); err != nil { // the bus goes in all the same
 				log.Printf("alpine: sound: %v", err)
 				fmt.Fprintf(tty, "alpine: no sound: %v\r\n", err)
-			} else {
-				cmd.Env = append(cmd.Env, "HELLOBRO_ALPINE_SOUND=1")
 			}
+			cmd.Env = append(cmd.Env, "HELLOBRO_ALPINE_BUS=1")
 		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setpgid:    true, // close's hangup goes to the jail's first process, and with it the jail

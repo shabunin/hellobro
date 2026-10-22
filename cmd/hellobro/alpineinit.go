@@ -15,9 +15,9 @@ package main
 // reboot, ptrace, clock or network setup, and no way to get them back
 // (no_new_privs).
 //
-// With sound on (alpine.go), the jail gets the system bus's socket, the
-// bluealsa 3.1 plugins in /usr/local/lib/alsa-lib, and an
-// /etc/asound.conf that makes them ALSA's default (if it has none).
+// With system bus access on (alpine.go), the jail gets the bus's socket,
+// and for sound the bluealsa 3.1 plugins in /usr/local/lib/alsa-lib and
+// an /etc/asound.conf that makes them ALSA's default (if it has none).
 //
 // Nothing is mounted or written at a path in the jail before pivot_root:
 // an absolute symlink in it would point at the Kobo's own files then.
@@ -95,9 +95,9 @@ func alpineInit(command string) {
 	}
 }
 
-// alsaConf is the jail's /etc/asound.conf, with sound on.
+// alsaConf is the jail's /etc/asound.conf, with the bus.
 const alsaConf = `# hellobro: sound to the Kobo's Bluetooth headphones, through its
-# bluealsa 3.1 (Settings, Alpine's sound). Alpine's own bluez-alsa is 4.x,
+# bluealsa 3.1 (Settings, Alpine: system bus access). Alpine's own bluez-alsa is 4.x,
 # which the Kobo's doesn't speak, so its plugins are 3.1.0's.
 pcm_type.bluealsa { lib "/usr/local/lib/alsa-lib/libasound_module_pcm_bluealsa.so" }
 ctl_type.bluealsa { lib "/usr/local/lib/alsa-lib/libasound_module_ctl_bluealsa.so" }
@@ -110,15 +110,13 @@ ctl.!default { type bluealsa; service "org.bluealsa"; battery "yes" }
 
 func alpineJail() error {
 	resolv, _ := os.ReadFile("/etc/resolv.conf") // the Kobo's, for the jail's
-	sound := os.Getenv("HELLOBRO_ALPINE_SOUND") == "1"
-	plugins := map[string][]byte{} // by the name in the jail
-	if sound {
+	bus := os.Getenv("HELLOBRO_ALPINE_BUS") == "1"
+	plugins := map[string][]byte{} // by the name in the jail; none if they couldn't be fetched
+	if bus {
 		for name, keep := range bluealsaPlugins {
-			b, err := os.ReadFile(keep)
-			if err != nil {
-				return fmt.Errorf("sound: %w", err)
+			if b, err := os.ReadFile(keep); err == nil {
+				plugins["/usr/local/lib/alsa-lib/"+filepath.Base(name)] = b
 			}
-			plugins["/usr/local/lib/alsa-lib/"+filepath.Base(name)] = b
 		}
 	}
 	if err := syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, ""); err != nil {
@@ -167,7 +165,7 @@ func alpineJail() error {
 			}
 		}
 	}
-	if sound {
+	if bus {
 		if err := jailDir("/run/dbus"); err != nil {
 			return err
 		}
@@ -178,8 +176,10 @@ func alpineJail() error {
 		if err := syscall.Mount("/.oldroot/var/run/dbus/system_bus_socket", sock, "", syscall.MS_BIND, ""); err != nil {
 			return fmt.Errorf("the system bus: %w", err)
 		}
-		if err := jailDir("/usr/local/lib/alsa-lib"); err != nil {
-			return err
+		if len(plugins) > 0 {
+			if err := jailDir("/usr/local/lib/alsa-lib"); err != nil {
+				return err
+			}
 		}
 		for name, b := range plugins {
 			if have, err := os.ReadFile(name); err == nil && string(have) == string(b) {
@@ -190,7 +190,7 @@ func alpineJail() error {
 			}
 			os.Chmod(name, 0o755)
 		}
-		if _, err := os.Lstat("/etc/asound.conf"); err != nil {
+		if _, err := os.Lstat("/etc/asound.conf"); err != nil && len(plugins) > 0 {
 			writeNew("/etc/asound.conf", alsaConf)
 		}
 	}

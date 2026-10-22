@@ -74,15 +74,18 @@ var settingList = []setting{
 	{key: "shell", label: "Shell tab runs",
 		values: []string{"kobo", "alpine"},
 		shown:  []string{"the Kobo's /bin/sh, as root", "Alpine Linux, in a jail"}},
-	{key: "alpine-sound", label: "… Alpine's sound (the system bus)",
+	{key: "alpine-bus", label: "… Alpine: system bus access",
 		values: []string{"off", "on"},
-		shown:  []string{"off: no sound in the jail", "on: it reaches Bluetooth and Wi-Fi setup too"}},
+		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},
 	{key: "tabs", label: "Tabs", values: []string{""}, shown: []string{""}}, // the Tabs dialog: tabs.go
 	{key: "keys", label: "Keys", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
 }
+
+// settingRenamed are keys as they were once, by what they are now.
+var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
 // The defaults, by key: the index of a value.
 var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1}
@@ -117,6 +120,9 @@ func loadSettings() settings {
 		k, v, ok := strings.Cut(strings.TrimSpace(line), "=")
 		if !ok {
 			continue
+		}
+		if now, ok := settingRenamed[k]; ok {
+			k = now
 		}
 		for _, st := range settingList {
 			if st.key != k {
@@ -200,8 +206,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.shareApply()
 		case "profile":
 			profileOn.Store(a.setting(st.key) == "on")
-		case "alpine-sound":
-			alpineSound.Store(a.setting(st.key) == "on")
+		case "alpine-bus":
+			alpineBus.Store(a.setting(st.key) == "on")
 		case "light-idle":
 			a.applyLightIdle()
 		}

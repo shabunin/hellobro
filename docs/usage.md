@@ -251,9 +251,11 @@ away from the Kobo's system.
   - No mount, modules, raw devices, mknod, reboot, ptrace, clock or
     network setup, and no way to get them back (no_new_privs). The
     network itself works.
-- Sound: off by default. The Kobo has no sound card, only Bluetooth,
-  through its bluealsa (3.1) on the system bus. Settings, **… Alpine's
-  sound** gives the jail that bus, the bluez-alsa 3.1.0 ALSA plugins
+- System bus access: off by default. Settings, **… Alpine: system bus
+  access** gives the jail the Kobo's D-Bus, for what talks to its
+  services. Sound is the first of those: the Kobo has no sound card,
+  only Bluetooth, through its bluealsa (3.1) on that bus. With the bus
+  the jail also gets the bluez-alsa 3.1.0 ALSA plugins
   (from Alpine 3.15, as Alpine's own 4.x doesn't speak to the Kobo's;
   fetched once, pinned hash) and an `/etc/asound.conf` making them the
   default (written if there's none). Then mplayer, mpv, aplay… play to
