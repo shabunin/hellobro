@@ -38,7 +38,11 @@ NickelMenu entry (`nm/hellobro`) to `.adds/hellobro`, and writes a first
 they share the touch calibration; each logs to its own `NAME.log` there.
 `launch.sh APP` freezes Nickel while the app runs (leaving whatever holds
 the watchdog alone) and thaws it afterwards; the app thaws it itself if it
-ever gets stuck.
+ever gets stuck. With `nickel=closed` in `settings` (hellobro only) it
+starts a copy of itself in a session of its own (`setsid`), so Nickel's
+going doesn't take it along, ends Nickel as KOReader's `koreader.sh`
+does, and starts it as `rcS` does when the app has quit
+(`HELLOBRO_NICKEL=closed` tells the app).
 
 A release: tag it (`git tag -a v0.2.0 -m v0.2.0`, push the tag), then
 `touch cmd/hellobro/main.go && make dist`, so the build takes the tag as

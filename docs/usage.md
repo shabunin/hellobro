@@ -291,7 +291,10 @@ away from the Kobo's system.
   has one registered, so BlueZ sends the presses there as D-Bus calls,
   and Nickel, frozen, never answers them. hellobro tries to watch the bus
   for them, but the Elipsa's D-Bus (1.6.30) has no monitor mode and
-  doesn't allow eavesdropping, so on the Elipsa they're lost.
+  doesn't allow eavesdropping, so on the Elipsa they're lost. Settings,
+  "Nickel while hellobro runs", closed: hellobro closes Nickel as it
+  starts, as KOReader does, and Nickel's player goes with it (see
+  below).
 - The library has three views (tap them, or v / 1-3):
   - **Albums**: every folder with tracks in it.
   - **Folders**: the folders as they are, from the one all the music is
@@ -426,6 +429,20 @@ Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Ctrl+Shift+F
 in hellobro): swipe in from the top or bottom edge to leave it. Esc or the exit button leave;
 the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
 with a session up, 6 hours while music plays).
+
+## Closing Nickel
+
+Settings, "Nickel while hellobro runs": frozen (the default) or closed.
+Closed, from the next start, `launch.sh` ends Nickel and its helpers as
+KOReader does (after a `sync`), and starts it again, as the Kobo boots
+it, when hellobro quits. What Nickel registered with BlueZ goes with it,
+its media player too, so the headphones' buttons are no longer sent to
+it. Wi-Fi carries on; if Bluetooth goes (its chip's link was Nickel's
+child), hellobro turns it on again a few seconds in. Quitting turns both
+radios off and Nickel turns them on as its settings say, so leaving
+takes as long as Nickel takes to start, and Nickel's idle timers start
+afresh. Updates (a restart into a new build) keep Nickel closed and the
+radios on.
 
 ## E-ink
 

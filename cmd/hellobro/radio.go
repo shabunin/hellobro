@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -54,11 +55,12 @@ type radioButton struct {
 }
 
 type radioState struct {
-	started bool
-	onDone  bool // radiosOn ran
-	wifi    radio.WiFi
-	bt      radio.Bluetooth
-	focus   int
+	started    bool
+	onDone     bool // radiosOn ran
+	btBackDone bool // btBack ran
+	wifi       radio.WiFi
+	bt         radio.Bluetooth
+	focus      int
 
 	ws         radio.WiFiStatus
 	nets       []radio.Network
@@ -220,6 +222,7 @@ func (r *radioState) keepSelected(w, b string) {
 func (a *bro) radioTick() {
 	r := &a.rs
 	a.radiosOn()
+	a.btBack()
 	if !r.started {
 		return
 	}
@@ -238,14 +241,59 @@ func (a *bro) radioTick() {
 
 func (a *bro) radioExit() {
 	r := &a.rs
+	if nickelClosed && !a.Restarting() {
+		a.radioStart() // whether or not we used them, they go off
+	}
 	if !r.started {
 		return
 	}
 	if p := r.prompt; p != nil && p.reply != nil {
 		p.reply <- radioReply{}
 	}
+	if nickelClosed && !a.Restarting() {
+		// Nickel starts again after us, as it boots: it wants the radios
+		// off, and turns them on as its settings say. Bluetooth first:
+		// Wi-Fi off then powers the chip they share down too.
+		log.Print("radio: off for Nickel, which starts again")
+		if err := r.bt.SetPower(false); err != nil {
+			log.Printf("bluetooth: %v", err)
+		}
+		if err := r.wifi.SetPower(false, func(s string) { log.Printf("wifi: %s", s) }); err != nil {
+			log.Printf("wifi: %v", err)
+		}
+		r.bt.Keep()
+		r.wifi.Keep()
+	}
 	r.bt.Restore()
 	r.wifi.Restore()
+}
+
+// nickelClosed says launch.sh closed Nickel for our run (the nickel
+// setting), and starts it again after.
+var nickelClosed = os.Getenv("HELLOBRO_NICKEL") == "closed"
+
+// nickelBT says Bluetooth was on as Nickel went. The chip's link
+// (rtk_hciattach) was Nickel's child and may have gone with it.
+var nickelBT = nickelClosed && os.Getenv("HELLOBRO_BT_WAS") == "1"
+
+var startedAt = time.Now()
+
+// btBack brings Bluetooth back, once, a few seconds in, if Nickel's going
+// took it.
+func (a *bro) btBack() {
+	r := &a.rs
+	if !nickelBT || r.btBackDone || time.Since(startedAt) < 3*time.Second {
+		return
+	}
+	r.btBackDone = true
+	a.radioStart()
+	bt := r.bt
+	if bs, _ := bt.Status(); bs.Powered {
+		return
+	}
+	a.radioRun(panelBT, "Bluetooth went with Nickel: turning it on again…", func(func(string)) error {
+		return bt.SetPower(true)
+	})
 }
 
 // --- doing things ---

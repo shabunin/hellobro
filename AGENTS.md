@@ -153,6 +153,11 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   (`termUnseen`): on the Kobo, waking up for each small read costs more
   than parsing it. Floods are still read at once, so the writer never
   blocks on a full pty.
+- Closed Nickel (`nickel=closed`): `bluetoothd` and `bluealsa` are
+  D-Bus activated (`/usr/share/dbus-1/system-services`), so killing them
+  is safe, but `rtk_hciattach` is Nickel's child. Wi-Fi's daemons are
+  init's. `/tmp/nickel-hardware-status` must go while Nickel's away
+  (writers hang on the FIFO) and come back before it starts.
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 

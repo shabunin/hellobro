@@ -297,6 +297,9 @@ func (a *App) Restart(exe string) {
 	a.restart, a.quit = exe, true
 }
 
+// Restarting says whether we're quitting to run a new build in our place.
+func (a *App) Restarting() bool { return a.restart != "" }
+
 // restartedEnv tells a new build it's taking over from the one before.
 const restartedEnv = "HELLOBRO_RESTARTED"
 
