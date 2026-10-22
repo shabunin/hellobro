@@ -79,7 +79,7 @@ var settingList = []setting{
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
 	{key: "term-clean", label: "Terminal: clean redraw of typed text",
 		values: []string{"10", "30", "60", "off"},
-		shown:  []string{"a flash, 10 s after (once it's still)", "a flash, 30 s after", "a flash, 1 min after", "off: it stays faint"}},
+		shown:  []string{"a flash every 10 s", "a flash every 30 s", "a flash every 1 min", "off: it stays faint"}},
 	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown on the terminals", "hidden"}},

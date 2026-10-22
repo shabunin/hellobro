@@ -45,7 +45,6 @@ const (
 	termFrame     = 60 * time.Millisecond // at most this often we redraw from the emulator
 	termBackFrame = time.Second           // and a pane not in focus, at most this often
 	termTyping    = time.Second           // after a key, a pane not in focus waits
-	termStill     = 2 * time.Second       // a pane this long without output or keys gets its clean redraw
 	termFullEvery = 3 * time.Second       // and this often we compare all the cells, not only the touched rows
 	maxSessions   = 9
 )
@@ -1149,13 +1148,12 @@ func (a *bro) termTick() {
 	// That cleanup leaves text the fast waveform drew faint and thin (the
 	// panel drives only the pixels that change, and those don't), till a
 	// flash or another page over it. So what was drawn fast gets a flash
-	// of its own, once its pane is still a moment: at most this long
-	// after it was typed (the setting).
+	// of its own, every so often (the setting) while there's any: typing
+	// or not, as asked.
 	if every := a.settingSeconds("term-clean"); every > 0 {
 		for _, t := range g.sessions {
 			pn := &t.pane
-			if !pn.dimArea.Empty() && time.Since(pn.dimAt) >= every && a.showing(t) &&
-				time.Since(pn.drawnAt) > termStill && time.Since(t.keyAt) > termStill {
+			if !pn.dimArea.Empty() && time.Since(pn.dimAt) >= every && a.showing(t) {
 				a.MarkFlash(pn.dimArea)
 				pn.dimArea, pn.fastArea = image.Rectangle{}, image.Rectangle{}
 				break

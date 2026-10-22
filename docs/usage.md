@@ -433,9 +433,10 @@ both up).
 
 The GL16 cleanup leaves typed text faint and thin, as the panel only
 drives the pixels that change. So the rows drawn fast also get a small
-flash of their own once their pane is still for 2 s, 10 s after the first
-of them at the soonest. Settings, "Terminal: clean redraw of typed text",
-makes that 30 s, 1 min, or off. Switching tabs and back cleans it all too.
+flash of their own every 10 s, in SSH and Shell sessions alike, while
+there's any (typing or not). Settings, "Terminal: clean redraw of typed
+text", makes that 30 s, 1 min, or off. Switching tabs and back cleans it
+all too.
 
 ## Files on the Kobo
 
