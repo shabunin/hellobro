@@ -286,6 +286,7 @@ type Panel struct {
 	Fold               image.Rectangle // the − / + box at the strip's end, if it folds
 	Folded             bool            // only the title strip shows
 	Close              image.Rectangle // a window's ×, at the strip's end
+	Full               image.Rectangle // a window's ▢ before it: full screen
 	New                image.Rectangle // a window's +, after its name: a window next to it
 	Focused            bool            // the keys go to it: its strip is black
 }
@@ -489,6 +490,9 @@ func WithButton(f Fonts, p Panel, label string) Panel {
 		if !p.Close.Empty() {
 			end = p.Close.Min.X - 12
 		}
+		if !p.Full.Empty() {
+			end = p.Full.Min.X - 12
+		}
 		bw := TextWidth(f.Small, label) + 36
 		p.Button = image.Rect(end-bw, p.Title.Min.Y+6, end, p.Title.Max.Y-8)
 	}
@@ -505,13 +509,15 @@ func WithFold(f Fonts, p Panel, folded bool) Panel {
 }
 
 // WithWindow is p as a window's: a × at the end of its strip that
-// closes it, and with newBox a + after its name, for a window next to it.
+// closes it, a ▢ before it for full screen, and with newBox a + after
+// its name, for a window next to it.
 func WithWindow(f Fonts, p Panel, focused, newBox bool) Panel {
 	if p.Title.Empty() {
 		return p
 	}
 	s := p.Title.Dy() - 14
 	p.Close = image.Rect(p.Title.Max.X-10-s, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
+	p.Full = p.Close.Sub(image.Pt(s+12, 0))
 	p.New, p.Focused = image.Rectangle{}, focused
 	if newBox {
 		x := p.Title.Min.X + 16 + TextWidth(f.Panel, p.Name) + 24
@@ -918,6 +924,14 @@ func (a *App) DrawPanelTitle(p Panel, status string) {
 			c.Fill(image.Rect(m.X+d-1, m.Y+d-1, m.X+d+2, m.Y+d+2), Black)
 			c.Fill(image.Rect(m.X+d-1, m.Y-d-1, m.X+d+2, m.Y-d+2), Black)
 		}
+		t.Max.X = f.Min.X - 16
+	}
+	if f := p.Full; !f.Empty() {
+		box(f)
+		m := f.Min.Add(f.Max).Div(2)
+		r := image.Rect(m.X-11, m.Y-9, m.X+12, m.Y+10) // ▢, a window's outline
+		c.Frame(r, 2, Black)
+		c.Fill(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+5), Black)
 		t.Max.X = f.Min.X - 16
 	}
 	if f := p.Fold; !f.Empty() {

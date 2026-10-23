@@ -1,7 +1,9 @@
 # The lock with the keyboard gone: Shift+Meta+X, then the keyboard goes
 # (its FIFO closed): the lock screen lists its swipes. A short swipe up
-# and a slant do nothing; a swipe right unlocks and opens Bluetooth. The
-# keyboard comes back, locks again and goes: a swipe up unlocks. Locked
+# and a slant do nothing; a swipe right unlocks and opens Bluetooth, full
+# screen; a swipe in from the top edge leaves it, and a tap on its ▢
+# (FULL_X, FULL_Y) puts it back. The keyboard comes back, locks again and
+# goes: a swipe up unlocks. Locked
 # once more, a swipe down goes back to Nickel (the app quits). The log
 # says "lock: swiped →, Bluetooth", "lock: swiped ↑, unlock",
 # "lock: swiped ↓, back to Nickel".
@@ -23,7 +25,11 @@ start(); time.sleep(3)
 lock(); gone()                    # the swipes listed
 swipe(0, -200)                    # a brush: nothing
 swipe(400, -500)                  # a slant: nothing
-swipe(500, 0)                     # Bluetooth
+swipe(500, 0)                     # Bluetooth, full screen
+stroke([(W // 2, 10 + 30 * i) for i in range(12)]); time.sleep(4)  # in from the top: out of it
+if os.environ.get("FULL_X"):
+    tap(int(os.environ["FULL_X"]), int(os.environ["FULL_Y"])); time.sleep(4)  # its ▢: full screen again
+    stroke([(W // 2, 10 + 30 * i) for i in range(12)]); time.sleep(4)
 back(); lock(); gone()
 swipe(0, -500)                    # unlocked
 back(); lock(); gone()

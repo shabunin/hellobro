@@ -41,9 +41,11 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     processes that keep the CPU busy (percent of one core).
 
 A window's title strip has its name (white on black when it has the
-focus), a **+** for a launcher next to it, and a **×** that closes it (a
-terminal's shell or connection ends with it). A tap on a window gives it
-the focus; the keys go to the one that has it.
+focus), a **+** for a launcher next to it, a **▢** that puts it full
+screen, and a **×** that closes it (a terminal's shell or connection
+ends with it). A tap on a window gives it the focus; the keys go to the
+one that has it. Full screen, a swipe in from the top (or bottom) edge
+of the screen, or Meta+F, puts it back.
 
 New windows open next to the one in focus, along its container: side
 by side, or one above another after Meta+V (split vertically; Meta+B,
@@ -80,8 +82,9 @@ and the time. It looks again every 15 s. In a binding mode (Meta+R,
 say) it says which, and what plays, and for a moment what was copied.
 
 **≡** at its end is the menu: rotate the
-screen, touch calibration, sleep, the switcher, and quit,
+screen, touch calibration, sleep, lock, the switcher, and quit,
 back to Nickel. Tap one, or type to narrow and Enter; Esc closes it.
+A swipe up or down along the right edge of the screen opens it too.
 
 Meta and the arrows (or h j k l, as vim has them) move the focus
 between the windows; with Shift, the window itself moves. Meta+A
@@ -160,7 +163,7 @@ The keys are hellobro's commands', i3's with Meta (the Win key):
 | Meta+1…0, Meta+Shift+1…0 | go to a workspace, send the window there |
 | Meta+B, Meta+V | split: the next window beside, below |
 | Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
-| Meta+F | fullscreen |
+| Meta+F | fullscreen (or its strip's ▢; a swipe in from the top edge leaves it) |
 | Meta+Shift+Space | floating |
 | Meta+A | focus the container around |
 | Meta+Shift+Minus, Meta+Minus | put the window away, bring it back |
@@ -290,7 +293,7 @@ sleep or quit for it.
 
 ## Lock
 
-Shift+Meta+X locks the screen, for a bag or a hand: touch does nothing
+Shift+Meta+X (or Lock in the ≡ menu) locks the screen, for a bag or a hand: touch does nothing
 and keys go nowhere, but the music's keys, the power button (sleep),
 and Shift+Meta+X again, which unlocks. The light goes off till then
 (notifications don't flash it). The lock screen says hello bro, what
@@ -298,10 +301,9 @@ plays and whether it's paused, a low battery, how to unlock, the
 version and where it's from; it changes only when one of them does. The windows go on behind it, as they are when it
 unlocks; asleep and awake, it's still locked. Locked, touches and
 keys don't count as use: the light stays off and sleeping when idle
-still comes. It wants a keyboard (its keys unlock). If the keyboard
-goes while it's locked, the lock screen lists swipes instead, the touch
-screen's way out: ↑ unlocks, → unlocks and opens Bluetooth (to connect
-the keyboard again), ↓ goes back to Nickel. A swipe is long (a quarter
+still comes. With no keyboard (or the keyboard gone while it's locked),
+the lock screen lists swipes instead, the touch screen's way out: ↑ unlocks, → unlocks and opens Bluetooth full screen
+(to connect the keyboard again), ↓ goes back to Nickel. A swipe is long (a quarter
 of the screen's short side) and straight, so a brush in a bag isn't
 one; the keyboard back, they're gone. keys.conf: `lock`.
 
@@ -333,8 +335,8 @@ one; the keyboard back, they're gone. keys.conf: `lock`.
 - Each terminal is a window, with its own size: the remote (or the
   shell) is told when it changes. The title strip's `disconnect` or
   `kill` ends what runs, and the window is a launcher again; × closes it.
-- Ctrl+= / Ctrl+- / Ctrl+0, or a swipe along the right edge: font size,
-  all the terminals' (remembered in `hellobro.json`).
+- Ctrl+= / Ctrl+- / Ctrl+0: font size, all the terminals' (remembered
+  in `hellobro.json`).
 - A status bar along the bottom, under the windows, fullscreen too: what's playing, and the
   battery (charge, temperature), CPU and memory use, every 5 s.
   Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it

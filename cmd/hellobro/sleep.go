@@ -133,19 +133,18 @@ func (a *bro) radioStart() {
 	factsOnce.Do(func() { go radio.LogFacts() })
 }
 
-// lock locks the screen till the lock's keys again. Only with a keyboard
-// and a key for it: a lock from the switcher or the menu would leave a
-// Kobo with neither stuck.
+// lock locks the screen till the lock's keys again. With no keyboard, or
+// no key for it, the lock screen has swipes to get out by touch.
 func (a *bro) lock() {
 	k := a.keyLabel("lock")
-	switch {
-	case a.Keyboard == "":
-		a.Toast("locking wants a keyboard: its keys unlock", 4*time.Second)
-	case k == "":
-		a.Toast("locking wants a key for it (keys.conf: lock)", 4*time.Second)
-	default:
-		a.picker = nil // what's open stays put; the switcher would only be in the way
-		a.App.Lock(k+" unlocks", a.lockLines())
+	hint := k + " unlocks"
+	if k == "" {
+		hint = ""
+	}
+	a.picker = nil // what's open stays put; the switcher would only be in the way
+	a.App.Lock(hint, a.lockLines())
+	if a.Keyboard == "" || k == "" { // no key to unlock it: swipes
+		a.SetLockSwipes(a.lockSwipes())
 	}
 }
 
@@ -168,11 +167,11 @@ func (a *bro) lockLines() []string {
 
 // lockSwipes are the lock screen's, with the keyboard gone: nothing else
 // could unlock it. Bluetooth unlocks too, for the keyboard to connect
-// again.
+// again, its window full screen: easy to hit by touch.
 func (a *bro) lockSwipes() []kobo.LockSwipe {
 	return []kobo.LockSwipe{
 		{Dir: kobo.SwipeUp, Label: "unlock", Run: a.Unlock},
-		{Dir: kobo.SwipeRight, Label: "Bluetooth", Run: func() { a.Unlock(); a.openGUI("bluetooth") }},
+		{Dir: kobo.SwipeRight, Label: "Bluetooth", Run: func() { a.Unlock(); a.openGUI("bluetooth"); a.fullWin(a.gui("bluetooth")) }},
 		{Dir: kobo.SwipeDown, Label: "back to Nickel", Run: a.Quit},
 	}
 }

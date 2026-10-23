@@ -110,7 +110,7 @@ make dist            # a release's files, in dist/
 | Meta+1…0, with Shift | go to a workspace, send the window there |
 | Meta+B, Meta+V | split: the next window beside, below |
 | Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
-| Meta+F | fullscreen (swipe in from the top or bottom edge to leave) |
+| Meta+F | fullscreen, or a window's ▢ (swipe in from the top or bottom edge to leave) |
 | Meta+Shift+Space | floating |
 | Meta+R | resize: the arrows, then Esc |
 | Meta+Shift+Q | close the window |
@@ -121,7 +121,7 @@ make dist            # a release's files, in dist/
 | Shift+Meta+X | lock: touch does nothing till it again |
 | swipe the left edge, Ctrl+Alt+Up / Down | frontlight |
 | Ctrl+Alt+L | frontlight on / off |
-| Meta+Shift+E, ≡ (the bar's menu) | back to Nickel |
+| Meta+Shift+E, ≡ (the bar's menu; or swipe along the right edge) | back to Nickel |
 
 Every key can be changed in Settings (Keys) or `keys.conf`, which takes
 any i3 command line and binding modes. See [Keys](docs/usage.md#keys)

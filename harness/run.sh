@@ -20,7 +20,7 @@
 #      settings, relay.conf, keys, keys.conf, hellobro.json),
 #      HELLOBRO_MSG (the ipc feed's hellobro-msg: a PC build of hellobro by that name)
 #
-# The ssh, fullscreen, stress, connect, flash, zoom and fontswipe feeds want
+# The ssh, fullscreen, stress, connect, flash and zoom feeds want
 # the server running: (cd server && go run .); the relay feed wants
 # more, see it.
 set -eu

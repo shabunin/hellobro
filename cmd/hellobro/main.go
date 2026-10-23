@@ -6,7 +6,7 @@
 // Bluetooth, sharing with a computer (SFTP, ssh, mDNS), hellobro's
 // settings, the battery and what uses it.
 //
-// A swipe along the right edge sets the font size. The keys are i3's,
+// A swipe along the right edge opens the ≡ menu. The keys are i3's,
 // with Meta, and the user's to change (commands.go); i3's commands come
 // in on a socket too (ipc.go). The music is a Linux player's, in an
 // Alpine session (mpris.go). The rest (the screen, touch, the frontlight
@@ -35,7 +35,7 @@ type bro struct {
 	ipc    ipcState
 	tf     termFonts
 	tv     termView
-	font   *fontSwipe // a contact along the right edge, which may become a font swipe
+	edge   *kobo.Gesture // a contact along the right edge, which may become a menu swipe
 	media  mediaState
 	stat   statBar  // the terminal tabs' status bar
 	picker *picker  // the switcher, while it's up
@@ -61,13 +61,10 @@ type bro struct {
 	lay    kobo.Layout // the last layout, to lay out again
 }
 
-// fontSwipe is a contact that started on the right edge.
-type fontSwipe struct {
-	g        *kobo.Gesture
-	from, to int // font sizes: when it started, and when the finger lifts
-}
-
-const ownFont = 1 // a gesture that is a font swipe
+const (
+	ownMenu   = 1   // a gesture that is a menu swipe
+	menuSwipe = 100 // px along the right edge it takes
+)
 
 func main() {
 	if filepath.Base(os.Args[0]) == "hellobro-msg" { // in a jail (ipc.go)
@@ -201,7 +198,7 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		if m.Gone != "" { // what it held won't come up now
 			a.tv.mods = termMods{caps: a.tv.mods.caps}
 			a.SetLockSwipes(a.lockSwipes()) // locked, touch's way out
-		} else {
+		} else if a.keyLabel("lock") != "" {
 			a.SetLockSwipes(nil) // its keys unlock again
 		}
 		return true
@@ -248,21 +245,19 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		switch {
 		case a.overlay():
 		case !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth:
-			a.font = &fontSwipe{g: g}
+			a.edge = g
 		case a.wmTouch(p, g):
 		default:
 			a.selStart(p, g)
 		}
 	case a.tv.sel != nil && a.tv.sel.g == g:
 		a.selMove(p, g)
-	case a.font != nil && a.font.g == g:
-		dy := g.Start.Y - p.Y
-		if g.Owner == 0 && kobo.Abs(dy) > kobo.SwipeStart && kobo.Abs(dy) > 2*kobo.Abs(p.X-g.Start.X) {
-			g.Owner, a.font.from = ownFont, a.tv.fontPx
-			log.Printf("font swipe from %d px", a.font.from)
-		}
-		if g.Owner == ownFont {
-			a.termFontSwipe(a.font, dy)
+	case a.edge == g:
+		// Up or down along the right edge: the ≡ menu, by touch.
+		if dy := g.Start.Y - p.Y; g.Owner == 0 && kobo.Abs(dy) > menuSwipe && kobo.Abs(dy) > 2*kobo.Abs(p.X-g.Start.X) {
+			g.Owner, a.edge = ownMenu, nil
+			log.Print("menu swipe")
+			a.MenuTap()
 		}
 	}
 }
@@ -271,13 +266,11 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.selLift(g) || a.wmDragLift(g) {
 		return
 	}
-	if f := a.font; f != nil && f.g == g {
-		a.font = nil
-		if g.Owner == ownFont {
-			a.HideGauge()
-			a.setTermFont(f.to)
-			return
-		}
+	if a.edge == g {
+		a.edge = nil
+	}
+	if g.Owner == ownMenu {
+		return
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {
 		a.termSwipe(g.Start, g.Last)

@@ -71,8 +71,8 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
   workspace laid out as the tab was, but their taps may land elsewhere.
   `tiling`, `ipc` (`HELLOBRO_MSG=` a PC build of hellobro named
   hellobro-msg), `layout` then `restore` are the window manager's.
-- Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`,
-  `fontswipe` and `relay` need the test server:
+- Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`
+  and `relay` need the test server:
   `cd server && go run .` (port 2222).
 - Put outputs in your scratch directory, not the repo.
 

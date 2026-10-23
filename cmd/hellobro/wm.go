@@ -292,6 +292,15 @@ func (a *bro) openGUI(key string) {
 	a.openWin(&guiWin{key: key})
 }
 
+// fullWin puts w full screen, in focus. Out of it: a swipe in from the
+// top or bottom edge, or Meta+F.
+func (a *bro) fullWin(w window) {
+	if n := a.nodeOf(w); n != nil {
+		a.wm.tree.Focus(n)
+		a.wmRun("fullscreen enable")
+	}
+}
+
 // replaceWin puts w where old is (a launcher, say, that picked a settings
 // window), and closes old.
 func (a *bro) replaceWin(old, w window) {
@@ -544,7 +553,7 @@ func (a *bro) MenuTap() {
 		a.closePicker()
 	}
 	var entries []pickEntry
-	for _, id := range []string{"rotate", "calibrate", "sleep", "palette", "quit"} {
+	for _, id := range []string{"rotate", "calibrate", "sleep", "lock", "palette", "quit"} {
 		if c := commandByID(id); c != nil {
 			entries = append(entries, pickEntry{kind: "command", title: c.title, detail: a.keyLabels(c.id), do: func() { c.run(a) }})
 		}
@@ -834,7 +843,7 @@ func (a *bro) emptyHelp() [][2]string {
 
 // --- input ---
 
-// wmTap takes a tap on the workspace: a tab, a window's + or ×, a window
+// wmTap takes a tap on the workspace: a tab, a window's +, ▢ or ×, a window
 // (the one tapped takes the focus; a settings' window gets the tap too),
 // or the empty workspace.
 func (a *bro) wmTap(p image.Point) {
@@ -856,6 +865,9 @@ func (a *bro) wmTap(p image.Point) {
 	switch {
 	case kobo.Hit(p, pn.Close):
 		a.closeWin(w)
+		return
+	case kobo.Hit(p, pn.Full):
+		a.fullWin(w)
 		return
 	case kobo.Hit(p, pn.New):
 		a.openLauncher()
@@ -907,7 +919,7 @@ func (a *bro) wmKey(code uint16, value int32) bool {
 func (a *bro) wmTouch(p image.Point, g *kobo.Gesture) bool {
 	w := a.windowAt(p)
 	n := a.nodeOf(w)
-	if w == nil || !floatingNode(n) || !p.In(w.panel(a).Title) || kobo.Hit(p, w.panel(a).Close) || kobo.Hit(p, w.panel(a).New) {
+	if w == nil || !floatingNode(n) || !p.In(w.panel(a).Title) || kobo.Hit(p, w.panel(a).Close) || kobo.Hit(p, w.panel(a).Full) || kobo.Hit(p, w.panel(a).New) {
 		return false
 	}
 	a.wm.drag = &wmDrag{g: g, n: n, from: a.wm.tree.FloatRect(n)}

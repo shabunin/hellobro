@@ -729,24 +729,6 @@ func (a *bro) endSession() {
 	a.drawPane(t)
 }
 
-// termFontSwipe follows a swipe along the right edge, dy pixels up so
-// far: half the screen height covers the whole range. The gauge shows the
-// size; the terminal gets it when the finger lifts, since every change
-// means a reflow on the remote and a full redraw here.
-func (a *bro) termFontSwipe(f *fontSwipe, dy int) {
-	steps := (termFontMax - termFontMin) / termFontStep
-	px := f.from + dy*steps/(a.C.Bounds().Dy()/2)*termFontStep
-	px = max(termFontMin, min(termFontMax, px))
-	if px == f.to && a.GaugeUp() {
-		return
-	}
-	f.to = px
-	b := a.C.Bounds()
-	cy := b.Dy() / 2
-	r := image.Rect(b.Max.X-kobo.EdgeWidth-130, cy-260, b.Max.X-kobo.EdgeWidth-20, cy+260)
-	a.DrawGauge(r, px-termFontMin, termFontMax-termFontMin, fmt.Sprintf("%d px", px))
-}
-
 // setTermFont changes the terminal's font size; the remotes get the new
 // cell count, as when a terminal window is resized.
 func (a *bro) setTermFont(px int) {
