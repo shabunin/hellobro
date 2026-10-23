@@ -45,7 +45,7 @@ func (a *App) addMark(p image.Point, dot bool) {
 	}
 	m := touchMark{at: p, dot: dot, until: time.Now().Add(markTime)}
 	a.marks = append(a.marks, m)
-	a.Mark(m.box(), true)
+	a.Mark(m.box(), false) // black: the fast waveform shows it, never in the way of what the touch does
 }
 
 // markTick takes off the marks whose time is up.
