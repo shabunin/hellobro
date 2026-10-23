@@ -65,8 +65,10 @@ type radioState struct {
 	ws         radio.WiFiStatus
 	nets       []radio.Network
 	wSel, wTop int
-	wBusy      string // what's going on, "" when nothing
-	wNote      string // how the last thing went
+	wBusy      string     // what's going on, "" when nothing
+	wNote      string     // how the last thing went
+	wJob       sync.Mutex // held while a Wi-Fi job runs: sleep waits for it
+	wAfter     func()     // a job for when the one going on ends (waking's)
 	scanned    bool
 
 	bs         radio.BTStatus
@@ -214,6 +216,11 @@ func (a *bro) radioTick() {
 	if !r.started {
 		return
 	}
+	if r.wAfter != nil && r.wBusy == "" {
+		do := r.wAfter
+		r.wAfter = nil
+		do()
+	}
 	if !r.discoverTo.IsZero() && time.Now().After(r.discoverTo) {
 		r.discoverTo = time.Time{}
 		go r.bt.Discover(false)
@@ -301,12 +308,18 @@ func (a *bro) radioRun(panel int, busy string, do func(progress func(string)) er
 	a.drawRadioPanel(panel)
 	log.Printf("radio: %s", busy)
 	go func() {
+		if panel == panelWiFi {
+			r.wJob.Lock()
+		}
 		err := do(func(s string) {
 			a.Do(func() {
 				*b = s
 				a.drawRadioPanel(panel)
 			})
 		})
+		if panel == panelWiFi {
+			r.wJob.Unlock()
+		}
 		a.Do(func() {
 			*b = ""
 			if err != nil {

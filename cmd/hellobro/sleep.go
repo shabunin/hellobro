@@ -78,8 +78,15 @@ func (a *bro) Sleep() func() {
 	}
 	r.prompt = nil
 	wifi, bt := r.wifi, r.bt
+	waking := r.wAfter != nil // Wi-Fi on, waiting for a job to end: it's to be on
+	r.wAfter = nil
 	return func() {
-		s.wifiWas = wifi.Status().On // also notes how Kobo runs it, for turning it on again
+		if !r.wJob.TryLock() { // a job going on (on, from waking just now) ends first
+			log.Print("sleep: a Wi-Fi job first")
+			r.wJob.Lock()
+		}
+		defer r.wJob.Unlock()
+		s.wifiWas = wifi.Status().On || waking // also notes how Kobo runs it, for turning it on again
 		bs, _ := bt.Status()
 		if s.btWas = bs.Powered; s.btWas { // first: Wi-Fi's chip may be Bluetooth's too
 			if err := bt.SetPower(false); err != nil {
@@ -106,14 +113,22 @@ func (a *bro) Wake() {
 		a.mountAgain()
 		return
 	}
-	a.radioRun(panelWiFi, "turning Wi-Fi back on…", func(p func(string)) error {
-		err := r.wifi.SetPower(true, p)
-		a.Do(func() {
-			a.termKick()
-			a.mountAgain()
+	on := func() {
+		a.radioRun(panelWiFi, "turning Wi-Fi back on…", func(p func(string)) error {
+			err := r.wifi.SetPower(true, p)
+			a.Do(func() {
+				a.termKick()
+				a.mountAgain()
+			})
+			return err
 		})
-		return err
-	})
+	}
+	if r.wBusy != "" { // still at what it did before it slept: after that
+		log.Printf("sleep: wifi on once %q is done", r.wBusy)
+		r.wAfter = on
+		return
+	}
+	on()
 }
 
 // termKick has the sessions waiting to reconnect try now, from the start.
