@@ -537,8 +537,7 @@ func WithWindow(f Fonts, p Panel, focused, newBox bool) Panel {
 		x -= bw + 2*tapMargin // apart: a tap is one's or the other's
 	}
 	p.New, p.Focused = image.Rectangle{}, focused
-	if newBox {
-		x := p.Title.Min.X + 16 + TextWidth(f.Panel, p.Name) + 24
+	if x := p.Title.Min.X + 16 + TextWidth(f.Panel, p.Name) + 24; newBox && x+44+2*tapMargin <= p.Float.Min.X { // none where it won't fit
 		p.New = image.Rect(x, p.Title.Min.Y+6, x+44, p.Title.Max.Y-8)
 	}
 	return WithButton(f, p, p.ButtonLabel)
