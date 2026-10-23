@@ -96,7 +96,9 @@ window on the workspace.
 
 Meta+R is the resize mode: the arrows (or h j k l) make the window in
 focus wider or narrower, taller or shorter; Enter, Esc or Meta+R again
-ends it. In a mode only its keys count.
+ends it. In a mode only its keys count. While it lasts the windows are
+grey boxes with their sizes, the one in focus framed thick: the
+terminals take their new size once, when it ends, not at every step.
 
 In a settings' window, Tab moves the keys' focus through its controls,
 as on a desktop: the buttons and the lists; Shift+Tab goes back. A

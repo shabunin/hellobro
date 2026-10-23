@@ -241,7 +241,7 @@ func (a *bro) terms() []*termSession {
 
 // shows says whether w is on screen, with nothing over it.
 func (a *bro) shows(w window) bool {
-	return w != nil && !w.panel(a).Outer.Empty() && !a.Calibrating() && !a.overlay()
+	return w != nil && !w.panel(a).Outer.Empty() && !a.Calibrating() && !a.overlay() && !a.sketching()
 }
 
 // guiShows says whether the settings' window key is on screen.
@@ -460,6 +460,14 @@ func (a *bro) wmApply() {
 	if a.C.Gray == nil || a.wm.area.Empty() {
 		return
 	}
+	if a.sketching() { // the boxes only, quick: placed for real once it's done
+		if a.wmPlace() && !a.overlay() && !a.Calibrating() {
+			a.DrawPage()
+			a.Mark(a.lay.Page, true)
+		}
+		a.wmFocusMoved()
+		return
+	}
 	if a.wmPlace() {
 		if !a.overlay() && !a.Calibrating() {
 			a.DrawPage()
@@ -589,7 +597,7 @@ func (a *bro) wmPlace() bool {
 			return
 		}
 		fmt.Fprint(&sig, n.ID, n.Rect, n.Layout, floatingNode(n), ";")
-		if w := a.wm.wins[n]; w != nil {
+		if w := a.wm.wins[n]; w != nil && !a.sketching() { // sketching: they stay as they were till it's done
 			placed[w] = true
 			r := n.Rect.Inset(wmGap / 2)
 			switch {
@@ -621,7 +629,7 @@ func (a *bro) wmPlace() bool {
 		walk(t.Current())
 	}
 	for _, w := range a.wm.wins {
-		if !placed[w] && !w.panel(a).Outer.Empty() {
+		if !placed[w] && !w.panel(a).Outer.Empty() && !a.sketching() {
 			w.place(a, kobo.Panel{})
 		}
 	}
@@ -669,6 +677,11 @@ func (a *bro) Draw() {
 		a.drawEmpty()
 	}
 	a.drawTabs()
+	if a.sketching() {
+		a.drawSketch()
+		a.drawStat(true)
+		return
+	}
 	for _, n := range t.Shown() {
 		if w := a.wm.wins[n]; w != nil && !floatingNode(n) {
 			w.draw(a)
@@ -676,6 +689,41 @@ func (a *bro) Draw() {
 	}
 	a.drawFloats(image.Rectangle{})
 	a.drawStat(true)
+}
+
+// sketching says the windows show as boxes: the resize mode. Each step
+// of it is a box drawn again, not a window laid out, its terminal and
+// what runs in it resized; that's done once, as the mode ends.
+func (a *bro) sketching() bool { return a.wm.mode == "resize" }
+
+// drawSketch draws the windows as they'd be: gray boxes, the one being
+// resized framed black, each with its name and size.
+func (a *bro) drawSketch() {
+	c, t := a.C, a.wm.tree
+	focus := t.Focused()
+	fs := t.Fullscreen()
+	for _, n := range t.Shown() {
+		w := a.wm.wins[n]
+		if w == nil {
+			continue
+		}
+		r := n.Rect.Inset(wmGap / 2)
+		if n == fs {
+			r = n.Rect
+		}
+		frame := 2
+		if n == focus {
+			frame = 8
+		}
+		c.Fill(r, kobo.Light)
+		c.Frame(r, frame, kobo.Black)
+		mid := r.Min.Y + r.Dy()/2
+		c.Text(a.F.Panel, image.Rect(r.Min.X, mid-60, r.Max.X, mid), "resize mode", kobo.Black, kobo.AlignCenter)
+		c.Text(a.F.Small, image.Rect(r.Min.X, mid, r.Max.X, mid+40), fmt.Sprintf("%s · %d×%d", w.Title(), r.Dx(), r.Dy()), kobo.Dark, kobo.AlignCenter)
+		if n == focus {
+			c.Text(a.F.Small, image.Rect(r.Min.X, mid+40, r.Max.X, mid+80), "arrows: its size · Enter or Esc: done", kobo.Dark, kobo.AlignCenter)
+		}
+	}
 }
 
 func floatingNode(n *wm.Node) bool {
@@ -1005,8 +1053,13 @@ func (a *bro) showMode() {
 
 // setMode goes to the keys' binding mode name ("": the default).
 func (a *bro) setMode(name string) {
+	sketched := a.sketching()
 	a.wm.mode = name
 	log.Printf("wm: mode %q", name)
+	if sketched != a.sketching() { // boxes now, or the windows again: drawn anew
+		a.wm.laid = ""
+		defer a.wmApply()
+	}
 	change := name
 	if change == "" {
 		change = "default"

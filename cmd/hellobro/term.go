@@ -191,7 +191,7 @@ func (a *bro) term() *termSession {
 
 // onScreen says whether t's panel is up.
 func (a *bro) onScreen(t *termSession) bool {
-	return !a.Calibrating() && !a.overlay() && t != nil && !t.pane.p.Outer.Empty()
+	return !a.Calibrating() && !a.overlay() && !a.sketching() && t != nil && !t.pane.p.Outer.Empty()
 }
 
 // showing says whether t's cells or launcher are up.
