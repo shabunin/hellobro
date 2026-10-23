@@ -163,3 +163,52 @@ func TestMDNSAnswers(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A key with command="…" runs that and nothing else: not what it asks
+// for, not SFTP; and forgetting another key keeps its option.
+func TestForcedCommand(t *testing.T) {
+	state := t.TempDir()
+	s, err := Start(Config{Addr: "127.0.0.1:0", StateDir: state, Root: t.TempDir(),
+		Builtin: func(cmd string, out io.Writer) (int, bool) {
+			fmt.Fprintf(out, "ran %s\n", cmd)
+			return 0, true
+		},
+		Notify: func(Event) {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	keys, other := newKey(t), newKey(t)
+	line := func(k ssh.Signer, comment string) string {
+		return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(k.PublicKey()))) + " " + comment + "\n"
+	}
+	os.WriteFile(filepath.Join(state, authorizedFile), []byte(`command="hellobro-keys" `+line(keys, "kobo")+line(other, "pc")), 0o600)
+	if err := s.Forget(ssh.FingerprintSHA256(other.PublicKey())); err != nil {
+		t.Fatal(err)
+	}
+	c, err := dial(s, keys, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	for _, cmd := range []string{"rm -rf /", ""} {
+		sess, _ := c.NewSession()
+		var out []byte
+		if cmd == "" {
+			var b bytes.Buffer
+			sess.Stdout = &b
+			sess.Shell()
+			sess.Wait()
+			out = b.Bytes()
+		} else {
+			out, _ = sess.Output(cmd)
+		}
+		if string(out) != "ran hellobro-keys\n" {
+			t.Errorf("%q: %q", cmd, out)
+		}
+	}
+	if fc, err := sftp.NewClient(c); err == nil {
+		fc.Close()
+		t.Error("sftp for a key that runs one command")
+	}
+}

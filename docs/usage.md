@@ -558,7 +558,10 @@ computers get in, with their key; there are no passwords:
 
 Paired keys are in
 `.adds/hellobro/authorized_keys` (`forget paired` empties it), the Kobo's
-host key in `ssh_host_ed25519_key` there. The server only runs while
+host key in `ssh_host_ed25519_key` there. A key whose line starts with
+OpenSSH's `command="…"` runs that and nothing else, whatever it asks
+for (no SFTP either): `command="hellobro-keys" ssh-ed25519 AAAA… kobo`,
+a key that may only type. The server only runs while
 hellobro does, with sharing on, and Wi-Fi up. Sleeping when idle comes
 even with a computer connected.
 

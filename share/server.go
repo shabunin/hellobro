@@ -218,8 +218,12 @@ func (s *Server) Pairing() string {
 // --- authentication ---
 
 func (s *Server) publicKey(meta ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-	if known, _ := s.authorized(key); known {
-		return &ssh.Permissions{Extensions: map[string]string{"key": ssh.FingerprintSHA256(key)}}, nil
+	if k, _ := s.authorized(key); k != nil {
+		p := &ssh.Permissions{Extensions: map[string]string{"key": ssh.FingerprintSHA256(key)}}
+		if cmd, ok := k.Command(); ok {
+			p.CriticalOptions = map[string]string{"force-command": cmd}
+		}
+		return p, nil
 	}
 	if s.Pairing() != "" {
 		return &ssh.Permissions{Extensions: map[string]string{"pair": "1"}}, nil
@@ -274,15 +278,15 @@ func (s *Server) checkCode(answer string) error {
 	return errors.New("wrong code")
 }
 
-// authorized says whether key is in authorized_keys.
-func (s *Server) authorized(key ssh.PublicKey) (bool, error) {
+// authorized is key's line in authorized_keys, nil if it's not there.
+func (s *Server) authorized(key ssh.PublicKey) (*AuthorizedKey, error) {
 	keys, err := s.Keys()
 	for _, k := range keys {
 		if subtle.ConstantTimeCompare(k.Key.Marshal(), key.Marshal()) == 1 {
-			return true, nil
+			return &k, nil
 		}
 	}
-	return false, err
+	return nil, err
 }
 
 // AuthorizedKey is a paired computer's key.
@@ -290,6 +294,27 @@ type AuthorizedKey struct {
 	Key         ssh.PublicKey
 	Comment     string
 	Fingerprint string
+	Options     []string // OpenSSH's: command="…" is the one heeded
+}
+
+// Command is the command the key runs whatever it asks for (OpenSSH's
+// command="…"): a key that may only do that, as hellobro-keys.
+func (k AuthorizedKey) Command() (string, bool) {
+	for _, o := range k.Options {
+		if v, ok := strings.CutPrefix(o, "command="); ok {
+			return strings.ReplaceAll(strings.Trim(v, `"`), `\"`, `"`), true
+		}
+	}
+	return "", false
+}
+
+// line is k as authorized_keys has it.
+func (k AuthorizedKey) line() string {
+	l := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(k.Key))) + " " + k.Comment
+	if len(k.Options) > 0 {
+		l = strings.Join(k.Options, ",") + " " + l
+	}
+	return l
 }
 
 // Keys are the paired keys.
@@ -300,11 +325,11 @@ func (s *Server) Keys() ([]AuthorizedKey, error) {
 	}
 	var out []AuthorizedKey
 	for len(b) > 0 {
-		k, comment, _, rest, err := ssh.ParseAuthorizedKey(b)
+		k, comment, opts, rest, err := ssh.ParseAuthorizedKey(b)
 		if err != nil {
 			break
 		}
-		out = append(out, AuthorizedKey{k, comment, ssh.FingerprintSHA256(k)})
+		out = append(out, AuthorizedKey{k, comment, ssh.FingerprintSHA256(k), opts})
 		b = rest
 	}
 	return out, err
@@ -332,7 +357,7 @@ func (s *Server) Forget(fp string) error {
 	var b strings.Builder
 	for _, k := range keys {
 		if k.Fingerprint != fp {
-			fmt.Fprintf(&b, "%s %s\n", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(k.Key))), k.Comment)
+			b.WriteString(k.line() + "\n")
 		}
 	}
 	return os.WriteFile(filepath.Join(s.cfg.StateDir, authorizedFile), []byte(b.String()), 0o600)
@@ -484,6 +509,7 @@ type ptyReq struct {
 
 func (s *Server) session(c *conn, ch ssh.Channel, reqs <-chan *ssh.Request) {
 	defer ch.Close()
+	forced, isForced := c.c.Permissions.CriticalOptions["force-command"] // that, and nothing else
 	cc := counted{ch, c}
 	var pty *ptyReq
 	var shell Shell
@@ -511,7 +537,7 @@ func (s *Server) session(c *conn, ch ssh.Channel, reqs <-chan *ssh.Request) {
 		case "subsystem":
 			var p struct{ Name string }
 			ssh.Unmarshal(req.Payload, &p)
-			if p.Name != "sftp" {
+			if p.Name != "sftp" || isForced {
 				req.Reply(false, nil)
 				continue
 			}
@@ -542,6 +568,9 @@ func (s *Server) session(c *conn, ch ssh.Channel, reqs <-chan *ssh.Request) {
 				var p struct{ Cmd string }
 				ssh.Unmarshal(req.Payload, &p)
 				cmd = p.Cmd
+			}
+			if isForced {
+				cmd = forced
 			}
 			if cmd != "" && s.cfg.Builtin != nil {
 				if status, ok := s.cfg.Builtin(strings.TrimSpace(cmd), cc); ok {
