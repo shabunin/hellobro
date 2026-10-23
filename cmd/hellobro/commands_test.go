@@ -235,3 +235,29 @@ func TestKeysOf(t *testing.T) {
 		}
 	}
 }
+
+// With Alt as the Mod key, Alt runs keys.conf's meta keys, the Win key
+// its alt ones, and the hints say what to press.
+func TestModIsAlt(t *testing.T) {
+	defer func() { modIsAlt = false }()
+	c, err := parseKey("meta+enter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.label(); got != "Meta+Enter" {
+		t.Errorf("Super: label %q", got)
+	}
+	modIsAlt = true
+	if got := c.label(); got != "Alt+Enter" {
+		t.Errorf("Alt: label %q", got)
+	}
+	if got := c.String(); got != "meta+enter" {
+		t.Errorf("Alt: keys.conf has %q, still meta's", got)
+	}
+	if got := swapMod(modAlt | modShift); got != modMeta|modShift {
+		t.Errorf("Alt+Shift held is %b, want meta+shift", got)
+	}
+	if got := swapMod(modMeta); got != modAlt {
+		t.Errorf("the Win key held is %b, want alt", got)
+	}
+}

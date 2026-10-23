@@ -211,6 +211,26 @@ type modName struct {
 
 var modNames = []modName{{"ctrl", modCtrl, "Ctrl"}, {"shift", modShift, "Shift"}, {"alt", modAlt, "Alt"}, {"meta", modMeta, "Meta"}}
 
+// modIsAlt says Alt is the window keys' modifier (Settings, "Mod key"),
+// as i3's "set $mod Mod1": keys.conf's meta is then Alt, and its alt the
+// Win key. What goes to a terminal is the keys as they are.
+var modIsAlt bool
+
+// swapMod swaps meta and alt in mods, when Alt is the Mod key.
+func swapMod(mods uint8) uint8 {
+	if !modIsAlt {
+		return mods
+	}
+	m := mods &^ (modAlt | modMeta)
+	if mods&modAlt != 0 {
+		m |= modMeta
+	}
+	if mods&modMeta != 0 {
+		m |= modAlt
+	}
+	return m
+}
+
 var keyCodes = map[string]uint16{
 	"esc": kobo.KeyEsc, "tab": kobo.KeyTab, "space": kobo.KeySpace, "enter": kobo.KeyEnter,
 	"backspace": kobo.KeyBackspace, "up": keyUp, "down": keyDown, "left": keyLeft, "right": keyRight,
@@ -276,7 +296,7 @@ func (c combo) label() string {
 	if ch, ok := kobo.KeyChar(c.code, false, false); ok && c.mods&modShift != 0 && ch != " " && !isAlnum(ch) {
 		name, _ = kobo.KeyChar(c.code, true, false) // Shift+, is <
 	}
-	return modsLabel(c.mods) + name
+	return modsLabel(swapMod(c.mods)) + name
 }
 
 // String is c as keys.conf has it: "ctrl+shift+p".
@@ -502,7 +522,8 @@ func defaultKeysConf() string {
 # [name] starts a binding mode's keys (i3's "mode"): while it's on, only
 # those count. [default] goes back to the default's.
 #
-# Modifiers: ctrl shift alt meta (the Win key). Keys: a-z 0-9 f1-f12 tab
+# Modifiers: ctrl shift alt meta (the Win key; Alt, with Settings' Mod key
+# Alt, and then alt is the Win key). Keys: a-z 0-9 f1-f12 tab
 # space enter esc backspace up down left right pgup pgdn home end insert
 # delete, the marks (minus or -, = [ ] ; ' ` + "`" + ` \ , . /), brightnessup
 # brightnessdown, and any other by its Linux code: key183.
@@ -591,7 +612,7 @@ func (a *bro) applyFooter() {
 func (m keyMap) footer() string {
 	one, nine := m.keys["workspace number 1"], m.keys["workspace number 9"]
 	if len(one) > 0 && len(nine) > 0 && one[0].mods == nine[0].mods && one[0].code == kobo.Key1 && nine[0].code == kobo.Key1+8 {
-		return "workspaces: tap or " + modsLabel(one[0].mods) + "1–9"
+		return "workspaces: tap or " + modsLabel(swapMod(one[0].mods)) + "1–9"
 	}
 	return "workspaces: tap"
 }
@@ -608,7 +629,7 @@ func (a *bro) mods() uint8 {
 			b |= x.bit
 		}
 	}
-	return b
+	return swapMod(b)
 }
 
 // keyCommand is the command code runs now, with the modifiers held, in

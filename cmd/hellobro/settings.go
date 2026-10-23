@@ -46,7 +46,10 @@ var settingList = []setting{
 	{key: "sleep-power", label: "… plugged in", title: "Sleep when idle, plugged in",
 		values: []string{"off", "5", "15", "30", "60", "120"},
 		shown:  []string{"never by itself", "after 5 min untouched", "after 15 min untouched", "after 30 min untouched", "after 1 h untouched", "after 2 h untouched"}},
-	{key: "kbd-gone", group: "Keyboard", label: "The keyboard gone", title: "The keyboard gone: Bluetooth",
+	{key: "mod", group: "Keyboard", label: "Mod key, the window keys'",
+		values: []string{"super", "alt"},
+		shown:  []string{"Super, the Win key (Meta+Enter…)", "Alt (Alt+Enter…; the Win key is Alt then)"}},
+	{key: "kbd-gone", label: "The keyboard gone", title: "The keyboard gone: Bluetooth",
 		values: []string{"15", "30", "60", "off"},
 		shown:  []string{"Bluetooth full screen after 15 s", "Bluetooth full screen after 30 s", "Bluetooth full screen after 1 min", "nothing comes up"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
@@ -273,6 +276,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.radiosOn()
 		case "light-idle":
 			a.applyLightIdle()
+		case "mod":
+			a.applyMod()
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))
@@ -457,4 +462,12 @@ func (a *bro) settingsKey(code uint16) {
 func (a *bro) applyLightIdle() {
 	n, _ := strconv.Atoi(a.setting("light-idle")) // "off": 0, never
 	a.LightIdle = time.Duration(n) * time.Second
+}
+
+// applyMod makes the Mod key the setting's, and the hints say so.
+func (a *bro) applyMod() {
+	modIsAlt = a.setting("mod") == "alt"
+	a.tv.mods = termMods{caps: a.tv.mods.caps} // what was held meant the other
+	a.applyFooter()
+	a.wm.names = nil // the bar's hints again
 }

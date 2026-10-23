@@ -102,7 +102,7 @@ func main() {
 	a.applyLightStart()
 	log.Printf("hellobro %s", version)
 	a.keys = loadKeys()
-	a.applyFooter()
+	a.applyMod()
 	a.tf.setSize(termFontDefault)
 	a.wmInit()
 	a.ipcStart()

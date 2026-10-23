@@ -519,7 +519,7 @@ func (a *bro) wmBar() {
 		hint := ""
 		if w.Num >= 0 && w.Num <= 10 {
 			hint = a.keyLabel(fmt.Sprintf("workspace number %d", w.Num))
-			hint = strings.TrimPrefix(hint, "Meta+")
+			hint = strings.TrimPrefix(hint, modsLabel(swapMod(modMeta)))
 		}
 		hints = append(hints, hint)
 		if w == a.wm.tree.Current() {

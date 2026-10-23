@@ -152,7 +152,10 @@ The bar says what was copied or pasted, for a moment.
 
 ## Keys
 
-The keys are hellobro's commands', i3's with Meta (the Win key):
+The keys are hellobro's commands', i3's with Meta (the Win key). Settings,
+Keyboard, "Mod key" makes it Alt instead, as i3's `set $mod Mod1`: then
+Alt+Enter opens a window, and the Win key does what Alt did. The hints
+say which; keys.conf still says meta for the Mod key either way.
 
 | Key | |
 | --- | --- |
