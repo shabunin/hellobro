@@ -67,6 +67,7 @@ type bro struct {
 const (
 	ownMenu   = 1   // a gesture that is a menu swipe
 	ownPair   = 4   // one of two fingers together: maybe a workspace swipe
+	ownEdge   = 5   // one in from an edge: a workspace swipe
 	menuSwipe = 100 // px along the right edge it takes
 	pairSwipe = 120 // px across both fingers go, for a workspace
 )
@@ -242,11 +243,11 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		a.pickerKey(m.Code, m.Value)
 		return true
 	case a.termMod(m.Code, m.Value): // kept track of always, for the terminals
-		if t := a.term(); t != nil && a.focusedWin() == window(t) {
+		if t := a.term(); t != nil && a.focusedWin() == window(t) && a.wm.mode == "" {
 			t.kittySend(m.Code, m.Value, a.tv.mods) // a program that wants every key has them too
 		}
 		return true
-	case a.grabbed(m.Code, m.Value): // every key the window's, but grab's own
+	case a.wm.mode == "" && a.grabbed(m.Code, m.Value): // every key the window's, but grab's own; a mode's keys are its own
 		return a.wmKey(m.Code, m.Value)
 	case a.runKey(m.Code, m.Value): // ours, never the remote's
 		return true
@@ -266,26 +267,54 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			return
 		}
 		a.focusTouched(p)
+		if !ev.Pen && !a.overlay() && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
+			a.edge = g
+		}
 		switch {
 		case a.overlay():
-		case !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth:
-			a.edge = g
+		case a.edge == g && p.X >= kobo.EdgeWidth: // the right edge is ours
 		case a.wmTouch(p, g):
 		default:
 			a.selStart(p, g)
 		}
+	case a.edge == g && a.edgeSwipe(p, g):
 	case a.tv.sel != nil && a.tv.sel.g == g:
 		a.selMove(p, g)
-	case a.edge == g:
-		// Up or down along the right edge: the menu, by touch.
-		if dy := g.Start.Y - p.Y; g.Owner == 0 && kobo.Abs(dy) > menuSwipe && kobo.Abs(dy) > 2*kobo.Abs(p.X-g.Start.X) {
-			g.Owner, a.edge = ownMenu, nil
-			log.Print("menu swipe")
-			a.menu()
-		}
 	case g.Owner == ownPair:
 		a.pairSwipe()
 	}
+}
+
+// edgeSwipe takes a swipe from an edge, once it's gone far enough: in
+// from the right, the next workspace, in from the left the one before
+// (as pages turn); up or down along the right edge, the menu. (Up or
+// down the left edge is the light's: kobo's.)
+func (a *bro) edgeSwipe(p image.Point, g *kobo.Gesture) bool {
+	if g.Owner != 0 {
+		return false
+	}
+	dx, dy := p.X-g.Start.X, p.Y-g.Start.Y
+	right := g.Start.X >= kobo.EdgeWidth
+	switch {
+	case right && kobo.Abs(dy) > menuSwipe && kobo.Abs(dy) > 2*kobo.Abs(dx):
+		g.Owner, a.edge = ownMenu, nil
+		log.Print("menu swipe")
+		a.menu()
+	case kobo.Abs(dx) > menuSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) && (dx < 0) == right: // inward
+		g.Owner, a.edge = ownEdge, nil
+		if a.tv.sel != nil && a.tv.sel.g == g {
+			a.tv.sel = nil
+		}
+		to := "next"
+		if !right {
+			to = "prev"
+		}
+		log.Printf("edge swipe: workspace %s", to)
+		a.wmRun("workspace " + to)
+	default:
+		return false
+	}
+	return true
 }
 
 // pairUp makes g and the finger already down a pair, if that one isn't
@@ -357,7 +386,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.pair[0] == g || a.pair[1] == g {
 		a.pair = [2]*kobo.Gesture{}
 	}
-	if g.Owner == ownMenu || g.Owner == ownPair {
+	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge {
 		return
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {

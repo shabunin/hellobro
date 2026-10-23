@@ -890,7 +890,7 @@ func (a *bro) emptyHelp() [][2]string {
 			help = append(help, [2]string{k, row.what})
 		}
 	}
-	return append(help, [2]string{"swipe the left edge", "the light, up or down"}, [2]string{"swipe the right edge", "the menu: rotate, touch calibration, sleep, lock, quit"}, [2]string{"two fingers across", "the next workspace (left) or the one before (right)"})
+	return append(help, [2]string{"swipe the left edge", "the light, up or down"}, [2]string{"swipe the right edge", "the menu: rotate, touch calibration, sleep, lock, quit"}, [2]string{"swipe in from an edge", "the next workspace (from the right) or the one before (from the left); two fingers across too"})
 }
 
 // --- input ---

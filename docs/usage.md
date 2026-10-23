@@ -86,8 +86,10 @@ say) it says which (`grab` too, while the keys are grabbed), and what plays, and
 A swipe up or down along the right edge of the screen opens the menu:
 rotate the screen, touch calibration, sleep, lock, the switcher, and
 quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
-it. Two fingers swiped left, anywhere, go to the next workspace; to the
-right, to the one before. Settings, Touch marks shows where touches
+it. A swipe in from the right edge, at any height, goes to the next
+workspace, in from the left edge to the one before, as pages turn; so
+do two fingers swiped left or right anywhere, where the screen tells
+two fingers apart. Settings, Touch marks shows where touches
 land: a ring where a finger (or the pen) came down, a dot where it
 lifted after moving, each for 3 s.
 
@@ -103,7 +105,7 @@ window on the workspace.
 
 Meta+R is the resize mode: the arrows (or h j k l) make the window in
 focus wider or narrower, taller or shorter; Enter, Esc or Meta+R again
-ends it. In a mode only its keys count. While it lasts the windows are
+ends it. In a mode only its keys count, even in a grabbed window: no key, not even Shift or Ctrl, reaches a window. While it lasts the windows are
 grey boxes with their sizes, the one in focus framed thick: the
 terminals take their new size once, when it ends, not at every step.
 

@@ -1,7 +1,8 @@
 # The frame for fingers (HELLOBRO_TOUCH=big): a taller bar, title
 # strips, tabs and menu rows. Two workspaces, the second tabbed; two
 # fingers across go from one to the other (left: the next, right: the
-# one before), one finger across doesn't; then the menu.
+# one before), one finger across doesn't, one in from the right edge
+# (the next) or the left edge (the one before) does; then the menu.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,5 +36,8 @@ mod(KEY_W); time.sleep(3)                            # tabbed
 two(-500)                                            # left: the next, 1
 two(500)                                             # right: the one before, 2
 stroke([(W // 2 + 250 - 25 * i, H // 2) for i in range(21)]); time.sleep(3)  # one finger: still 2
+stroke([(W - 20 - 25 * i, H // 3) for i in range(21)]); time.sleep(3)       # in from the right: the next, 1
+stroke([(20 + 25 * i, 2 * H // 3) for i in range(21)]); time.sleep(3)       # in from the left: the one before, 2
+stroke([(30, 2 * H // 3 - 20 * i) for i in range(21)]); time.sleep(4)       # up the left edge: the light, not a workspace
 menu()
 exit_app()
