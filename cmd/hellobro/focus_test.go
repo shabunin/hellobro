@@ -12,7 +12,7 @@ import (
 // control moved to takes Enter or Space.
 func TestFocusTab(t *testing.T) {
 	a := &bro{App: &kobo.App{}}
-	a.wm.tree = wm.New(image.Rect(0, 0, 900, 900), wmTabH)
+	a.wm.tree = wm.New(image.Rect(0, 0, 900, 900), kobo.FoldH)
 	a.wm.wins = map[*wm.Node]window{}
 	g := &guiWin{key: "wifi"}
 	a.wm.wins[a.wm.tree.Open(g)] = g

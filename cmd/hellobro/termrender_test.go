@@ -225,7 +225,7 @@ func TestRenderTouched(t *testing.T) {
 // testTerm is a terminal window, the only one, and the terminals' cells
 // sized.
 func testTerm(a *bro) *termSession {
-	a.wm.tree = wm.New(a.C.Bounds(), wmTabH)
+	a.wm.tree = wm.New(a.C.Bounds(), kobo.FoldH)
 	a.wm.wins = map[*wm.Node]window{}
 	tr := &termSession{}
 	a.wm.wins[a.wm.tree.Open(tr)] = tr

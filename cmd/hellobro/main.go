@@ -37,6 +37,7 @@ type bro struct {
 	tf     termFonts
 	tv     termView
 	edge   *kobo.Gesture // a contact along the right edge, which may become a menu swipe
+	bottom *kobo.Gesture // one along the bottom, which may become a workspace swipe
 	media  mediaState
 	stat   statBar  // the terminal tabs' status bar
 	picker *picker  // the switcher, while it's up
@@ -64,8 +65,9 @@ type bro struct {
 }
 
 const (
-	ownMenu   = 1   // a gesture that is a menu swipe
-	menuSwipe = 100 // px along the right edge it takes
+	ownMenu      = 1   // a gesture that is a menu swipe
+	ownWorkspace = 4   // one that is a workspace swipe
+	menuSwipe    = 100 // px along the right edge it takes (and the bottom, for a workspace)
 )
 
 func main() {
@@ -89,7 +91,11 @@ func main() {
 		alpineInit(os.Args[2])
 		return
 	}
-	updateTrial() // before anything that might hang
+	updateTrial()                                  // before anything that might hang
+	if kobo.EnvOr("HELLOBRO_TOUCH", "") == "big" { // a small sharp screen, fingers on it
+		kobo.Big()
+		pickRowH, statH = 92, 56
+	}
 	a := &bro{media: mediaState{kick: make(chan struct{}, 1)}}
 	a.loadStatBar()
 	a.set = loadSettings()
@@ -259,6 +265,8 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		case a.overlay():
 		case !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth:
 			a.edge = g
+		case !ev.Pen && p.Y >= a.C.Bounds().Max.Y-statH-wmGap: // the status bar, or where it would be
+			a.bottom = g
 		case a.wmTouch(p, g):
 		default:
 			a.selStart(p, g)
@@ -272,6 +280,17 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			log.Print("menu swipe")
 			a.menu()
 		}
+	case a.bottom == g:
+		// Left or right along the bottom: the next workspace, or the one before.
+		if dx := p.X - g.Start.X; g.Owner == 0 && kobo.Abs(dx) > menuSwipe && kobo.Abs(dx) > 2*kobo.Abs(p.Y-g.Start.Y) {
+			g.Owner, a.bottom = ownWorkspace, nil
+			to := "next"
+			if dx > 0 {
+				to = "prev"
+			}
+			log.Printf("workspace swipe: %s", to)
+			a.wmRun("workspace " + to)
+		}
 	}
 }
 
@@ -282,7 +301,10 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.edge == g {
 		a.edge = nil
 	}
-	if g.Owner == ownMenu {
+	if a.bottom == g {
+		a.bottom = nil
+	}
+	if g.Owner == ownMenu || g.Owner == ownWorkspace {
 		return
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {

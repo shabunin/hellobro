@@ -86,7 +86,12 @@ say) it says which (`grab` too, while the keys are grabbed), and what plays, and
 A swipe up or down along the right edge of the screen opens the menu:
 rotate the screen, touch calibration, sleep, lock, the switcher, and
 quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
-it.
+it. A swipe left along the bottom (the status bar, or where it would
+be) goes to the next workspace, right to the one before.
+
+On a small sharp screen used by touch, `HELLOBRO_TOUCH=big` (in
+`launch.sh`'s environment) makes the frame for fingers: a taller bar,
+status bar, title strips and tabs, bigger window buttons and menu rows.
 
 Meta and the arrows (or h j k l, as vim has them) move the focus
 between the windows; with Shift, the window itself moves. Meta+A

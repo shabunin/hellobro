@@ -17,8 +17,9 @@ import (
 	"hellobro/kobo"
 )
 
+var statH = 34 // HELLOBRO_TOUCH=big: taller
+
 const (
-	statH      = 34
 	statEvery  = 5 * time.Second
 	statBarTxt = "status-bar"
 )

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"hellobro/kobo"
 	"hellobro/wm"
 )
 
@@ -36,7 +37,7 @@ func TestIPCFrames(t *testing.T) {
 // runs only what can't reach out of one.
 func TestIPCHost(t *testing.T) {
 	a := &bro{}
-	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), wmTabH)
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
 	a.wm.wins = map[*wm.Node]window{}
 	h := ipcHost{wmHost{a}}
 	for _, c := range []struct {

@@ -312,13 +312,30 @@ const (
 	Pad       = 16
 	headerH   = 76
 	tabH      = 68
-	barH      = 46 // Config.Bar's
 	footerH   = 46
-	titleH    = 48
 	border    = 3
-	FoldH     = titleH + 2*border // a folded panel: its frame and title strip
-	tapMargin = 12                // buttons accept taps a little outside their frame
+	tapMargin = 12 // buttons accept taps a little outside their frame
 )
+
+// The frame's sizes, which Big makes bigger.
+var (
+	barH   = 46 // Config.Bar's
+	titleH = 48
+	FoldH  = titleH + 2*border // a folded panel: its frame and title strip
+	big    bool
+)
+
+// Big makes the frame for fingers on a small sharp screen: a taller bar,
+// title strips (tabs too) and their buttons. Before anything is laid out.
+func Big() {
+	big = true
+	barH, titleH = 72, 76
+	FoldH = titleH + 2*border
+	barTabPad, winIconPad = 24, 20
+}
+
+// IsBig says the frame is Big's.
+func IsBig() bool { return big }
 
 // layout is makeLayout for the screen and tabs as they are.
 func (a *App) layout() Layout {
@@ -399,10 +416,9 @@ func makeBar(L Layout, f Fonts, tabs, info []string) Layout {
 	return L
 }
 
-const (
-	barTabPad  = 14 // inside a bar tab, at either end
-	barInfoGap = 12 // between its label and what's in it
-)
+const barInfoGap = 12 // between a bar tab's label and what's in it
+
+var barTabPad = 14 // inside a bar tab, at either end
 
 // squeeze fits widths into room: those that want less than a fair share
 // keep theirs, the others share what's left.
@@ -543,10 +559,9 @@ func WithWindow(f Fonts, p Panel, focused, newBox bool) Panel {
 	return WithButton(f, p, p.ButtonLabel)
 }
 
-const (
-	winIconW   = 24 // a window button's icon
-	winIconPad = 12 // around it in its box
-)
+const winIconW = 24 // a window button's icon
+
+var winIconPad = 12 // around it in its box
 
 // winButton is a window's button in its strip.
 type winButton struct {

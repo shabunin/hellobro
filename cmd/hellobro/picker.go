@@ -18,10 +18,9 @@ import (
 	"hellobro/wm"
 )
 
-const (
-	pickRowH    = 58
-	pickRowsMax = 10
-)
+const pickRowsMax = 10
+
+var pickRowH = 58 // HELLOBRO_TOUCH=big: taller, for fingers
 
 type pickEntry struct {
 	kind, title, detail string
@@ -102,6 +101,7 @@ func (a *bro) showPicker(p *picker) {
 	}
 	h := 136 + min(max(1, n), pickRowsMax)*pickRowH + 16
 	top := b.Min.Y + max(40, b.Dy()/8)
+	h = min(h, b.Max.Y-40-top)
 	p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
 	a.picker = p
 	a.filterPicker()
@@ -277,8 +277,12 @@ func (a *bro) drawPicker() {
 		if e.current {
 			title += "  ●"
 		}
-		c.Text(a.F.Body, text, title, fg, kobo.AlignLeft)
-		text.Min.X += kobo.TextWidth(a.F.Body, title) + 28
+		f := a.F.Body
+		if kobo.IsBig() {
+			f = a.F.Tab
+		}
+		c.Text(f, text, title, fg, kobo.AlignLeft)
+		text.Min.X += kobo.TextWidth(f, title) + 28
 		c.Text(a.F.Small, text, e.detail, dim, kobo.AlignLeft)
 	}
 	a.Mark(p.box, true)

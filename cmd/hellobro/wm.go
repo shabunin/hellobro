@@ -45,7 +45,6 @@ type window interface {
 const (
 	wmKeepAfter = 5 * time.Second // the layout's kept this long after a change
 	wmGap       = kobo.Pad        // between the windows
-	wmTabH      = kobo.FoldH
 	maxWins     = 24
 )
 
@@ -86,12 +85,12 @@ type wmDrag struct {
 // wmInit makes the tree: the windows as they were left, or a launcher
 // on workspace 1.
 func (a *bro) wmInit() {
-	a.wm.tree = wm.New(image.Rect(0, 0, 1, 1), wmTabH)
+	a.wm.tree = wm.New(image.Rect(0, 0, 1, 1), kobo.FoldH)
 	a.wm.wins = map[*wm.Node]window{}
 	if s := a.mem.Layout; s != nil && a.wmRestore(*s) {
 		return
 	}
-	a.wm.tree = wm.New(image.Rect(0, 0, 1, 1), wmTabH)
+	a.wm.tree = wm.New(image.Rect(0, 0, 1, 1), kobo.FoldH)
 	a.wm.wins = map[*wm.Node]window{}
 	a.openWin(&termSession{})
 }
@@ -655,10 +654,10 @@ func (a *bro) placeTabs(n *wm.Node) {
 		var r image.Rectangle
 		if n.Layout == wm.Tabbed {
 			x0, x1 := in.Min.X+in.Dx()*i/k, in.Min.X+in.Dx()*(i+1)/k
-			r = image.Rect(x0, in.Min.Y, x1, in.Min.Y+wmTabH)
+			r = image.Rect(x0, in.Min.Y, x1, in.Min.Y+kobo.FoldH)
 		} else {
-			y := in.Min.Y + i*wmTabH
-			r = image.Rect(in.Min.X, y, in.Max.X, y+wmTabH)
+			y := in.Min.Y + i*kobo.FoldH
+			r = image.Rect(in.Min.X, y, in.Max.X, y+kobo.FoldH)
 		}
 		a.wm.tabs = append(a.wm.tabs, wmTab{r.Intersect(in), c})
 	}
@@ -891,7 +890,7 @@ func (a *bro) emptyHelp() [][2]string {
 			help = append(help, [2]string{k, row.what})
 		}
 	}
-	return append(help, [2]string{"swipe the left edge", "the light, up or down"}, [2]string{"swipe the right edge", "the menu: rotate, touch calibration, sleep, lock, quit"})
+	return append(help, [2]string{"swipe the left edge", "the light, up or down"}, [2]string{"swipe the right edge", "the menu: rotate, touch calibration, sleep, lock, quit"}, [2]string{"swipe along the bottom", "the next workspace (left) or the one before (right)"})
 }
 
 // --- input ---
