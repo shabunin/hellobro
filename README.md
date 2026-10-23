@@ -37,7 +37,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   Bluetooth headphones. The media keys and the headphones' buttons work,
   and the status bar shows what plays.
 - **Sleep when idle**: untouched for 30 minutes on battery (Settings),
-  the Kobo sleeps, so one left on the shelf keeps its charge.
+  the Kobo sleeps (music or not), so one left on the shelf keeps its
+  charge. A toast at 10%.
 - **Host files**: a saved host's home mounted for Alpine, read-only or
   read-write: copy, rsync, or play music straight from the PC.
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel, and

@@ -277,11 +277,16 @@ It also sleeps by itself after a while untouched (Settings, Sleep): on
 battery after 30 minutes by default, plugged in never, each one 5 min to
 2 hours or never. Whatever runs goes down with it: SSH sessions, the
 relay, a copy to or from the Kobo. A toast says so a minute before, and
-a touch or a key keeps it awake. Music playing keeps it awake too, and
-the while starts again once it stops; so it does when it's plugged in or
-out (unplugged after a night on power, it sleeps after the battery's
-while from then, not at once). Left awake untouched, the Kobo
-lasts about 12 hours from full.
+a touch or a key keeps it awake. Music doesn't: it's paused, as for the
+power button. The while starts again when it's plugged in or out
+(unplugged after a night on power, it sleeps after the battery's while
+from then, not at once). hellobro never quits by itself: sleep is what
+an idle Kobo gets. Left awake untouched, the Kobo lasts about 12 hours
+from full.
+
+At 10% on battery a toast says to plug it in (once on the way down),
+and the lock screen says so too. Nothing else happens: it doesn't
+sleep or quit for it.
 
 ## Lock
 
@@ -289,12 +294,16 @@ Shift+Meta+X locks the screen, for a bag or a hand: touch does nothing
 and keys go nowhere, but the music's keys, the power button (sleep),
 and Shift+Meta+X again, which unlocks. The light goes off till then
 (notifications don't flash it). The lock screen says hello bro, what
-plays and whether it's paused, how to unlock, the version and where
-it's from; it changes only when the music does. The windows go on behind it, as they are when it
+plays and whether it's paused, a low battery, how to unlock, the
+version and where it's from; it changes only when one of them does. The windows go on behind it, as they are when it
 unlocks; asleep and awake, it's still locked. Locked, touches and
 keys don't count as use: the light stays off and sleeping when idle
-still comes. It wants a keyboard (its keys unlock), and unlocks by
-itself if the keyboard goes. keys.conf: `lock`.
+still comes. It wants a keyboard (its keys unlock). If the keyboard
+goes while it's locked, the lock screen lists swipes instead, the touch
+screen's way out: ↑ unlocks, → unlocks and opens Bluetooth (to connect
+the keyboard again), ↓ goes back to Nickel. A swipe is long (a quarter
+of the screen's short side) and straight, so a brush in a bag isn't
+one; the keyboard back, they're gone. keys.conf: `lock`.
 
 ## Terminal
 
@@ -527,8 +536,8 @@ computers get in, with their key; there are no passwords:
 Paired keys are in
 `.adds/hellobro/authorized_keys` (`forget paired` empties it), the Kobo's
 host key in `ssh_host_ed25519_key` there. The server only runs while
-hellobro does, with sharing on, and Wi-Fi up. The auto-exit doesn't come
-while a computer is connected; sleep does.
+hellobro does, with sharing on, and Wi-Fi up. Sleeping when idle comes
+even with a computer connected.
 
 ## Updating over the air
 
@@ -573,8 +582,8 @@ Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Meta+F in
 hellobro): swipe in from the top or bottom edge to leave it. The exit
 button leaves, and so does Esc in brotools, Meta+Shift+E in hellobro (where Esc
 is the terminal's, or closes what's open);
-the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
-with a session up, 6 hours while music plays).
+the power button sleeps. brotools also leaves after 3 minutes idle;
+hellobro doesn't, it sleeps instead (Sleep).
 
 ## Closing Nickel
 

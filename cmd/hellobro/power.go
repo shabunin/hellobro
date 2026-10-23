@@ -168,6 +168,7 @@ func (a *bro) histTick() {
 	}
 	s := batSample{time.Now(), b.pct, b.ma, b.charging()}
 	ps.plugged = s.charging
+	a.batteryCheck(b.pct, s.charging)
 	ps.hist = append(ps.hist, s)
 	if cut := slices.IndexFunc(ps.hist, func(s batSample) bool { return time.Since(s.at) < histKeep }); cut > 0 {
 		ps.hist = ps.hist[cut:]

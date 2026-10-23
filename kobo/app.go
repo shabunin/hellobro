@@ -177,32 +177,36 @@ type App struct {
 	inputAt time.Time   // last touch or key
 	call    chan func() // work from goroutines, run on the UI loop
 
-	status    string          // the header's status text, as drawn
-	note      string          // the Program's, left of it
-	network   string          // the Program's, first: the Wi-Fi and the address
-	dirty     []dirtyRect     // pending screen updates, blitted one at a time
-	flash     bool            // the next full-screen update should flash
-	flashR    image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
-	blitting  bool
-	jobs      chan blitJob
-	done      chan error
-	quit      bool
-	alive     atomic.Int64    // last loop tick, for the watchdog
-	blitAt    atomic.Int64    // start of the blit in flight, or 0
-	noPower   bool            // the power button doesn't reach us
-	wokeAt    time.Time       // from sleep: the power press that woke us comes after
-	asleep    bool            // the sleep screen is up: nothing else gets drawn
-	sleeping  atomic.Bool     // asleep, for the watchdog: the clock jumps
-	locked    bool            // touch does nothing, keys only what the Program lets through (lock.go)
-	lockHint  string          // how to unlock
-	eatTouch  bool            // a contact that began while locked isn't over
-	lockLines []string        // what else the lock screen shows
-	lockC     Canvas          // the lock screen, on the panel while locked
-	lockLight int             // the light before locking
-	restart   string          // a binary to run in our place once we've quit
-	ctrl      [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
-	alt       [2]bool         // and Alt
-	ring      image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
+	status     string          // the header's status text, as drawn
+	note       string          // the Program's, left of it
+	network    string          // the Program's, first: the Wi-Fi and the address
+	dirty      []dirtyRect     // pending screen updates, blitted one at a time
+	flash      bool            // the next full-screen update should flash
+	flashR     image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
+	blitting   bool
+	jobs       chan blitJob
+	done       chan error
+	quit       bool
+	alive      atomic.Int64    // last loop tick, for the watchdog
+	blitAt     atomic.Int64    // start of the blit in flight, or 0
+	noPower    bool            // the power button doesn't reach us
+	wokeAt     time.Time       // from sleep: the power press that woke us comes after
+	asleep     bool            // the sleep screen is up: nothing else gets drawn
+	sleeping   atomic.Bool     // asleep, for the watchdog: the clock jumps
+	locked     bool            // touch does nothing, keys only what the Program lets through (lock.go)
+	lockHint   string          // how to unlock
+	eatTouch   bool            // a contact that began while locked isn't over
+	lockLines  []string        // what else the lock screen shows
+	lockC      Canvas          // the lock screen, on the panel while locked
+	lockLight  int             // the light before locking
+	lockSwipes []LockSwipe     // the lock screen's swipes, if any
+	lockSlot   int32           // the contact that may be one, or -1
+	lockFrom   image.Point     // where it came down
+	lockTo     image.Point     // and where it is
+	restart    string          // a binary to run in our place once we've quit
+	ctrl       [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
+	alt        [2]bool         // and Alt
+	ring       image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
 
 	blinks     []blinking // notice.go
 	toast      *toast

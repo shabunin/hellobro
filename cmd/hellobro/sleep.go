@@ -5,10 +5,12 @@ package main
 // back on waking, the SSH sessions reconnecting once Wi-Fi is up.
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"time"
 
+	"hellobro/kobo"
 	"hellobro/radio"
 )
 
@@ -16,10 +18,12 @@ import (
 type sleepState struct {
 	wifiWas, btWas bool
 	warned         bool      // the toast said it's going to sleep
-	musicAt        time.Time // the music last played: idle counts from then too
 	plugged        bool      // on power, as last seen
-	plugAt         time.Time // plugged in or out: and from then
+	plugAt         time.Time // plugged in or out: idle counts from then too
+	low            int       // the battery's %, once it's low and not charging; 0 otherwise
 }
+
+const batteryLow = 10 // %: a warning, once on the way down
 
 const sleepWarn = time.Minute // the toast comes this long before
 
@@ -27,27 +31,24 @@ const sleepWarn = time.Minute // the toast comes this long before
 // input, on battery or plugged in: left awake, it lasts a night at most.
 // Whatever runs goes down with it (SSH, the relay, a copy to it), so a
 // toast says so a minute before, and a touch or a key keeps it awake.
-// Music playing keeps it awake too, and once it stops the while starts
-// again: after an album, the toast still comes first. So it does after
-// plugging in or out, or the battery's while, long run out on power,
-// would sleep it at once.
+// Music doesn't keep it awake: it's paused, the battery comes first.
+// Plugging in or out starts the while again, or the battery's, long run
+// out on power, would sleep it at once with no toast. It's the only way
+// hellobro goes idle: it doesn't quit for want of input (IdleTimeout).
 func (a *bro) sleepWhenIdle() {
 	key := "sleep-battery"
 	if a.pw.plugged {
 		key = "sleep-power"
 	}
 	d := a.settingMinutes(key)
-	if a.musicPlaying() {
-		a.slp.musicAt = time.Now()
-	}
 	if a.pw.plugged != a.slp.plugged {
 		a.slp.plugged, a.slp.plugAt = a.pw.plugged, time.Now()
 	}
-	if d == 0 || a.musicPlaying() || a.Calibrating() {
+	if d == 0 || a.Calibrating() {
 		a.slp.warned = false
 		return
 	}
-	switch idle := min(a.IdleFor(), time.Since(a.slp.musicAt), time.Since(a.slp.plugAt)); {
+	switch idle := min(a.IdleFor(), time.Since(a.slp.plugAt)); {
 	case idle >= d:
 		a.slp.warned = false
 		log.Printf("sleep: %v without input (%s)", d, key)
@@ -148,18 +149,49 @@ func (a *bro) lock() {
 	}
 }
 
-// lockLines are what the lock screen says of the music: the track, and
-// whether it plays.
+// lockLines are what the lock screen says: the music's track and whether
+// it plays, and the battery, if it's low.
 func (a *bro) lockLines() []string {
-	p, ok := a.target()
-	if !ok || p.title == "" {
-		return nil
+	var ls []string
+	if p, ok := a.target(); ok && p.title != "" {
+		s := "♪ " + p.title
+		if p.artist != "" {
+			s += " · " + p.artist
+		}
+		ls = append(ls, s, strings.ToLower(p.status))
 	}
-	s := "♪ " + p.title
-	if p.artist != "" {
-		s += " · " + p.artist
+	if a.slp.low > 0 {
+		ls = append(ls, fmt.Sprintf("battery %d%%: plug it in", a.slp.low))
 	}
-	return []string{s, strings.ToLower(p.status)}
+	return ls
+}
+
+// lockSwipes are the lock screen's, with the keyboard gone: nothing else
+// could unlock it. Bluetooth unlocks too, for the keyboard to connect
+// again.
+func (a *bro) lockSwipes() []kobo.LockSwipe {
+	return []kobo.LockSwipe{
+		{Dir: kobo.SwipeUp, Label: "unlock", Run: a.Unlock},
+		{Dir: kobo.SwipeRight, Label: "Bluetooth", Run: func() { a.Unlock(); a.openGUI("bluetooth") }},
+		{Dir: kobo.SwipeDown, Label: "back to Nickel", Run: a.Quit},
+	}
+}
+
+// batteryCheck warns once the battery is low on its way down: a toast,
+// and a line on the lock screen. pct is the battery's now.
+func (a *bro) batteryCheck(pct int, charging bool) {
+	low := 0
+	if !charging && pct <= batteryLow {
+		low = pct
+	}
+	if low > 0 && a.slp.low == 0 {
+		log.Printf("battery: %d%%, low", pct)
+		a.Toast(fmt.Sprintf("battery %d%%: plug it in", pct), 10*time.Second)
+	}
+	if low != a.slp.low {
+		a.slp.low = low
+		a.SetLockLines(a.lockLines())
+	}
 }
 
 // lockedKey is a key while locked: the lock's unlocks, the modifiers are

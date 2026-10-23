@@ -35,7 +35,6 @@ const (
 	jailBus     = "/run/user/0/bus" // a session's bus, in the jail
 	busesEvery  = 5 * time.Second   // new sessions' buses are looked for this often
 	mprisWait   = 2 * time.Second   // a player that doesn't answer in this long is skipped
-	playingIdle = 6 * time.Hour     // while music plays, don't quit for want of input
 	volumeStep  = 0.05
 )
 

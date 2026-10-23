@@ -27,9 +27,6 @@ import (
 	"hellobro/radio"
 )
 
-const termIdleTimeout = 20 * time.Minute // with a session up: reading a remote screen takes longer
-const relayIdle = 24 * time.Hour         // with the relay on: as good as never
-
 // bro is the app: the kobo.App, the windows, the radios, and the Linux
 // players' remote control.
 type bro struct {
@@ -192,25 +189,20 @@ func (a *bro) Exit() {
 	alpineExit()
 }
 
-func (a *bro) IdleTimeout() time.Duration {
-	if a.musicPlaying() { // sleepWhenIdle sleeps once it's over
-		return playingIdle
-	}
-	if a.relayOn() { // a computer may come in from afar any time
-		return relayIdle
-	}
-	if a.termLive() || a.shareBusy() { // a computer sending music takes a while
-		return termIdleTimeout
-	}
-	return kobo.IdleTimeout
-}
+// IdleTimeout is never: sleeping when idle (sleepWhenIdle) takes the
+// auto-exit's place, and keeps the windows.
+func (a *bro) IdleTimeout() time.Duration { return noAutoExit }
+
+const noAutoExit = 100 * 365 * 24 * time.Hour
 
 func (a *bro) Key(m kobo.KeyMsg) bool {
 	switch {
 	case m.Connected != "" || m.Gone != "":
 		if m.Gone != "" { // what it held won't come up now
 			a.tv.mods = termMods{caps: a.tv.mods.caps}
-			a.Unlock() // and nothing else could unlock
+			a.SetLockSwipes(a.lockSwipes()) // locked, touch's way out
+		} else {
+			a.SetLockSwipes(nil) // its keys unlock again
 		}
 		return true
 	case kobo.IsMediaKey(m.Code): // the music's, locked too

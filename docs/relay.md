@@ -102,10 +102,7 @@ Then in Settings turn **Relay** on. File sharing has to be on too.
 Settings, Sharing shows whether it's up. It reconnects by itself: after 5 s, then
 up to a minute between tries.
 
-While the relay is on, the Kobo stays reachable, and that costs battery:
-
-- hellobro doesn't auto-exit.
-
+While the relay is on, the Kobo stays reachable, and that costs battery.
 A deep sleep (the power button) drops the relay till the Kobo wakes.
 So does sleeping when idle (Settings, Sleep: on battery after 30 min
 untouched, by default), relay or not; a toast says so a minute before.

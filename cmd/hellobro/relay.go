@@ -136,7 +136,6 @@ func (a *bro) relayApply() {
 		r.conf, r.err, r.status, r.up = c, "", "connecting…", false
 		r.stop = make(chan struct{})
 		log.Printf("relay: on, through %s", c)
-		a.DrawFooter() // no auto-exit
 		go runRelay(c, srv.ServeConn, r.stop, func(up bool, s string) {
 			a.Do(func() {
 				if r.stop != nil {
@@ -149,7 +148,6 @@ func (a *bro) relayApply() {
 		close(r.stop)
 		r.stop, r.up, r.status = nil, false, ""
 		log.Print("relay: off")
-		a.DrawFooter() // auto-exit, again
 	case !on:
 		r.err = ""
 	}

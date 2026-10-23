@@ -57,7 +57,7 @@ var settingList = []setting{
 		shown:  []string{"off", "on (Sharing, above)", "pair a computer"}},
 	{key: "relay", label: "Relay, a way in from afar (relay.conf)",
 		values: []string{"off", "on"},
-		shown:  []string{"off", "on, while sharing and awake: no auto-exit"}},
+		shown:  []string{"off", "on, while sharing and awake"}},
 	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
 		values: []string{"on", "off"},
 		shown:  []string{"yes, while sharing", "no"}},
