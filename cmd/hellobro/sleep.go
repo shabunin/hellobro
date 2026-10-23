@@ -14,6 +14,39 @@ import (
 // sleepState is what was on when the Kobo went to sleep.
 type sleepState struct {
 	wifiWas, btWas bool
+	warned         bool // the toast said it's going to sleep
+}
+
+const sleepWarn = time.Minute // the toast comes this long before
+
+// sleepWhenIdle puts the Kobo to sleep after the settings' while without
+// input, on battery or plugged in: left awake, it lasts a night at most.
+// Whatever runs goes down with it (SSH, the relay, a copy to it), so a
+// toast says so a minute before, and a touch or a key keeps it awake.
+// Music dozes instead (dozeWhenIdle).
+func (a *bro) sleepWhenIdle() {
+	key := "sleep-battery"
+	if a.pw.plugged {
+		key = "sleep-power"
+	}
+	d := a.settingMinutes(key)
+	if d == 0 || a.musicPlaying() || a.Calibrating() {
+		a.slp.warned = false
+		return
+	}
+	switch idle := a.IdleFor(); {
+	case idle >= d:
+		a.slp.warned = false
+		log.Printf("sleep: %v without input (%s)", d, key)
+		a.App.Sleep()
+	case idle >= d-sleepWarn:
+		if !a.slp.warned {
+			a.slp.warned = true
+			a.Toast("sleeping in a minute: SSH, the relay and sharing drop. touch or type to stay awake", sleepWarn)
+		}
+	default:
+		a.slp.warned = false
+	}
 }
 
 func (a *bro) Sleep() func() {

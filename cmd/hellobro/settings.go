@@ -40,7 +40,13 @@ var settingList = []setting{
 	{key: "light-start", label: "Light at start",
 		values: []string{"last", "nickel"},
 		shown:  []string{"as you last set it", "as Nickel had it"}},
-	{key: "doze-after", group: "Sleep and music", label: "Light sleep while music plays",
+	{key: "sleep-battery", group: "Sleep", label: "Sleep when idle, on battery",
+		values: []string{"5", "15", "30", "60", "120", "off"},
+		shown:  []string{"after 5 min untouched", "after 15 min untouched", "after 30 min untouched", "after 1 h untouched", "after 2 h untouched", "never by itself"}},
+	{key: "sleep-power", label: "… plugged in", title: "Sleep when idle, plugged in",
+		values: []string{"off", "5", "15", "30", "60", "120"},
+		shown:  []string{"never by itself", "after 5 min untouched", "after 15 min untouched", "after 30 min untouched", "after 1 h untouched", "after 2 h untouched"}},
+	{key: "doze-after", group: "Music", label: "Light sleep while music plays",
 		values: []string{"off", "1", "2", "5", "10", "20"},
 		shown:  []string{"never by itself", "after 1 min idle", "after 2 min idle", "after 5 min idle", "after 10 min idle", "after 20 min idle"}},
 	{key: "sleep-music", label: "Sleep%s with music on", cmd: "sleep",
@@ -63,7 +69,7 @@ var settingList = []setting{
 		shown:  []string{"off", "on (Sharing, above)", "pair a computer"}},
 	{key: "relay", label: "Relay, a way in from afar (relay.conf)",
 		values: []string{"off", "on"},
-		shown:  []string{"off", "on, while sharing: no auto-exit"}},
+		shown:  []string{"off", "on, while sharing and awake: no auto-exit"}},
 	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
 		values: []string{"on", "off"},
 		shown:  []string{"yes, while sharing", "no"}},
@@ -126,7 +132,7 @@ func settingLine(i int) int {
 var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
 // The defaults, by key: the index of a value.
-var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1}
+var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1, "sleep-battery": 2}
 
 // settingCommands step the settings from the switcher, each to its next
 // value, as a tap on its row does, and a toast says what it is now. The

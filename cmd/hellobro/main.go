@@ -172,6 +172,7 @@ func (a *bro) Tick() {
 		return
 	}
 	a.dozeWhenIdle()
+	a.sleepWhenIdle()
 	a.keysTick()
 	a.netTick()
 	a.termTick()

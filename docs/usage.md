@@ -26,7 +26,7 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     and devices (scan, pair, connect, disconnect, forget);
   - **Sharing** with a computer over SFTP and SSH (how to reach the
     Kobo, pairing, who's connected and sending what);
-  - **Settings**, hellobro's own, in groups: Light; Sleep and music; At
+  - **Settings**, hellobro's own, in groups: Light; Sleep; Music; At
     start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
     CPU profiles); Terminal (notifications, the status bar); Alpine;
     Keys;
@@ -272,6 +272,14 @@ device (frozen, all the while hellobro is up), so hellobro reads the
 button's GPIO instead (`/sys/kernel/debug/gpio`); the presses still queue
 up for Nickel, which may see them when hellobro quits (and go to sleep
 once).
+
+It also sleeps by itself after a while untouched (Settings, Sleep): on
+battery after 30 minutes by default, plugged in never, each one 5 min to
+2 hours or never. Whatever runs goes down with it: SSH sessions, the
+relay, a copy to or from the Kobo. A toast says so a minute before, and
+a touch or a key keeps it awake. While music plays, light sleep comes
+instead (below). Left awake untouched, the Kobo lasts about 12 hours
+from full.
 
 ## Light sleep
 
@@ -568,7 +576,7 @@ It's only installed when asked for: `make install-tools`.
 In both: swipe the left edge for the frontlight (in hellobro also
 Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Meta+F in
 hellobro): swipe in from the top or bottom edge to leave it. The exit
-button leaves, and so does Esc in brotools, Ctrl+Q in hellobro (where Esc
+button leaves, and so does Esc in brotools, Meta+Shift+E in hellobro (where Esc
 is the terminal's, or closes what's open);
 the power button sleeps; they also leave after 3 minutes idle (hellobro: 20
 with a session up, 6 hours while music plays).

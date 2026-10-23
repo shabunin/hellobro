@@ -109,6 +109,10 @@ While the relay is on, the Kobo stays reachable, and that costs battery:
 - a light sleep with the music over doesn't turn into a deep one.
 
 A deep sleep (the power button) drops the relay till the Kobo wakes.
+So does sleeping when idle (Settings, Sleep: on battery after 30 min
+untouched, by default), relay or not; a toast says so a minute before.
+To keep it reachable all night, leave it on its charger ("plugged in"
+is never, by default), or set "on battery" to never.
 hellobro has to be running for any of it.
 
 ## Using it

@@ -229,6 +229,7 @@ func New(cfg Config, prog Program) *App {
 	return &App{
 		prog: prog, cfg: cfg, scr: scr, F: LoadFonts(), cal: loadCalibrations(), gestures: map[int32]*Gesture{},
 		jobs: make(chan blitJob), done: make(chan error), call: make(chan func(), 64),
+		inputAt: time.Now(), // idle from the start, not since 1970: the light, sleep and auto-exit count from here
 	}
 }
 
