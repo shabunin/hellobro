@@ -171,8 +171,9 @@ type termView struct {
 	hosts    []sshHost
 	keyAsked map[string]bool // hosts we offered to install our key on
 
-	sel     *termSel // the selection, or a contact that may become one (clipboard.go): the focused session's
-	cw, ch  int      // cell size
+	nearby  nearbyState // the other hellobros heard (typein.go)
+	sel     *termSel    // the selection, or a contact that may become one (clipboard.go): the focused session's
+	cw, ch  int         // cell size
 	drawnAt time.Time
 	churn   int       // pixels changed since the last flash
 	bigAt   time.Time // the last change of more than a few rows
@@ -439,6 +440,12 @@ func (a *bro) drawConnect(t *termSession) {
 			line += "   · mounted, " + mountMode(m.rw)
 		}
 		add(run(func() { a.hostMenu(t, i) }), line)
+	}
+	a.nearbyLook()
+	for i, p := range v.nearby.peers {
+		if n := len(v.hosts) + i + 3; n <= 9 {
+			add(run(func() { a.typeInto(t, p) }), fmt.Sprintf("   %d   %s   nearby: type into it", n, p.Name))
+		}
 	}
 	add(nil, "", "Or a host not saved: user@host[:port] [command] and Enter (saved once it connects).")
 	switch {
@@ -987,6 +994,7 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	t.size = t.startSize()
 	cols, rows := t.size.X, t.size.Y
 	t.back, t.state = back, termConnected
+	defer a.showMode() // typing into another device, maybe
 	t.emu = vt.NewSafeEmulator(cols, rows)
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
 	t.emu.SetDefaultBackgroundColor(color.White)
@@ -1061,6 +1069,7 @@ func (a *bro) termEnded(t *termSession, gen int, err error, lost bool, how strin
 		return
 	}
 	a.termClose(t)
+	defer a.showMode() // not typing into another device now
 	msg := "connection closed"
 	if t.kind == kindShell {
 		msg = "the shell exited"
@@ -1255,6 +1264,9 @@ func (a *bro) termKey(code uint16, value int32) bool {
 				return true
 			case i-2 < len(v.hosts):
 				a.hostMenu(t, i-2)
+			case i-2-len(v.hosts) < len(v.nearby.peers):
+				a.typeInto(t, v.nearby.peers[i-2-len(v.hosts)])
+				return true
 			}
 		case printable && !m.ctrl:
 			t.input += ch

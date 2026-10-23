@@ -3,7 +3,7 @@ package share
 // The mDNS responder (RFC 6762, DNS-SD RFC 6763): "kobo.local" for the
 // Kobo's Wi-Fi address, and the server as _sftp-ssh._tcp and _ssh._tcp,
 // so a computer finds it by name, and a file manager lists it under
-// Network. It answers on the Wi-Fi interface, follows the interface
+// Network; and as _hellobro._tcp, for other hellobros (Browse). It answers on the Wi-Fi interface, follows the interface
 // through Wi-Fi going off and on, and says goodbye when stopped. (It
 // doesn't probe for a name already taken: one Kobo per network.)
 
@@ -37,7 +37,10 @@ const (
 	flush        = 0x8000 // the class's cache-flush bit: these records are only ours
 )
 
-var serviceTypes = []string{"_sftp-ssh._tcp.local.", "_ssh._tcp.local."}
+// HelloType is hellobro's own: other hellobros find it by it (Browse).
+const HelloType = "_hellobro._tcp.local."
+
+var serviceTypes = []string{"_sftp-ssh._tcp.local.", "_ssh._tcp.local.", HelloType}
 
 // zone is the records, for one address.
 type zone struct {

@@ -25,13 +25,13 @@ import (
 
 const (
 	pairTime = 5 * time.Minute
-	mdnsHost = "kobo" // kobo.local
 )
 
 var (
 	shareRoot = kobo.EnvOr("HELLOBRO_SHARE_ROOT", "/mnt/onboard")
 	shareAddr = kobo.EnvOr("HELLOBRO_SHARE_ADDR", fmt.Sprintf(":%d", share.Port))
 	shareIf   = kobo.EnvOr("INTERFACE", "wlan0")
+	mdnsHost  = kobo.EnvOr("HELLOBRO_MDNS_HOST", "kobo") // kobo.local
 )
 
 type shareState struct {
@@ -57,6 +57,9 @@ func (a *bro) shareApply() {
 		srv, err := share.Start(share.Config{
 			Addr: shareAddr, StateDir: kobo.AppFile(""), Root: shareRoot,
 			StartShell: func(cmd string, cols, rows int) (share.Shell, error) {
+				if isKeys(cmd) { // another device typing here (typein.go)
+					return startKeys(a.deviceName())
+				}
 				start := func() (*localShell, error) { return startShell(cols, rows, cmd) }
 				if rest, ok := strings.CutPrefix(cmd, "hellobro-alpine"); ok && (rest == "" || rest[0] == ' ') {
 					start = func() (*localShell, error) { return startAlpine(cols, rows, strings.TrimSpace(rest)) }
@@ -69,6 +72,7 @@ func (a *bro) shareApply() {
 			},
 			Builtin: a.builtin,
 			Notify:  func(e share.Event) { a.Do(func() { a.shareEvent(e) }) },
+			AskKeys: a.askKeys,
 		})
 		if err != nil {
 			s.err = err.Error()
@@ -88,7 +92,7 @@ func (a *bro) shareApply() {
 	case mdns && s.stopMDNS == nil:
 		_, port, _ := net.SplitHostPort(shareAddr)
 		p, _ := strconv.Atoi(port)
-		s.stopMDNS = share.Advertise(share.Advert{Host: mdnsHost, Instance: "Kobo (hellobro)", Port: p, Iface: shareIf,
+		s.stopMDNS = share.Advertise(share.Advert{Host: mdnsHost, Instance: a.deviceName(), Port: p, Iface: shareIf,
 			TXT: []string{"u=root", "path=" + shareRoot}})
 	case !mdns && s.stopMDNS != nil:
 		s.stopMDNS()

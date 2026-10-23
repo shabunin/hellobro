@@ -405,6 +405,7 @@ func dialClient(h sshHost, o dialOpts) (*ssh.Client, string, error) {
 		},
 		HostKeyCallback: tofuHostKeys(o.note),
 		Timeout:         10 * time.Second,
+		ClientVersion:   sshClientVersion,
 	}
 	client, err := sshDial(h, cfg, signer)
 	if err != nil {

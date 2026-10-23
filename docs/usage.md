@@ -565,6 +565,29 @@ a key that may only type. The server only runs while
 hellobro does, with sharing on, and Wi-Fi up. Sleeping when idle comes
 even with a computer connected.
 
+## Typing into another device
+
+Another e-reader running hellobro, on the same Wi-Fi with sharing on,
+is listed in the launcher under the saved hosts: `4   Kobo Libra
+nearby: type into it`. Picked (its number, or a tap), this keyboard
+types there: a window logs in to it as `hellobro-keys`, and what's typed
+in it goes to a keyboard made there (uinput), which that hellobro takes
+for any other. While the window is in focus every key goes there,
+hellobro's own too, as grabbed (Meta+Shift+G gives them back here, and
+again to it); the bar says `typing into …`. Ctrl+] ends it.
+
+The first time, the other device asks on its screen whether this one
+may type there (allow / no). Allowed, the key is kept there for typing
+only, `command="hellobro-keys"`: no shell, no files. Settings, Sharing
+there lists it, to forget. Each one says it's there over mDNS
+(`_hellobro._tcp`); the launcher looks again each time it's drawn,
+every 20 s at most.
+
+A computer types into hellobro the same way: `ssh -t -p 2022
+hellobro-keys@kobo.local`, in kitty, foot or another terminal that
+speaks kitty's keyboard protocol for Super and the releases (any other
+sends no Super: the Mod key is best Alt then).
+
 ## Updating over the air
 
 From a release (see the README's Install): send its bare `hellobro` as

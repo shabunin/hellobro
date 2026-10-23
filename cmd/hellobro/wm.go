@@ -501,6 +501,7 @@ func (a *bro) wmFocusMoved() {
 	if w != nil {
 		log.Printf("wm: focus on %s", w.Title())
 	}
+	a.showMode() // typing into another device, or not
 }
 
 // wmBar puts the workspaces in the bar, each with its windows' titles.
@@ -971,7 +972,7 @@ func (a *bro) toggleGrab() {
 // grabbed says the key goes to the window, grabbed.
 func (a *bro) grabbed(code uint16, value int32) bool {
 	switch {
-	case !a.wm.grab:
+	case !a.grabbing():
 		return false
 	case value == 0:
 		return !a.keys.down[code] // grab's own key coming up is runKey's
@@ -983,8 +984,12 @@ func (a *bro) grabbed(code uint16, value int32) bool {
 // showMode has the bar say the binding mode, or grab.
 func (a *bro) showMode() {
 	switch {
-	case a.wm.grab:
+	case a.grabbing() && a.term().typing():
+		a.SetStatus("typing into " + a.term().target.name + ": " + a.keyLabel("grab") + " lets go")
+	case a.grabbing():
 		a.SetStatus("grab: " + a.keyLabel("grab") + " lets go")
+	case a.term().typing():
+		a.SetStatus("keys here: " + a.keyLabel("grab") + " gives them to " + a.term().target.name)
 	case a.wm.mode != "":
 		a.SetStatus("mode: " + a.wm.mode)
 	default:

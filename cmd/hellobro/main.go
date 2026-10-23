@@ -25,6 +25,7 @@ import (
 
 	"hellobro/kobo"
 	"hellobro/radio"
+	"hellobro/share"
 )
 
 // bro is the app: the kobo.App, the windows, the radios, and the Linux
@@ -101,6 +102,7 @@ func main() {
 	a.applyLightIdle()
 	a.applyLightStart()
 	log.Printf("hellobro %s", version)
+	sshClientVersion = "SSH-2.0-hellobro " + share.PeerName("SSH-2.0-hellobro "+a.deviceName()) // who's asking to type, for another hellobro
 	a.keys = loadKeys()
 	a.applyMod()
 	a.tf.setSize(termFontDefault)

@@ -52,7 +52,15 @@ type Config struct {
 	// Notify hears what happens (connections, pairing), from the server's
 	// goroutines.
 	Notify func(Event)
+	// AskKeys asks on the screen whether who (at addr) may type here:
+	// another device logging in as KeysUser with a key not paired yet.
+	// Allowed, its key is saved to do only that. nil: nobody's asked.
+	AskKeys func(who, addr string) bool
 }
+
+// KeysUser is the user another device logs in as to type here, and the
+// command a key paired for that runs, whatever it asks for.
+const KeysUser = "hellobro-keys"
 
 // Event is something that happened, for the UI.
 type Event struct {
@@ -84,6 +92,7 @@ type Server struct {
 	pairCode  string
 	pairUntil time.Time
 	pairTries int
+	asking    sync.Mutex // one AskKeys at a time
 }
 
 type conn struct {
@@ -225,6 +234,9 @@ func (s *Server) publicKey(meta ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permi
 		}
 		return p, nil
 	}
+	if meta.User() == KeysUser && s.cfg.AskKeys != nil {
+		return &ssh.Permissions{Extensions: map[string]string{"askkeys": "1"}}, nil
+	}
 	if s.Pairing() != "" {
 		return &ssh.Permissions{Extensions: map[string]string{"pair": "1"}}, nil
 	}
@@ -234,6 +246,9 @@ func (s *Server) publicKey(meta ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permi
 // verifiedKey: the client holds key. A paired one is in; an unknown one,
 // while pairing, goes on to the code.
 func (s *Server) verifiedKey(meta ssh.ConnMetadata, key ssh.PublicKey, perms *ssh.Permissions, _ string) (*ssh.Permissions, error) {
+	if perms.Extensions["askkeys"] != "" {
+		return s.askKeys(meta, key)
+	}
 	if perms.Extensions["pair"] == "" {
 		return perms, nil
 	}
@@ -259,6 +274,49 @@ func (s *Server) verifiedKey(meta ssh.ConnMetadata, key ssh.PublicKey, perms *ss
 		},
 		PasswordCallback: func(_ ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) { return code(string(pw)) },
 	}}
+}
+
+// askKeys has the screen ask whether the device may type here, and saves
+// its key for only that if so.
+func (s *Server) askKeys(meta ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+	if !s.asking.TryLock() {
+		return nil, errors.New("asking about another already")
+	}
+	defer s.asking.Unlock()
+	who, addr := PeerName(string(meta.ClientVersion())), hostOf(meta.RemoteAddr())
+	if !s.cfg.AskKeys(who, addr) {
+		return nil, errors.New("not allowed to type here")
+	}
+	comment := fmt.Sprintf("keys-%s-%s@%s", time.Now().Format("2006-01-02"), strings.ReplaceAll(who, " ", "_"), addr)
+	if err := s.addKey(key, comment, `command="`+KeysUser+`"`); err != nil {
+		return nil, err
+	}
+	log.Printf("share: %s (%s) may type here: %s", who, addr, ssh.FingerprintSHA256(key))
+	s.cfg.Notify(Event{Kind: "paired", Note: comment})
+	return &ssh.Permissions{CriticalOptions: map[string]string{"force-command": KeysUser},
+		Extensions: map[string]string{"key": ssh.FingerprintSHA256(key)}}, nil
+}
+
+// PeerName is who an SSH client's version says it is: another hellobro
+// says its device ("SSH-2.0-hellobro Kobo Elipsa"), anything else its
+// software. Only letters, digits and a few marks: it's shown and kept.
+func PeerName(version string) string {
+	v := strings.TrimPrefix(version, "SSH-2.0-")
+	if rest, ok := strings.CutPrefix(v, "hellobro "); ok {
+		v = rest
+	}
+	var b strings.Builder
+	for _, r := range v {
+		switch {
+		case b.Len() >= 40:
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', strings.ContainsRune(" ._-", r):
+			b.WriteRune(r)
+		}
+	}
+	if n := strings.TrimSpace(b.String()); n != "" {
+		return n
+	}
+	return "a computer"
 }
 
 func (s *Server) checkCode(answer string) error {
@@ -335,12 +393,12 @@ func (s *Server) Keys() ([]AuthorizedKey, error) {
 	return out, err
 }
 
-func (s *Server) addKey(key ssh.PublicKey, comment string) error {
+func (s *Server) addKey(key ssh.PublicKey, comment string, opts ...string) error {
 	f, err := os.OpenFile(filepath.Join(s.cfg.StateDir, authorizedFile), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
-	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key))) + " " + comment + "\n"
+	line := AuthorizedKey{Key: key, Comment: comment, Options: opts}.line() + "\n"
 	if _, err := f.WriteString(line); err != nil {
 		f.Close()
 		return err
