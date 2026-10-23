@@ -177,26 +177,30 @@ type App struct {
 	inputAt time.Time   // last touch or key
 	call    chan func() // work from goroutines, run on the UI loop
 
-	status   string          // the header's status text, as drawn
-	note     string          // the Program's, left of it
-	network  string          // the Program's, first: the Wi-Fi and the address
-	dirty    []dirtyRect     // pending screen updates, blitted one at a time
-	flash    bool            // the next full-screen update should flash
-	flashR   image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
-	blitting bool
-	jobs     chan blitJob
-	done     chan error
-	quit     bool
-	alive    atomic.Int64    // last loop tick, for the watchdog
-	blitAt   atomic.Int64    // start of the blit in flight, or 0
-	noPower  bool            // the power button doesn't reach us
-	wokeAt   time.Time       // from sleep: the power press that woke us comes after
-	asleep   bool            // the sleep screen is up: nothing else gets drawn
-	sleeping atomic.Bool     // asleep, for the watchdog: the clock jumps
-	restart  string          // a binary to run in our place once we've quit
-	ctrl     [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
-	alt      [2]bool         // and Alt
-	ring     image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
+	status      string          // the header's status text, as drawn
+	note        string          // the Program's, left of it
+	network     string          // the Program's, first: the Wi-Fi and the address
+	dirty       []dirtyRect     // pending screen updates, blitted one at a time
+	flash       bool            // the next full-screen update should flash
+	flashR      image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
+	blitting    bool
+	jobs        chan blitJob
+	done        chan error
+	quit        bool
+	alive       atomic.Int64    // last loop tick, for the watchdog
+	blitAt      atomic.Int64    // start of the blit in flight, or 0
+	noPower     bool            // the power button doesn't reach us
+	wokeAt      time.Time       // from sleep: the power press that woke us comes after
+	asleep      bool            // the sleep screen is up: nothing else gets drawn
+	sleeping    atomic.Bool     // asleep, for the watchdog: the clock jumps
+	locked      bool            // touch does nothing, keys only what the Program lets through (lock.go)
+	lockHint    string          // how to unlock
+	eatTouch    bool            // a contact that began while locked isn't over
+	lockNudgeAt time.Time       // the hint last showed
+	restart     string          // a binary to run in our place once we've quit
+	ctrl        [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
+	alt         [2]bool         // and Alt
+	ring        image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
 
 	blinks     []blinking // notice.go
 	toast      *toast
@@ -451,21 +455,30 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			if a.asleep {
 				continue
 			}
+			if a.locked || a.eatTouch {
+				a.lockTouch(ev)
+				continue
+			}
 			a.lightBack()
 			a.onTouch(ev)
 			idle.Reset(IdleTimeout)
 			a.inputAt = time.Now()
 		case m := <-keys:
+			key := !m.at.IsZero() && m.Connected == "" && m.Gone == ""
 			if m.at.IsZero() {
 				a.stats.event("keyboard", 0) // a keyboard came or went
 			} else {
 				a.stats.event("key", time.Since(m.at))
-				if m.Connected == "" && m.Gone == "" {
-					a.lightBack()
-				}
+			}
+			locked := a.locked
+			if key && !locked {
+				a.lightBack()
 			}
 			a.onKey(m)
-			if m.Connected == "" && m.Gone == "" {
+			if m.Connected == "" && m.Gone == "" && !a.locked { // locked, keys aren't use: in a bag they'd keep it awake
+				if key && locked { // the one that unlocked
+					a.lightBack()
+				}
 				idle.Reset(IdleTimeout)
 				a.inputAt = time.Now()
 			}
@@ -924,6 +937,10 @@ func (a *App) onKey(m KeyMsg) {
 		if IsModifier(m.Code) {
 			a.prog.Key(m)
 		}
+		return
+	}
+	if a.locked { // the Program lets through what it will
+		a.prog.Key(m)
 		return
 	}
 	// Ctrl+Alt+N: tab N, whatever the page does with keys (a terminal

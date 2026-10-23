@@ -821,6 +821,7 @@ func (a *bro) emptyHelp() [][2]string {
 		{[]string{"music.play"}, "play / pause the music"},
 		{[]string{"light.toggle"}, "the light on / off"},
 		{[]string{"sleep"}, "sleep"},
+		{[]string{"lock"}, "lock: touch does nothing till these keys again"},
 		{[]string{"reload"}, "read keys.conf again"},
 		{[]string{"quit"}, "quit, back to Nickel"},
 	} {

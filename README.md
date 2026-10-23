@@ -117,6 +117,7 @@ make dist            # a release's files, in dist/
 | Ctrl+Shift+Space | play / pause, anywhere |
 | Ctrl+Shift+< / > | previous / next track |
 | Ctrl+Alt+S, power button | sleep |
+| Shift+Meta+X | lock: touch does nothing till it again |
 | swipe the left edge, Ctrl+Alt+Up / Down | frontlight |
 | Ctrl+Alt+L | frontlight on / off |
 | Meta+Shift+E, ≡ (the bar's menu) | back to Nickel |

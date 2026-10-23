@@ -123,3 +123,39 @@ func (a *bro) radioStart() {
 	r.bt = radio.NewBluetooth(radioAgent{a})
 	factsOnce.Do(func() { go radio.LogFacts() })
 }
+
+// lock locks the screen till the lock's keys again. Only with a keyboard
+// and a key for it: a lock from the switcher or the menu would leave a
+// Kobo with neither stuck.
+func (a *bro) lock() {
+	k := a.keyLabel("lock")
+	switch {
+	case a.Keyboard == "":
+		a.Toast("locking wants a keyboard: its keys unlock", 4*time.Second)
+	case k == "":
+		a.Toast("locking wants a key for it (keys.conf: lock)", 4*time.Second)
+	default:
+		a.picker = nil // what's open stays put; the switcher would only be in the way
+		a.App.Lock("locked: touch does nothing. " + k + " unlocks")
+	}
+}
+
+// lockedKey is a key while locked: the lock's unlocks, the modifiers are
+// kept track of, anything else only says how to unlock.
+func (a *bro) lockedKey(code uint16, value int32) {
+	if a.termMod(code, value) {
+		return
+	}
+	if value == 0 {
+		delete(a.keys.down, code) // the lock key's release, say
+		return
+	}
+	if c := a.keyCommand(code); c != nil && c.id == "lock" {
+		if value == 1 {
+			a.keys.down[code] = true
+			a.Unlock()
+		}
+		return
+	}
+	a.LockNudge()
+}

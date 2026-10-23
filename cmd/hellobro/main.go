@@ -210,13 +210,17 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 	case m.Connected != "" || m.Gone != "":
 		if m.Gone != "" { // what it held won't come up now
 			a.tv.mods = termMods{caps: a.tv.mods.caps}
+			a.Unlock() // and nothing else could unlock
 		}
 		return true
-	case kobo.IsMediaKey(m.Code): // the music's
+	case kobo.IsMediaKey(m.Code): // the music's, locked too
 		if m.Value == 1 || m.Value == 2 && (m.Code == kobo.KeyVolumeUp || m.Code == kobo.KeyVolumeDown) {
 			log.Printf("media key %d from %s", m.Code, m.Dev)
 			a.mediaKey(m.Code)
 		}
+		return true
+	case a.Locked():
+		a.lockedKey(m.Code, m.Value)
 		return true
 	case a.Calibrating():
 		return false

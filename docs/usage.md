@@ -281,6 +281,16 @@ a touch or a key keeps it awake. Music playing keeps it awake too, and
 the while starts again once it stops. Left awake untouched, the Kobo
 lasts about 12 hours from full.
 
+## Lock
+
+Shift+Meta+X locks the screen, for a bag or a hand: touch does nothing
+and keys go nowhere, but the music's keys, the power button (sleep),
+and Shift+Meta+X again, which unlocks. A toast says so, and again (every
+10 s at most) when a touch or a key went nowhere. Locked, touches and
+keys don't count as use: the light stays off and sleeping when idle
+still comes. It wants a keyboard (its keys unlock), and unlocks by
+itself if the keyboard goes. keys.conf: `lock`.
+
 ## Terminal
 
 - A launcher (Meta+Enter, or a window's +) asks what to run: **1**

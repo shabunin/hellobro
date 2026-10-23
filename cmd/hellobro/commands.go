@@ -135,6 +135,7 @@ func makeCommands() []*command {
 			run: func(a *bro) { a.mediaKey(kobo.KeyVolumeDown) }},
 		&command{id: "statusbar", title: "Status bar: show / hide", keys: []string{"ctrl+shift+b"}, run: (*bro).toggleStat},
 		&command{id: "sleep", title: "Sleep", keys: []string{"ctrl+alt+s"}, run: func(a *bro) { a.App.Sleep() }},
+		&command{id: "lock", title: "Lock: touch does nothing till its keys again", keys: []string{"meta+shift+x"}, run: (*bro).lock},
 		&command{id: "wifi", title: "Wi-Fi on / off", run: func(a *bro) { a.radioToggle(panelWiFi) }},
 		&command{id: "bluetooth", title: "Bluetooth on / off", run: func(a *bro) { a.radioToggle(panelBT) }},
 		&command{id: "wifi.scan", title: "Wi-Fi: look for networks", run: onRadio("wifi", func(a *bro) { a.radioPoll(true) })},
