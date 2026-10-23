@@ -801,6 +801,17 @@ func (a *App) onTouch(ev TouchEv) {
 	}
 }
 
+// Fingers are the fingers on the screen now (not the pen).
+func (a *App) Fingers() []*Gesture {
+	var fs []*Gesture
+	for _, g := range a.gestures {
+		if !g.Pen {
+			fs = append(fs, g)
+		}
+	}
+	return fs
+}
+
 // String describes g, once it's over.
 func (g *Gesture) String() string {
 	s := fmt.Sprintf("stroke  %d pts  %.2fs  %d,%d → %d,%d", g.Points, g.Dur.Seconds(), g.Start.X, g.Start.Y, g.Last.X, g.Last.Y)

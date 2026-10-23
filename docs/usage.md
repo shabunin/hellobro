@@ -86,8 +86,8 @@ say) it says which (`grab` too, while the keys are grabbed), and what plays, and
 A swipe up or down along the right edge of the screen opens the menu:
 rotate the screen, touch calibration, sleep, lock, the switcher, and
 quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
-it. A swipe left along the bottom (the status bar, or where it would
-be) goes to the next workspace, right to the one before.
+it. Two fingers swiped left, anywhere, go to the next workspace; to the
+right, to the one before.
 
 On a small sharp screen used by touch, `HELLOBRO_TOUCH=big` (in
 `launch.sh`'s environment) makes the frame for fingers: a taller bar,

@@ -36,8 +36,8 @@ type bro struct {
 	ipc    ipcState
 	tf     termFonts
 	tv     termView
-	edge   *kobo.Gesture // a contact along the right edge, which may become a menu swipe
-	bottom *kobo.Gesture // one along the bottom, which may become a workspace swipe
+	edge   *kobo.Gesture    // a contact along the right edge, which may become a menu swipe
+	pair   [2]*kobo.Gesture // two fingers together: may become a workspace swipe
 	media  mediaState
 	stat   statBar  // the terminal tabs' status bar
 	picker *picker  // the switcher, while it's up
@@ -65,9 +65,10 @@ type bro struct {
 }
 
 const (
-	ownMenu      = 1   // a gesture that is a menu swipe
-	ownWorkspace = 4   // one that is a workspace swipe
-	menuSwipe    = 100 // px along the right edge it takes (and the bottom, for a workspace)
+	ownMenu   = 1   // a gesture that is a menu swipe
+	ownPair   = 4   // one of two fingers together: maybe a workspace swipe
+	menuSwipe = 100 // px along the right edge it takes
+	pairSwipe = 120 // px across both fingers go, for a workspace
 )
 
 func main() {
@@ -260,13 +261,14 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	switch {
 	case g == nil:
 	case ev.Kind == kobo.TouchDown:
+		if !ev.Pen && a.pairUp(g) {
+			return
+		}
 		a.focusTouched(p)
 		switch {
 		case a.overlay():
 		case !ev.Pen && p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth:
 			a.edge = g
-		case !ev.Pen && p.Y >= a.C.Bounds().Max.Y-statH-wmGap: // the status bar, or where it would be
-			a.bottom = g
 		case a.wmTouch(p, g):
 		default:
 			a.selStart(p, g)
@@ -280,18 +282,68 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			log.Print("menu swipe")
 			a.menu()
 		}
-	case a.bottom == g:
-		// Left or right along the bottom: the next workspace, or the one before.
-		if dx := p.X - g.Start.X; g.Owner == 0 && kobo.Abs(dx) > menuSwipe && kobo.Abs(dx) > 2*kobo.Abs(p.Y-g.Start.Y) {
-			g.Owner, a.bottom = ownWorkspace, nil
-			to := "next"
-			if dx > 0 {
-				to = "prev"
-			}
-			log.Printf("workspace swipe: %s", to)
-			a.wmRun("workspace " + to)
-		}
+	case g.Owner == ownPair:
+		a.pairSwipe()
 	}
+}
+
+// pairUp makes g and the finger already down a pair, if that one isn't
+// anything yet: two fingers are a workspace swipe, never a tap, a scroll
+// or a selection.
+func (a *bro) pairUp(g *kobo.Gesture) bool {
+	fs := a.Fingers()
+	if len(fs) != 2 || a.overlay() {
+		return false
+	}
+	first := fs[0]
+	if first == g {
+		first = fs[1]
+	}
+	if first.Owner != 0 || first.Pen {
+		return false
+	}
+	if a.tv.sel != nil && a.tv.sel.g == first {
+		a.tv.sel = nil
+	}
+	if a.edge == first {
+		a.edge = nil
+	}
+	first.Owner, g.Owner = ownPair, ownPair
+	a.pair = [2]*kobo.Gesture{first, g}
+	return true
+}
+
+// pairSwipe is the next workspace (both fingers to the left) or the one
+// before (to the right), once both have gone far enough across.
+func (a *bro) pairSwipe() {
+	f, g := a.pair[0], a.pair[1]
+	if f == nil || g == nil {
+		return
+	}
+	dir := pairDir(f) + pairDir(g)
+	if dir != -2 && dir != 2 {
+		return
+	}
+	a.pair = [2]*kobo.Gesture{} // once: the fingers stay a pair till they lift
+	to := "next"
+	if dir > 0 {
+		to = "prev"
+	}
+	log.Printf("two-finger swipe: workspace %s", to)
+	a.wmRun("workspace " + to)
+}
+
+// pairDir is which way a finger went across: -1 left, 1 right, 0 not
+// far enough, or more up or down.
+func pairDir(g *kobo.Gesture) int {
+	d := g.Last.Sub(g.Start)
+	switch {
+	case kobo.Abs(d.X) < pairSwipe || kobo.Abs(d.X) < 2*kobo.Abs(d.Y):
+		return 0
+	case d.X < 0:
+		return -1
+	}
+	return 1
 }
 
 func (a *bro) Lift(g *kobo.Gesture) {
@@ -301,10 +353,10 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.edge == g {
 		a.edge = nil
 	}
-	if a.bottom == g {
-		a.bottom = nil
+	if a.pair[0] == g || a.pair[1] == g {
+		a.pair = [2]*kobo.Gesture{}
 	}
-	if g.Owner == ownMenu || g.Owner == ownWorkspace {
+	if g.Owner == ownMenu || g.Owner == ownPair {
 		return
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {
