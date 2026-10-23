@@ -102,6 +102,7 @@ func main() {
 	a.applyLightIdle()
 	a.applyLightStart()
 	log.Printf("hellobro %s", version)
+	deviceLabel = a.deviceName()
 	sshClientVersion = "SSH-2.0-hellobro " + share.PeerName("SSH-2.0-hellobro "+a.deviceName()) // who's asking to type, for another hellobro
 	a.keys = loadKeys()
 	a.applyMod()

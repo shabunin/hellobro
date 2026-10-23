@@ -4,10 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -168,5 +170,35 @@ func TestAlpineAskSize(t *testing.T) {
 	}
 	if _, err := alpineAskSize(&tty{Reader: strings.NewReader("lots\n")}, 4095); err == nil {
 		t.Error("the session closed, and it still has a size")
+	}
+}
+
+func TestJailReadOnly(t *testing.T) {
+	kobo, bq := t.TempDir(), t.TempDir()
+	for _, d := range []string{".adds/hellobro", ".kobo", "Books"} {
+		os.MkdirAll(filepath.Join(kobo, d), 0o755)
+	}
+	os.MkdirAll(filepath.Join(bq, ".hellobro"), 0o755)
+	for _, c := range []struct {
+		storage, img string
+		want         []string
+	}{
+		{kobo, kobo + "/.adds/hellobro/alpine.img", []string{kobo + "/.adds", kobo + "/.kobo"}},
+		{bq, bq + "/.hellobro/alpine.img", []string{bq + "/.hellobro"}},
+		{bq, "/elsewhere/alpine.img", nil},
+	} {
+		if got := jailReadOnly(c.storage, c.img); fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("%s, %s: %v, want %v", c.storage, c.img, got, c.want)
+		}
+	}
+}
+
+func TestProcSession(t *testing.T) {
+	sid, _, errno := syscall.RawSyscall(syscall.SYS_GETSID, 0, 0, 0)
+	if errno != 0 {
+		t.Fatal(errno)
+	}
+	if got, ok := procSession(os.Getpid()); !ok || got != int(sid) {
+		t.Errorf("our session: %d %v, want %d", got, ok, sid)
 	}
 }

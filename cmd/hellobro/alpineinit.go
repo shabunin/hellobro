@@ -29,16 +29,27 @@ package main
 //
 // Nothing is mounted or written at a path in the jail before pivot_root:
 // an absolute symlink in it would point at the Kobo's own files then.
+//
+// A kernel without PID namespaces (alpineShared) gets only the mount
+// namespace: the first process isn't 1, the jail sees the device's
+// processes (all root's), shares its hostname and its /dev/pts, and
+// has no no_new_privs. Its root's powers are dropped all the same. Once
+// the shell is gone, so is what's left in its session; what left the
+// session stays till hellobro's launcher ends it.
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // alpineCaps are the capabilities the jail keeps, as Docker does, less
@@ -63,11 +74,12 @@ const prSetNoNewPrivs, prCapbsetDrop = 38, 24
 
 func alpineInit(command string) {
 	runtime.LockOSThread() // what's dropped is this thread's, and the shell starts from it
-	if os.Getpid() != 1 {
+	shared := os.Getenv("HELLOBRO_ALPINE_SHARED") == "1"
+	if os.Getpid() != 1 && !shared {
 		fmt.Fprintln(os.Stderr, "hellobro --alpine-init: only as a jail's first process")
 		os.Exit(2)
 	}
-	if err := alpineJail(); err != nil {
+	if err := alpineJail(shared); err != nil {
 		fmt.Fprintf(os.Stderr, "alpine: %v\r\n", err)
 		os.Exit(1)
 	}
@@ -100,6 +112,9 @@ func alpineInit(command string) {
 			os.Exit(0)
 		}
 		if pid == cmd.Process.Pid {
+			if shared { // no PID namespace to take them with us
+				endSession(pid)
+			}
 			if ws.Signaled() {
 				os.Exit(128 + int(ws.Signal()))
 			}
@@ -145,7 +160,7 @@ pcm.!default {
 ctl.!default { type bluealsa; service "org.bluealsa"; battery "yes" }
 `
 
-func alpineJail() error {
+func alpineJail(shared bool) error {
 	resolv, _ := os.ReadFile("/etc/resolv.conf") // the Kobo's, for the jail's
 	exe, _ := os.Executable()                    // hellobro, for hellobro-msg
 	bus := os.Getenv("HELLOBRO_ALPINE_BUS") == "1"
@@ -186,14 +201,17 @@ func alpineJail() error {
 		data         string
 	}{
 		{"tmpfs", "/dev", "tmpfs", nosuid | noexec, "mode=755,size=1m"},
-		{"devpts", "/dev/pts", "devpts", nosuid | noexec, "newinstance,ptmxmode=0666,mode=0620,gid=5"},
+		{"devpts", "/dev/pts", "devpts", nosuid | noexec, "newinstance,ptmxmode=0666,mode=0620,gid=5"}, // shared: the device's, below
 		{"tmpfs", "/dev/shm", "tmpfs", nosuid | nodev, "mode=1777"},
 		{"proc", "/proc", "proc", nosuid | nodev | noexec, ""},
 		{"sysfs", "/sys", "sysfs", rdonly | nosuid | nodev | noexec, ""},
 		{"tmpfs", "/tmp", "tmpfs", nosuid | nodev, "mode=1777"},
 		{"tmpfs", "/run", "tmpfs", nosuid | nodev, "mode=755"},
-		{"/.oldroot/mnt/onboard", "/mnt/onboard", "", bind, ""},
+		{"/.oldroot" + shareRoot, shareRoot, "", bind, ""},
 	} {
+		if shared && m.fs == "devpts" { // one devpts for all: the device's
+			m.src, m.fs, m.flags, m.data = "/.oldroot/dev/pts", "", bind, ""
+		}
 		if err := jailDir(m.dst); err != nil {
 			return err
 		}
@@ -272,7 +290,7 @@ func alpineJail() error {
 	}
 	// Read-only: what runs as root outside the jail, and what of /proc
 	// would change the Kobo itself.
-	for _, p := range []string{"/mnt/onboard/.adds", "/mnt/onboard/.kobo", "/proc/sys", "/proc/sysrq-trigger", "/proc/irq", "/proc/bus"} {
+	for _, p := range append(jailReadOnly(shareRoot, alpineImg), "/proc/sys", "/proc/sysrq-trigger", "/proc/irq", "/proc/bus") {
 		if _, err := os.Lstat(p); err != nil {
 			continue
 		}
@@ -295,6 +313,11 @@ func alpineJail() error {
 			return fmt.Errorf("/dev/%s: %w", d.name, err)
 		}
 	}
+	if shared { // the device's devpts has no ptmx of its own
+		if err := syscall.Mknod("/dev/ptmx", syscall.S_IFCHR|0o666, 5<<8|2); err != nil {
+			return fmt.Errorf("/dev/ptmx: %w", err)
+		}
+	}
 	syscall.Umask(old022)
 	for name, to := range map[string]string{"ptmx": "pts/ptmx", "fd": "/proc/self/fd",
 		"stdin": "/proc/self/fd/0", "stdout": "/proc/self/fd/1", "stderr": "/proc/self/fd/2"} {
@@ -311,7 +334,9 @@ func alpineJail() error {
 	if b, err := os.ReadFile("/etc/hostname"); err == nil && len(strings.TrimSpace(string(b))) > 0 {
 		host = strings.TrimSpace(string(b))
 	}
-	syscall.Sethostname([]byte(host))
+	if !shared { // shared, it'd be the device's
+		syscall.Sethostname([]byte(host))
+	}
 	// Root's powers: gone from the bounding set, which is what root gets
 	// on exec, and never to come back.
 	for c := 0; c < 64; c++ {
@@ -324,7 +349,7 @@ func alpineJail() error {
 			return fmt.Errorf("dropping capability %d: %w", c, e)
 		}
 	}
-	if _, _, e := syscall.RawSyscall6(syscall.SYS_PRCTL, prSetNoNewPrivs, 1, 0, 0, 0, 0); e != 0 {
+	if _, _, e := syscall.RawSyscall6(syscall.SYS_PRCTL, prSetNoNewPrivs, 1, 0, 0, 0, 0); e != 0 && !(shared && e == syscall.EINVAL) { // shared: a kernel too old for it
 		return fmt.Errorf("no_new_privs: %w", e)
 	}
 	return nil
@@ -383,4 +408,70 @@ func rootShell() string {
 		}
 	}
 	return "/bin/sh"
+}
+
+// jailReadOnly is what of the storage the jail may read but not change:
+// what runs as root outside it (the Kobo's .adds and .kobo: the
+// launcher, NickelMenu's entries, KoboRoot.tgz), and the folder the
+// jail's own image is in, if it's on the storage. Those that are there.
+func jailReadOnly(storage, img string) []string {
+	var out []string
+	for _, p := range []string{filepath.Join(storage, ".adds"), filepath.Join(storage, ".kobo"), filepath.Dir(img)} {
+		if !strings.HasPrefix(p, storage+"/") || slices.ContainsFunc(out, func(o string) bool { return p == o || strings.HasPrefix(p, o+"/") }) {
+			continue // not the storage's, or read-only already
+		}
+		if _, err := os.Lstat(p); err == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// endSession ends what's left of the shell's session (its ID is the
+// shell's PID): with no PID namespace, nothing else does.
+func endSession(sid int) {
+	in := func() []int {
+		var pids []int
+		ds, _ := os.ReadDir("/proc")
+		for _, d := range ds {
+			pid, err := strconv.Atoi(d.Name())
+			if err != nil || pid == os.Getpid() {
+				continue
+			}
+			if s, ok := procSession(pid); ok && s == sid {
+				pids = append(pids, pid)
+			}
+		}
+		return pids
+	}
+	for i, sig := range []syscall.Signal{syscall.SIGHUP, syscall.SIGKILL} {
+		pids := in()
+		if len(pids) == 0 {
+			return
+		}
+		for _, p := range pids {
+			syscall.Kill(p, sig)
+		}
+		if i == 0 {
+			time.Sleep(time.Second)
+		}
+	}
+}
+
+// procSession is a process's session ID, from /proc/PID/stat.
+func procSession(pid int) (int, bool) {
+	b, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return 0, false
+	}
+	i := bytes.LastIndexByte(b, ')') // the name may hold anything
+	if i < 0 {
+		return 0, false
+	}
+	f := strings.Fields(string(b[i+1:])) // state ppid pgrp session …
+	if len(f) < 4 {
+		return 0, false
+	}
+	s, err := strconv.Atoi(f[3])
+	return s, err == nil
 }

@@ -60,10 +60,14 @@ const (
 )
 
 var (
-	alpineURL  = "http://dl-cdn.alpinelinux.org/alpine/v3.24/releases/armv7/alpine-minirootfs-" + alpineVersion + "-armv7.tar.gz"
-	alpineImg  = kobo.AppFile("alpine.img")
-	alpineRoot = kobo.EnvOr("HELLOBRO_ALPINE_ROOT", "/tmp/hellobro-alpine")
-	alpineMu   sync.Mutex // one setup at a time
+	alpineURL = "http://dl-cdn.alpinelinux.org/alpine/v3.24/releases/armv7/alpine-minirootfs-" + alpineVersion + "-armv7.tar.gz"
+	alpineImg = kobo.EnvOr("HELLOBRO_ALPINE_IMG", kobo.AppFile("alpine.img"))
+	// alpineShared: a kernel without PID namespaces (nor UTS or IPC
+	// ones), only the mount namespace: the jail sees the device's
+	// processes, and they're all root's (alpineinit.go).
+	alpineShared = func() bool { _, err := os.Stat("/proc/self/ns/pid"); return err != nil }()
+	alpineRoot   = kobo.EnvOr("HELLOBRO_ALPINE_ROOT", "/tmp/hellobro-alpine")
+	alpineMu     sync.Mutex // one setup at a time
 
 	bluealsaURL = "http://dl-cdn.alpinelinux.org/alpine/v3.15/community/armv7/bluez-alsa-3.1.0-r0.apk"
 	// The plugins, as kept next to hellobro: the jail's first process
@@ -94,7 +98,7 @@ func startAlpine(cols, rows int, command string) (*localShell, error) {
 		}
 		cmd := exec.Command("/proc/self/exe", "--alpine-init", command)
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
-		cmd.Env = []string{"TERM=xterm-256color"}
+		cmd.Env = []string{"TERM=xterm-256color", "HELLOBRO_SHARE_ROOT=" + shareRoot, "HELLOBRO_ALPINE_IMG=" + alpineImg}
 		if alpineBus.Load() {
 			if err := bluealsaReady(tty); err != nil { // the bus goes in all the same
 				log.Printf("alpine: sound: %v", err)
@@ -105,6 +109,10 @@ func startAlpine(cols, rows int, command string) (*localShell, error) {
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setpgid:    true, // close's hangup goes to the jail's first process, and with it the jail
 			Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC,
+		}
+		if alpineShared {
+			cmd.SysProcAttr.Cloneflags = syscall.CLONE_NEWNS
+			cmd.Env = append(cmd.Env, "HELLOBRO_ALPINE_SHARED=1")
 		}
 		if err := s.start(cmd); err != nil {
 			log.Printf("alpine: %v", err)
@@ -163,6 +171,9 @@ func alpineMakeImage(out io.ReadWriter) error {
 	}
 	size, err := alpineAskSize(out, most)
 	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(alpineImg), 0o755); err != nil {
 		return err
 	}
 	part := alpineImg + ".part"
@@ -271,6 +282,21 @@ func alpineExit() {
 	log.Print("alpine: unmounted")
 }
 
+// alpineMotd says where the jail is, and what of the storage it can't
+// change.
+func alpineMotd() string {
+	s := "Alpine " + alpineVersion + " in a jail on the " + deviceLabel + ". apk add installs things.\n"
+	if ro := jailReadOnly(shareRoot, alpineImg); len(ro) > 0 {
+		s += "The storage is " + shareRoot + "; " + strings.Join(ro, ", ") + " read-only here.\n"
+	} else {
+		s += "The storage is " + shareRoot + ".\n"
+	}
+	if alpineShared {
+		s += "This kernel has no PID namespace: the processes here see the device's, all root's. Careful with kill.\n"
+	}
+	return s + "\n"
+}
+
 // alpineInstall fetches Alpine's minirootfs and unpacks it in the image.
 func alpineInstall(out io.Writer) error {
 	fmt.Fprintf(out, "fetching Alpine %s (3 MB)…\r\n", alpineVersion)
@@ -284,8 +310,7 @@ func alpineInstall(out io.Writer) error {
 	}
 	for _, f := range []struct{ name, text string }{
 		{"etc/hostname", "alpine\n"},
-		{"etc/motd", "Alpine " + alpineVersion + " in a jail on the Kobo. apk add installs things.\n" +
-			"The Kobo's storage is /mnt/onboard; its .adds and .kobo are read-only here.\n\n"},
+		{"etc/motd", alpineMotd()},
 		{alpineDone, alpineVersion + "\n"},
 	} {
 		if err := writeNew(filepath.Join(alpineRoot, f.name), f.text); err != nil {

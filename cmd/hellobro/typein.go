@@ -47,6 +47,10 @@ func (a *bro) deviceName() string {
 // asking to type by it (share.PeerName).
 var sshClientVersion = "SSH-2.0-hellobro"
 
+// deviceLabel is this device's name, for what's said where there's no
+// bro (Alpine's motd).
+var deviceLabel = "Kobo"
+
 // --- typing from here ---
 
 type nearbyState struct {
