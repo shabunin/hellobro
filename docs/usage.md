@@ -41,8 +41,10 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     processes that keep the CPU busy (percent of one core).
 
 A window's title strip has its name (white on black when it has the
-focus), a **+** for a launcher next to it, **full**, which puts it full
-screen, and **close** (a terminal's shell or connection ends with it). A tap on a window gives it the focus; the keys go to the
+focus), a **+** for a launcher next to it, and at its end **float**
+(floats it over the others; floating, it's **tile**, which puts it
+back), **fullscreen**, and **close** (a terminal's shell or connection
+ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
 one that has it. Full screen, a swipe in from the top (or bottom) edge
 of the screen, or Meta+F, puts it back.
 
@@ -52,8 +54,9 @@ horizontally, side by side). Meta+E turns a container round, Meta+W
 tabs it (a row of tabs, one window shown), Meta+S stacks it (a title
 each, one above another, one window shown). Meta+F gives the window the
 whole screen (again, or a swipe in from the top or bottom edge, gives it
-back); Meta+Shift+Space floats it over the others (drag it by its strip;
-a floating window is put back with the same key).
+back); Meta+Shift+Space (or its strip's float) floats it over the others (drag
+it by its strip; a floating window is put back with the same key, or
+tile).
 
 **Workspaces** are in the bar at the top, numbered, each with its
 windows' titles after its number (`1 Alpine · Wi-Fi · Battery`), the one
@@ -162,7 +165,7 @@ The keys are hellobro's commands', i3's with Meta (the Win key):
 | Meta+1…0, Meta+Shift+1…0 | go to a workspace, send the window there |
 | Meta+B, Meta+V | split: the next window beside, below |
 | Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
-| Meta+F | fullscreen (or its strip's full; a swipe in from the top edge leaves it) |
+| Meta+F | fullscreen (or its strip's fullscreen; a swipe in from the top edge leaves it) |
 | Meta+Shift+Space | floating |
 | Meta+A | focus the container around |
 | Meta+Shift+Minus, Meta+Minus | put the window away, bring it back |

@@ -110,8 +110,8 @@ make dist            # a release's files, in dist/
 | Meta+1…0, with Shift | go to a workspace, send the window there |
 | Meta+B, Meta+V | split: the next window beside, below |
 | Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
-| Meta+F | fullscreen, or a window's full (swipe in from the top or bottom edge to leave) |
-| Meta+Shift+Space | floating |
+| Meta+F | fullscreen, or a window's fullscreen (swipe in from the top or bottom edge to leave) |
+| Meta+Shift+Space | floating, or a window's float (tile puts it back) |
 | Meta+R | resize: the arrows, then Esc |
 | Meta+Shift+Q | close the window |
 | pen across text, Ctrl+Shift+V | copy, paste |

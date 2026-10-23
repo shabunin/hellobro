@@ -285,8 +285,11 @@ type Panel struct {
 	ButtonLabel        string
 	Fold               image.Rectangle // the − / + box at the strip's end, if it folds
 	Folded             bool            // only the title strip shows
-	Close              image.Rectangle // a window's "close", at the strip's end
-	Full               image.Rectangle // a window's "full" before it: full screen
+	Close              image.Rectangle // a window's × close, at the strip's end
+	Full               image.Rectangle // its ▢ fullscreen, before that
+	Float              image.Rectangle // its float (or tile, floating), before that
+	Floating           bool            // the window floats
+	Words              bool            // its buttons have words, not just icons
 	New                image.Rectangle // a window's +, after its name: a window next to it
 	Focused            bool            // the keys go to it: its strip is black
 }
@@ -491,6 +494,9 @@ func WithButton(f Fonts, p Panel, label string) Panel {
 		if !p.Full.Empty() {
 			end = p.Full.Min.X - 12
 		}
+		if !p.Float.Empty() {
+			end = p.Float.Min.X - 12
+		}
 		bw := TextWidth(f.Small, label) + 36
 		p.Button = image.Rect(end-bw, p.Title.Min.Y+6, end, p.Title.Max.Y-8)
 	}
@@ -506,22 +512,87 @@ func WithFold(f Fonts, p Panel, folded bool) Panel {
 	return WithButton(f, p, p.ButtonLabel)
 }
 
-// WithWindow is p as a window's: "close" at the end of its strip,
-// "full" before it for full screen, and with newBox a + after its name,
-// for a window next to it.
+// WithWindow is p as a window's: at the end of its strip × close, ▢
+// fullscreen and float (tile, if it floats), an icon and a word each
+// (only the icon in a narrow strip), and with newBox a + after its
+// name, for a window next to it.
 func WithWindow(f Fonts, p Panel, focused, newBox bool) Panel {
 	if p.Title.Empty() {
 		return p
 	}
-	cw, fw := TextWidth(f.Small, "close")+32, TextWidth(f.Small, "full")+32
-	p.Close = image.Rect(p.Title.Max.X-10-cw, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
-	p.Full = image.Rect(p.Close.Min.X-2*tapMargin-fw, p.Close.Min.Y, p.Close.Min.X-2*tapMargin, p.Close.Max.Y) // apart: a tap is one's or the other's
+	p.Close, p.Full, p.Float = image.Rectangle{}, image.Rectangle{}, image.Rectangle{}
+	bs := windowButtons(p)
+	w := 0
+	for _, b := range bs {
+		w += winIconPad*2 + winIconW + 8 + TextWidth(f.Small, b.label) + 2*tapMargin
+	}
+	p.Words = w < p.Title.Dx()/2
+	x := p.Title.Max.X - 10
+	for _, b := range bs {
+		bw := 2*winIconPad + winIconW
+		if p.Words {
+			bw += 8 + TextWidth(f.Small, b.label)
+		}
+		*b.at(&p) = image.Rect(x-bw, p.Title.Min.Y+6, x, p.Title.Max.Y-8)
+		x -= bw + 2*tapMargin // apart: a tap is one's or the other's
+	}
 	p.New, p.Focused = image.Rectangle{}, focused
 	if newBox {
 		x := p.Title.Min.X + 16 + TextWidth(f.Panel, p.Name) + 24
 		p.New = image.Rect(x, p.Title.Min.Y+6, x+44, p.Title.Max.Y-8)
 	}
 	return WithButton(f, p, p.ButtonLabel)
+}
+
+const (
+	winIconW   = 24 // a window button's icon
+	winIconPad = 12 // around it in its box
+)
+
+// winButton is a window's button in its strip.
+type winButton struct {
+	r           image.Rectangle
+	icon, label string
+	at          func(*Panel) *image.Rectangle
+}
+
+// windowButtons are p's, from the strip's end.
+func windowButtons(p Panel) []winButton {
+	float, label := "float", "float"
+	if p.Floating {
+		float, label = "tile", "tile"
+	}
+	return []winButton{
+		{p.Close, "close", "close", func(p *Panel) *image.Rectangle { return &p.Close }},
+		{p.Full, "full", "fullscreen", func(p *Panel) *image.Rectangle { return &p.Full }},
+		{p.Float, float, label, func(p *Panel) *image.Rectangle { return &p.Float }},
+	}
+}
+
+// windowIcon draws a window button's icon around m: × close, ▢ (a
+// window, its title bar thick) fullscreen, two windows one over the
+// other float, a window split in two tile.
+func (c Canvas) windowIcon(icon string, m image.Point) {
+	win := func(r image.Rectangle) {
+		c.Fill(r, White)
+		c.Frame(r, 2, Black)
+		c.Fill(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+5), Black)
+	}
+	switch icon {
+	case "close":
+		for d := -8; d <= 8; d++ {
+			c.Fill(image.Rect(m.X+d-1, m.Y+d-1, m.X+d+2, m.Y+d+2), Black)
+			c.Fill(image.Rect(m.X+d-1, m.Y-d-1, m.X+d+2, m.Y-d+2), Black)
+		}
+	case "full":
+		win(image.Rect(m.X-12, m.Y-10, m.X+12, m.Y+10))
+	case "float":
+		win(image.Rect(m.X-6, m.Y-11, m.X+12, m.Y+3))
+		win(image.Rect(m.X-12, m.Y-4, m.X+6, m.Y+11))
+	case "tile":
+		win(image.Rect(m.X-12, m.Y-10, m.X+12, m.Y+10))
+		c.Fill(image.Rect(m.X-1, m.Y-10, m.X+1, m.Y+10), Black)
+	}
 }
 
 // FoldHit says whether a tap at pt folds or opens p: on its box, or
@@ -909,15 +980,20 @@ func (a *App) DrawPanelTitle(p Panel, status string) {
 		c.Fill(r, White)
 		c.Frame(r, 2, Black)
 	}
-	for _, b := range []struct {
-		r     image.Rectangle
-		label string
-	}{{p.Close, "close"}, {p.Full, "full"}} {
-		if !b.r.Empty() {
-			box(b.r)
-			c.Text(a.F.Small, b.r, b.label, Black, AlignCenter)
-			t.Max.X = b.r.Min.X - 16
+	for _, b := range windowButtons(p) {
+		if b.r.Empty() {
+			continue
 		}
+		box(b.r)
+		m := image.Pt(b.r.Min.X+winIconPad+winIconW/2, (b.r.Min.Y+b.r.Max.Y)/2)
+		if !p.Words {
+			m.X = (b.r.Min.X + b.r.Max.X) / 2
+		}
+		c.windowIcon(b.icon, m)
+		if p.Words {
+			c.Text(a.F.Small, image.Rect(m.X+winIconW/2+8, b.r.Min.Y, b.r.Max.X, b.r.Max.Y), b.label, Black, AlignLeft)
+		}
+		t.Max.X = b.r.Min.X - 16
 	}
 	if f := p.Fold; !f.Empty() {
 		c.Fill(f, White)

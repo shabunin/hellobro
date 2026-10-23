@@ -585,7 +585,7 @@ func (a *bro) wmPlace() bool {
 		if !n.Visible {
 			return
 		}
-		fmt.Fprint(&sig, n.ID, n.Rect, n.Layout, ";")
+		fmt.Fprint(&sig, n.ID, n.Rect, n.Layout, floatingNode(n), ";")
 		if w := a.wm.wins[n]; w != nil {
 			placed[w] = true
 			r := n.Rect.Inset(wmGap / 2)
@@ -597,7 +597,9 @@ func (a *bro) wmPlace() bool {
 			case n.Border == wm.BorderNone:
 				w.place(a, kobo.Panel{Name: w.Title(), Outer: r, Body: r})
 			default:
-				w.place(a, kobo.NewPanel(a.F, w.Title(), r, ""))
+				p := kobo.NewPanel(a.F, w.Title(), r, "")
+				p.Floating = floatingNode(n)
+				w.place(a, p)
 			}
 		}
 		if n.Layout == wm.Tabbed || n.Layout == wm.Stacked {
@@ -843,7 +845,8 @@ func (a *bro) emptyHelp() [][2]string {
 
 // --- input ---
 
-// wmTap takes a tap on the workspace: a tab, a window's +, ▢ or ×, a window
+// wmTap takes a tap on the workspace: a tab, a window's +, float,
+// fullscreen or close, a window
 // (the one tapped takes the focus; a settings' window gets the tap too),
 // or the empty workspace.
 func (a *bro) wmTap(p image.Point) {
@@ -868,6 +871,10 @@ func (a *bro) wmTap(p image.Point) {
 		return
 	case kobo.Hit(p, pn.Full):
 		a.fullWin(w)
+		return
+	case kobo.Hit(p, pn.Float):
+		a.wm.tree.Focus(a.nodeOf(w))
+		a.wmRun("floating toggle")
 		return
 	case kobo.Hit(p, pn.New):
 		a.openLauncher()
@@ -919,7 +926,7 @@ func (a *bro) wmKey(code uint16, value int32) bool {
 func (a *bro) wmTouch(p image.Point, g *kobo.Gesture) bool {
 	w := a.windowAt(p)
 	n := a.nodeOf(w)
-	if w == nil || !floatingNode(n) || !p.In(w.panel(a).Title) || kobo.Hit(p, w.panel(a).Close) || kobo.Hit(p, w.panel(a).Full) || kobo.Hit(p, w.panel(a).New) {
+	if w == nil || !floatingNode(n) || !p.In(w.panel(a).Title) || kobo.Hit(p, w.panel(a).Close) || kobo.Hit(p, w.panel(a).Full) || kobo.Hit(p, w.panel(a).Float) || kobo.Hit(p, w.panel(a).New) {
 		return false
 	}
 	a.wm.drag = &wmDrag{g: g, n: n, from: a.wm.tree.FloatRect(n)}
