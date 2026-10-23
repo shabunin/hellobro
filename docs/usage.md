@@ -91,7 +91,8 @@ workspace, in from the left edge to the one before, as pages turn; so
 do two fingers swiped left or right anywhere, where the screen tells
 two fingers apart. Settings, Touch marks shows where touches
 land: a ring where a finger (or the pen) came down, a dot where it
-lifted after moving, each for 3 s.
+lifted after moving, each for 3 s; the log has each touch then, to the
+millisecond.
 
 On a small sharp screen used by touch, `HELLOBRO_TOUCH=big` (in
 `launch.sh`'s environment) makes the frame for fingers: a taller bar,

@@ -735,6 +735,9 @@ func (a *App) onTouch(ev TouchEv) {
 	case TouchDown:
 		g := &Gesture{Start: p, Last: p, At: ev.At, Pen: ev.Pen, Points: 1, MaxPressure: ev.Pressure}
 		a.gestures[ev.slot] = g
+		if a.touchMarks { // to see what the panel says, to the ms
+			log.Printf("touch: down #%d at %d,%d (%s)", ev.slot, p.X, p.Y, ev.At.Format("05.000"))
+		}
 		a.addMark(p, false)
 		a.prog.Touch(ev, p, g)
 		g.lightZone = a.light != nil && !ev.Pen && p.X < EdgeWidth && g.Owner == 0
@@ -781,6 +784,9 @@ func (a *App) onTouch(ev TouchEv) {
 		delete(a.gestures, ev.slot)
 		if g == nil {
 			return
+		}
+		if a.touchMarks {
+			log.Printf("touch: up #%d at %d,%d (%s)", ev.slot, g.Last.X, g.Last.Y, ev.At.Format("05.000"))
 		}
 		if g.light {
 			log.Printf("light swipe: %d%% → %d%%", g.lightFrom, a.light.level)
