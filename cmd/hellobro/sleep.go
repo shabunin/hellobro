@@ -17,6 +17,8 @@ type sleepState struct {
 	wifiWas, btWas bool
 	warned         bool      // the toast said it's going to sleep
 	musicAt        time.Time // the music last played: idle counts from then too
+	plugged        bool      // on power, as last seen
+	plugAt         time.Time // plugged in or out: and from then
 }
 
 const sleepWarn = time.Minute // the toast comes this long before
@@ -26,7 +28,9 @@ const sleepWarn = time.Minute // the toast comes this long before
 // Whatever runs goes down with it (SSH, the relay, a copy to it), so a
 // toast says so a minute before, and a touch or a key keeps it awake.
 // Music playing keeps it awake too, and once it stops the while starts
-// again: after an album, the toast still comes first.
+// again: after an album, the toast still comes first. So it does after
+// plugging in or out, or the battery's while, long run out on power,
+// would sleep it at once.
 func (a *bro) sleepWhenIdle() {
 	key := "sleep-battery"
 	if a.pw.plugged {
@@ -36,11 +40,14 @@ func (a *bro) sleepWhenIdle() {
 	if a.musicPlaying() {
 		a.slp.musicAt = time.Now()
 	}
+	if a.pw.plugged != a.slp.plugged {
+		a.slp.plugged, a.slp.plugAt = a.pw.plugged, time.Now()
+	}
 	if d == 0 || a.musicPlaying() || a.Calibrating() {
 		a.slp.warned = false
 		return
 	}
-	switch idle := min(a.IdleFor(), time.Since(a.slp.musicAt)); {
+	switch idle := min(a.IdleFor(), time.Since(a.slp.musicAt), time.Since(a.slp.plugAt)); {
 	case idle >= d:
 		a.slp.warned = false
 		log.Printf("sleep: %v without input (%s)", d, key)

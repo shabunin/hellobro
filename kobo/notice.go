@@ -32,7 +32,7 @@ type toast struct {
 // FlashLight turns the light on at level for d, if it's off, and off
 // again; quietly, with no gauge. A hand on the light meanwhile keeps it.
 func (a *App) FlashLight(level int, d time.Duration) {
-	if a.light == nil || a.light.level > 0 || a.asleep || a.calib != nil {
+	if a.light == nil || a.light.level > 0 || a.asleep || a.locked || a.calib != nil {
 		return
 	}
 	if err := a.light.set(max(1, min(100, level))); err != nil {

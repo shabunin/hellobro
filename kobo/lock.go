@@ -2,8 +2,9 @@ package kobo
 
 // Locked: the touch screen does nothing, and of the keys only those the
 // Program lets through (its unlock key, the music's), so the Kobo can go
-// in a bag or a hand with the screen on. None of it counts as use: the
-// light stays off, and sleeping when idle still comes. The panel shows
+// in a bag or a hand with the screen on. The light goes off till it's
+// unlocked, and none of it counts as use: sleeping when idle still
+// comes. The panel shows
 // the lock screen meanwhile (the title, what the Program says, how to
 // unlock), and the page goes on in a.C off it, so unlocking shows it as
 // it is by then.
@@ -12,6 +13,7 @@ import (
 	"image"
 	"log"
 	"slices"
+	"time"
 )
 
 // Lock locks: hint says how to unlock, lines what else the lock screen
@@ -20,11 +22,19 @@ func (a *App) Lock(hint string, lines []string) {
 	if a.locked {
 		return
 	}
-	log.Print("lock: locked")
 	a.HideGauge()
 	a.lightOverlay = nil
 	a.WaitBlit()
 	a.locked, a.lockHint, a.lockLines = true, hint, lines
+	a.lockLight = 0
+	if a.light != nil && a.light.level > 0 {
+		if a.lightOffAt.IsZero() { // not a notice's flash: the reader's
+			a.lockLight = a.light.level
+		}
+		a.lightOffAt = time.Time{}
+		a.light.set(0)
+	}
+	log.Printf("lock: locked, the light off (was %d%%)", a.lockLight)
 	a.drawLock()
 }
 
@@ -33,9 +43,12 @@ func (a *App) Unlock() {
 	if !a.locked {
 		return
 	}
-	log.Print("lock: unlocked")
+	log.Printf("lock: unlocked, the light back to %d%%", a.lockLight)
 	a.WaitBlit()
 	a.locked, a.lockC = false, Canvas{}
+	if a.light != nil && a.lockLight > 0 && a.light.level == 0 {
+		a.light.set(a.lockLight)
+	}
 	a.markAll(true)
 	a.flush()
 }
@@ -73,7 +86,12 @@ func (a *App) drawLock() {
 		c.Text(f, image.Rect(Pad*4, y, b.Dx()-Pad*4, y+50), l, col, AlignCenter)
 		y += 56
 	}
-	c.Text(a.F.Small, image.Rect(0, b.Dy()-140, b.Dx(), b.Dy()-96), a.lockHint, Mid, AlignCenter)
+	y = b.Dy() - 90 - 48*len(a.cfg.About) // at the foot, as the start's card: the version, where it's from
+	c.Text(a.F.Body, image.Rect(0, y-80, b.Dx(), y-30), a.lockHint, Dark, AlignCenter)
+	for _, l := range a.cfg.About {
+		c.Text(a.F.Small, image.Rect(0, y, b.Dx(), y+44), l, Mid, AlignCenter)
+		y += 48
+	}
 	a.blinks, a.toast = nil, nil
 	a.dirty = []dirtyRect{{b, true}}
 	a.flush()

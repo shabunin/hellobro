@@ -278,16 +278,19 @@ battery after 30 minutes by default, plugged in never, each one 5 min to
 2 hours or never. Whatever runs goes down with it: SSH sessions, the
 relay, a copy to or from the Kobo. A toast says so a minute before, and
 a touch or a key keeps it awake. Music playing keeps it awake too, and
-the while starts again once it stops. Left awake untouched, the Kobo
+the while starts again once it stops; so it does when it's plugged in or
+out (unplugged after a night on power, it sleeps after the battery's
+while from then, not at once). Left awake untouched, the Kobo
 lasts about 12 hours from full.
 
 ## Lock
 
 Shift+Meta+X locks the screen, for a bag or a hand: touch does nothing
 and keys go nowhere, but the music's keys, the power button (sleep),
-and Shift+Meta+X again, which unlocks. The lock screen says hello bro,
-what plays and whether it's paused, and how to unlock; it changes only
-when the music does. The windows go on behind it, as they are when it
+and Shift+Meta+X again, which unlocks. The light goes off till then
+(notifications don't flash it). The lock screen says hello bro, what
+plays and whether it's paused, how to unlock, the version and where
+it's from; it changes only when the music does. The windows go on behind it, as they are when it
 unlocks; asleep and awake, it's still locked. Locked, touches and
 keys don't count as use: the light stays off and sleeping when idle
 still comes. It wants a keyboard (its keys unlock), and unlocks by

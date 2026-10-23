@@ -198,6 +198,7 @@ type App struct {
 	eatTouch  bool            // a contact that began while locked isn't over
 	lockLines []string        // what else the lock screen shows
 	lockC     Canvas          // the lock screen, on the panel while locked
+	lockLight int             // the light before locking
 	restart   string          // a binary to run in our place once we've quit
 	ctrl      [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
 	alt       [2]bool         // and Alt
