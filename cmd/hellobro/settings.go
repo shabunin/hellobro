@@ -52,6 +52,9 @@ var settingList = []setting{
 	{key: "kbd-gone", label: "The keyboard gone", title: "The keyboard gone: Bluetooth",
 		values: []string{"15", "30", "60", "off"},
 		shown:  []string{"Bluetooth full screen after 15 s", "Bluetooth full screen after 30 s", "Bluetooth full screen after 1 min", "nothing comes up"}},
+	{key: "touch-marks", group: "Touch", label: "Touch marks",
+		values: []string{"off", "on"},
+		shown:  []string{"off", "a ring where it touched, a dot where it lifted, for 3 s"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
 		values: []string{"frozen", "closed"},
 		shown:  []string{"frozen: back to it at once", "closed, as KOReader does (from the next start)"}},
@@ -278,6 +281,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.applyLightIdle()
 		case "mod":
 			a.applyMod()
+		case "touch-marks":
+			a.SetTouchMarks(a.setting(st.key) == "on")
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))

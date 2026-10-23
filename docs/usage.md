@@ -87,7 +87,9 @@ A swipe up or down along the right edge of the screen opens the menu:
 rotate the screen, touch calibration, sleep, lock, the switcher, and
 quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
 it. Two fingers swiped left, anywhere, go to the next workspace; to the
-right, to the one before.
+right, to the one before. Settings, Touch marks shows where touches
+land: a ring where a finger (or the pen) came down, a dot where it
+lifted after moving, each for 3 s.
 
 On a small sharp screen used by touch, `HELLOBRO_TOUCH=big` (in
 `launch.sh`'s environment) makes the frame for fingers: a taller bar,

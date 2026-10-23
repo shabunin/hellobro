@@ -206,6 +206,8 @@ type App struct {
 	ctrl       [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
 	alt        [2]bool         // and Alt
 	ring       image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
+	touchMarks bool            // where touches land, shown (touchmark.go)
+	marks      []touchMark
 
 	blinks     []blinking // notice.go
 	toast      *toast
@@ -507,6 +509,7 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			if !a.asleep {
 				a.prog.Tick()
 				a.noticeTick()
+				a.markTick()
 				a.lightIdle()
 			}
 			a.flush()
@@ -732,6 +735,7 @@ func (a *App) onTouch(ev TouchEv) {
 	case TouchDown:
 		g := &Gesture{Start: p, Last: p, At: ev.At, Pen: ev.Pen, Points: 1, MaxPressure: ev.Pressure}
 		a.gestures[ev.slot] = g
+		a.addMark(p, false)
 		a.prog.Touch(ev, p, g)
 		g.lightZone = a.light != nil && !ev.Pen && p.X < EdgeWidth && g.Owner == 0
 		if a.Full && !ev.Pen && !g.lightZone && g.Owner == 0 { // no fullscreen key without a keyboard: a way out by touch
@@ -789,6 +793,9 @@ func (a *App) onTouch(ev TouchEv) {
 		}
 		g.Dur = ev.At.Sub(g.At)
 		g.Tap = g.Moved < tapSlop && g.Dur < tapTime
+		if g.Moved >= tapSlop {
+			a.addMark(g.Last, true)
+		}
 		if g.Tap && g.Owner == 0 && g.Ignored == "" {
 			a.tapAt(g.Start)
 		}
@@ -1041,6 +1048,7 @@ func (a *App) flush() {
 		if d.r.Overlaps(a.ring) {
 			stampRing(img, a.ring)
 		}
+		stampMarks(img, a.marks)
 	}
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {

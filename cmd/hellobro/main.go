@@ -113,6 +113,7 @@ func main() {
 	sshClientVersion = "SSH-2.0-hellobro " + share.PeerName("SSH-2.0-hellobro "+a.deviceName()) // who's asking to type, for another hellobro
 	a.keys = loadKeys()
 	a.applyMod()
+	a.SetTouchMarks(a.setting("touch-marks") == "on")
 	a.tf.setSize(termFontDefault)
 	a.wmInit()
 	a.ipcStart()
