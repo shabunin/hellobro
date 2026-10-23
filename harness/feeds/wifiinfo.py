@@ -1,22 +1,20 @@
-# The Wi-Fi panel's info: i on the Settings tab puts the details up, c
-# copies them, Esc closes; then the info button, tapped, and a tap
-# outside closes it.
+# The Wi-Fi window's info: i puts the details up, c copies them, Esc
+# closes; then the info button, tapped, and a tap outside closes it.
+# Wi-Fi alone on its workspace (the launcher closed first).
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K3, KI, KC = 4, 23, 46  # Settings, I, C
-L = W > H
-X0, Y0, X1 = 16, 160, W - 16
+KQ, KI, KC = 16, 23, 46  # Q, I, C
 
 start(); time.sleep(3)
-key(K3, ctrl=True, alt=True); time.sleep(5)           # Settings, Wi-Fi in focus
+mod(KQ, shift=True); time.sleep(2)                    # the launcher closed
+gui("wi-fi"); time.sleep(2)                           # the workspace's only window
 key(KI); time.sleep(3)                                # the details
 key(KC); time.sleep(2)                                # copied
 key(ESC); time.sleep(2)
-right = X0 + (X1 - X0) * 50 // 100 - 8 if L else X1   # the Wi-Fi panel's right edge
-bw = min(250, (right - 3 - 16 - X0 - 3 - 16 - 36) // 4)
-tap(X0 + 3 + 16 + 3 * (bw + 12) + bw // 2, Y0 + 3 + 48 + 16 + 32); time.sleep(3)  # info, tapped
-tap(W // 2, 20); time.sleep(2)                        # outside: closed
+bw = min(250, (W - 2 * 34 - 36) // 4)                 # its buttons along the top
+tap(34 + 3 * (bw + 12) + bw // 2, 152); time.sleep(3) # info, tapped
+tap(W // 2, H - 60); time.sleep(2)                    # outside: closed
 exit_app()

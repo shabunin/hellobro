@@ -1,8 +1,9 @@
 # Removing Alpine: "Alpine: remove it" in the switcher, Enter.
 # The question's yes waits for "yes delete it bro": half of it and Enter
 # do nothing, all of it and Enter delete the image. Then the switcher's
-# "Alpine: remove it…" finds none. Run it with a stand-in image and
-# shell=alpine (APP_EXTRA), which stays so.
+# "Alpine: remove it…" finds none. Run it with a stand-in alpine.img in
+# APP_EXTRA (head -c 3000000 /dev/zero > alpine.img). The log says
+# "alpine: removed".
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

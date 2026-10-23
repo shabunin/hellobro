@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab: connect screen
+tap(tab_x(0), tabs_y); time.sleep(2)                 # workspace 1: the launcher
 keys("3"); key(ENTER); time.sleep(5)                                     # saved host 3, connect: a login shell
 keys("btop\n"); time.sleep(10)                       # its graphs fill in
 fullscreen(); time.sleep(10)                             # fullscreen

@@ -17,7 +17,7 @@ import os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
-K1, K4 = 2, 4  # SSH, Settings
+K1 = 2  # workspace 1
 OUT = os.path.dirname(os.path.abspath(sys.argv[1]))
 VPS, PORT, KEY = os.environ["RELAY_VPS"], os.environ["RELAY_PORT"], os.environ["PC_KEY"]
 log = open(os.path.join(OUT, "pc.log"), "w")
@@ -33,7 +33,7 @@ def pc(*cmd):
     return r
 
 start()
-key(K4, ctrl=True, alt=True); time.sleep(8)            # Settings: sharing on, the relay up
+gui("sharing"); time.sleep(6)                         # Sharing: on, the relay up
 pc("ssh", *BASE, *JUMP, "-p", PORT, "root@127.0.0.1", "hellobro-version"); time.sleep(2)
 with open(os.path.join(OUT, "hello.txt"), "w") as f:
     f.write("through the relay\n")
@@ -41,9 +41,10 @@ pc("scp", *BASE, *JUMP, "-P", PORT, os.path.join(OUT, "hello.txt"), "root@127.0.
 app = os.path.join(OUT, "app", "hellobro")
 pc("scp", *BASE, *JUMP, "-P", PORT, app, "root@127.0.0.1:" + os.path.join(OUT, "app", "hellobro.new"))
 pc("ssh", *BASE, *JUMP, "-p", PORT, "root@127.0.0.1", "hellobro-update"); time.sleep(14)  # the restart, on trial
-key(K4, ctrl=True, alt=True); time.sleep(8)            # the relay back up, after it
+time.sleep(8)                                          # the relay back up, after it
 pc("ssh", *BASE, *JUMP, "-p", PORT, "root@127.0.0.1", "hellobro-version"); time.sleep(2)
 key(KEY_P, ctrl=True, shift=True); time.sleep(1.5)       # the switcher: home, via the "VPS"
 keys("home"); time.sleep(1)
 key(ENTER); time.sleep(10)
 key(K1, ctrl=True, alt=True); time.sleep(3)
+exit_app()

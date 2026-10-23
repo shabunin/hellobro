@@ -67,9 +67,12 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
   open settings' windows through the switcher (`gui()`). hellobro has
   no header: `exit_app()` quits through its menu (`menu()`, a swipe
   along the right edge), and `bar` is
-  the feed of the bar, the menu, an empty workspace's keys and `notify`. The feeds
-  written for the tabs that were still run: their Ctrl+Alt+1–4 go to a
-  workspace laid out as the tab was, but their taps may land elsewhere.
+  the feed of the bar, the menu, an empty workspace's keys and `notify`. A
+  few feeds still say Ctrl+Alt+1–4 (`tab()`): that's a workspace laid
+  out as the tab was. The saved host is 3 in the launcher (1 Alpine, 2
+  the Kobo's sh). `settings`, `shots`, `power`, `radio` want landscape
+  (ROTA 1); `stress` TIMEOUT=400; `alpineremove` a stand-in
+  `alpine.img` in APP_EXTRA.
   `tiling`, `ipc` (`HELLOBRO_MSG=` a PC build of hellobro named
   hellobro-msg), `layout` then `restore` are the window manager's.
 - Feeds `ssh`, `fullscreen`, `stress`, `connect`, `flash`, `zoom`

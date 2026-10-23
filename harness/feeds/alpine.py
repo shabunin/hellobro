@@ -1,7 +1,8 @@
-# The Alpine shell, as far as a PC shows it: Settings, "Shell tab runs"
-# to Alpine (the 18th setting), system bus access on (the next), then the
-# Shell tab says so, and Enter starts
-# a session, which can't be a jail here (no root): it says why and ends.
+# The Alpine shell, as far as a PC shows it: Settings, End to its last
+# row and up two to "Alpine: system bus access", → turns it on. Then
+# a new window, 1 in its launcher: an Alpine session, which can't be a
+# jail here (no root): it says why and ends. The log says
+# "settings: alpine-bus = on".
 # On the Kobo: ssh -t -p 2022 kobo.local hellobro-alpine.
 # app: hellobro
 import os, sys
@@ -9,13 +10,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 start()
-key(4, ctrl=True, alt=True); time.sleep(3)            # Settings
-key(TAB, ctrl=True); key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # the settings panel
-for _ in range(15):
-    key(DOWN); time.sleep(0.2)
-time.sleep(2)
-key(RIGHT); time.sleep(3)                             # Shell tab runs: Alpine
-key(DOWN); key(RIGHT); time.sleep(3)                  # … Alpine: system bus access, on
-key(3, ctrl=True, alt=True); time.sleep(3)            # the Shell tab
-key(ENTER); time.sleep(6)                             # a session: no jail on a PC
+gui("settings")
+key(END); key(UP); key(UP); time.sleep(2)             # Alpine: system bus access
+key(RIGHT); time.sleep(3)                             # on
+mod(ENTER); time.sleep(2)                             # a launcher beside it
+keys("1"); time.sleep(6)                              # Alpine: no jail on a PC
 exit_app()

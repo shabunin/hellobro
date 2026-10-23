@@ -125,9 +125,9 @@ and no mDNS (it would claim kobo.local on the real network). The app's log ends 
 (`calls.txt` there lists every update with its waveform). The feeds live in
 `harness/feeds`, each with an `# app:` line naming the app it drives, and
 their shared helpers in `harness/feedlib.py` (`mod()` for Meta and a key,
-`gui()` for a settings' window). Feeds written for the tabs that were
-still run: Ctrl+Alt+1–4 there go to a workspace laid out as the tab was,
-but their taps may land elsewhere.
+`gui()` for a settings' window). A few feeds still say Ctrl+Alt+1–4
+(`tab()`, from the tabs that were): that's a workspace laid out as the
+tab was.
 
 `harness/record.py` records what a terminal program prints, for
 `termrender_test.go`:

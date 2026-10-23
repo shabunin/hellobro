@@ -1,6 +1,6 @@
-# The terminal tabs' status bar (portrait) and the music hotkeys, for a
-# Linux player: play from the SSH tab, next and previous, fullscreen
-# with the bar, hiding and showing it, a tap on it to pause. Wants
+# The status bar (portrait) and the music hotkeys, for a Linux player:
+# play from the launcher, next and previous, fullscreen with the bar,
+# hiding and showing it, a tap on it to pause; workspace 2 has it too. Wants
 # MPRIS=1 (the stand-in mpv).
 # app: hellobro
 import os, sys
@@ -9,7 +9,7 @@ from feedlib import *
 
 COMMA, DOT, KEY_B = 51, 52, 48
 
-start(); time.sleep(6)                                # SSH tab, the bar with the battery, CPU, RAM
+start(); time.sleep(6)                                # the launcher, the bar with the battery, CPU, RAM
 key(SPACE, ctrl=True, shift=True); time.sleep(6)      # play
 key(DOT, ctrl=True, shift=True); time.sleep(4)        # next track
 key(COMMA, ctrl=True, shift=True); time.sleep(4)      # back to the first
@@ -18,5 +18,5 @@ key(KEY_B, ctrl=True, shift=True); time.sleep(3)      # hidden
 key(KEY_B, ctrl=True, shift=True); time.sleep(3)      # back
 tap(300, H - 17); time.sleep(3)                       # a tap on it: paused
 fullscreen(); time.sleep(3)
-tab(2); time.sleep(3)                                 # the Shell tab's workspace has it too
+tab(2); time.sleep(3)                                 # workspace 2, a Kobo sh: the bar there too
 exit_app()

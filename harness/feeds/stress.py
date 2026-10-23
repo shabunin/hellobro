@@ -7,7 +7,7 @@ from feedlib import *
 start()
 import random
 random.seed(1)
-tap(tab_x(0), tabs_y); time.sleep(2)                 # SSH tab
+tap(tab_x(0), tabs_y); time.sleep(2)                 # workspace 1: the launcher
 keys("3"); key(ENTER); time.sleep(5)                                     # connect
 end = time.time() + 330
 n = 0
