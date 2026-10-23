@@ -117,10 +117,10 @@ make dist            # a release's files, in dist/
 | pen across text, Ctrl+Shift+V | copy, paste |
 | Ctrl+Shift+Space | play / pause, anywhere |
 | Ctrl+Shift+< / > | previous / next track |
-| Ctrl+Alt+S, power button | sleep |
+| Shift+Meta+S, power button | sleep |
 | Shift+Meta+X | lock: touch does nothing till it again |
-| swipe the left edge, Ctrl+Alt+Up / Down | frontlight |
-| Ctrl+Alt+L | frontlight on / off |
+| swipe the left edge, Meta+] / Meta+[ | frontlight |
+| Meta+\\ | frontlight on / off |
 | Meta+Shift+E, or the menu (swipe along the right edge) | back to Nickel |
 
 Every key can be changed in Settings (Keys) or `keys.conf`, which takes

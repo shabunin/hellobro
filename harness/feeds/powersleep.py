@@ -1,6 +1,6 @@
 # The power button sleeps, music or not: no light sleep. Music playing,
 # a press: the player paused, the radios off, asleep (pretended), awake;
-# then Ctrl+Alt+S, the same. The log says "power button: sleeping",
+# then Shift+Meta+S, the same. The log says "power button: sleeping",
 # "sleep: going to sleep" twice. Wants MPRIS=1 (the stand-in mpv).
 # app: hellobro
 import os, sys
@@ -12,5 +12,5 @@ start(); time.sleep(6)
 key(SPACE, ctrl=True, shift=True); time.sleep(6)      # play
 power(); time.sleep(12)                               # asleep, paused; awake again
 key(SPACE, ctrl=True, shift=True); time.sleep(6)      # play again
-key(KEY_S, ctrl=True, alt=True); time.sleep(12)       # the same by keys
+key(KEY_S, shift=True, meta=True); time.sleep(12)       # the same by keys
 exit_app()

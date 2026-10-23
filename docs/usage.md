@@ -189,7 +189,7 @@ as i3's `bindsym`:
 ```
 meta+t       layout tabbed; focus parent  # i3's, any line of them
 f1           workspace number 1
-ctrl+alt+1   workspace number 1           # as the tabs' keys were
+f2           workspace number 2
 meta+o       [class="hellobro" instance="wifi"] focus
 meta+x       exec htop                    # in a new Alpine window
 ctrl+shift+n launcher
@@ -267,7 +267,7 @@ gives Nickel its own level back.
 
 ## Sleep
 
-The power button, Ctrl+Alt+S, the menu (a swipe along the right edge), or "Sleep"
+The power button, Shift+Meta+S, the menu (a swipe along the right edge), or "Sleep"
 in the switcher put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
 screen, the light off, suspend to RAM); the power button wakes it, and
 it's all as it was. A player that plays is paused first (Bluetooth goes off),
@@ -309,10 +309,10 @@ the lock screen lists swipes instead, the touch screen's way out: â†‘ unlocks, â
 of the screen's short side) and straight, so a brush in a bag isn't
 one; the keyboard back, they're gone. keys.conf: `lock`.
 
-Unlocked, a keyboard gone for 10 s brings up the Bluetooth window, full
+Unlocked, a keyboard gone for 15 s brings up the Bluetooth window, full
 screen, to connect it again; when it's back the window goes (or, if it
 was open already, goes back to its place). A keyboard back within the
-10 s, napping, say, shows nothing, and asleep or just awake it waits:
+15 s, napping, say, shows nothing, and asleep or just awake it waits:
 Bluetooth comes back on with the keyboard.
 
 ## Terminal
@@ -588,7 +588,8 @@ It's only installed when asked for: `make install-tools`.
 ## In both apps
 
 In both: swipe the left edge for the frontlight (in hellobro also
-Ctrl+Alt+Up/Down, and Ctrl+Alt+L for on/off). Fullscreen (Meta+F in
+Meta+] / Meta+[, and Meta+\ for on/off; in brotools Ctrl+Alt+Up/Down
+and Ctrl+Alt+L). Fullscreen (Meta+F in
 hellobro): swipe in from the top or bottom edge to leave it. The exit
 button leaves, and so does Esc in brotools, Meta+Shift+E in hellobro (where Esc
 is the terminal's, or closes what's open);

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const kbdWait = 10 * time.Second
+const kbdWait = 15 * time.Second
 
 type kbdState struct {
 	gen    int  // which going the timer is for

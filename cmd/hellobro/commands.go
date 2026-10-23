@@ -134,7 +134,7 @@ func makeCommands() []*command {
 		&command{id: "music.quieter", title: "Quieter (the player's volume)", repeat: true,
 			run: func(a *bro) { a.mediaKey(kobo.KeyVolumeDown) }},
 		&command{id: "statusbar", title: "Status bar: show / hide", keys: []string{"ctrl+shift+b"}, run: (*bro).toggleStat},
-		&command{id: "sleep", title: "Sleep", keys: []string{"ctrl+alt+s"}, run: func(a *bro) { a.App.Sleep() }},
+		&command{id: "sleep", title: "Sleep", keys: []string{"meta+shift+s"}, run: func(a *bro) { a.App.Sleep() }},
 		&command{id: "lock", title: "Lock the screen", keys: []string{"meta+shift+x"}, run: (*bro).lock},
 		&command{id: "wifi", title: "Wi-Fi on / off", run: func(a *bro) { a.radioToggle(panelWiFi) }},
 		&command{id: "bluetooth", title: "Bluetooth on / off", run: func(a *bro) { a.radioToggle(panelBT) }},
@@ -152,11 +152,11 @@ func makeCommands() []*command {
 	)
 	cs = append(cs, settingCommands()...)
 	cs = append(cs,
-		&command{id: "light.up", title: "Light: brighter", keys: []string{"ctrl+alt+up", "brightnessup"}, repeat: true,
+		&command{id: "light.up", title: "Light: brighter", keys: []string{"meta+]", "brightnessup"}, repeat: true,
 			run: func(a *bro) { a.stepLight(lightStep) }},
-		&command{id: "light.down", title: "Light: dimmer", keys: []string{"ctrl+alt+down", "brightnessdown"}, repeat: true,
+		&command{id: "light.down", title: "Light: dimmer", keys: []string{"meta+[", "brightnessdown"}, repeat: true,
 			run: func(a *bro) { a.stepLight(-lightStep) }},
-		&command{id: "light.toggle", title: "Light: on / off (the backlight)", keys: []string{"ctrl+alt+l"}, run: (*bro).toggleLight},
+		&command{id: "light.toggle", title: "Light: on / off (the backlight)", keys: []string{"meta+\\"}, run: (*bro).toggleLight},
 		&command{id: "rotate", title: "Rotate the screen", run: func(a *bro) { a.Rotate() }},
 	)
 	for r, name := range []string{"Portrait", "Landscape", "Portrait, upside down", "Landscape, the other way"} {

@@ -2,7 +2,7 @@
 # run.sh sets): a network with a wrong password and then the right one,
 # a Bluetooth scan, pairing with a code to confirm, Wi-Fi off and on; then
 # the switcher (Ctrl+Shift+P, typed into) and Ctrl+Alt+N tabs; then
-# sleep (Ctrl+Alt+S, pretended: HELLOBRO_FAKE_SLEEP) and waking.
+# sleep (Shift+Meta+S, pretended: HELLOBRO_FAKE_SLEEP) and waking.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -34,6 +34,6 @@ fullscreen(); time.sleep(2)
 key(KEY_P, ctrl=True, shift=True); time.sleep(2)        # the switcher, fullscreen
 key(ESC); time.sleep(2)
 key(K3, ctrl=True, alt=True); time.sleep(3)           # out of fullscreen, to Settings
-key(KS, ctrl=True, alt=True); time.sleep(1)           # sleep: the screen, the radios off
+key(KS, shift=True, meta=True); time.sleep(1)         # sleep: the screen, the radios off
 keys("o"); time.sleep(8)                              # ignored while asleep; awake, radios back on
 exit_app()
