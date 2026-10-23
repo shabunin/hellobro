@@ -54,7 +54,8 @@ type wmState struct {
 	wins      map[*wm.Node]window
 	area      image.Rectangle   // where the windows go
 	mode      string            // the keys' binding mode: "" is the default
-	grab      bool              // every key goes to the window in focus, but grab's own
+	grab      window            // the window every key goes to while it's in focus, but grab's own; nil: none
+	typing    window            // the window in focus, typing into another device, as grabTyping saw it
 	tabs      []wmTab           // tabbed and stacked containers' tabs, as drawn
 	frames    []image.Rectangle // the frames around tabbed windows, as drawn
 	laid      string            // what was placed last: another layout is a new screen
@@ -501,7 +502,7 @@ func (a *bro) wmFocusMoved() {
 	if w != nil {
 		log.Printf("wm: focus on %s", w.Title())
 	}
-	a.showMode() // typing into another device, or not
+	a.grabTyping()
 }
 
 // wmBar puts the workspaces in the bar, each with its windows' titles.
@@ -957,12 +958,17 @@ const ownDrag = 3
 
 // toggleGrab gives every key to the window in focus, hellobro's own
 // too, but the one that gives them back: for hellobro, tmux or a desktop
-// on the other end of a terminal, with keys of their own.
+// on the other end of a terminal, with keys of their own. It's that
+// window's: the focus going elsewhere ends it.
 func (a *bro) toggleGrab() {
-	a.wm.grab = !a.wm.grab
-	log.Printf("grab: %v", a.wm.grab)
+	if a.grabbing() {
+		a.wm.grab = nil
+	} else {
+		a.wm.grab = a.focusedWin()
+	}
+	log.Printf("grab: %v", a.grabbing())
 	a.showMode()
-	if a.wm.grab {
+	if a.grabbing() {
 		a.Toast("grab: every key to the window; "+a.keyLabel("grab")+" gives them back", 3*time.Second)
 	} else {
 		a.Toast("grab: off, the keys are hellobro's again", 3*time.Second)

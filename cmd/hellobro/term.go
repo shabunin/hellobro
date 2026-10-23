@@ -994,7 +994,7 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	t.size = t.startSize()
 	cols, rows := t.size.X, t.size.Y
 	t.back, t.state = back, termConnected
-	defer a.showMode() // typing into another device, maybe
+	defer a.grabTyping() // typing into another device, maybe
 	t.emu = vt.NewSafeEmulator(cols, rows)
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
 	t.emu.SetDefaultBackgroundColor(color.White)
@@ -1069,7 +1069,7 @@ func (a *bro) termEnded(t *termSession, gen int, err error, lost bool, how strin
 		return
 	}
 	a.termClose(t)
-	defer a.showMode() // not typing into another device now
+	defer a.grabTyping() // done typing into another device, maybe
 	msg := "connection closed"
 	if t.kind == kindShell {
 		msg = "the shell exited"

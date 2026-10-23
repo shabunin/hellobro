@@ -112,11 +112,36 @@ func (t *termSession) typing() bool {
 	return t != nil && t.kind == kindSSH && t.target.user == share.KeysUser && t.connected()
 }
 
-// grabbing says the keys go to the window in focus, all of them: grab's
-// on, or it's typing into another device (and grab's off: for a moment
-// the keys are hellobro's).
+// grabbing says the keys go to the window in focus, all of them.
 func (a *bro) grabbing() bool {
-	return a.wm.grab != a.term().typing()
+	return a.wm.grab != nil && a.wm.grab == a.focusedWin()
+}
+
+// grabTyping is the grab as the focus and the connections have it now.
+func (a *bro) grabTyping() {
+	a.wm.grab, a.wm.typing = grabFor(a.focusedWin(), a.wm.grab, a.wm.typing)
+	a.showMode()
+}
+
+// grabFor is the grab with w in focus: a window typing into another
+// device grabs the keys when it gets the focus (or connects in it), and
+// lets go when it's done; any grab ends with the focus going elsewhere.
+// typing is the window in focus that was typing, last time we looked:
+// once let go (Meta+Shift+G), it's not grabbed again till it's back.
+func grabFor(w, grab, typing window) (window, window) {
+	t, _ := w.(*termSession)
+	switch {
+	case t.typing() && typing != w:
+		grab = w
+	case grab == w && typing == w && !t.typing():
+		grab = nil // done typing there
+	case grab != w:
+		grab = nil
+	}
+	if t.typing() {
+		return grab, w
+	}
+	return grab, nil
 }
 
 // --- typed into, here ---
