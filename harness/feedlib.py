@@ -115,10 +115,14 @@ def power():
     open(g, 'w').write(line)
     time.sleep(0.6)
 
+def menu():
+    """hellobro's menu: a swipe up along the right edge."""
+    stroke([(W - 50, H * 2 // 3 - i * 15) for i in range(21)]); time.sleep(2)
+
 def exit_app():
-    """Taps the header's exit button; in hellobro, the bar's menu, then Quit."""
+    """Taps the header's exit button; in hellobro, its menu, then Quit."""
     if BAR:
-        tap(W - 30, 23); time.sleep(2)
+        menu()
         keys("quit"); time.sleep(1); key(ENTER)
     else:
         tap(W - 16 - 45, 38)

@@ -65,7 +65,8 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
   relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
 - Feeds drive the window manager with Meta (`mod()` in feedlib) and
   open settings' windows through the switcher (`gui()`). hellobro has
-  no header: `exit_app()` quits through the bar's ≡ menu, and `bar` is
+  no header: `exit_app()` quits through its menu (`menu()`, a swipe
+  along the right edge), and `bar` is
   the feed of the bar, the menu, an empty workspace's keys and `notify`. The feeds
   written for the tabs that were still run: their Ctrl+Alt+1–4 go to a
   workspace laid out as the tab was, but their taps may land elsewhere.

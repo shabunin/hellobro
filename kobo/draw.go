@@ -285,8 +285,8 @@ type Panel struct {
 	ButtonLabel        string
 	Fold               image.Rectangle // the − / + box at the strip's end, if it folds
 	Folded             bool            // only the title strip shows
-	Close              image.Rectangle // a window's ×, at the strip's end
-	Full               image.Rectangle // a window's ▢ before it: full screen
+	Close              image.Rectangle // a window's "close", at the strip's end
+	Full               image.Rectangle // a window's "full" before it: full screen
 	New                image.Rectangle // a window's +, after its name: a window next to it
 	Focused            bool            // the keys go to it: its strip is black
 }
@@ -302,8 +302,7 @@ type Layout struct {
 	header, tabBar, footer, status, titleText image.Rectangle
 	tabs                                      []image.Rectangle
 	btnRotate, btnCalib, btnExit, btnSleep    image.Rectangle
-	bar                                       bool            // Config.Bar's: no header, the tabs and status in one
-	btnMenu                                   image.Rectangle // the bar's ≡
+	bar                                       bool // Config.Bar's: no header, the tabs and status in one
 }
 
 const (
@@ -372,15 +371,14 @@ func makeLayout(w, h int, f Fonts, cfg Config, tabs, info []string, full bool) L
 
 // makeBar is Config.Bar's frame: one bar at the top, the tabs at its left
 // as wide as their labels and what's in them want (squeezed when they
-// don't fit), the status after them, and the menu button at the end. No
-// footer: the page goes down to the bottom.
+// don't fit), and the status after them. No footer: the page goes down
+// to the bottom.
 func makeBar(L Layout, f Fonts, tabs, info []string) Layout {
 	w, h := L.W, L.H
 	L.tabBar = image.Rect(0, 0, w, barH)
 	L.Page = image.Rect(0, barH, w, h)
 	L.Body = L.Page.Inset(Pad)
-	L.btnMenu = image.Rect(w-barH-16, 0, w, barH)
-	room := (L.btnMenu.Min.X - 2*Pad) * 7 / 10 // the rest is the status's
+	room := (w - 2*Pad) * 7 / 10 // the rest is the status's
 	want := make([]int, len(tabs))
 	for i := range want {
 		want[i] = 2*barTabPad + TextWidth(f.Panel, tabs[i])
@@ -394,7 +392,7 @@ func makeBar(L Layout, f Fonts, tabs, info []string) Layout {
 		L.tabs = append(L.tabs, image.Rect(x, 0, x+tw, barH))
 		x += tw
 	}
-	L.status = image.Rect(x+Pad, 0, L.btnMenu.Min.X-Pad/2, barH)
+	L.status = image.Rect(x+Pad, 0, w-Pad, barH)
 	return L
 }
 
@@ -508,16 +506,16 @@ func WithFold(f Fonts, p Panel, folded bool) Panel {
 	return WithButton(f, p, p.ButtonLabel)
 }
 
-// WithWindow is p as a window's: a × at the end of its strip that
-// closes it, a ▢ before it for full screen, and with newBox a + after
-// its name, for a window next to it.
+// WithWindow is p as a window's: "close" at the end of its strip,
+// "full" before it for full screen, and with newBox a + after its name,
+// for a window next to it.
 func WithWindow(f Fonts, p Panel, focused, newBox bool) Panel {
 	if p.Title.Empty() {
 		return p
 	}
-	s := p.Title.Dy() - 14
-	p.Close = image.Rect(p.Title.Max.X-10-s, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
-	p.Full = p.Close.Sub(image.Pt(s+12, 0))
+	cw, fw := TextWidth(f.Small, "close")+32, TextWidth(f.Small, "full")+32
+	p.Close = image.Rect(p.Title.Max.X-10-cw, p.Title.Min.Y+6, p.Title.Max.X-10, p.Title.Max.Y-8)
+	p.Full = image.Rect(p.Close.Min.X-2*tapMargin-fw, p.Close.Min.Y, p.Close.Min.X-2*tapMargin, p.Close.Max.Y) // apart: a tap is one's or the other's
 	p.New, p.Focused = image.Rectangle{}, focused
 	if newBox {
 		x := p.Title.Min.X + 16 + TextWidth(f.Panel, p.Name) + 24
@@ -810,12 +808,6 @@ func (a *App) drawBar() {
 			c.Text(a.F.Small, in, info, dim, AlignLeft)
 		}
 	}
-	m := L.btnMenu
-	for i := -1; i <= 1; i++ { // ≡
-		y := (m.Min.Y+m.Max.Y)/2 + i*10
-		x := (m.Min.X + m.Max.X) / 2
-		c.Fill(image.Rect(x-15, y-2, x+15, y+2), White)
-	}
 	a.status = ""
 	a.drawStatus()
 	a.Mark(L.tabBar, true)
@@ -917,22 +909,15 @@ func (a *App) DrawPanelTitle(p Panel, status string) {
 		c.Fill(r, White)
 		c.Frame(r, 2, Black)
 	}
-	if f := p.Close; !f.Empty() {
-		box(f)
-		m := f.Min.Add(f.Max).Div(2)
-		for d := -8; d <= 8; d++ { // ×
-			c.Fill(image.Rect(m.X+d-1, m.Y+d-1, m.X+d+2, m.Y+d+2), Black)
-			c.Fill(image.Rect(m.X+d-1, m.Y-d-1, m.X+d+2, m.Y-d+2), Black)
+	for _, b := range []struct {
+		r     image.Rectangle
+		label string
+	}{{p.Close, "close"}, {p.Full, "full"}} {
+		if !b.r.Empty() {
+			box(b.r)
+			c.Text(a.F.Small, b.r, b.label, Black, AlignCenter)
+			t.Max.X = b.r.Min.X - 16
 		}
-		t.Max.X = f.Min.X - 16
-	}
-	if f := p.Full; !f.Empty() {
-		box(f)
-		m := f.Min.Add(f.Max).Div(2)
-		r := image.Rect(m.X-11, m.Y-9, m.X+12, m.Y+10) // ▢, a window's outline
-		c.Frame(r, 2, Black)
-		c.Fill(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+5), Black)
-		t.Max.X = f.Min.X - 16
 	}
 	if f := p.Fold; !f.Empty() {
 		c.Fill(f, White)

@@ -21,6 +21,8 @@ type sleepState struct {
 	plugged        bool      // on power, as last seen
 	plugAt         time.Time // plugged in or out: idle counts from then too
 	low            int       // the battery's %, once it's low and not charging; 0 otherwise
+	asleep         bool
+	wokeAt         time.Time
 }
 
 const batteryLow = 10 // %: a warning, once on the way down
@@ -64,6 +66,7 @@ func (a *bro) sleepWhenIdle() {
 }
 
 func (a *bro) Sleep() func() {
+	a.slp.asleep = true
 	a.picker = nil   // the sleep screen goes over it; waking draws the page
 	a.pausePlayers() // the Bluetooth audio goes with the radio: on again after, where it was
 	a.unmountAll(true)
@@ -94,6 +97,7 @@ func (a *bro) Sleep() func() {
 
 func (a *bro) Wake() {
 	r, s := &a.rs, &a.slp
+	s.asleep, s.wokeAt = false, time.Now()
 	if s.btWas {
 		a.radioRun(panelBT, "turning Bluetooth back on…", func(func(string)) error { return r.bt.SetPower(true) })
 	}
@@ -171,7 +175,7 @@ func (a *bro) lockLines() []string {
 func (a *bro) lockSwipes() []kobo.LockSwipe {
 	return []kobo.LockSwipe{
 		{Dir: kobo.SwipeUp, Label: "unlock", Run: a.Unlock},
-		{Dir: kobo.SwipeRight, Label: "Bluetooth", Run: func() { a.Unlock(); a.openGUI("bluetooth"); a.fullWin(a.gui("bluetooth")) }},
+		{Dir: kobo.SwipeRight, Label: "Bluetooth", Run: func() { a.Unlock(); a.kbdBluetooth() }},
 		{Dir: kobo.SwipeDown, Label: "back to Nickel", Run: a.Quit},
 	}
 }

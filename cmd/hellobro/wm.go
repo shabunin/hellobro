@@ -546,9 +546,9 @@ func barTitle(s string) string {
 
 const barTitleMax = 18 // runes of a window's title in the bar
 
-// MenuTap is the bar's ≡: what the header's buttons were, and the rest
-// of the app's own.
-func (a *bro) MenuTap() {
+// menu is the app's own menu, a swipe along the right edge away: what
+// the header's buttons were, lock and the switcher.
+func (a *bro) menu() {
 	if a.picker != nil { // another menu: this one in its place
 		a.closePicker()
 	}

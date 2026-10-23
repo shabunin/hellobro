@@ -41,9 +41,8 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     processes that keep the CPU busy (percent of one core).
 
 A window's title strip has its name (white on black when it has the
-focus), a **+** for a launcher next to it, a **▢** that puts it full
-screen, and a **×** that closes it (a terminal's shell or connection
-ends with it). A tap on a window gives it the focus; the keys go to the
+focus), a **+** for a launcher next to it, **full**, which puts it full
+screen, and **close** (a terminal's shell or connection ends with it). A tap on a window gives it the focus; the keys go to the
 one that has it. Full screen, a swipe in from the top (or bottom) edge
 of the screen, or Meta+F, puts it back.
 
@@ -81,10 +80,10 @@ right where the Kobo is on the network, the Wi-Fi's name and its address
 and the time. It looks again every 15 s. In a binding mode (Meta+R,
 say) it says which, and what plays, and for a moment what was copied.
 
-**≡** at its end is the menu: rotate the
-screen, touch calibration, sleep, lock, the switcher, and quit,
-back to Nickel. Tap one, or type to narrow and Enter; Esc closes it.
-A swipe up or down along the right edge of the screen opens it too.
+A swipe up or down along the right edge of the screen opens the menu:
+rotate the screen, touch calibration, sleep, lock, the switcher, and
+quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
+it.
 
 Meta and the arrows (or h j k l, as vim has them) move the focus
 between the windows; with Shift, the window itself moves. Meta+A
@@ -163,7 +162,7 @@ The keys are hellobro's commands', i3's with Meta (the Win key):
 | Meta+1…0, Meta+Shift+1…0 | go to a workspace, send the window there |
 | Meta+B, Meta+V | split: the next window beside, below |
 | Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
-| Meta+F | fullscreen (or its strip's ▢; a swipe in from the top edge leaves it) |
+| Meta+F | fullscreen (or its strip's full; a swipe in from the top edge leaves it) |
 | Meta+Shift+Space | floating |
 | Meta+A | focus the container around |
 | Meta+Shift+Minus, Meta+Minus | put the window away, bring it back |
@@ -265,7 +264,7 @@ gives Nickel its own level back.
 
 ## Sleep
 
-The power button, Ctrl+Alt+S, the bar's menu (≡), or "Sleep"
+The power button, Ctrl+Alt+S, the menu (a swipe along the right edge), or "Sleep"
 in the switcher put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
 screen, the light off, suspend to RAM); the power button wakes it, and
 it's all as it was. A player that plays is paused first (Bluetooth goes off),
@@ -293,7 +292,7 @@ sleep or quit for it.
 
 ## Lock
 
-Shift+Meta+X (or Lock in the ≡ menu) locks the screen, for a bag or a hand: touch does nothing
+Shift+Meta+X (or Lock in the menu) locks the screen, for a bag or a hand: touch does nothing
 and keys go nowhere, but the music's keys, the power button (sleep),
 and Shift+Meta+X again, which unlocks. The light goes off till then
 (notifications don't flash it). The lock screen says hello bro, what
@@ -306,6 +305,12 @@ the lock screen lists swipes instead, the touch screen's way out: ↑ unlocks, �
 (to connect the keyboard again), ↓ goes back to Nickel. A swipe is long (a quarter
 of the screen's short side) and straight, so a brush in a bag isn't
 one; the keyboard back, they're gone. keys.conf: `lock`.
+
+Unlocked, a keyboard gone for 10 s brings up the Bluetooth window, full
+screen, to connect it again; when it's back the window goes (or, if it
+was open already, goes back to its place). A keyboard back within the
+10 s, napping, say, shows nothing, and asleep or just awake it waits:
+Bluetooth comes back on with the keyboard.
 
 ## Terminal
 
@@ -334,7 +339,7 @@ one; the keyboard back, they're gone. keys.conf: `lock`.
   typed earlier (kept in memory only). Esc stops it.
 - Each terminal is a window, with its own size: the remote (or the
   shell) is told when it changes. The title strip's `disconnect` or
-  `kill` ends what runs, and the window is a launcher again; × closes it.
+  `kill` ends what runs, and the window is a launcher again; close closes it.
 - Ctrl+= / Ctrl+- / Ctrl+0: font size, all the terminals' (remembered
   in `hellobro.json`).
 - A status bar along the bottom, under the windows, fullscreen too: what's playing, and the

@@ -1,5 +1,5 @@
 # The bar, with no header: the workspaces with their windows' titles,
-# the status, the ≡ menu (tapped open, closed by Esc); an empty
+# the status, the menu (a swipe along the right edge, closed by Esc); an empty
 # workspace's keys; a notification over the IPC socket; the Battery
 # window with the busiest processes; and quitting by Shift+Meta+E.
 # snap.txt in OUT says which snapshot is which.
@@ -34,7 +34,7 @@ mod(3); time.sleep(3)                                 # workspace 3: empty, its 
 note("help")
 mod(ENTER); time.sleep(2); keys("2"); time.sleep(3)   # a Kobo sh there
 note("bar with two")
-tap(W - 30, 23); time.sleep(3)                        # the menu
+menu(); time.sleep(1)                                 # the menu, by the edge swipe
 note("menu")
 key(ESC); time.sleep(2)
 command('notify "the build is done, bro"'); time.sleep(2)

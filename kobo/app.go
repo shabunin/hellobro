@@ -80,9 +80,8 @@ type Config struct {
 	About []string // at the foot of the cards, a line each: the version, where it's from
 	Tabs  []string // Ctrl+Alt+1, 2, …
 	// Bar puts the header and the tabs in one bar at the top: no title,
-	// the tabs with what's in them (SetTabNames' info), the status, and
-	// a menu button for the Program (MenuTapper) in place of the
-	// header's buttons.
+	// the tabs with what's in them (SetTabNames' info), and the status.
+	// No buttons: the Program has a menu of its own.
 	Bar bool
 	// OwnKeys leaves Ctrl+Alt+1–9 (tabs) and Ctrl+Alt+S (sleep) to the
 	// Program's Key, for an app with keys of its own making, and Esc
@@ -425,11 +424,6 @@ func (a *App) SetTabNames(names, hints, info []string, cur int) {
 	a.L = a.layout()
 	a.L.Full = full
 	a.drawTabs()
-}
-
-// MenuTapper is a Program that has a menu for Config.Bar's ≡.
-type MenuTapper interface {
-	MenuTap()
 }
 
 // TabTapper is a Program that takes the taps on the tabs itself: i is
@@ -837,10 +831,6 @@ func (a *App) tapAt(p image.Point) {
 		}
 	}
 	switch {
-	case a.L.bar && p.In(a.L.btnMenu): // no margin: a window's × is just below
-		if m, ok := a.prog.(MenuTapper); ok {
-			m.MenuTap()
-		}
 	case Hit(p, a.L.btnExit):
 		log.Print("exit tapped")
 		a.quit = true

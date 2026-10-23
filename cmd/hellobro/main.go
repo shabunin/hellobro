@@ -6,7 +6,7 @@
 // Bluetooth, sharing with a computer (SFTP, ssh, mDNS), hellobro's
 // settings, the battery and what uses it.
 //
-// A swipe along the right edge opens the ≡ menu. The keys are i3's,
+// A swipe along the right edge opens the menu. The keys are i3's,
 // with Meta, and the user's to change (commands.go); i3's commands come
 // in on a socket too (ipc.go). The music is a Linux player's, in an
 // Alpine session (mpris.go). The rest (the screen, touch, the frontlight
@@ -58,6 +58,7 @@ type bro struct {
 	net    netState // the header's network
 	pv     powerView
 	pw     powerState
+	kbd    kbdState
 	lay    kobo.Layout // the last layout, to lay out again
 }
 
@@ -198,8 +199,12 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		if m.Gone != "" { // what it held won't come up now
 			a.tv.mods = termMods{caps: a.tv.mods.caps}
 			a.SetLockSwipes(a.lockSwipes()) // locked, touch's way out
-		} else if a.keyLabel("lock") != "" {
-			a.SetLockSwipes(nil) // its keys unlock again
+			a.kbdGone()
+		} else {
+			if a.keyLabel("lock") != "" {
+				a.SetLockSwipes(nil) // its keys unlock again
+			}
+			a.kbdBack()
 		}
 		return true
 	case kobo.IsMediaKey(m.Code): // the music's, locked too
@@ -253,11 +258,11 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	case a.tv.sel != nil && a.tv.sel.g == g:
 		a.selMove(p, g)
 	case a.edge == g:
-		// Up or down along the right edge: the ≡ menu, by touch.
+		// Up or down along the right edge: the menu, by touch.
 		if dy := g.Start.Y - p.Y; g.Owner == 0 && kobo.Abs(dy) > menuSwipe && kobo.Abs(dy) > 2*kobo.Abs(p.X-g.Start.X) {
 			g.Owner, a.edge = ownMenu, nil
 			log.Print("menu swipe")
-			a.MenuTap()
+			a.menu()
 		}
 	}
 }
