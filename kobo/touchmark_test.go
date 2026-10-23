@@ -29,3 +29,20 @@ func TestStampMarks(t *testing.T) {
 		}
 	}
 }
+
+// A mark at the screen's edge marks only what's on the screen: a
+// framebuffer written straight has nothing past it.
+func TestMarkAtEdge(t *testing.T) {
+	scr := image.Rect(0, 0, 1072, 1448)
+	a := &App{C: Canvas{image.NewGray(scr)}, touchMarks: true}
+	a.addMark(image.Pt(1062, 650), false)
+	a.addMark(image.Pt(3, 3), true)
+	for _, d := range a.dirty {
+		if !d.r.In(scr) {
+			t.Errorf("marked %v, off the screen %v", d.r, scr)
+		}
+	}
+	if len(a.dirty) == 0 {
+		t.Error("nothing marked")
+	}
+}

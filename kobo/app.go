@@ -993,6 +993,9 @@ func compact(a, b image.Rectangle) bool { return Area(a.Union(b)) <= (Area(a)+Ar
 // areas get a grayscale waveform, others (black & white ink only) the
 // fast one.
 func (a *App) Mark(r image.Rectangle, ui bool) {
+	if a.C.Gray != nil {
+		r = r.Intersect(a.C.Bounds()) // a touch mark at the edge, say: a framebuffer written straight has nothing past it
+	}
 	if r.Empty() || a.locked { // the page is off the panel
 		return
 	}
