@@ -26,8 +26,8 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     and devices (scan, pair, connect, disconnect, forget);
   - **Sharing** with a computer over SFTP and SSH (how to reach the
     Kobo, pairing, who's connected and sending what);
-  - **Settings**, hellobro's own, in groups: Light; Sleep; At
-    start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
+  - **Settings**, hellobro's own, in groups: Light; Sleep; Keyboard
+    (the Bluetooth window when it's gone); At start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
     CPU profiles); Terminal (notifications, the status bar); Alpine;
     Keys;
   - **Battery**: the charge, the current it gives (mA, W), the gauge's
@@ -313,7 +313,8 @@ Unlocked, a keyboard gone for 15 s brings up the Bluetooth window, full
 screen, to connect it again; when it's back the window goes (or, if it
 was open already, goes back to its place). A keyboard back within the
 15 s, napping, say, shows nothing, and asleep or just awake it waits:
-Bluetooth comes back on with the keyboard.
+Bluetooth comes back on with the keyboard. Settings, **The keyboard
+gone**: after 15 s, 30 s or 1 min, or nothing comes up.
 
 ## Terminal
 

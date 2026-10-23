@@ -4,14 +4,20 @@ package main
 // without one the Bluetooth window comes up, full screen, to connect it
 // again; and goes when it's back. The while is for the keyboard's own
 // naps and the radio's blips: back within it, nothing shows. Asleep, or
-// just awake (Bluetooth comes back on with the keyboard), it waits.
+// just awake (Bluetooth comes back on with the keyboard), it waits. The
+// while is Settings' "The keyboard gone", which may be never.
 
 import (
 	"log"
+	"strconv"
 	"time"
 )
 
-const kbdWait = 15 * time.Second
+// kbdWait is the while; 0: nothing comes up.
+func (a *bro) kbdWait() time.Duration {
+	n, _ := strconv.Atoi(a.setting("kbd-gone"))
+	return time.Duration(n) * time.Second
+}
 
 type kbdState struct {
 	gen    int  // which going the timer is for
@@ -22,15 +28,18 @@ type kbdState struct {
 // kbdGone starts the while.
 func (a *bro) kbdGone() {
 	a.kbd.gen++
-	gen := a.kbd.gen
-	time.AfterFunc(kbdWait, func() { a.Do(func() { a.kbdStillGone(gen) }) })
+	gen, wait := a.kbd.gen, a.kbdWait()
+	if wait == 0 {
+		return
+	}
+	time.AfterFunc(wait, func() { a.Do(func() { a.kbdStillGone(gen) }) })
 }
 
 func (a *bro) kbdStillGone(gen int) {
 	switch {
 	case gen != a.kbd.gen || a.Keyboard != "":
 	case a.Locked(): // the lock screen has its swipes
-	case a.slp.asleep || time.Since(a.slp.wokeAt) < 3*kbdWait:
+	case a.slp.asleep || time.Since(a.slp.wokeAt) < 3*a.kbdWait():
 		a.kbdGone() // later
 	case a.guiFocused("bluetooth"): // there already
 	default:
