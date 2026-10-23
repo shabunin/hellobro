@@ -109,7 +109,8 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     TIMEOUT=650 harness/run.sh /tmp/hb 1 sleepidle    # sleep when idle: the toast, a key keeping it awake, sleep
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 tmux       # saved host 1 (dir/ssh.conf, dir/id_ed25519): tmux attach, framed and fullscreen
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 btop       # the same, btop
-    CMUS=cmd HELLOBRO_MPRIS_BUS=addr harness/run.sh /tmp/hb 0 cmus  # cmd (cmus, say in a container with music) in a shell, a track playing
+    APP_EXTRA=dir HELLOBRO_MPRIS_BUS=addr harness/run.sh /tmp/hb 0 ncmpcpp  # the same, ncmpcpp on mpd, a track playing
+    harness/shots/run.sh /tmp/shots MUSIC             # a container for those (user bro on host pc), the README's: see it
     harness/relay.sh /tmp/hb                           # the relay: sshd as the VPS, both ways through it, an update (with the server)
 
 `MPRIS=1` starts a session bus in `OUT/bus` with a stand-in mpv on it

@@ -1,0 +1,15 @@
+# The screenshots' stand-in PC (run.sh): sshd, tmux, btop, ncmpcpp on
+# mpd, and the test server, for user bro on host pc.
+FROM docker.io/library/alpine:3.22
+RUN apk add --no-cache openssh tmux btop htop vim git bash dbus mpd mpc ncmpcpp mpd-mpris ncurses-terminfo-base
+ARG UID=1000
+RUN adduser -D -u $UID -s /bin/bash bro && sed -i 's/^bro:!:/bro:*:/' /etc/shadow \
+ && mkdir -p /home/bro/.ssh /home/bro/.config/mpd /run/mpd && ssh-keygen -A
+COPY authorized_keys /home/bro/.ssh/authorized_keys
+COPY hellobro-server /usr/local/bin/hellobro-server
+COPY mpd.conf /home/bro/.config/mpd/mpd.conf
+COPY bashrc /home/bro/.bashrc
+COPY entry.sh /entry.sh
+RUN chown -R bro:bro /home/bro && chmod 700 /home/bro/.ssh && chmod 600 /home/bro/.ssh/authorized_keys \
+ && printf '. ~/.bashrc\n' > /home/bro/.bash_profile && chown bro:bro /home/bro/.bash_profile
+CMD ["/entry.sh"]

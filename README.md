@@ -4,12 +4,12 @@ A terminal, a Linux in your pocket and a way in for your computer, on a
 Kobo e-reader. Bring a Bluetooth keyboard.
 
 <p align="center">
-  <img src="docs/screenshots/tmux.png" width="48.5%" alt="Claude Code in tmux on the PC, over SSH">
+  <img src="docs/screenshots/tmux.png" width="48.5%" alt="vim, git log and htop in tmux on a PC, over SSH">
   <img src="docs/screenshots/btop.png" width="48.5%" alt="btop on the PC, over SSH">
 </p>
 <p align="center">
   <img src="docs/screenshots/ssh.png" width="48.5%" alt="An SSH session">
-  <img src="docs/screenshots/cmus.png" width="48.5%" alt="cmus in a shell, the status bar showing what plays">
+  <img src="docs/screenshots/ncmpcpp.png" width="48.5%" alt="ncmpcpp on mpd, the bar and the status bar showing what plays">
 </p>
 <p align="center">
   <img src="docs/screenshots/tiling.png" width="48.5%" alt="Wi-Fi, Sharing, Bluetooth and Settings, tiled">
