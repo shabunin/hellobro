@@ -174,18 +174,18 @@ func TestAlpineAskSize(t *testing.T) {
 }
 
 func TestJailReadOnly(t *testing.T) {
-	kobo, bq := t.TempDir(), t.TempDir()
+	kobo, other := t.TempDir(), t.TempDir()
 	for _, d := range []string{".adds/hellobro", ".kobo", "Books"} {
 		os.MkdirAll(filepath.Join(kobo, d), 0o755)
 	}
-	os.MkdirAll(filepath.Join(bq, ".hellobro"), 0o755)
+	os.MkdirAll(filepath.Join(other, ".hellobro"), 0o755)
 	for _, c := range []struct {
 		storage, img string
 		want         []string
 	}{
 		{kobo, kobo + "/.adds/hellobro/alpine.img", []string{kobo + "/.adds", kobo + "/.kobo"}},
-		{bq, bq + "/.hellobro/alpine.img", []string{bq + "/.hellobro"}},
-		{bq, "/elsewhere/alpine.img", nil},
+		{other, other + "/.hellobro/alpine.img", []string{other + "/.hellobro"}},
+		{other, "/elsewhere/alpine.img", nil},
 	} {
 		if got := jailReadOnly(c.storage, c.img); fmt.Sprint(got) != fmt.Sprint(c.want) {
 			t.Errorf("%s, %s: %v, want %v", c.storage, c.img, got, c.want)
