@@ -26,7 +26,7 @@ Back to the [README](../README.md). Agents: [AGENTS.md](../AGENTS.md).
   keys; `gui.go`: the settings' windows; `ipc.go`: i3's IPC and
   hellobro-msg), the terminal (the emulator view, SSH, the local shell),
   the status bar, the switcher, the settings' and power windows, sleep
-  and light sleep, the Linux players' remote control (MPRIS), the hosts'
+  (and when idle), the Linux players' remote control (MPRIS), the hosts'
   files mounted (FUSE over SFTP), updates over the air.
 - `cmd/brotools/`: the diagnostics pages.
 
@@ -106,7 +106,7 @@ fake input devices, Nickel settings and frontlight stand in for the rest:
     MPRIS=1 harness/run.sh /tmp/hb 0 statbar           # the status bar, the media keys, a stand-in player
     harness/run.sh /tmp/hb 0 radio                     # Wi-Fi/BT (stand-ins), the switcher, sleep
     harness/run.sh /tmp/hb 0 share                     # pairing, scp, make push's update and restart (ssh, scp on the PC)
-    MPRIS=1 harness/run.sh /tmp/hb 0 doze              # settings, light sleep with music, media keys
+    TIMEOUT=650 harness/run.sh /tmp/hb 1 sleepidle    # sleep when idle: the toast, a key keeping it awake, sleep
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 tmux       # saved host 1 (dir/ssh.conf, dir/id_ed25519): tmux attach, framed and fullscreen
     APP_EXTRA=dir harness/run.sh /tmp/hb 1 btop       # the same, btop
     CMUS=cmd HELLOBRO_MPRIS_BUS=addr harness/run.sh /tmp/hb 0 cmus  # cmd (cmus, say in a container with music) in a shell, a track playing

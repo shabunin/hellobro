@@ -26,7 +26,7 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     and devices (scan, pair, connect, disconnect, forget);
   - **Sharing** with a computer over SFTP and SSH (how to reach the
     Kobo, pairing, who's connected and sending what);
-  - **Settings**, hellobro's own, in groups: Light; Sleep; Music; At
+  - **Settings**, hellobro's own, in groups: Light; Sleep; At
     start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
     CPU profiles); Terminal (notifications, the status bar); Alpine;
     Keys;
@@ -80,7 +80,7 @@ and the time. It looks again every 15 s. In a binding mode (Meta+R,
 say) it says which, and what plays, and for a moment what was copied.
 
 **≡** at its end is the menu: rotate the
-screen, touch calibration, light sleep, sleep, the switcher, and quit,
+screen, touch calibration, sleep, the switcher, and quit,
 back to Nickel. Tap one, or type to narrow and Enter; Esc closes it.
 
 Meta and the arrows (or h j k l, as vim has them) move the focus
@@ -116,7 +116,7 @@ Among them: the window manager's (focus, move, layouts, fullscreen,
 floating); disconnecting the terminal in focus; the player's play,
 pause, stop, tracks and volume; Wi-Fi or Bluetooth on and off, looking
 for networks or devices, joining a network by name, its details;
-sharing, pairing, the relay; light sleep, the light, the screen's way
+sharing, pairing, the relay; sleep, the light, the screen's way
 round; and every setting ("Setting: …", with its value now: Enter steps
 it, as a tap on its row does). Typing narrows it (fuzzy); Up/Down and
 Enter, or 1–9 before typing.
@@ -277,27 +277,9 @@ It also sleeps by itself after a while untouched (Settings, Sleep): on
 battery after 30 minutes by default, plugged in never, each one 5 min to
 2 hours or never. Whatever runs goes down with it: SSH sessions, the
 relay, a copy to or from the Kobo. A toast says so a minute before, and
-a touch or a key keeps it awake. While music plays, light sleep comes
-instead (below). Left awake untouched, the Kobo lasts about 12 hours
-from full.
-
-## Light sleep
-
-Light sleep is for listening: the light goes off and the screen shows
-what's playing (the track, the artist, the album, the player), but the
-Kobo stays awake, so the music plays on and a keyboard's media keys play and pause,
-skip, and set the volume. The power button or
-any other key wakes it up, to the page as it was; touching the screen
-doesn't (unless there's no keyboard and no power button to be had). With music playing it comes
-after a while without input (5 minutes; Settings), and Ctrl+Alt+S dozes
-instead of sleeping (Settings: or not). Wi-Fi goes off once the light
-sleep has lasted 3 minutes (Settings: or not), and comes back on waking.
-Not before: Wi-Fi coming back (a scan, joining, DHCP) takes the air from
-the music, which skips meanwhile, so a short light sleep leaves it be.
-With Bluetooth on, the Wi-Fi chip keeps its
-power (on the Elipsa it's Bluetooth's chip too: cutting it took the
-headphones with it). Once the music has stopped for a while (10
-minutes), the Kobo goes to sleep properly.
+a touch or a key keeps it awake. Music playing keeps it awake too, and
+the while starts again once it stops. Left awake untouched, the Kobo
+lasts about 12 hours from full.
 
 ## Terminal
 
@@ -373,8 +355,7 @@ which are mounted; the menu unmounts.
 
 The mount is hellobro's (a process of its own, `hellobro --mount`), as
 the jail can't mount; it goes away before the Kobo sleeps and comes back
-on waking, and goes when hellobro does. Light sleep keeps Wi-Fi on while
-a host is mounted, as the music may be coming from it. If the host goes
+on waking, and goes when hellobro does. If the host goes
 quiet (keepalives, as for sessions), it's unmounted, and says so: what
 was using it gets an error, not a hang. Sessions started before an
 update see `/mnt/hosts` from their next start.
@@ -531,9 +512,8 @@ computers get in, with their key; there are no passwords:
 Paired keys are in
 `.adds/hellobro/authorized_keys` (`forget paired` empties it), the Kobo's
 host key in `ssh_host_ed25519_key` there. The server only runs while
-hellobro does, with sharing on, and Wi-Fi up: light sleep turns Wi-Fi off
-(Settings), so it doesn't come while a computer is connected, nor does
-the auto-exit.
+hellobro does, with sharing on, and Wi-Fi up. The auto-exit doesn't come
+while a computer is connected; sleep does.
 
 ## Updating over the air
 

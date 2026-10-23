@@ -104,9 +104,7 @@ up to a minute between tries.
 
 While the relay is on, the Kobo stays reachable, and that costs battery:
 
-- hellobro doesn't auto-exit;
-- light sleep keeps Wi-Fi on;
-- a light sleep with the music over doesn't turn into a deep one.
+- hellobro doesn't auto-exit.
 
 A deep sleep (the power button) drops the relay till the Kobo wakes.
 So does sleeping when idle (Settings, Sleep: on battery after 30 min

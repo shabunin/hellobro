@@ -177,30 +177,26 @@ type App struct {
 	inputAt time.Time   // last touch or key
 	call    chan func() // work from goroutines, run on the UI loop
 
-	status    string          // the header's status text, as drawn
-	note      string          // the Program's, left of it
-	network   string          // the Program's, first: the Wi-Fi and the address
-	dirty     []dirtyRect     // pending screen updates, blitted one at a time
-	flash     bool            // the next full-screen update should flash
-	flashR    image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
-	blitting  bool
-	jobs      chan blitJob
-	done      chan error
-	quit      bool
-	alive     atomic.Int64    // last loop tick, for the watchdog
-	blitAt    atomic.Int64    // start of the blit in flight, or 0
-	noPower   bool            // the power button doesn't reach us
-	wokeAt    time.Time       // from sleep: the power press that woke us comes after
-	asleep    bool            // the sleep screen is up: nothing else gets drawn
-	sleeping  atomic.Bool     // asleep, for the watchdog: the clock jumps
-	dozing    bool            // a light sleep: the doze screen on the panel, the page going on in C
-	panelC    Canvas          // while dozing, what's on the panel
-	dozeLight int             // the light's level before dozing
-	eatTouch  bool            // the contact that woke us from dozing isn't over
-	restart   string          // a binary to run in our place once we've quit
-	ctrl      [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
-	alt       [2]bool         // and Alt
-	ring      image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
+	status   string          // the header's status text, as drawn
+	note     string          // the Program's, left of it
+	network  string          // the Program's, first: the Wi-Fi and the address
+	dirty    []dirtyRect     // pending screen updates, blitted one at a time
+	flash    bool            // the next full-screen update should flash
+	flashR   image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
+	blitting bool
+	jobs     chan blitJob
+	done     chan error
+	quit     bool
+	alive    atomic.Int64    // last loop tick, for the watchdog
+	blitAt   atomic.Int64    // start of the blit in flight, or 0
+	noPower  bool            // the power button doesn't reach us
+	wokeAt   time.Time       // from sleep: the power press that woke us comes after
+	asleep   bool            // the sleep screen is up: nothing else gets drawn
+	sleeping atomic.Bool     // asleep, for the watchdog: the clock jumps
+	restart  string          // a binary to run in our place once we've quit
+	ctrl     [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
+	alt      [2]bool         // and Alt
+	ring     image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
 
 	blinks     []blinking // notice.go
 	toast      *toast
@@ -456,10 +452,6 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 				continue
 			}
 			a.lightBack()
-			if a.dozing || a.eatTouch {
-				a.dozeTouch(ev)
-				continue
-			}
 			a.onTouch(ev)
 			idle.Reset(IdleTimeout)
 			a.inputAt = time.Now()
@@ -925,20 +917,12 @@ func (a *App) onKey(m KeyMsg) {
 	case keyLeftAlt, keyRightAlt:
 		a.alt[b2i(m.Code == keyRightAlt)] = m.Value != 0
 	}
-	// Asleep or dozing, the modifiers still go to the Program, so it knows
-	// what's held: Ctrl+Alt+S's Ctrl and Alt come up once it's dozing, and
+	// Asleep, the modifiers still go to the Program, so it knows what's
+	// held: Ctrl+Alt+S's Ctrl and Alt come up once it's asleep, and
 	// missed, they'd stay down after.
-	if (a.asleep || a.dozing) && IsModifier(m.Code) {
-		a.prog.Key(m)
-	}
 	if a.asleep {
-		return
-	}
-	if a.dozing { // the media keys play on; any other key wakes
-		if IsMediaKey(m.Code) {
+		if IsModifier(m.Code) {
 			a.prog.Key(m)
-		} else if m.Value == 1 {
-			a.Undoze()
 		}
 		return
 	}
@@ -978,7 +962,7 @@ func compact(a, b image.Rectangle) bool { return Area(a.Union(b)) <= (Area(a)+Ar
 // areas get a grayscale waveform, others (black & white ink only) the
 // fast one.
 func (a *App) Mark(r image.Rectangle, ui bool) {
-	if r.Empty() || a.dozing { // the page is off the panel
+	if r.Empty() {
 		return
 	}
 	for i, d := range a.dirty {
@@ -993,9 +977,6 @@ func (a *App) Mark(r image.Rectangle, ui bool) {
 // MarkFlash redraws r with a flash, which clears the ghosting that
 // non-flashing updates leave behind.
 func (a *App) MarkFlash(r image.Rectangle) {
-	if a.dozing {
-		return
-	}
 	a.Mark(r, true)
 	a.flashR = r
 }
@@ -1030,16 +1011,10 @@ func (a *App) flush() {
 	}
 	a.dirty = rest
 	img := image.NewGray(d.r)
-	src := a.C
-	if a.dozing {
-		src = a.panelC
-	}
-	CopyGray(img, d.r, src.Gray, d.r.Min)
-	if !a.dozing {
-		a.stampNotices(img)
-		if d.r.Overlaps(a.ring) {
-			stampRing(img, a.ring)
-		}
+	CopyGray(img, d.r, a.C.Gray, d.r.Min)
+	a.stampNotices(img)
+	if d.r.Overlaps(a.ring) {
+		stampRing(img, a.ring)
 	}
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {

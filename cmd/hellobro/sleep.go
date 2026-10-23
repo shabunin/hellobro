@@ -14,7 +14,8 @@ import (
 // sleepState is what was on when the Kobo went to sleep.
 type sleepState struct {
 	wifiWas, btWas bool
-	warned         bool // the toast said it's going to sleep
+	warned         bool      // the toast said it's going to sleep
+	musicAt        time.Time // the music last played: idle counts from then too
 }
 
 const sleepWarn = time.Minute // the toast comes this long before
@@ -23,18 +24,22 @@ const sleepWarn = time.Minute // the toast comes this long before
 // input, on battery or plugged in: left awake, it lasts a night at most.
 // Whatever runs goes down with it (SSH, the relay, a copy to it), so a
 // toast says so a minute before, and a touch or a key keeps it awake.
-// Music dozes instead (dozeWhenIdle).
+// Music playing keeps it awake too, and once it stops the while starts
+// again: after an album, the toast still comes first.
 func (a *bro) sleepWhenIdle() {
 	key := "sleep-battery"
 	if a.pw.plugged {
 		key = "sleep-power"
 	}
 	d := a.settingMinutes(key)
+	if a.musicPlaying() {
+		a.slp.musicAt = time.Now()
+	}
 	if d == 0 || a.musicPlaying() || a.Calibrating() {
 		a.slp.warned = false
 		return
 	}
-	switch idle := a.IdleFor(); {
+	switch idle := min(a.IdleFor(), time.Since(a.slp.musicAt)); {
 	case idle >= d:
 		a.slp.warned = false
 		log.Printf("sleep: %v without input (%s)", d, key)
@@ -61,13 +66,8 @@ func (a *bro) Sleep() func() {
 	}
 	r.prompt = nil
 	wifi, bt := r.wifi, r.bt
-	dozedOff := a.doze.wifiOff // off for a doze we're leaving for sleep: it was on
-	a.doze.wifiAsk = false     // and waking from the doze doesn't turn it on: sleep does
-	if dozedOff {
-		a.dozeWiFi("forget")
-	}
 	return func() {
-		s.wifiWas = wifi.Status().On || dozedOff // also notes how Kobo runs it, for turning it on again
+		s.wifiWas = wifi.Status().On // also notes how Kobo runs it, for turning it on again
 		bs, _ := bt.Status()
 		if s.btWas = bs.Powered; s.btWas { // first: Wi-Fi's chip may be Bluetooth's too
 			if err := bt.SetPower(false); err != nil {

@@ -143,7 +143,7 @@ func (a *bro) focusTouched(p image.Point) {
 // go. It's looked at every tick.
 func (a *bro) updateRing() {
 	var r image.Rectangle
-	if a.fs.ring && !a.overlay() && !a.Calibrating() && !a.Dozing() {
+	if a.fs.ring && !a.overlay() && !a.Calibrating() {
 		w := a.focusedWin()
 		cs := a.controls(w)
 		if i := a.focused(w, cs); i >= 0 {

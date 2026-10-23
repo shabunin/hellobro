@@ -60,7 +60,7 @@ func openFrontlight(start int) *frontlight {
 }
 
 // keepLight tells the Program the level the reader chose, once they're
-// done choosing. Not the idle's, a doze's or a notice's: those aren't
+// done choosing. Not the idle's or a notice's: those aren't
 // the reader's.
 func (a *App) keepLight() {
 	if a.light.level == a.light.kept {
@@ -197,7 +197,7 @@ func (a *App) lightLevel() int {
 // lightIdle turns the light off once idle long enough.
 func (a *App) lightIdle() {
 	if a.LightIdle <= 0 || a.light == nil || a.light.level == 0 || a.lightIdled > 0 ||
-		!a.lightOffAt.IsZero() || a.dozing || a.asleep || a.calib != nil || time.Since(a.inputAt) < a.LightIdle {
+		!a.lightOffAt.IsZero() || a.asleep || a.calib != nil || time.Since(a.inputAt) < a.LightIdle {
 		return
 	}
 	log.Printf("light: off after %s idle (was %d%%)", a.LightIdle, a.light.level)

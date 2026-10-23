@@ -7,8 +7,7 @@ package main
 // first process's root. The media keys go there: a keyboard's, Ctrl+
 // Shift+Space, < and >, and the headphones' buttons, which BlueZ sends
 // as keys while Nickel is closed. What plays shows in the header and
-// the status bar, keeps us from quitting, and is what light sleep waits
-// on and shows.
+// the status bar, and keeps us from quitting or sleeping.
 //
 // The players are looked at when a bus says something changed (their
 // properties, a player coming or going), and every few seconds for new
@@ -236,7 +235,6 @@ func (a *bro) setPlayers(ps []player) {
 		a.SetStatus(now)
 		a.drawStat(false)
 	}
-	a.redoze()
 }
 
 // lookAgain has the players looked at now, after a key changed them.

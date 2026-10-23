@@ -55,7 +55,7 @@ FBInk, input FIFOs, stand-in Wi-Fi/Bluetooth and pretend sleep:
 
 ```sh
 harness/run.sh OUT ROTA FEED          # ROTA 0-3 (1, 3 landscape); FEED from harness/feeds
-MPRIS=1 harness/run.sh OUT 0 doze      # a session bus with a stand-in mpv (harness/mpris)
+MPRIS=1 harness/run.sh OUT 0 statbar   # a session bus with a stand-in mpv (harness/mpris)
 harness/relay.sh OUT                  # the relay, sshd playing the VPS
 ```
 
@@ -148,8 +148,8 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
 - The battery's gauge (ricoh61x) gives `current_now` in tenths of a mA
   (2708: 271 mA), not µA: its `time_to_empty_now` times that is a full
   battery. The harness has a stand-in battery (`HELLOBRO_BATTERY`).
-- Keys dropped while asleep or dozing must not include the modifiers:
-  Ctrl+Alt+S's Ctrl and Alt come up after it dozed, and missed, they
+- Keys dropped while asleep must not include the modifiers:
+  Ctrl+Alt+S's Ctrl and Alt come up after it slept, and missed, they
   stayed down (`tv.mods`), so every key after waking was Ctrl+Alt+key.
   `onKey` hands them to the Program anyway (`IsModifier`).
 - The Alpine jail (`alpine.go`, `alpineinit.go`): no user namespaces in

@@ -446,7 +446,7 @@ var ipcCommands = map[string]bool{
 	"statusbar": true, "font.bigger": true, "font.smaller": true, "font.reset": true,
 	"light.up": true, "light.down": true, "light.toggle": true, "rotate": true,
 	"screen.portrait": true, "screen.landscape": true, "screen.portrait2": true, "screen.landscape2": true,
-	"doze": true, "sleep": true, "wifi.scan": true, "bt.scan": true,
+	"sleep": true, "wifi.scan": true, "bt.scan": true,
 }
 
 func (h ipcHost) Command(n *wm.Node, name string, args []string) (bool, error) {

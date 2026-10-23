@@ -177,7 +177,7 @@ func TestKeyString(t *testing.T) {
 }
 
 func TestRewriteKeys(t *testing.T) {
-	conf := "# the defaults\n# meta+tab focus next\nf5 workspace next\nnone doze\nf7 layout tabbed; focus parent\n[resize]\nx mode default\n"
+	conf := "# the defaults\n# meta+tab focus next\nf5 workspace next\nnone music.stop\nf7 layout tabbed; focus parent\n[resize]\nx mode default\n"
 	k := func(s string) combo { c, _ := parseKey(s); return c }
 	for _, c := range []struct {
 		id    string
@@ -185,16 +185,16 @@ func TestRewriteKeys(t *testing.T) {
 		reset bool
 		want  string // the lines that aren't comments
 	}{
-		{"workspace next", []combo{k("f6")}, false, "none doze|f7 layout tabbed; focus parent|f6 workspace next|[resize]|x mode default"},
-		{"workspace next", nil, true, "none doze|f7 layout tabbed; focus parent|[resize]|x mode default"},
-		{"workspace next", []combo{}, false, "none doze|f7 layout tabbed; focus parent|none workspace next|[resize]|x mode default"},
-		{"doze", []combo{k("ctrl+alt+d")}, false, "f5 workspace next|f7 layout tabbed; focus parent|ctrl+alt+d doze|[resize]|x mode default"},
+		{"workspace next", []combo{k("f6")}, false, "none music.stop|f7 layout tabbed; focus parent|f6 workspace next|[resize]|x mode default"},
+		{"workspace next", nil, true, "none music.stop|f7 layout tabbed; focus parent|[resize]|x mode default"},
+		{"workspace next", []combo{}, false, "none music.stop|f7 layout tabbed; focus parent|none workspace next|[resize]|x mode default"},
+		{"music.stop", []combo{k("ctrl+alt+d")}, false, "f5 workspace next|f7 layout tabbed; focus parent|ctrl+alt+d music.stop|[resize]|x mode default"},
 		// Meta+K was focus up's: it keeps its other.
-		{"doze", []combo{k("meta+k")}, false, "f5 workspace next|f7 layout tabbed; focus parent|focus up's|meta+k doze|[resize]|x mode default"},
+		{"music.stop", []combo{k("meta+k")}, false, "f5 workspace next|f7 layout tabbed; focus parent|focus up's|meta+k music.stop|[resize]|x mode default"},
 		// Meta+A was focus parent's only key: it has none then.
-		{"doze", []combo{k("meta+a")}, false, "f5 workspace next|f7 layout tabbed; focus parent|none focus parent|meta+a doze|[resize]|x mode default"},
+		{"music.stop", []combo{k("meta+a")}, false, "f5 workspace next|f7 layout tabbed; focus parent|none focus parent|meta+a music.stop|[resize]|x mode default"},
 		// F7 was keys.conf's own line: it goes.
-		{"doze", []combo{k("f7")}, false, "f5 workspace next|f7 doze|[resize]|x mode default"},
+		{"music.stop", []combo{k("f7")}, false, "f5 workspace next|f7 music.stop|[resize]|x mode default"},
 	} {
 		m, _ := parseKeys(conf)
 		out := rewriteKeys(conf, m, c.id, c.keys, c.reset)

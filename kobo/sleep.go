@@ -4,8 +4,7 @@ package kobo
 // way Nickel and KOReader do it on these devices (state-extended, then
 // "mem"), and the app back as it was on waking. Nickel holds the power
 // button, so going to sleep is ours to ask for (the header's button,
-// Ctrl+Alt+S, Sleep); the button still wakes the device up. A Dozer may
-// doze instead (doze.go), or go on to sleep from a doze.
+// Ctrl+Alt+S, Sleep); the button still wakes the device up.
 
 import (
 	"fmt"
@@ -31,22 +30,14 @@ func (a *App) Sleep() {
 	if a.asleep || a.calib != nil {
 		return
 	}
-	if d, ok := a.prog.(Dozer); ok && !a.dozing && d.DozeInstead() {
-		a.Doze()
-		return
-	}
 	log.Print("sleep: going to sleep")
 	var prep func()
 	if s, ok := a.prog.(Sleeper); ok {
-		prep = s.Sleep() // while still dozing, if it was
+		prep = s.Sleep()
 	}
 	light := -1
 	if a.light != nil {
 		light = a.lightLevel()
-	}
-	if a.dozing { // from a doze: the page's canvas back, the light as before it
-		a.endDoze()
-		light = a.dozeLight
 	}
 	a.HideGauge()
 	a.lightOverlay = nil
@@ -173,20 +164,19 @@ func exists(p string) bool {
 	return err == nil
 }
 
-// powerPressed is the power button: it wakes from light sleep, and
-// otherwise sleeps (lightly, if the Program says so: music playing).
+// powerPressed is the power button: it sleeps.
 func (a *App) powerPressed() {
 	switch {
 	case a.asleep || a.calib != nil || time.Since(a.wokeAt) < 3*time.Second: // the press that woke it
 		log.Print("power button: pressed (nothing to do)")
-	case a.dozing:
-		log.Print("power button: waking up")
-		a.Undoze()
 	default:
 		log.Print("power button: sleeping")
 		a.Sleep()
 	}
 }
+
+// IdleFor is how long since the last touch or key.
+func (a *App) IdleFor() time.Duration { return time.Since(a.inputAt) }
 
 // PowerButton says whether the power button reaches us.
 func (a *App) PowerButton() bool { return !a.noPower }

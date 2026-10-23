@@ -104,7 +104,7 @@ func (a *bro) updateTick() {
 				return
 			}
 			log.Printf("update: %s is %s (this is %s)", newBinary, ver, version)
-			if a.overlay() || a.Calibrating() || a.Dozing() {
+			if a.overlay() || a.Calibrating() {
 				u.seen = "" // ask once that's gone
 				return
 			}

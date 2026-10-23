@@ -87,7 +87,7 @@ func (a *App) noticeTick() {
 	now := time.Now()
 	if !a.lightOffAt.IsZero() && now.After(a.lightOffAt) {
 		a.lightOffAt = time.Time{}
-		if a.light != nil && a.light.level > 0 && !a.dozing {
+		if a.light != nil && a.light.level > 0 {
 			a.light.set(0)
 		}
 	}

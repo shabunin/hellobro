@@ -239,7 +239,7 @@ func (a *bro) terms() []*termSession {
 
 // shows says whether w is on screen, with nothing over it.
 func (a *bro) shows(w window) bool {
-	return w != nil && !w.panel(a).Outer.Empty() && !a.Calibrating() && !a.overlay() && !a.Dozing()
+	return w != nil && !w.panel(a).Outer.Empty() && !a.Calibrating() && !a.overlay()
 }
 
 // guiShows says whether the settings' window key is on screen.
@@ -544,7 +544,7 @@ func (a *bro) MenuTap() {
 		a.closePicker()
 	}
 	var entries []pickEntry
-	for _, id := range []string{"rotate", "calibrate", "doze", "sleep", "palette", "quit"} {
+	for _, id := range []string{"rotate", "calibrate", "sleep", "palette", "quit"} {
 		if c := commandByID(id); c != nil {
 			entries = append(entries, pickEntry{kind: "command", title: c.title, detail: a.keyLabels(c.id), do: func() { c.run(a) }})
 		}

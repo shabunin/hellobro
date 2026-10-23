@@ -55,7 +55,6 @@ type bro struct {
 	set    settings
 	mem    remembered // hellobro.json
 	mnt    mountState // the hosts' files, mounted (mount.go)
-	doze   dozeState
 	share  shareState
 	relay  relayState
 	upd    updateState
@@ -167,11 +166,6 @@ func (a *bro) Tap(p image.Point) {
 }
 
 func (a *bro) Tick() {
-	if a.Dozing() {
-		a.dozeTick()
-		return
-	}
-	a.dozeWhenIdle()
 	a.sleepWhenIdle()
 	a.keysTick()
 	a.netTick()
@@ -199,7 +193,7 @@ func (a *bro) Exit() {
 }
 
 func (a *bro) IdleTimeout() time.Duration {
-	if a.Dozing() || a.musicPlaying() { // dozeTick sleeps when the music's over
+	if a.musicPlaying() { // sleepWhenIdle sleeps once it's over
 		return playingIdle
 	}
 	if a.relayOn() { // a computer may come in from afar any time
@@ -218,7 +212,7 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 			a.tv.mods = termMods{caps: a.tv.mods.caps}
 		}
 		return true
-	case kobo.IsMediaKey(m.Code): // the music's, dozing too
+	case kobo.IsMediaKey(m.Code): // the music's
 		if m.Value == 1 || m.Value == 2 && (m.Code == kobo.KeyVolumeUp || m.Code == kobo.KeyVolumeDown) {
 			log.Printf("media key %d from %s", m.Code, m.Dev)
 			a.mediaKey(m.Code)

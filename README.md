@@ -8,9 +8,8 @@ Kobo e-reader. Bring a Bluetooth keyboard.
   <img src="docs/screenshots/btop.png" width="48.5%" alt="btop on the PC, over SSH">
 </p>
 <p align="center">
-  <img src="docs/screenshots/ssh.png" width="32%" alt="An SSH session">
-  <img src="docs/screenshots/cmus.png" width="32%" alt="cmus in a shell, the status bar showing what plays">
-  <img src="docs/screenshots/light-sleep.png" width="32%" alt="Light sleep, the music playing on">
+  <img src="docs/screenshots/ssh.png" width="48.5%" alt="An SSH session">
+  <img src="docs/screenshots/cmus.png" width="48.5%" alt="cmus in a shell, the status bar showing what plays">
 </p>
 <p align="center">
   <img src="docs/screenshots/tiling.png" width="48.5%" alt="Wi-Fi, Sharing, Bluetooth and Settings, tiled">
@@ -37,8 +36,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 - **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to
   Bluetooth headphones. The media keys and the headphones' buttons work,
   and the status bar shows what plays.
-- **Light sleep**: the screen shows what's playing, the light goes off,
-  and the music keeps going.
+- **Sleep when idle**: untouched for 30 minutes on battery (Settings),
+  the Kobo sleeps, so one left on the shelf keeps its charge.
 - **Host files**: a saved host's home mounted for Alpine, read-only or
   read-write: copy, rsync, or play music straight from the PC.
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel, and

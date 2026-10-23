@@ -81,9 +81,6 @@ func (a *bro) termNotify(t *termSession, msg string) {
 	if s, err := strconv.Atoi(a.setting("notify-light")); err == nil {
 		a.FlashLight(max(2*lightStep, a.mem.LightOn), time.Duration(s)*time.Second)
 	}
-	if a.Dozing() {
-		return
-	}
 	if n, err := strconv.Atoi(a.setting("notify-blink")); err == nil && a.onScreen(t) && !t.pane.p.Title.Empty() {
 		a.Blink(t.pane.p.Title, n)
 		return
@@ -105,9 +102,6 @@ func (a *bro) notify(msg string) {
 	log.Printf("notify: %s", msg)
 	if s, err := strconv.Atoi(a.setting("notify-light")); err == nil {
 		a.FlashLight(max(2*lightStep, a.mem.LightOn), time.Duration(s)*time.Second)
-	}
-	if a.Dozing() {
-		return
 	}
 	if s, err := strconv.Atoi(a.setting("notify-note")); err == nil {
 		a.Toast(msg, time.Duration(s)*time.Second)

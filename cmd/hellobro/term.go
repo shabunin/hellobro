@@ -1122,7 +1122,7 @@ func (a *bro) termCloseAll() {
 func (a *bro) termTick() {
 	ts, v := a.terms(), &a.tv
 	for _, t := range ts {
-		t.seen.Store(a.showing(t) && !a.Dozing())
+		t.seen.Store(a.showing(t))
 		if t.state == termWaiting && time.Now().After(t.retryAt) {
 			a.termConnect(t, t.target)
 		}

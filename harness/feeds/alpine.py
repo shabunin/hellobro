@@ -11,7 +11,7 @@ from feedlib import *
 start()
 key(4, ctrl=True, alt=True); time.sleep(3)            # Settings
 key(TAB, ctrl=True); key(TAB, ctrl=True); key(TAB, ctrl=True); time.sleep(2)  # the settings panel
-for _ in range(19):
+for _ in range(15):
     key(DOWN); time.sleep(0.2)
 time.sleep(2)
 key(RIGHT); time.sleep(3)                             # Shell tab runs: Alpine

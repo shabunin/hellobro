@@ -46,18 +46,6 @@ var settingList = []setting{
 	{key: "sleep-power", label: "… plugged in", title: "Sleep when idle, plugged in",
 		values: []string{"off", "5", "15", "30", "60", "120"},
 		shown:  []string{"never by itself", "after 5 min untouched", "after 15 min untouched", "after 30 min untouched", "after 1 h untouched", "after 2 h untouched"}},
-	{key: "doze-after", group: "Music", label: "Light sleep while music plays",
-		values: []string{"off", "1", "2", "5", "10", "20"},
-		shown:  []string{"never by itself", "after 1 min idle", "after 2 min idle", "after 5 min idle", "after 10 min idle", "after 20 min idle"}},
-	{key: "sleep-music", label: "Sleep%s with music on", cmd: "sleep",
-		values: []string{"light", "deep"},
-		shown:  []string{"light: the music plays on", "deep: the music pauses"}},
-	{key: "doze-wifi", label: "Wi-Fi in light sleep",
-		values: []string{"off", "on"},
-		shown:  []string{"off after 3 min (the battery lasts)", "stays on"}},
-	{key: "doze-deep", label: "Music stopped in light sleep",
-		values: []string{"5", "10", "30", "off"},
-		shown:  []string{"deep sleep after 5 min", "deep sleep after 10 min", "deep sleep after 30 min", "stay in light sleep"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
 		values: []string{"frozen", "closed"},
 		shown:  []string{"frozen: back to it at once", "closed, as KOReader does (from the next start)"}},
@@ -132,7 +120,7 @@ func settingLine(i int) int {
 var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
 // The defaults, by key: the index of a value.
-var settingDefault = map[string]int{"doze-after": 3, "doze-deep": 1, "light-idle": 1, "sleep-battery": 2}
+var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2}
 
 // settingCommands step the settings from the switcher, each to its next
 // value, as a tap on its row does, and a toast says what it is now. The
