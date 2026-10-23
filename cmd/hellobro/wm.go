@@ -53,6 +53,7 @@ type wmState struct {
 	wins      map[*wm.Node]window
 	area      image.Rectangle   // where the windows go
 	mode      string            // the keys' binding mode: "" is the default
+	moving    time.Time         // the last move, while the windows show as boxes (wmMoved)
 	grab      window            // the window every key goes to while it's in focus, but grab's own; nil: none
 	typing    window            // the window in focus, typing into another device, as grabTyping saw it
 	tabs      []wmTab           // tabbed and stacked containers' tabs, as drawn
@@ -339,6 +340,9 @@ func (a *bro) closeWin(w window) {
 func (a *bro) wmRun(line string) []wm.Result { return a.wmRunWith(line, wmHost{a}) }
 
 func (a *bro) wmRunWith(line string, h wm.Host) []wm.Result {
+	if wmMove(line) {
+		a.wmMoved()
+	}
 	rs := a.wm.tree.Run(line, h)
 	for _, r := range rs {
 		if !r.Success {
@@ -693,7 +697,48 @@ func (a *bro) Draw() {
 // sketching says the windows show as boxes: the resize mode. Each step
 // of it is a box drawn again, not a window laid out, its terminal and
 // what runs in it resized; that's done once, as the mode ends.
-func (a *bro) sketching() bool { return a.wm.mode == "resize" }
+func (a *bro) sketching() bool { return a.wm.mode == "resize" || !a.wm.moving.IsZero() }
+
+// wmMove says an i3 command moves a window where it is, a step: left,
+// right, up or down (so many px, floating), or to a position.
+func wmMove(line string) bool {
+	f := strings.Fields(line)
+	if len(f) < 2 || f[0] != "move" {
+		return false
+	}
+	switch f[1] {
+	case "left", "right", "up", "down", "position", "absolute":
+		return true
+	case "window", "container":
+		return len(f) > 2 && f[2] != "to"
+	}
+	return false
+}
+
+// moveSettle is how long after the last move the windows are placed for
+// real: moves in a row are boxes till then, as in the resize mode.
+const moveSettle = time.Second
+
+// wmMoved is a move: the windows show as boxes till they settle.
+func (a *bro) wmMoved() {
+	if a.wm.moving.IsZero() && a.wm.mode != "resize" {
+		a.wm.laid = "" // boxes now: drawn anew
+	}
+	a.wm.moving = time.Now()
+}
+
+// wmSettle places the windows for real once the moves are done: a while
+// after the last, or now (anything else came).
+func (a *bro) wmSettle(now bool) {
+	if a.wm.moving.IsZero() || !now && time.Since(a.wm.moving) < moveSettle {
+		return
+	}
+	a.wm.moving = time.Time{}
+	if a.wm.mode != "resize" {
+		a.wm.laid = ""
+		a.wmApply()
+	}
+}
 
 // drawSketch draws the windows as they'd be: gray boxes, the one being
 // resized framed black, each with its name and size.
@@ -717,10 +762,14 @@ func (a *bro) drawSketch() {
 		c.Fill(r, kobo.Light)
 		c.Frame(r, frame, kobo.Black)
 		mid := r.Min.Y + r.Dy()/2
-		c.Text(a.F.Panel, image.Rect(r.Min.X, mid-60, r.Max.X, mid), "resize mode", kobo.Black, kobo.AlignCenter)
+		what, how := "resize mode", "arrows: its size · Enter or Esc: done"
+		if a.wm.mode != "resize" {
+			what, how = "moving", "in place in a moment"
+		}
+		c.Text(a.F.Panel, image.Rect(r.Min.X, mid-60, r.Max.X, mid), what, kobo.Black, kobo.AlignCenter)
 		c.Text(a.F.Small, image.Rect(r.Min.X, mid, r.Max.X, mid+40), fmt.Sprintf("%s · %d×%d", w.Title(), r.Dx(), r.Dy()), kobo.Dark, kobo.AlignCenter)
 		if n == focus {
-			c.Text(a.F.Small, image.Rect(r.Min.X, mid+40, r.Max.X, mid+80), "arrows: its size · Enter or Esc: done", kobo.Dark, kobo.AlignCenter)
+			c.Text(a.F.Small, image.Rect(r.Min.X, mid+40, r.Max.X, mid+80), how, kobo.Dark, kobo.AlignCenter)
 		}
 	}
 }
@@ -737,7 +786,7 @@ func floatingNode(n *wm.Node) bool {
 // drawFloats draws the floating windows over r (all of them, for an empty
 // r), from the bottom up.
 func (a *bro) drawFloats(r image.Rectangle) {
-	if a.wm.composing {
+	if a.wm.composing || a.sketching() { // boxes: drawSketch has them all, floating too
 		return
 	}
 	a.wm.composing = true

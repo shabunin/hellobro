@@ -184,6 +184,7 @@ func (a *bro) Tick() {
 	a.updateTick()
 	a.trialTick()
 	a.ipcTick()
+	a.wmSettle(false)
 	a.wmKeep(false)
 	a.updateRing()
 }
@@ -206,6 +207,11 @@ func (a *bro) IdleTimeout() time.Duration { return noAutoExit }
 const noAutoExit = 100 * 365 * 24 * time.Hour
 
 func (a *bro) Key(m kobo.KeyMsg) bool {
+	if !a.wm.moving.IsZero() && m.Value == 1 && m.Code != 0 && !kobo.IsModifier(m.Code) {
+		if c := a.keyCommand(m.Code); c == nil || !wmMove(c.id) { // anything but another move: in place now
+			a.wmSettle(true)
+		}
+	}
 	switch {
 	case m.Connected != "" || m.Gone != "":
 		if m.Gone != "" { // what it held won't come up now
@@ -260,6 +266,9 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 }
 
 func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
+	if ev.Kind == kobo.TouchDown {
+		a.wmSettle(true) // the windows where they are now, before the touch finds one
+	}
 	switch {
 	case g == nil:
 	case ev.Kind == kobo.TouchDown:
