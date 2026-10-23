@@ -231,7 +231,12 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		a.pickerKey(m.Code, m.Value)
 		return true
 	case a.termMod(m.Code, m.Value): // kept track of always, for the terminals
+		if t := a.term(); t != nil && a.focusedWin() == window(t) {
+			t.kittySend(m.Code, m.Value, a.tv.mods) // a program that wants every key has them too
+		}
 		return true
+	case a.grabbed(m.Code, m.Value): // every key the window's, but grab's own
+		return a.wmKey(m.Code, m.Value)
 	case a.runKey(m.Code, m.Value): // ours, never the remote's
 		return true
 	case a.wm.mode != "": // a mode has its keys, and only those

@@ -107,6 +107,7 @@ type termSession struct {
 
 	back     termBackend
 	emu      *vt.SafeEmulator
+	kitty    kittyKeys  // kitty's keyboard protocol, if the program asked for it (kitty.go)
 	mu       sync.Mutex // held while the emulator changes (write): its touched lines are read and cleared under it
 	dirty    atomic.Bool
 	seen     atomic.Bool // its cells show: its output is read as it comes, else in batches
@@ -1001,6 +1002,7 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 		},
 		Bell: func() { go a.Do(func() { a.termNotify(t, "") }) },
 	})
+	t.kittyRegister(t.emu)
 	t.emu.RegisterOscHandler(52, a.osc52(t))
 	t.emu.RegisterOscHandler(9, a.oscNotify(t))
 	t.emu.RegisterOscHandler(777, a.oscNotify(t))
@@ -1176,6 +1178,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 		return true
 	}
 	if value == 0 {
+		t.kittySend(code, value, *m) // released: only said the kitty way
 		return true
 	}
 	a.clearSel() // a key: the selection's done with
@@ -1262,7 +1265,9 @@ func (a *bro) termKey(code uint16, value int32) bool {
 		return true
 	}
 
-	if k, ok := termKeyEvent(code, *m); ok {
+	if t.kittySend(code, value, *m) {
+		t.keyAt = time.Now()
+	} else if k, ok := termKeyEvent(code, *m); ok {
 		t.emu.SendKey(k)
 		t.keyAt = time.Now()
 	}

@@ -77,6 +77,7 @@ func makeCommands() []*command {
 		wmCommand("layout stacking", "Layout: stacked", false, "meta+s"),
 		wmCommand("layout tabbed", "Layout: tabbed", false, "meta+w"),
 		wmCommand("fullscreen toggle", "Fullscreen: the window in focus", false, "meta+f"),
+		&command{id: "grab", title: "Grab: every key to the window, till this again", keys: []string{"meta+shift+g"}, run: (*bro).toggleGrab},
 		wmCommand("floating toggle", "Floating: the window in focus", false, "meta+shift+space"),
 		wmCommand("move scratchpad", "Put the window away (the scratchpad)", false, "meta+shift+minus"),
 		wmCommand("scratchpad show", "Bring back a window put away", false, "meta+minus"),

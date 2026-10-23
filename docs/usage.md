@@ -81,7 +81,7 @@ One bar at the top, as i3's: the workspaces at its left, and at its
 right where the Kobo is on the network, the Wi-Fi's name and its address
 (`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`), the battery
 and the time. It looks again every 15 s. In a binding mode (Meta+R,
-say) it says which, and what plays, and for a moment what was copied.
+say) it says which (`grab` too, while the keys are grabbed), and what plays, and for a moment what was copied.
 
 A swipe up or down along the right edge of the screen opens the menu:
 rotate the screen, touch calibration, sleep, lock, the switcher, and
@@ -357,6 +357,15 @@ gone**: after 15 s, 30 s or 1 min, or nothing comes up.
   for hellobro's own (the commands' keys: Meta+Shift+E quits, say). A
   program there that wants one of them gets it if keys.conf frees it:
   `ctrl+shift+v -`.
+- **Grab** (Meta+Shift+G) gives every key to the window in focus,
+  hellobro's own too, till Meta+Shift+G again: for tmux, a desktop or
+  another hellobro on the other end, with keys of their own. The bar
+  says `grab` while it's on.
+- A program that asks for kitty's keyboard protocol (`CSI > flags u`:
+  kitty's own, foot's, neovim, helix, hellobro-keys…) gets the keys as
+  kitty says them: the modifiers apart, Super among them, and releases
+  and repeats if it wants them. A modifier tapped for one of hellobro's
+  keys reaches it too, as in kitty; the key itself doesn't.
 - A session calls out with the bell, or with a message as programs send a
   desktop notification (OSC 9 or 777: `make; printf '\e]9;make done\a'`).
   The light comes on a moment if it's off; the session's title strip

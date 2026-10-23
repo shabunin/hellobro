@@ -54,6 +54,7 @@ type wmState struct {
 	wins      map[*wm.Node]window
 	area      image.Rectangle   // where the windows go
 	mode      string            // the keys' binding mode: "" is the default
+	grab      bool              // every key goes to the window in focus, but grab's own
 	tabs      []wmTab           // tabbed and stacked containers' tabs, as drawn
 	frames    []image.Rectangle // the frames around tabbed windows, as drawn
 	laid      string            // what was placed last: another layout is a new screen
@@ -953,6 +954,44 @@ func (a *bro) wmDragLift(g *kobo.Gesture) bool {
 
 const ownDrag = 3
 
+// toggleGrab gives every key to the window in focus, hellobro's own
+// too, but the one that gives them back: for hellobro, tmux or a desktop
+// on the other end of a terminal, with keys of their own.
+func (a *bro) toggleGrab() {
+	a.wm.grab = !a.wm.grab
+	log.Printf("grab: %v", a.wm.grab)
+	a.showMode()
+	if a.wm.grab {
+		a.Toast("grab: every key to the window; "+a.keyLabel("grab")+" gives them back", 3*time.Second)
+	} else {
+		a.Toast("grab: off, the keys are hellobro's again", 3*time.Second)
+	}
+}
+
+// grabbed says the key goes to the window, grabbed.
+func (a *bro) grabbed(code uint16, value int32) bool {
+	switch {
+	case !a.wm.grab:
+		return false
+	case value == 0:
+		return !a.keys.down[code] // grab's own key coming up is runKey's
+	}
+	c := a.keyCommand(code)
+	return c == nil || c.id != "grab"
+}
+
+// showMode has the bar say the binding mode, or grab.
+func (a *bro) showMode() {
+	switch {
+	case a.wm.grab:
+		a.SetStatus("grab: " + a.keyLabel("grab") + " lets go")
+	case a.wm.mode != "":
+		a.SetStatus("mode: " + a.wm.mode)
+	default:
+		a.SetStatus("")
+	}
+}
+
 // setMode goes to the keys' binding mode name ("": the default).
 func (a *bro) setMode(name string) {
 	a.wm.mode = name
@@ -962,9 +1001,5 @@ func (a *bro) setMode(name string) {
 		change = "default"
 	}
 	a.ipcSend("mode", map[string]any{"change": change, "pango_markup": false})
-	if name == "" {
-		a.SetStatus("")
-	} else {
-		a.SetStatus("mode: " + name)
-	}
+	a.showMode()
 }
