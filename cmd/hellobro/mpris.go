@@ -235,6 +235,7 @@ func (a *bro) setPlayers(ps []player) {
 		a.SetStatus(now)
 		a.drawStat(false)
 	}
+	a.SetLockLines(a.lockLines())
 }
 
 // lookAgain has the players looked at now, after a key changed them.

@@ -177,30 +177,31 @@ type App struct {
 	inputAt time.Time   // last touch or key
 	call    chan func() // work from goroutines, run on the UI loop
 
-	status      string          // the header's status text, as drawn
-	note        string          // the Program's, left of it
-	network     string          // the Program's, first: the Wi-Fi and the address
-	dirty       []dirtyRect     // pending screen updates, blitted one at a time
-	flash       bool            // the next full-screen update should flash
-	flashR      image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
-	blitting    bool
-	jobs        chan blitJob
-	done        chan error
-	quit        bool
-	alive       atomic.Int64    // last loop tick, for the watchdog
-	blitAt      atomic.Int64    // start of the blit in flight, or 0
-	noPower     bool            // the power button doesn't reach us
-	wokeAt      time.Time       // from sleep: the power press that woke us comes after
-	asleep      bool            // the sleep screen is up: nothing else gets drawn
-	sleeping    atomic.Bool     // asleep, for the watchdog: the clock jumps
-	locked      bool            // touch does nothing, keys only what the Program lets through (lock.go)
-	lockHint    string          // how to unlock
-	eatTouch    bool            // a contact that began while locked isn't over
-	lockNudgeAt time.Time       // the hint last showed
-	restart     string          // a binary to run in our place once we've quit
-	ctrl        [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
-	alt         [2]bool         // and Alt
-	ring        image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
+	status    string          // the header's status text, as drawn
+	note      string          // the Program's, left of it
+	network   string          // the Program's, first: the Wi-Fi and the address
+	dirty     []dirtyRect     // pending screen updates, blitted one at a time
+	flash     bool            // the next full-screen update should flash
+	flashR    image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
+	blitting  bool
+	jobs      chan blitJob
+	done      chan error
+	quit      bool
+	alive     atomic.Int64    // last loop tick, for the watchdog
+	blitAt    atomic.Int64    // start of the blit in flight, or 0
+	noPower   bool            // the power button doesn't reach us
+	wokeAt    time.Time       // from sleep: the power press that woke us comes after
+	asleep    bool            // the sleep screen is up: nothing else gets drawn
+	sleeping  atomic.Bool     // asleep, for the watchdog: the clock jumps
+	locked    bool            // touch does nothing, keys only what the Program lets through (lock.go)
+	lockHint  string          // how to unlock
+	eatTouch  bool            // a contact that began while locked isn't over
+	lockLines []string        // what else the lock screen shows
+	lockC     Canvas          // the lock screen, on the panel while locked
+	restart   string          // a binary to run in our place once we've quit
+	ctrl      [2]bool         // left and right Ctrl held, for Ctrl+Alt+N
+	alt       [2]bool         // and Alt
+	ring      image.Rectangle // the focus ring's outer edge, if it shows (ring.go)
 
 	blinks     []blinking // notice.go
 	toast      *toast
@@ -979,7 +980,7 @@ func compact(a, b image.Rectangle) bool { return Area(a.Union(b)) <= (Area(a)+Ar
 // areas get a grayscale waveform, others (black & white ink only) the
 // fast one.
 func (a *App) Mark(r image.Rectangle, ui bool) {
-	if r.Empty() {
+	if r.Empty() || a.locked { // the page is off the panel
 		return
 	}
 	for i, d := range a.dirty {
@@ -1028,10 +1029,12 @@ func (a *App) flush() {
 	}
 	a.dirty = rest
 	img := image.NewGray(d.r)
-	CopyGray(img, d.r, a.C.Gray, d.r.Min)
-	a.stampNotices(img)
-	if d.r.Overlaps(a.ring) {
-		stampRing(img, a.ring)
+	CopyGray(img, d.r, a.panel().Gray, d.r.Min)
+	if !a.locked {
+		a.stampNotices(img)
+		if d.r.Overlaps(a.ring) {
+			stampRing(img, a.ring)
+		}
 	}
 	flash := a.flash && d.r == a.C.Bounds()
 	if !flash && d.ui && !a.flashR.Empty() && a.flashR.In(d.r) {

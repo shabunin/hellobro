@@ -6,6 +6,7 @@ package main
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"hellobro/radio"
@@ -136,12 +137,26 @@ func (a *bro) lock() {
 		a.Toast("locking wants a key for it (keys.conf: lock)", 4*time.Second)
 	default:
 		a.picker = nil // what's open stays put; the switcher would only be in the way
-		a.App.Lock("locked: touch does nothing. " + k + " unlocks")
+		a.App.Lock(k+" unlocks", a.lockLines())
 	}
 }
 
+// lockLines are what the lock screen says of the music: the track, and
+// whether it plays.
+func (a *bro) lockLines() []string {
+	p, ok := a.target()
+	if !ok || p.title == "" {
+		return nil
+	}
+	s := "♪ " + p.title
+	if p.artist != "" {
+		s += " · " + p.artist
+	}
+	return []string{s, strings.ToLower(p.status)}
+}
+
 // lockedKey is a key while locked: the lock's unlocks, the modifiers are
-// kept track of, anything else only says how to unlock.
+// kept track of, anything else goes nowhere.
 func (a *bro) lockedKey(code uint16, value int32) {
 	if a.termMod(code, value) {
 		return
@@ -155,7 +170,5 @@ func (a *bro) lockedKey(code uint16, value int32) {
 			a.keys.down[code] = true
 			a.Unlock()
 		}
-		return
 	}
-	a.LockNudge()
 }

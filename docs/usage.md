@@ -285,8 +285,10 @@ lasts about 12 hours from full.
 
 Shift+Meta+X locks the screen, for a bag or a hand: touch does nothing
 and keys go nowhere, but the music's keys, the power button (sleep),
-and Shift+Meta+X again, which unlocks. A toast says so, and again (every
-10 s at most) when a touch or a key went nowhere. Locked, touches and
+and Shift+Meta+X again, which unlocks. The lock screen says hello bro,
+what plays and whether it's paused, and how to unlock; it changes only
+when the music does. The windows go on behind it, as they are when it
+unlocks; asleep and awake, it's still locked. Locked, touches and
 keys don't count as use: the light stays off and sleeping when idle
 still comes. It wants a keyboard (its keys unlock), and unlocks by
 itself if the keyboard goes. keys.conf: `lock`.

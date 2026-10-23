@@ -70,6 +70,9 @@ func (a *App) wake(light int, why string) {
 	if a.light != nil && light > 0 {
 		a.light.set(light)
 	}
+	if a.locked { // the lock screen again, over the sleep screen
+		a.drawLock()
+	}
 	a.drawAll(true)
 	if s, ok := a.prog.(Sleeper); ok {
 		s.Wake()
@@ -78,7 +81,7 @@ func (a *App) wake(light int, why string) {
 
 // drawSleep is the screen that stays on the panel while asleep.
 func (a *App) drawSleep() {
-	c := a.C
+	c := a.panel()
 	b := c.Bounds()
 	c.Fill(b, White)
 	cy := b.Dy() / 2
