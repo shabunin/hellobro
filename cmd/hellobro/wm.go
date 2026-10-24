@@ -97,25 +97,33 @@ func (a *bro) wmInit() {
 }
 
 // winWord is what's kept of a window between runs: what it was, so it can
-// be again. A terminal runs it again: a shell starts, SSH connects.
+// be again. A terminal runs it again: a shell starts, SSH connects; its
+// font's size goes before, "20px/alpine".
 func winWord(w wm.Window) string {
 	switch w := w.(type) {
 	case *guiWin:
 		return "gui:" + w.key
 	case *termSession:
-		switch {
-		case w.launcher():
-			return "launcher"
-		case w.kind == kindSSH && w.target.name != "":
-			return "ssh:" + w.target.name
-		case w.kind == kindSSH, w.exec != "": // typed in, or a command: what it was isn't kept
-			return "launcher"
-		case w.alpine:
-			return "alpine"
+		if w.fontPx != 0 {
+			return strconv.Itoa(w.fontPx) + "px/" + termWord(w)
 		}
-		return "sh"
+		return termWord(w)
 	}
 	return ""
+}
+
+func termWord(w *termSession) string {
+	switch {
+	case w.launcher():
+		return "launcher"
+	case w.kind == kindSSH && w.target.name != "":
+		return "ssh:" + w.target.name
+	case w.kind == kindSSH, w.exec != "": // typed in, or a command: what it was isn't kept
+		return "launcher"
+	case w.alpine:
+		return "alpine"
+	}
+	return "sh"
 }
 
 // wmRestore builds the windows as s has them; false if none came back.
@@ -134,8 +142,13 @@ func (a *bro) wmRestore(s wm.Saved) (ok bool) {
 		if n >= maxWins {
 			return nil
 		}
-		kind, arg, _ := strings.Cut(word, ":")
 		t := &termSession{}
+		if n, rest, ok := strings.Cut(word, "px/"); ok {
+			if px, err := strconv.Atoi(n); err == nil {
+				t.fontPx, word = max(termFontMin, min(termFontMax, px)), rest
+			}
+		}
+		kind, arg, _ := strings.Cut(word, ":")
 		switch kind {
 		case "gui":
 			if guiName(arg) == "" || gui[arg] {

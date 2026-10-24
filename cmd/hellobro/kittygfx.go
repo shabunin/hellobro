@@ -798,9 +798,8 @@ func dither16(m *image.Gray, r image.Rectangle) {
 
 // gfxTile is pl drawn for the cells as they are now: kept, as long as
 // they don't come to too much.
-func (a *bro) gfxTile(pl *kgPlace) *image.Gray {
+func (a *bro) gfxTile(pl *kgPlace, cell image.Point) *image.Gray {
 	v := &a.tv
-	cell := image.Pt(v.cw, v.ch)
 	if m := v.tiles[pl]; m != nil && m.Rect.Dx() == pl.cols*cell.X && m.Rect.Dy() == pl.rows*cell.Y {
 		return m
 	}

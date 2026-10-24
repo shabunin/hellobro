@@ -362,8 +362,9 @@ gone**: after 15 s, 30 s or 1 min, or nothing comes up.
 - Each terminal is a window, with its own size: the remote (or the
   shell) is told when it changes. The title strip's `disconnect` or
   `kill` ends what runs, and the window is a launcher again; close closes it.
-- Ctrl+= / Ctrl+- / Ctrl+0: font size, all the terminals' (remembered
-  in `hellobro.json`).
+- Ctrl+= / Ctrl+- / Ctrl+0: font size, the terminal in focus's: the
+  others keep theirs. A new terminal takes the size last set. Each
+  window's is kept with the layout in `hellobro.json`.
 - A status bar along the bottom, under the windows, fullscreen too: what's playing, and the
   battery (charge, temperature), CPU and memory use, every 5 s.
   Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it
@@ -716,7 +717,7 @@ Kobo's storage:
 | `authorized_keys` | computers paired for file sharing |
 | `ssh_host_ed25519_key` | the Kobo's host key, for file sharing |
 | `settings`, `status-bar` | settings |
-| `hellobro.json` | the saved SSH hosts, and how it was left: the windows, the light, the font size |
+| `hellobro.json` | the saved SSH hosts, and how it was left: the windows (each terminal's font size with it), the light, the font size for new terminals |
 | `ssh.conf.old` | the hosts as kept before, taken in once |
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |

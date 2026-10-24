@@ -34,7 +34,6 @@ type bro struct {
 	*kobo.App
 	wm     wmState
 	ipc    ipcState
-	tf     termFonts
 	tv     termView
 	edge   *kobo.Gesture    // a contact along the right edge, which may become a menu swipe
 	pair   [2]*kobo.Gesture // two fingers together: may become a workspace swipe
@@ -118,7 +117,6 @@ func main() {
 	a.keys = loadKeys()
 	a.applyMod()
 	a.SetTouchMarks(a.setting("touch-marks") == "on")
-	a.tf.setSize(termFontDefault)
 	a.wmInit()
 	a.ipcStart()
 	a.termInit()
@@ -136,7 +134,7 @@ func (a *bro) Layout(L kobo.Layout) {
 		a.wm.area = L.Page
 	}
 	a.layoutStat()
-	if a.tv.cw != 0 {
+	if a.tv.fontPx != 0 {
 		a.termGeometry() // the cells' size
 	}
 	if a.wm.tree == nil {

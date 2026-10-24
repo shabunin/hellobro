@@ -210,13 +210,13 @@ func (a *bro) selMove(p image.Point, g *kobo.Gesture) {
 		s.on, g.Owner = true, ownSelect
 		log.Print("terminal: selecting")
 	}
-	v, t := &a.tv, a.term()
+	t := a.term()
 	if t == nil {
 		return
 	}
-	pn := &t.pane
+	pn, f := &t.pane, a.face(t)
 	q := p.Sub(pn.grid.Min)
-	s.to = image.Pt(max(0, min(pn.cols-1, q.X/max(1, v.cw))), max(0, min(pn.rows-1, q.Y/max(1, v.ch))))
+	s.to = image.Pt(max(0, min(pn.cols-1, q.X/f.cw)), max(0, min(pn.rows-1, q.Y/f.ch)))
 	if t.connected() {
 		a.renderTerm(t)
 	}

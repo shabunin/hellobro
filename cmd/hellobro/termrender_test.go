@@ -30,7 +30,7 @@ func TestRenderRecording(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
-	a.tf.setSize(termFontDefault)
+	a.tv.fontPx = termFontDefault
 	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1872, 1404))}
 	a.C.Fill(a.C.Bounds(), kobo.White)
 	tr := testTerm(a)
@@ -139,7 +139,7 @@ func TestTermKeys(t *testing.T) {
 // screen, colors, wide characters and a cursor jumping about.
 func TestRenderTouched(t *testing.T) {
 	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
-	a.tf.setSize(termFontDefault)
+	a.tv.fontPx = termFontDefault
 	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1000, 700))}
 	a.C.Fill(a.C.Bounds(), kobo.White)
 	tr := testTerm(a)
@@ -256,7 +256,7 @@ func BenchmarkRenderTerm(b *testing.B) {
 	for _, full := range []bool{false, true} {
 		b.Run(map[bool]string{false: "touched", true: "full"}[full], func(b *testing.B) {
 			a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
-			a.tf.setSize(termFontDefault)
+			a.tv.fontPx = termFontDefault
 			a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1872, 1404))}
 			tr := testTerm(a)
 			tr.pane.p = kobo.NewPanel(a.F, "Terminal", image.Rect(16, 60, 1856, 1390), "")

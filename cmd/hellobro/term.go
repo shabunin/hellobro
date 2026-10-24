@@ -112,6 +112,7 @@ type termSession struct {
 	emu      *vt.SafeEmulator
 	kitty    kittyKeys  // kitty's keyboard protocol, if the program asked for it (kitty.go)
 	gfx      kittyGfx   // and its images (kittygfx.go), under mu
+	fontPx   int        // its font's size (face)
 	mu       sync.Mutex // held while the emulator changes (write): its touched lines are read and cleared under it
 	dirty    atomic.Bool
 	seen     atomic.Bool // its cells show: its output is read as it comes, else in batches
@@ -177,14 +178,13 @@ type termView struct {
 
 	nearby  nearbyState // the other hellobros heard (typein.go)
 	sel     *termSel    // the selection, or a contact that may become one (clipboard.go): the focused session's
-	cw, ch  int         // cell size
 	drawnAt time.Time
 	churn   int       // pixels changed since the last flash
 	bigAt   time.Time // the last change of more than a few rows
 
 	mods   termMods
-	glyphs map[glyphKey]*image.Alpha
-	fontPx int
+	faces  map[int]*termFace // the font, by size: the terminals' sizes
+	fontPx int               // the size last set: a new terminal's
 
 	tiles     map[*kgPlace]*image.Gray // placements drawn for the cells' size (kittygfx.go)
 	tileBytes int
@@ -271,13 +271,10 @@ func (t *termSession) press(a *bro, code uint16, value int32) bool { return a.te
 
 // --- layout & geometry ---
 
-// termGeometry measures the cells and lays the sessions out again.
+// termGeometry lays the sessions out again.
 func (a *bro) termGeometry() {
 	v := &a.tv
 	v.sel = nil // its cells are other ones now
-	v.cw = kobo.TextWidth(a.tf.term, "M")
-	m := a.tf.term.Metrics()
-	v.ch = m.Ascent.Ceil() + m.Descent.Ceil() + 2
 	for _, t := range a.terms() {
 		a.paneGeometry(t)
 	}
@@ -286,21 +283,21 @@ func (a *bro) termGeometry() {
 // paneGeometry fits t's cells to its panel. A session that doesn't show
 // keeps its size: the remote isn't told of every fold.
 func (a *bro) paneGeometry(t *termSession) {
-	v, pn := &a.tv, &t.pane
+	f, pn := a.face(t), &t.pane
 	pn.shown, pn.shownConnect, pn.picks, pn.grid = nil, nil, nil, image.Rectangle{}
-	if pn.p.Body.Empty() || v.cw == 0 {
+	if pn.p.Body.Empty() {
 		return
 	}
 	grid := pn.p.Body.Inset(6)
-	pn.cols, pn.rows = max(20, grid.Dx()/v.cw), max(5, grid.Dy()/v.ch)
+	pn.cols, pn.rows = max(20, grid.Dx()/f.cw), max(5, grid.Dy()/f.ch)
 	// Centered in the body.
-	gw, gh := pn.cols*v.cw, pn.rows*v.ch
+	gw, gh := pn.cols*f.cw, pn.rows*f.ch
 	at := image.Pt(grid.Min.X+(grid.Dx()-gw)/2, grid.Min.Y+(grid.Dy()-gh)/2)
 	pn.grid = image.Rectangle{at, at.Add(image.Pt(gw, gh))}
 	if !t.connected() {
 		return
 	}
-	cell := image.Pt(v.cw, v.ch)
+	cell := f.cell()
 	t.mu.Lock()
 	moved := cell != t.gfx.cell
 	t.gfx.cell = cell
@@ -356,7 +353,7 @@ func (t *termSession) status(v *termView) string {
 		if t.kind == kindShell {
 			where = map[bool]string{false: "sh on this Kobo", true: "Alpine, in a jail"}[t.alpine]
 		}
-		s := fmt.Sprintf("%s · %d×%d · %d px", where, t.size.X, t.size.Y, v.fontPx)
+		s := fmt.Sprintf("%s · %d×%d · %d px", where, t.size.X, t.size.Y, t.fontPx)
 		if t.title != "" {
 			s = t.title + " · " + s
 		}
@@ -617,11 +614,12 @@ func (a *bro) renderTerm(t *termSession) {
 	if big {
 		v.bigAt = time.Now()
 	}
+	f := a.face(t)
 	for _, p := range cells {
-		a.drawCell(pn, p.X, p.Y, pn.shown[p.Y][p.X])
+		a.drawCell(pn, f, p.X, p.Y, pn.shown[p.Y][p.X])
 	}
 	for _, c := range rows {
-		r := image.Rect(pn.grid.Min.X+c.from*v.cw, pn.grid.Min.Y+c.y*v.ch, pn.grid.Min.X+(c.to+1)*v.cw, pn.grid.Min.Y+(c.y+1)*v.ch)
+		r := image.Rect(pn.grid.Min.X+c.from*f.cw, pn.grid.Min.Y+c.y*f.ch, pn.grid.Min.X+(c.to+1)*f.cw, pn.grid.Min.Y+(c.y+1)*f.ch)
 		r = r.Inset(-1).Intersect(pn.grid)
 		v.churn += kobo.Area(r)
 		if !c.gray && !big {
@@ -712,31 +710,30 @@ func grayOf(c color.Color) uint8 {
 	return uint8((y + 8) / 17 * 17)
 }
 
-func (a *bro) drawCell(pn *termPane, x, y int, k cellKey) {
-	v := &a.tv
+func (a *bro) drawCell(pn *termPane, f *termFace, x, y int, k cellKey) {
 	if k.width == 0 {
 		return // the right half of a wide character, drawn with it
 	}
 	w := max(1, k.width)
-	r := image.Rect(pn.grid.Min.X+x*v.cw, pn.grid.Min.Y+y*v.ch, pn.grid.Min.X+(x+w)*v.cw, pn.grid.Min.Y+(y+1)*v.ch).Intersect(pn.grid)
+	r := image.Rect(pn.grid.Min.X+x*f.cw, pn.grid.Min.Y+y*f.ch, pn.grid.Min.X+(x+w)*f.cw, pn.grid.Min.Y+(y+1)*f.ch).Intersect(pn.grid)
 	fg, bg := k.fg, k.bg
 	if k.cursor != k.sel {
 		fg, bg = bg, fg
 	}
 	if k.place != nil {
-		kobo.CopyGray(a.C.Gray, r, a.gfxTile(k.place), image.Pt(int(k.ix)*v.cw, int(k.iy)*v.ch))
+		kobo.CopyGray(a.C.Gray, r, a.gfxTile(k.place, f.cell()), image.Pt(int(k.ix)*f.cw, int(k.iy)*f.ch))
 		return
 	}
 	a.C.Fill(r, bg)
 	if k.content != "" && k.content != " " {
-		mask := a.glyph(k.content, k.attrs&uv.AttrBold != 0, w)
+		mask := f.glyph(k.content, k.attrs&uv.AttrBold != 0, w)
 		a.C.Mask(r, fg, mask, image.Point{})
 	}
 	if k.ul != 0 {
 		a.C.Fill(image.Rect(r.Min.X, r.Max.Y-3, r.Max.X, r.Max.Y-1), fg)
 	}
 	if k.attrs&uv.AttrStrikethrough != 0 {
-		a.C.Fill(image.Rect(r.Min.X, r.Min.Y+v.ch/2, r.Max.X, r.Min.Y+v.ch/2+2), fg)
+		a.C.Fill(image.Rect(r.Min.X, r.Min.Y+f.ch/2, r.Max.X, r.Min.Y+f.ch/2+2), fg)
 	}
 }
 
@@ -746,9 +743,8 @@ func (a *bro) drawCell(pn *termPane, x, y int, k cellKey) {
 func (a *bro) termInit() {
 	v := &a.tv
 	v.fontPx = termFontDefault
-	if px := a.mem.TermFont; px != 0 && px != v.fontPx {
+	if px := a.mem.TermFont; px != 0 {
 		v.fontPx = max(termFontMin, min(termFontMax, px))
-		a.tf.setSize(v.fontPx)
 	}
 	a.termGeometry()
 }
@@ -766,24 +762,46 @@ func (a *bro) endSession() {
 	a.drawPane(t)
 }
 
-// setTermFont changes the terminal's font size; the remotes get the new
-// cell count, as when a terminal window is resized.
-func (a *bro) setTermFont(px int) {
+// termFontBy changes the font size of the terminal in focus by d px;
+// d 0: back to the default.
+func (a *bro) termFontBy(d int) {
+	if t := a.term(); t != nil {
+		px := termFontDefault
+		if d != 0 {
+			px = a.face(t).px + d
+		}
+		a.setTermFont(t, px)
+	}
+}
+
+// setTermFont changes t's font size, the other terminals' staying as
+// they are; the remote gets the new cell count, as when its window is
+// resized. New terminals take the size too.
+func (a *bro) setTermFont(t *termSession, px int) {
 	v := &a.tv
 	px = max(termFontMin, min(termFontMax, px))
-	if px == v.fontPx {
+	if px != v.fontPx {
+		v.fontPx, a.mem.TermFont = px, px
+		a.mem.save()
+	}
+	if px == a.face(t).px {
 		return
 	}
 	log.Printf("terminal font: %d px", px)
-	v.fontPx = px
-	a.tf.setSize(px)
-	v.glyphs = nil
-	a.termGeometry()
-	a.mem.TermFont = px
-	a.mem.save()
-	if !a.overlay() {
-		a.DrawPage()
-		a.MarkFlash(a.lay.Page) // every glyph changed: clean, not ghosted
+	t.fontPx = px
+	if t == a.term() {
+		v.sel = nil // its cells are other ones now
+	}
+	for size := range v.faces { // the sizes no terminal has any more
+		if !slices.ContainsFunc(a.terms(), func(o *termSession) bool { return o.fontPx == size }) {
+			delete(v.faces, size)
+		}
+	}
+	a.paneGeometry(t)
+	a.wm.changed = time.Now() // kept with the layout
+	if !a.overlay() && !t.pane.p.Outer.Empty() {
+		a.drawPane(t)
+		a.MarkFlash(t.pane.p.Outer) // every glyph changed: clean, not ghosted
 	}
 }
 
@@ -1026,7 +1044,7 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	defer a.grabTyping() // typing into another device, maybe
 	t.emu = vt.NewSafeEmulator(cols, rows)
 	t.mu.Lock()
-	t.gfx = kittyGfx{cell: image.Pt(a.tv.cw, a.tv.ch)}
+	t.gfx = kittyGfx{cell: a.face(t).cell()}
 	t.mu.Unlock()
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
 	t.emu.SetDefaultBackgroundColor(color.White)
@@ -1047,7 +1065,8 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	t.emu.RegisterOscHandler(52, a.osc52(t))
 	t.emu.RegisterOscHandler(9, a.oscNotify(t))
 	t.emu.RegisterOscHandler(777, a.oscNotify(t))
-	back.resize(cols, rows, image.Pt(cols*a.tv.cw, rows*a.tv.ch))
+	f := a.face(t)
+	back.resize(cols, rows, image.Pt(cols*f.cw, rows*f.ch))
 	if t.kind == kindShell {
 		log.Printf("shell: started, %d×%d", cols, rows)
 	} else {
@@ -1409,11 +1428,12 @@ func (a *bro) termMod(code uint16, value int32) bool {
 
 // termCell maps a screen point to a cell, if it's on the grid.
 func (a *bro) termCell(p image.Point) (int, int, bool) {
-	t, v := a.term(), &a.tv
-	if t == nil || !p.In(t.pane.grid) || v.cw == 0 {
+	t := a.term()
+	if t == nil || !p.In(t.pane.grid) {
 		return 0, 0, false
 	}
-	return (p.X - t.pane.grid.Min.X) / v.cw, (p.Y - t.pane.grid.Min.Y) / v.ch, true
+	f := a.face(t)
+	return (p.X - t.pane.grid.Min.X) / f.cw, (p.Y - t.pane.grid.Min.Y) / f.ch, true
 }
 
 // termTap handles a tap on a terminal: its button, a choice on the
@@ -1451,13 +1471,13 @@ func (a *bro) termTap(p image.Point) {
 
 // termSwipe turns a vertical swipe into mouse wheel steps, one per row moved.
 func (a *bro) termSwipe(from, to image.Point) bool {
-	t, v := a.term(), &a.tv
+	t := a.term()
 	x, y, ok := a.termCell(from)
 	if t == nil || !t.connected() || !ok {
 		return false
 	}
 	dy := to.Y - from.Y
-	steps := min(20, kobo.Abs(dy)/v.ch)
+	steps := min(20, kobo.Abs(dy)/a.face(t).ch)
 	if steps == 0 || kobo.Abs(dy) < 2*kobo.Abs(to.X-from.X) {
 		return false
 	}

@@ -4,6 +4,7 @@ package main
 // and box-drawing, block and braille characters drawn to fill the cell.
 
 import (
+	"cmp"
 	"image"
 	"image/color"
 	"image/draw"
@@ -25,44 +26,82 @@ func (f *termFonts) setSize(px int) {
 	f.term, f.bold, f.fallback = kobo.Face(gomono.TTF, float64(px)), kobo.Face(gomonobold.TTF, float64(px)), kobo.Face(goregular.TTF, float64(px))
 }
 
+// termFace is the terminal font in one size: its faces, its cells' size,
+// and the glyphs drawn in it. Each terminal has a size of its own; those
+// of a size share one.
+type termFace struct {
+	px     int
+	fonts  termFonts
+	cw, ch int
+	glyphs map[glyphKey]*image.Alpha
+}
+
+func newTermFace(px int) *termFace {
+	f := &termFace{px: px}
+	f.fonts.setSize(px)
+	f.cw = kobo.TextWidth(f.fonts.term, "M")
+	m := f.fonts.term.Metrics()
+	f.ch = m.Ascent.Ceil() + m.Descent.Ceil() + 2
+	return f
+}
+
+func (f *termFace) cell() image.Point { return image.Pt(f.cw, f.ch) }
+
+// face is t's font: its own size, which a new terminal takes from the
+// size last set.
+func (a *bro) face(t *termSession) *termFace {
+	v := &a.tv
+	if t.fontPx == 0 {
+		t.fontPx = cmp.Or(v.fontPx, termFontDefault)
+	}
+	f := v.faces[t.fontPx]
+	if f == nil {
+		if v.faces == nil {
+			v.faces = map[int]*termFace{}
+		}
+		f = newTermFace(t.fontPx)
+		v.faces[t.fontPx] = f
+	}
+	return f
+}
+
 type glyphKey struct {
 	s     string
 	bold  bool
 	width int
 }
 
-func (a *bro) glyph(s string, bold bool, width int) *image.Alpha {
-	v := &a.tv
+func (tf *termFace) glyph(s string, bold bool, width int) *image.Alpha {
 	k := glyphKey{s, bold, width}
-	if g, ok := v.glyphs[k]; ok {
+	if g, ok := tf.glyphs[k]; ok {
 		return g
 	}
-	if v.glyphs == nil || len(v.glyphs) > 4000 {
-		v.glyphs = map[glyphKey]*image.Alpha{}
+	if tf.glyphs == nil || len(tf.glyphs) > 4000 {
+		tf.glyphs = map[glyphKey]*image.Alpha{}
 	}
-	m := image.NewAlpha(image.Rect(0, 0, v.cw*width, v.ch))
+	m := image.NewAlpha(image.Rect(0, 0, tf.cw*width, tf.ch))
 	r, _ := utf8.DecodeRuneInString(s)
 	if !drawSpecial(m, r) {
-		f := a.tf.term
+		f := tf.fonts.term
 		if bold {
-			f = a.tf.bold
+			f = tf.fonts.bold
 		}
 		if _, ok := f.GlyphAdvance(r); !ok {
-			f = a.tf.fallback // Go Mono lacks it: try the proportional Go font, centered
+			f = tf.fonts.fallback // Go Mono lacks it: try the proportional Go font, centered
 		}
 		x := 0
-		if f == a.tf.fallback {
+		if f == tf.fonts.fallback {
 			if _, ok := f.GlyphAdvance(r); !ok {
 				drawMissing(m)
-				v.glyphs[k] = m
+				tf.glyphs[k] = m
 				return m
 			}
-			x = (v.cw*width - kobo.TextWidth(f, s)) / 2
+			x = (tf.cw*width - kobo.TextWidth(f, s)) / 2
 		}
-		d := font.Drawer{Dst: m, Src: image.Opaque, Face: f, Dot: fixed.P(x, 1+a.tf.term.Metrics().Ascent.Ceil())}
+		d := font.Drawer{Dst: m, Src: image.Opaque, Face: f, Dot: fixed.P(x, 1+tf.fonts.term.Metrics().Ascent.Ceil())}
 		d.DrawString(s)
 	}
-	v.glyphs[k] = m
+	tf.glyphs[k] = m
 	return m
 }
 

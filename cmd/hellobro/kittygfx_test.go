@@ -207,7 +207,7 @@ func TestGfxNumber(t *testing.T) {
 // TestGfxRender: the placement's cells are drawn from the image.
 func TestGfxRender(t *testing.T) {
 	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
-	a.tf.setSize(termFontDefault)
+	a.tv.fontPx = termFontDefault
 	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1000, 700))}
 	a.C.Fill(a.C.Bounds(), kobo.White)
 	tr := testTerm(a)
@@ -217,7 +217,7 @@ func TestGfxRender(t *testing.T) {
 	tr.emu = vt.NewSafeEmulator(v.cols, v.rows)
 	tr.size = image.Pt(v.cols, v.rows)
 	tr.state = termConnected
-	tr.gfx.cell = image.Pt(a.tv.cw, a.tv.ch)
+	tr.gfx.cell = a.face(tr).cell()
 	go func() {
 		buf := make([]byte, 256)
 		for {
@@ -227,7 +227,7 @@ func TestGfxRender(t *testing.T) {
 		}
 	}()
 	defer tr.emu.Close()
-	cw, ch := a.tv.cw, a.tv.ch
+	cw, ch := a.face(tr).cw, a.face(tr).ch
 	tr.write([]byte("\x1b_Ga=T,f=100,c=4,r=2,q=2;" + pngB64(t, 8, 8, color.Black) + "\x1b\\"))
 	a.renderTerm(tr)
 	g := v.grid.Min
