@@ -77,6 +77,9 @@ func main() {
 		msgMain(os.Args[1:])
 		return
 	}
+	if filepath.Base(os.Args[0]) == "read-kitty" { // in a jail (readkitty.go)
+		os.Exit(readMain(os.Args[1:]))
+	}
 	if len(os.Args) >= 2 && os.Args[1] == "--msg" {
 		msgMain(os.Args[2:])
 		return

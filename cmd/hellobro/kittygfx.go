@@ -732,7 +732,17 @@ func (pl *kgPlace) tile(cell image.Point) *image.Gray {
 	}
 	r := image.Rectangle{Max: pl.size(cell)}
 	scaleGray(m, r, g.SubImage(src).(*image.Gray))
-	dither16(m, r)
+	if r.Size() == src.Size() {
+		// Pixel for pixel, it was made for the screen: a page's text,
+		// say, which dots would only fray. Each pixel to its nearest gray.
+		for y := range r.Dy() {
+			for i, p := range m.Pix[y*m.Stride:][:r.Dx()] {
+				m.Pix[y*m.Stride+i] = uint8((int(p) + 8) / 17 * 17)
+			}
+		}
+	} else {
+		dither16(m, r)
+	}
 	return m
 }
 

@@ -248,16 +248,15 @@ func alpineJail(shared bool) error {
 			if err := jailDir("/usr/local/bin"); err != nil {
 				return err
 			}
-			const msg = "/usr/local/bin/hellobro-msg"
-			if st, err := os.Lstat(msg); err != nil || !st.Mode().IsRegular() {
-				if err := writeNew(msg, ""); err != nil {
-					return err
-				}
-			}
-			if err := jailBind("/.oldroot"+exe, msg, false); err != nil {
+			if err := jailExe(exe, "/usr/local/bin/hellobro-msg"); err != nil {
 				return err
 			}
 		}
+	}
+	// read-kitty (readkitty.go): this binary too. Not having it doesn't
+	// keep the jail from starting.
+	if exe != "" && jailDir("/usr/local/bin") == nil {
+		jailExe(exe, "/usr/local/bin/read-kitty")
 	}
 	if bus {
 		if err := jailDir("/run/dbus"); err != nil {
@@ -361,6 +360,17 @@ var jailIPC bool
 
 // jailBind binds src (the Kobo's, under /.oldroot) at dst read-only: a
 // directory (made if need be), or a file onto one there.
+// jailExe binds hellobro's binary (exe, the Kobo's path) read-only in
+// the jail at path: it does there what that name says.
+func jailExe(exe, path string) error {
+	if st, err := os.Lstat(path); err != nil || !st.Mode().IsRegular() {
+		if err := writeNew(path, ""); err != nil {
+			return err
+		}
+	}
+	return jailBind("/.oldroot"+exe, path, false)
+}
+
 func jailBind(src, dst string, dir bool) error {
 	if dir {
 		if err := jailDir(dst); err != nil {

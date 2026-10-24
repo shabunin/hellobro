@@ -383,11 +383,14 @@ gone**: after 15 s, 30 s or 1 min, or nothing comes up.
   keys reaches it too, as in kitty; the key itself doesn't.
 - Images: a program that speaks kitty's graphics protocol shows pictures
   in the terminal, in grays: `chafa -f kitty photo.jpg`, `timg -pk
-  photo.jpg` (both are in Alpine's apk), yazi's previews. They're sent
+  photo.jpg` (both are in Alpine's apk), yazi's previews, and books with
+  read-kitty (below, in the Alpine shell). They're sent
   in the stream (PNG, RGB or RGBA, zlib'd or not); a program that wants
   to hand over a file name instead is told no, and sends them in the
   stream then. They're cells like any text: they scroll away, and
-  `clear` clears them. The cells' size in pixels is told as programs
+  `clear` clears them. Scaled, they're dithered to the panel's 16
+  grays; shown pixel for pixel (a page's text), each pixel is only
+  rounded to its nearest gray. The cells' size in pixels is told as programs
   ask for it (`CSI 16 t`, and the pty's pixel size). No animation, no
   Unicode placeholders (so not through tmux).
 - A session calls out with the bell, or with a message as programs send a
@@ -477,6 +480,17 @@ Kobo's own `/bin/sh`, as root.)
   headphones at a time.
 - Each session is a jail of its own on the same image: when its shell
   exits, everything it started goes too (tmux's server included).
+- **read-kitty** reads a book or a document a page at a time: `apk add
+  mupdf-tools` once, then `read-kitty book.epub` (PDF, EPUB, MOBI, FB2,
+  XPS, CBZ: whatever MuPDF opens). Each page is drawn for the window's
+  pixels exactly, so text is as sharp as the panel makes it; a book's
+  text is laid out for the window, in points as on paper. Space, Enter,
+  →, PgDn: the next page; b, Backspace, ←, PgUp: the one before; Home,
+  End; a number then Enter: that page; + and -: a book's text bigger,
+  smaller; q: quit. Where each file was left (and its text's size) is
+  kept in `~/.local/state/read-kitty/places`, and a second argument
+  goes to that page. For long reading KOReader is still the better
+  reader: no terminal, no radio.
 - From a computer: `ssh -t -p 2022 kobo.local hellobro-alpine`, or
   `… hellobro-alpine COMMAND`. A plain `ssh kobo.local` is still the
   Kobo's root shell (`make push` needs it).

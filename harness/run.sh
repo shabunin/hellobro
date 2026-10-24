@@ -19,6 +19,8 @@
 #      APP_EXTRA (a directory copied into the app's, over what's there:
 #      settings, relay.conf, keys, keys.conf, hellobro.json),
 #      HELLOBRO_MSG (the ipc feed's hellobro-msg: a PC build of hellobro by that name)
+#      READ_KITTY, READ_DOCS (the readkitty feed's: a PC build named read-kitty;
+#      a directory with test.pdf and test.epub)
 #
 # The ssh, fullscreen, stress, connect, flash and zoom feeds want
 # the server running: (cd server && go run .); the relay feed wants
