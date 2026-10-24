@@ -1331,11 +1331,41 @@ func (a *bro) termKey(code uint16, value int32) bool {
 
 	if t.kittySend(code, value, *m) {
 		t.keyAt = time.Now()
+	} else if s, ok := xtermKey(code, *m); ok {
+		io.WriteString(t.emu.InputPipe(), s)
+		t.keyAt = time.Now()
 	} else if k, ok := termKeyEvent(code, *m); ok {
 		t.emu.SendKey(k)
 		t.keyAt = time.Now()
 	}
 	return true
+}
+
+// xtermKey is an arrow, Home, End, PgUp, PgDn, Ins, Del or an F-key
+// with modifiers held, as xterm says it (CSI 1;5A: Ctrl+Up), if it's
+// one: vt sends nothing for those, and tmux's prefix, Ctrl+arrows
+// (resizing panes) never came.
+func xtermKey(code uint16, m termMods) (string, bool) {
+	mods := 1
+	for _, b := range []struct {
+		on  bool
+		bit int
+	}{{m.shift, 1}, {m.alt, 2}, {m.ctrl, 4}, {m.meta, 8}} {
+		if b.on {
+			mods += b.bit
+		}
+	}
+	fn, ok := kittyFuncs[code]
+	if !ok || mods == 1 {
+		return "", false
+	}
+	if code == 61 { // F3: kitty's CSI 13 ~ is xterm's CSI 1;m R
+		fn = kittyFunc{1, 'R'}
+	}
+	if fn.n == 1 {
+		return fmt.Sprintf("\x1b[1;%d%c", mods, fn.final), true
+	}
+	return fmt.Sprintf("\x1b[%d;%d~", fn.n, mods), true
 }
 
 // termKeyEvent is the key for the emulator to send on, if it's one it

@@ -134,6 +134,32 @@ func TestTermKeys(t *testing.T) {
 	}
 }
 
+// Modified arrows and F-keys go out as xterm says them: vt sends none.
+func TestXtermKey(t *testing.T) {
+	for _, c := range []struct {
+		code uint16
+		m    termMods
+		want string
+	}{
+		{keyUp, termMods{ctrl: true}, "\x1b[1;5A"}, // tmux: prefix, then Ctrl+arrows resize panes
+		{keyLeft, termMods{ctrl: true}, "\x1b[1;5D"},
+		{keyRight, termMods{alt: true}, "\x1b[1;3C"},
+		{keyDown, termMods{shift: true}, "\x1b[1;2B"},
+		{keyEnd, termMods{shift: true, ctrl: true}, "\x1b[1;6F"},
+		{keyPgDn, termMods{ctrl: true}, "\x1b[6;5~"},
+		{111, termMods{shift: true}, "\x1b[3;2~"},
+		{61, termMods{ctrl: true}, "\x1b[1;5R"},
+		{63, termMods{alt: true}, "\x1b[15;3~"},
+		{keyUp, termMods{}, ""}, // plain: vt's, cursor keys' mode and all
+		{kobo.KeyA, termMods{ctrl: true}, ""},
+	} {
+		s, ok := xtermKey(c.code, c.m)
+		if s != c.want || ok != (c.want != "") {
+			t.Errorf("%d %+v: %q, want %q", c.code, c.m, s, c.want)
+		}
+	}
+}
+
 // Drawing only the touched rows ends where a full redraw would: through
 // scrolls, clears, inserted and deleted lines and cells, the alternate
 // screen, colors, wide characters and a cursor jumping about.
