@@ -484,10 +484,13 @@ Kobo's own `/bin/sh`, as root.)
   mupdf-tools` once, then `read-kitty book.epub` (PDF, EPUB, MOBI, FB2,
   XPS, CBZ: whatever MuPDF opens). Each page is drawn for the window's
   pixels exactly, so text is as sharp as the panel makes it; a book's
-  text is laid out for the window, in points as on paper. Space, Enter,
-  →, PgDn: the next page; b, Backspace, ←, PgUp: the one before; Home,
-  End; a number then Enter: that page; + and -: a book's text bigger,
-  smaller; q: quit. Where each file was left (and its text's size) is
+  text is laid out for the window, in points as on paper. Pictures open
+  too (JPEG, PNG, GIF, TIFF…). Space, Enter, PgDn: on (down a zoomed
+  page, then the next one); b, Backspace, PgUp: back; the arrows (or h
+  j k l): pages, or zoomed in, about the page; Home, End; a number then
+  Enter: that page; + and -: zoom (a book's text bigger, smaller
+  instead); w: the page's width, and back; q: quit. Zoomed, mutool
+  draws only what the window shows. Where each file was left (and its text's size) is
   kept in `~/.local/state/read-kitty/places`, and a second argument
   goes to that page. For long reading KOReader is still the better
   reader: no terminal, no radio.
