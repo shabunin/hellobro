@@ -202,10 +202,15 @@ func (r *reader) book() []string {
 
 // layout counts the pages, a book's as laid out for the window.
 func (r *reader) layout() error {
-	out, err := exec.Command("mutool", append([]string{"run", filepath.Join(r.tmp, "count.js"), r.file}, r.book()...)...).CombinedOutput()
+	// Its warnings (EPUB 3's "unknown epub version", say) go to stderr:
+	// only the answer is read.
+	var msg bytes.Buffer
+	cmd := exec.Command("mutool", append([]string{"run", filepath.Join(r.tmp, "count.js"), r.file}, r.book()...)...)
+	cmd.Stderr = &msg
+	out, err := cmd.Output()
 	var reflow string
 	if _, e := fmt.Sscanf(string(out), "%d %s", &r.pages, &reflow); err != nil || e != nil || r.pages < 1 {
-		return fmt.Errorf("mutool can't open it: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("mutool can't open it: %s", strings.TrimSpace(msg.String()))
 	}
 	r.reflow = reflow == "true"
 	r.page = max(1, min(r.pages, r.page))
