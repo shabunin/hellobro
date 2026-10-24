@@ -268,6 +268,12 @@ func cellText(t *termSession, cols int, from, to image.Point) string {
 			switch {
 			case c == nil || c.Content == "":
 				row.WriteByte(' ')
+			case len(c.Content) == 4 && c.Content[0] == 0xf3: // an image's, maybe (kgCell)
+				if _, _, _, ok := kgCell(c); ok {
+					row.WriteByte(' ')
+				} else {
+					row.WriteString(c.Content)
+				}
 			case c.Width == 0: // a wide character's right half
 			default:
 				row.WriteString(c.Content)

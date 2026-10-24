@@ -75,16 +75,19 @@ type cellKey struct {
 	attrs, ul uint8
 	width     int
 	cursor    bool
-	sel       bool // selected: shown reversed
+	sel       bool     // selected: shown reversed
+	img       uint32   // a placement's cell (kittygfx.go): its key
+	place     *kgPlace // and the placement, nil if it's gone
+	ix, iy    uint8    // which of its cells
 }
 
 type termMods struct{ shift, ctrl, alt, meta, caps bool }
 
 // termBackend is what a session talks to: an SSH session or a local shell.
 type termBackend interface {
-	io.Reader // output
-	io.Writer // input
-	resize(cols, rows int)
+	io.Reader                              // output
+	io.Writer                              // input
+	resize(cols, rows int, px image.Point) // px: the cells' size in pixels, all told
 	close()
 	// ended says, once the output has ended, whether the connection was
 	// lost (rather than the remote exiting), and how it ended.
@@ -108,6 +111,7 @@ type termSession struct {
 	back     termBackend
 	emu      *vt.SafeEmulator
 	kitty    kittyKeys  // kitty's keyboard protocol, if the program asked for it (kitty.go)
+	gfx      kittyGfx   // and its images (kittygfx.go), under mu
 	mu       sync.Mutex // held while the emulator changes (write): its touched lines are read and cleared under it
 	dirty    atomic.Bool
 	seen     atomic.Bool // its cells show: its output is read as it comes, else in batches
@@ -144,7 +148,7 @@ type termPane struct {
 // write puts the remote's output into the emulator.
 func (t *termSession) write(p []byte) {
 	t.mu.Lock()
-	t.emu.Write(p)
+	t.gfx.feed(p, func(b []byte) { t.emu.Write(b) }, t.gfxCommand)
 	t.mu.Unlock()
 }
 
@@ -181,6 +185,9 @@ type termView struct {
 	mods   termMods
 	glyphs map[glyphKey]*image.Alpha
 	fontPx int
+
+	tiles     map[*kgPlace]*image.Gray // placements drawn for the cells' size (kittygfx.go)
+	tileBytes int
 }
 
 // term is the terminal in focus, if it's one.
@@ -290,12 +297,20 @@ func (a *bro) paneGeometry(t *termSession) {
 	gw, gh := pn.cols*v.cw, pn.rows*v.ch
 	at := image.Pt(grid.Min.X+(grid.Dx()-gw)/2, grid.Min.Y+(grid.Dy()-gh)/2)
 	pn.grid = image.Rectangle{at, at.Add(image.Pt(gw, gh))}
-	if size := image.Pt(pn.cols, pn.rows); t.connected() && size != t.size {
-		t.size = size
-		t.mu.Lock()
+	if !t.connected() {
+		return
+	}
+	cell := image.Pt(v.cw, v.ch)
+	t.mu.Lock()
+	moved := cell != t.gfx.cell
+	t.gfx.cell = cell
+	if size := image.Pt(pn.cols, pn.rows); size != t.size {
+		t.size, moved = size, true
 		t.emu.Resize(pn.cols, pn.rows)
-		t.mu.Unlock()
-		t.back.resize(pn.cols, pn.rows)
+	}
+	t.mu.Unlock()
+	if moved {
+		t.back.resize(pn.cols, pn.rows, image.Pt(gw, gh))
 	}
 }
 
@@ -559,7 +574,7 @@ func (a *bro) renderTerm(t *termSession) {
 	// redraw, a switch of screens, with a selection, and every few
 	// seconds, in case something changed that vt didn't mark.
 	touched, alt := t.touchedRows(pn.rows)
-	full = full || alt != pn.alt
+	full = full || alt != pn.alt || t.gfx.takeChanged()
 	cur := emu.CursorPosition()
 	showCursor := !emu.CursorHidden()
 	for y := 0; y < pn.rows; y++ {
@@ -571,6 +586,9 @@ func (a *bro) renderTerm(t *termSession) {
 		var k cellKey
 		for x := range shown {
 			k.set(emu.CellAt(x, y), showCursor && cur.X == x && cur.Y == y)
+			if k.img != 0 {
+				k.place = t.gfx.places[k.img]
+			}
 			k.sel = sel && v.sel.has(x, y) // sel, not a.term() again: a cell at a time, that's a map lookup each
 			if k.same(&shown[x]) {
 				continue
@@ -581,7 +599,7 @@ func (a *bro) renderTerm(t *termSession) {
 				c.from = x
 			}
 			c.to = x
-			c.gray = c.gray || !bw(k.fg) || !bw(k.bg)
+			c.gray = c.gray || !bw(k.fg) || !bw(k.bg) || k.place != nil
 		}
 		if c.from >= 0 {
 			rows = append(rows, c)
@@ -622,7 +640,8 @@ func bw(g uint8) bool { return g == 0 || g == 255 }
 // and those that have mostly differ in their content.
 func (k *cellKey) same(o *cellKey) bool {
 	return k.content == o.content && k.fg == o.fg && k.bg == o.bg && k.attrs == o.attrs &&
-		k.ul == o.ul && k.width == o.width && k.cursor == o.cursor && k.sel == o.sel
+		k.ul == o.ul && k.width == o.width && k.cursor == o.cursor && k.sel == o.sel &&
+		k.place == o.place && k.ix == o.ix && k.iy == o.iy
 }
 
 // set makes k what a cell of the emulator looks like on the panel, all
@@ -630,8 +649,14 @@ func (k *cellKey) same(o *cellKey) bool {
 // copied, cost as much as the rest.
 func (k *cellKey) set(c *uv.Cell, cursor bool) {
 	k.fg, k.bg, k.cursor = kobo.Black, kobo.White, cursor
+	k.img, k.place, k.ix, k.iy = 0, nil, 0, 0
 	if c == nil {
 		k.content, k.width, k.attrs, k.ul = "", 1, 0, 0
+		return
+	}
+	if key, row, col, ok := kgCell(c); ok { // drawn from the image, not the font
+		k.content, k.width, k.attrs, k.ul = "", 1, 0, 0
+		k.img, k.iy, k.ix = key, row, col
 		return
 	}
 	k.content, k.width, k.attrs, k.ul = c.Content, c.Width, c.Style.Attrs, uint8(c.Style.Underline)
@@ -697,6 +722,10 @@ func (a *bro) drawCell(pn *termPane, x, y int, k cellKey) {
 	fg, bg := k.fg, k.bg
 	if k.cursor != k.sel {
 		fg, bg = bg, fg
+	}
+	if k.place != nil {
+		kobo.CopyGray(a.C.Gray, r, a.gfxTile(k.place), image.Pt(int(k.ix)*v.cw, int(k.iy)*v.ch))
+		return
 	}
 	a.C.Fill(r, bg)
 	if k.content != "" && k.content != " " {
@@ -996,6 +1025,9 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	t.back, t.state = back, termConnected
 	defer a.grabTyping() // typing into another device, maybe
 	t.emu = vt.NewSafeEmulator(cols, rows)
+	t.mu.Lock()
+	t.gfx = kittyGfx{cell: image.Pt(a.tv.cw, a.tv.ch)}
+	t.mu.Unlock()
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
 	t.emu.SetDefaultBackgroundColor(color.White)
 	t.emu.SetScrollbackSize(1000)    // not shown; the default 10000 costs a big copy per line once full
@@ -1011,10 +1043,11 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 		Bell: func() { go a.Do(func() { a.termNotify(t, "") }) },
 	})
 	t.kittyRegister(t.emu)
+	t.gfxRegister(t.emu)
 	t.emu.RegisterOscHandler(52, a.osc52(t))
 	t.emu.RegisterOscHandler(9, a.oscNotify(t))
 	t.emu.RegisterOscHandler(777, a.oscNotify(t))
-	back.resize(cols, rows)
+	back.resize(cols, rows, image.Pt(cols*a.tv.cw, rows*a.tv.ch))
 	if t.kind == kindShell {
 		log.Printf("shell: started, %d×%d", cols, rows)
 	} else {

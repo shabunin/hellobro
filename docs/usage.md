@@ -381,6 +381,15 @@ gone**: after 15 s, 30 s or 1 min, or nothing comes up.
   kitty says them: the modifiers apart, Super among them, and releases
   and repeats if it wants them. A modifier tapped for one of hellobro's
   keys reaches it too, as in kitty; the key itself doesn't.
+- Images: a program that speaks kitty's graphics protocol shows pictures
+  in the terminal, in grays: `chafa -f kitty photo.jpg`, `timg -pk
+  photo.jpg` (both are in Alpine's apk), yazi's previews. They're sent
+  in the stream (PNG, RGB or RGBA, zlib'd or not); a program that wants
+  to hand over a file name instead is told no, and sends them in the
+  stream then. They're cells like any text: they scroll away, and
+  `clear` clears them. The cells' size in pixels is told as programs
+  ask for it (`CSI 16 t`, and the pty's pixel size). No animation, no
+  Unicode placeholders (so not through tmux).
 - A session calls out with the bell, or with a message as programs send a
   desktop notification (OSC 9 or 777: `make; printf '\e]9;make done\a'`).
   The light comes on a moment if it's off; the session's title strip

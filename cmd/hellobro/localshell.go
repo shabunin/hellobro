@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"log"
 	"os"
@@ -55,7 +56,7 @@ func openPTY(cols, rows int) (pty, tty *os.File, err error) {
 		pty.Close()
 		return nil, nil, err
 	}
-	setWinsize(pty, cols, rows)
+	setWinsize(pty, cols, rows, image.Point{})
 	return pty, tty, nil
 }
 
@@ -198,10 +199,10 @@ func (s *localShell) Read(p []byte) (int, error) {
 
 func (s *localShell) Write(p []byte) (int, error) { return s.pty.Write(p) }
 
-func (s *localShell) resize(cols, rows int) { setWinsize(s.pty, cols, rows) }
+func (s *localShell) resize(cols, rows int, px image.Point) { setWinsize(s.pty, cols, rows, px) }
 
-func setWinsize(pty *os.File, cols, rows int) {
-	ws := struct{ row, col, x, y uint16 }{uint16(rows), uint16(cols), 0, 0}
+func setWinsize(pty *os.File, cols, rows int, px image.Point) {
+	ws := struct{ row, col, x, y uint16 }{uint16(rows), uint16(cols), uint16(px.X), uint16(px.Y)}
 	ioctl(pty, syscall.TIOCSWINSZ, unsafe.Pointer(&ws))
 }
 

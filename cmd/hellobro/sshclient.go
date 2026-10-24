@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"net"
 	"os"
@@ -477,7 +478,13 @@ func keepalive(c *ssh.Client, done <-chan struct{}, lost *atomic.Bool) {
 
 func (s *sshSession) Read(p []byte) (int, error)  { return s.stdout.Read(p) }
 func (s *sshSession) Write(p []byte) (int, error) { return s.stdin.Write(p) }
-func (s *sshSession) resize(cols, rows int)       { s.session.WindowChange(rows, cols) }
+
+// resize says the new size, in pixels too: x/crypto's WindowChange
+// leaves them 0, and programs that draw images want them.
+func (s *sshSession) resize(cols, rows int, px image.Point) {
+	s.session.SendRequest("window-change", false, ssh.Marshal(struct{ Cols, Rows, W, H uint32 }{
+		uint32(cols), uint32(rows), uint32(px.X), uint32(px.Y)}))
+}
 
 func (s *sshSession) close() {
 	select {

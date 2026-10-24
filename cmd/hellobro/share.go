@@ -9,6 +9,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"image"
 	"io"
 	"log"
 	"net"
@@ -203,7 +204,7 @@ func (a *bro) shareTick() {
 // sharedShell is a localShell, as the share package wants it.
 type sharedShell struct{ *localShell }
 
-func (s sharedShell) Resize(cols, rows int) { s.resize(cols, rows) }
+func (s sharedShell) Resize(cols, rows int) { s.resize(cols, rows, image.Point{}) }
 
 func (s sharedShell) Wait() error {
 	<-s.exit
