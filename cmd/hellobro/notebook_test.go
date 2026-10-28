@@ -83,3 +83,55 @@ func TestNewNoteName(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestNoteSlots(t *testing.T) {
+	for _, tc := range []struct {
+		area image.Rectangle
+		n    int
+	}{
+		{image.Rect(0, 0, 1388, 1760), 1}, // portrait, fullscreen
+		{image.Rect(0, 0, 1856, 1290), 2}, // landscape, fullscreen
+		{image.Rect(0, 0, 920, 1290), 1},  // landscape, half
+		{image.Rect(0, 0, 1388, 860), 2},  // portrait, the top half: wide
+		{image.Rect(0, 0, 1388, 1500), 1}, // a little short
+	} {
+		slots, scale := noteSlots(tc.area)
+		if len(slots) != tc.n {
+			t.Errorf("%v: %d pages, want %d (scale %.2f)", tc.area, len(slots), tc.n, scale)
+		}
+		for _, s := range slots {
+			if !s.In(tc.area) {
+				t.Errorf("%v: a page at %v", tc.area, s)
+			}
+		}
+		if len(slots) == 2 && slots[0].Overlaps(slots[1]) {
+			t.Errorf("%v: the pages overlap", tc.area)
+		}
+	}
+}
+
+func TestNoteTurn(t *testing.T) {
+	s := &noteStroke{}
+	for _, tc := range []struct {
+		pages      [][]*noteStroke
+		cur, shown int
+		by, want   int
+	}{
+		{[][]*noteStroke{{s}}, 0, 1, 1, 1},           // past the last, written on: a new page
+		{[][]*noteStroke{{s}, nil}, 1, 1, 1, -1},     // past a blank one: no
+		{[][]*noteStroke{{s}, nil}, 1, 1, -1, 0},     // back
+		{[][]*noteStroke{nil}, 0, 1, -1, -1},         // before the first
+		{[][]*noteStroke{{s}}, 0, 2, 1, -1},          // two shown, the second not written on
+		{[][]*noteStroke{{s}, {s}}, 0, 2, 1, 2},      // both written on: the next two
+		{[][]*noteStroke{{s}, {s}, {s}}, 0, 2, 1, 2}, // the third and a new one
+		{[][]*noteStroke{{s}, {s}, {s}}, 1, 2, -1, 0},
+	} {
+		w := &noteWin{nb: &notebook{pages: tc.pages}, cur: tc.cur}
+		for range tc.shown {
+			w.slots = append(w.slots, image.Rect(0, 0, 1, 1))
+		}
+		if got := w.turnTo(tc.by); got != tc.want {
+			t.Errorf("%d pages, at %d, %d shown, by %d: %d, want %d", len(tc.pages), tc.cur, tc.shown, tc.by, got, tc.want)
+		}
+	}
+}

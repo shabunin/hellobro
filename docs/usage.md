@@ -589,8 +589,10 @@ the launcher has them too, the last three written.
   remembered (`pen` in `hellobro.json`); take it out to write with
   fingers again. Near the left and right edges a finger writes nothing:
   those are the light's and the workspaces' swipes.
-- The page is the screen's shape, upright, and fitted into the window:
-  fullscreen (or a tall window) gives it the most room.
+- A page is the screen's shape, upright, fitted into the window. Where
+  two side by side are nearly as big as one alone would be (landscape,
+  fullscreen; a wide, short window) two show, and turn two at a time;
+  writing on the second makes it a page. **clear pages** clears both.
 - It's kept a few seconds after the last stroke and on closing, in
   `notebooks/` next to hellobro (see [Files on the
   Kobo](#files-on-the-kobo)). A notebook's window comes back with the

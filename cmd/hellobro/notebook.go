@@ -3,7 +3,8 @@ package main
 // The notebook: pages to write on with the pen, sums worked out by hand,
 // say. Its window shows a page, fitted in, under a strip of tools: the
 // pen or the eraser, undo and redo, clearing the page, the paper
-// (squares, lines, plain) and the pages. The pen writes; a button on it
+// (squares, lines, plain) and the pages: two side by side where there's
+// room for them (a landscape screen). The pen writes; a button on it
 // held, it erases; a finger swiped across turns the page, and turning
 // past the last page that has something on it makes a new one.
 //
@@ -263,16 +264,16 @@ func (s *noteStroke) hits(p image.Point) bool {
 
 type noteWin struct {
 	nb         *notebook
-	cur        int // the page shown
+	cur        int // the page shown, the left one of two
 	erasing    bool
-	undo, redo []noteOp
-	changed    time.Time // not kept since; zero: kept
+	undo, redo [][]noteOp // each step's changes
+	changed    time.Time  // not kept since; zero: kept
 
 	p     kobo.Panel
 	bar   image.Rectangle // the tools' strip
 	btns  []noteBtn
-	page  image.Rectangle // the page, on screen
-	scale float64         // screen px a page unit
+	slots []image.Rectangle // the pages on screen, left to right: cur, cur+1
+	scale float64           // screen px a page unit
 }
 
 type noteBtn struct {
@@ -289,9 +290,11 @@ type noteInk struct {
 	w      *noteWin
 	g      *kobo.Gesture
 	erase  bool
-	s      *noteStroke   // what's written
-	del    []*noteStroke // what's erased
-	last   image.Point   // where it was, on screen
+	page   int             // the page it's on
+	at     image.Rectangle // and where that is on screen
+	s      *noteStroke     // what's written
+	del    []*noteStroke   // what's erased
+	last   image.Point     // where it was, on screen
 	marked image.Rectangle
 }
 
@@ -299,8 +302,35 @@ type noteState struct {
 	ink *noteInk
 }
 
+const (
+	noteGap    = 24  // between two pages side by side
+	noteSpread = 0.8 // two pages side by side, if they're this big as one alone would be, or more
+)
+
+// noteSlots fits the pages into area: one, or two side by side if
+// there's room for two nearly as big (a landscape screen). It gives
+// where they go, and the scale.
+func noteSlots(area image.Rectangle) ([]image.Rectangle, float64) {
+	h := float64(area.Dy()) / notePageH
+	one := math.Min(float64(area.Dx())/notePageW, h)
+	two := math.Min(float64(area.Dx()-noteGap)/(2*notePageW), h)
+	n, scale := 1, one
+	if two >= noteSpread*one {
+		n, scale = 2, two
+	}
+	pw, ph := int(notePageW*scale), int(notePageH*scale)
+	x := area.Min.X + (area.Dx()-n*pw-(n-1)*noteGap)/2
+	y := area.Min.Y + (area.Dy()-ph)/2
+	var slots []image.Rectangle
+	for i := 0; i < n; i++ {
+		slots = append(slots, image.Rect(x, y, x+pw, y+ph))
+		x += pw + noteGap
+	}
+	return slots, scale
+}
+
 func (w *noteWin) place(a *bro, p kobo.Panel) {
-	w.p, w.btns, w.bar, w.page = p, nil, image.Rectangle{}, image.Rectangle{}
+	w.p, w.btns, w.bar, w.slots = p, nil, image.Rectangle{}, nil
 	if p.Outer.Empty() {
 		return
 	}
@@ -310,18 +340,48 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 	}
 	b := p.Body.Inset(kobo.Pad / 2)
 	w.bar = image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+h)
-	area := image.Rect(b.Min.X, w.bar.Max.Y+kobo.Pad/2, b.Max.X, b.Max.Y)
-	w.scale = math.Min(float64(area.Dx())/notePageW, float64(area.Dy())/notePageH)
-	pw, ph := int(notePageW*w.scale), int(notePageH*w.scale)
-	at := image.Pt(area.Min.X+(area.Dx()-pw)/2, area.Min.Y+(area.Dy()-ph)/2)
-	w.page = image.Rectangle{at, at.Add(image.Pt(pw, ph))}
+	w.slots, w.scale = noteSlots(image.Rect(b.Min.X, w.bar.Max.Y+kobo.Pad/2, b.Max.X, b.Max.Y))
 	w.layBar(a)
+}
+
+// pages is where the pages show, all told.
+func (w *noteWin) pages() image.Rectangle {
+	var r image.Rectangle
+	for _, s := range w.slots {
+		r = r.Union(s)
+	}
+	return r
+}
+
+// shown is how many pages show (one, even while the window doesn't).
+func (w *noteWin) shown() int { return max(1, len(w.slots)) }
+
+// strokes are page n's, none if it's not been written on yet.
+func (w *noteWin) strokes(n int) []*noteStroke {
+	if n < len(w.nb.pages) {
+		return w.nb.pages[n]
+	}
+	return nil
+}
+
+// counter says which pages show, of how many.
+func (w *noteWin) counter() string {
+	n := w.shown()
+	all := max(len(w.nb.pages), w.cur+n)
+	if n == 2 {
+		return fmt.Sprintf("%d–%d / %d", w.cur+1, w.cur+2, all)
+	}
+	return fmt.Sprintf("%d / %d", w.cur+1, all)
 }
 
 // layBar lays the tools along the strip, as many as fit: what's left
 // out goes from the least needed.
 func (w *noteWin) layBar(a *bro) {
-	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: "clear page"}, {id: "paper", label: w.nb.paper}}
+	clear := "clear page"
+	if w.shown() == 2 {
+		clear = "clear pages"
+	}
+	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paper", label: w.nb.paper}}
 	pages := []noteBtn{{id: "prev"}, {id: "next"}}
 	width := func(b noteBtn) int { return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8) }
 	for i := range tools {
@@ -330,7 +390,11 @@ func (w *noteWin) layBar(a *bro) {
 		}
 	}
 	const gap = 10
-	room := w.bar.Dx() - width(pages[0]) - width(pages[1]) - kobo.TextWidth(a.F.Small, "999 / 999") - 4*gap
+	counter := kobo.TextWidth(a.F.Small, "999 / 999")
+	if w.shown() == 2 {
+		counter = kobo.TextWidth(a.F.Small, "999–999 / 999")
+	}
+	room := w.bar.Dx() - width(pages[0]) - width(pages[1]) - counter - 4*gap
 	for _, drop := range []string{"paper", "redo", "clear"} {
 		need := 0
 		for _, t := range tools {
@@ -351,7 +415,7 @@ func (w *noteWin) layBar(a *bro) {
 	for _, t := range []noteBtn{pages[1], pages[0]} {
 		t.r = image.Rect(x-width(t), w.bar.Min.Y+4, x, w.bar.Max.Y-4)
 		w.btns = append(w.btns, t)
-		x = t.r.Min.X - kobo.TextWidth(a.F.Small, "999 / 999") - 2*gap
+		x = t.r.Min.X - counter - 2*gap
 	}
 }
 
@@ -364,7 +428,7 @@ func (w *noteWin) draw(a *bro) {
 	pn := w.panel(a)
 	a.DrawPanel(pn, "")
 	w.drawBar(a)
-	w.drawPage(a, w.page)
+	w.drawPages(a, w.pages())
 	a.Mark(pn.Outer, true)
 }
 
@@ -374,13 +438,14 @@ func (w *noteWin) drawTitle(a *bro) {
 	}
 }
 
-// drawBar draws the tools, the one in hand black, and which page.
+// drawBar draws the tools, the one in hand black, and which pages.
 func (w *noteWin) drawBar(a *bro) {
 	c := a.C
 	c.Fill(w.bar, kobo.White)
 	for _, b := range w.btns {
 		on := b.id == "pen" && !w.erasing || b.id == "eraser" && w.erasing
-		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 || b.id == "prev" && w.cur == 0
+		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 ||
+			b.id == "prev" && w.cur == 0 || b.id == "next" && w.turnTo(1) < 0
 		bg, ink := uint8(kobo.White), uint8(kobo.Black)
 		switch {
 		case on:
@@ -405,101 +470,118 @@ func (w *noteWin) drawBar(a *bro) {
 	}
 	if n := len(w.btns); n >= 2 {
 		r := image.Rect(w.btns[n-1].r.Max.X, w.bar.Min.Y, w.btns[n-2].r.Min.X, w.bar.Max.Y)
-		c.Text(a.F.Small, r, fmt.Sprintf("%d / %d", w.cur+1, len(w.nb.pages)), kobo.Black, kobo.AlignCenter)
+		c.Text(a.F.Small, r, w.counter(), kobo.Black, kobo.AlignCenter)
 	}
 }
 
-// drawPage draws the page where it's in clip: the paper, then the
+// drawPages draws the pages where they're in clip: the paper, then the
 // strokes over it.
-func (w *noteWin) drawPage(a *bro, clip image.Rectangle) {
+func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 	c := a.C
 	area := image.Rect(w.p.Body.Min.X, w.bar.Max.Y, w.p.Body.Max.X, w.p.Body.Max.Y).Intersect(clip)
 	c.Fill(area, kobo.White)
-	clip = clip.Intersect(w.page)
-	if clip.Empty() {
-		return
-	}
-	pg := w.page
-	switch w.nb.paper {
-	case "squares":
-		for u := noteRule; u < notePageW; u += noteRule {
-			x := pg.Min.X + int(float64(u)*w.scale)
-			c.Fill(image.Rect(x, pg.Min.Y, x+1, pg.Max.Y).Intersect(clip), kobo.Light)
+	for i, pg := range w.slots {
+		cl := clip.Intersect(pg)
+		if cl.Empty() {
+			continue
 		}
-		fallthrough
-	case "lines":
-		for u := 2 * noteRule; u < notePageH; u += noteRule {
-			y := pg.Min.Y + int(float64(u)*w.scale)
-			c.Fill(image.Rect(pg.Min.X, y, pg.Max.X, y+1).Intersect(clip), kobo.Light)
+		switch w.nb.paper {
+		case "squares":
+			for u := noteRule; u < notePageW; u += noteRule {
+				x := pg.Min.X + int(float64(u)*w.scale)
+				c.Fill(image.Rect(x, pg.Min.Y, x+1, pg.Max.Y).Intersect(cl), kobo.Light)
+			}
+			fallthrough
+		case "lines":
+			for u := 2 * noteRule; u < notePageH; u += noteRule {
+				y := pg.Min.Y + int(float64(u)*w.scale)
+				c.Fill(image.Rect(pg.Min.X, y, pg.Max.X, y+1).Intersect(cl), kobo.Light)
+			}
+		}
+		for _, s := range w.strokes(w.cur + i) {
+			if w.toScreenRect(s.box, pg).Overlaps(cl) {
+				w.drawStroke(a, s, pg, cl)
+			}
 		}
 	}
-	if pg.Max.X < w.p.Body.Max.X-kobo.Pad || pg.Min.X > w.p.Body.Min.X+kobo.Pad { // a page narrower than the window: its edges
-		c.Fill(image.Rect(pg.Min.X-2, pg.Min.Y, pg.Min.X, pg.Max.Y).Intersect(area), kobo.Mid)
-		c.Fill(image.Rect(pg.Max.X, pg.Min.Y, pg.Max.X+2, pg.Max.Y).Intersect(area), kobo.Mid)
-	}
-	for _, s := range w.nb.pages[w.cur] {
-		if w.toScreenRect(s.box).Overlaps(clip) {
-			w.drawStroke(a, s, clip)
+	if all := w.pages(); len(w.slots) > 1 || all.Max.X < w.p.Body.Max.X-kobo.Pad || all.Min.X > w.p.Body.Min.X+kobo.Pad { // two, or narrower than the window: the pages' edges
+		for _, pg := range w.slots {
+			c.Fill(image.Rect(pg.Min.X-2, pg.Min.Y, pg.Min.X, pg.Max.Y).Intersect(area), kobo.Mid)
+			c.Fill(image.Rect(pg.Max.X, pg.Min.Y, pg.Max.X+2, pg.Max.Y).Intersect(area), kobo.Mid)
 		}
 	}
 }
 
-func (w *noteWin) toScreen(p notePt) image.Point {
-	return image.Pt(w.page.Min.X+int(float64(p.x)*w.scale+0.5), w.page.Min.Y+int(float64(p.y)*w.scale+0.5))
+// toScreen is p of the page at on screen.
+func (w *noteWin) toScreen(p notePt, at image.Rectangle) image.Point {
+	return image.Pt(at.Min.X+int(float64(p.x)*w.scale+0.5), at.Min.Y+int(float64(p.y)*w.scale+0.5))
 }
 
-func (w *noteWin) toScreenRect(r image.Rectangle) image.Rectangle {
-	return image.Rect(w.page.Min.X+int(float64(r.Min.X)*w.scale), w.page.Min.Y+int(float64(r.Min.Y)*w.scale),
-		w.page.Min.X+int(math.Ceil(float64(r.Max.X)*w.scale))+1, w.page.Min.Y+int(math.Ceil(float64(r.Max.Y)*w.scale))+1)
+func (w *noteWin) toScreenRect(r, at image.Rectangle) image.Rectangle {
+	return image.Rect(at.Min.X+int(float64(r.Min.X)*w.scale), at.Min.Y+int(float64(r.Min.Y)*w.scale),
+		at.Min.X+int(math.Ceil(float64(r.Max.X)*w.scale))+1, at.Min.Y+int(math.Ceil(float64(r.Max.Y)*w.scale))+1)
 }
 
-func (w *noteWin) toPage(p image.Point) image.Point {
-	return image.Pt(int(float64(p.X-w.page.Min.X)/w.scale), int(float64(p.Y-w.page.Min.Y)/w.scale))
+func (w *noteWin) toPage(p image.Point, at image.Rectangle) image.Point {
+	return image.Pt(int(float64(p.X-at.Min.X)/w.scale), int(float64(p.Y-at.Min.Y)/w.scale))
 }
 
 // radius is the pen's on screen at p.
 func (w *noteWin) radius(p notePt) int { return max(1, int(float64(p.r)/10*w.scale+0.5)) }
 
-func (w *noteWin) drawStroke(a *bro, s *noteStroke, clip image.Rectangle) {
-	prev := w.toScreen(s.pts[0])
+func (w *noteWin) drawStroke(a *bro, s *noteStroke, at, clip image.Rectangle) {
+	prev := w.toScreen(s.pts[0], at)
 	a.C.Disc(prev, w.radius(s.pts[0]), kobo.Black, clip)
 	for _, p := range s.pts[1:] {
-		q := w.toScreen(p)
+		q := w.toScreen(p, at)
 		a.C.Line(prev, q, w.radius(p), kobo.Black, clip)
 		prev = q
 	}
 }
 
-// show draws the page again, and its strip, where they changed.
+// show draws the pages again, and the strip, where they changed.
 func (w *noteWin) show(a *bro) {
 	if !a.shows(w) {
 		return
 	}
 	w.drawBar(a)
-	w.drawPage(a, w.page)
+	w.drawPages(a, w.pages())
 	a.Mark(image.Rect(w.p.Body.Min.X, w.bar.Min.Y, w.p.Body.Max.X, w.p.Body.Max.Y), true)
 }
 
 // edited notes a change made: to undo, and to keep.
-func (w *noteWin) edited(op noteOp) {
-	w.undo = append(w.undo, op)
+func (w *noteWin) edited(ops ...noteOp) {
+	w.undo = append(w.undo, ops)
 	w.redo = nil
 	w.changed = time.Now()
 }
 
-func (w *noteWin) turn(a *bro, by int) {
-	n := w.cur + by
-	if n == len(w.nb.pages) && len(w.nb.pages[w.cur]) > 0 { // past the last page: a new one
-		w.nb.pages = append(w.nb.pages, nil)
-		w.changed = time.Now()
+// turnTo is the page to show first, the pages turned by (on, or back if
+// negative); -1 if they can't be. On goes as far as one page past the
+// last that's written on: a new one.
+func (w *noteWin) turnTo(by int) int {
+	n := w.cur + by*w.shown()
+	pages := w.nb.pages
+	switch {
+	case by < 0 && w.cur == 0:
+		return -1
+	case by < 0:
+		return max(0, n)
+	case n < len(pages), n == len(pages) && len(pages[n-1]) > 0:
+		return n
 	}
-	if n < 0 || n >= len(w.nb.pages) {
+	return -1
+}
+
+func (w *noteWin) turn(a *bro, by int) {
+	n := w.turnTo(by)
+	if n < 0 {
 		return
 	}
 	w.cur = n
 	w.show(a)
 	if a.shows(w) {
-		a.MarkFlash(w.page) // another page: no ghost of this one
+		a.MarkFlash(w.pages()) // other pages: no ghost of these
 	}
 }
 
@@ -511,11 +593,19 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 	if len(*from) == 0 {
 		return
 	}
-	op := (*from)[len(*from)-1]
+	ops := (*from)[len(*from)-1]
 	*from = (*from)[:len(*from)-1]
-	*to = append(*to, op)
-	w.nb.apply(op, undo)
-	w.cur = op.page
+	*to = append(*to, ops)
+	for i := range ops {
+		if undo {
+			w.nb.apply(ops[len(ops)-1-i], true)
+		} else {
+			w.nb.apply(ops[i], false)
+		}
+	}
+	if pg := ops[0].page; pg < w.cur || pg >= w.cur+w.shown() { // where it was: in sight
+		w.cur = pg
+	}
 	w.changed = time.Now()
 	w.show(a)
 }
@@ -533,12 +623,17 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		case "undo", "redo":
 			w.doUndo(a, b.id == "undo")
 		case "clear":
-			if pg := w.nb.pages[w.cur]; len(pg) > 0 {
-				op := noteOp{page: w.cur, del: slices.Clone(pg)}
-				w.nb.apply(op, false)
-				w.edited(op)
+			var ops []noteOp
+			for n := w.cur; n < w.cur+w.shown(); n++ {
+				if pg := w.strokes(n); len(pg) > 0 {
+					ops = append(ops, noteOp{page: n, del: slices.Clone(pg)})
+					w.nb.apply(ops[len(ops)-1], false)
+				}
+			}
+			if len(ops) > 0 {
+				w.edited(ops...)
 				w.show(a)
-				a.MarkFlash(w.page)
+				a.MarkFlash(w.pages())
 			}
 		case "paper":
 			ps := strings.Fields(notePapers)
@@ -616,7 +711,11 @@ func (w *noteWin) keep(a *bro) {
 // writes or erases, a finger may turn the page.
 func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	w, ok := a.windowAt(p).(*noteWin)
-	if !ok || !p.In(w.page) || !a.shows(w) {
+	if !ok || !a.shows(w) {
+		return false
+	}
+	slot := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return p.In(r) })
+	if slot < 0 {
 		return false
 	}
 	if ev.Pen && !a.mem.Pen {
@@ -637,7 +736,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		return false
 	}
 	g.Owner = ownInk
-	k := &noteInk{w: w, g: g, erase: w.erasing || ev.Button, last: p}
+	k := &noteInk{w: w, g: g, erase: w.erasing || ev.Button, page: w.cur + slot, at: w.slots[slot], last: p}
 	a.nt.ink = k
 	if k.erase {
 		a.noteErase(k, p)
@@ -685,11 +784,11 @@ func (a *bro) noteMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 }
 
 // noteInkTo adds p to the stroke, and shows it at once: black on white,
-// the fast waveform. Off the page it goes on, unseen, as a pen goes off
+// the fast waveform. Off its page it goes on, unseen, as a pen goes off
 // the paper's edge.
 func (a *bro) noteInkTo(k *noteInk, p image.Point, pressure int32) {
 	w := k.w
-	pp := w.toPage(p)
+	pp := w.toPage(p, k.at)
 	frac := math.Min(1, float64(pressure)/float64(a.PressureMax()))
 	pt := notePt{int16(pp.X), int16(pp.Y), int16(15 + 25*frac)} // 1.5 to 4 units
 	k.s.pts = append(k.s.pts, pt)
@@ -698,8 +797,8 @@ func (a *bro) noteInkTo(k *noteInk, p image.Point, pressure int32) {
 	if len(k.s.pts) == 1 {
 		from = p
 	}
-	a.C.Line(from, p, r, kobo.Black, w.page)
-	box := image.Rectangle{from, from}.Union(image.Rectangle{p, p}).Inset(-r - 1).Intersect(w.page)
+	a.C.Line(from, p, r, kobo.Black, k.at)
+	box := image.Rectangle{from, from}.Union(image.Rectangle{p, p}).Inset(-r - 1).Intersect(k.at)
 	k.marked = k.marked.Union(box)
 	k.last = p
 	a.Mark(box, false)
@@ -708,9 +807,9 @@ func (a *bro) noteInkTo(k *noteInk, p image.Point, pressure int32) {
 // noteErase takes the strokes the eraser touches at p off the page.
 func (a *bro) noteErase(k *noteInk, p image.Point) {
 	w := k.w
-	pp := w.toPage(p)
+	pp := w.toPage(p, k.at)
 	var gone []*noteStroke
-	for _, s := range w.nb.pages[w.cur] {
+	for _, s := range w.strokes(k.page) {
 		if s.hits(pp) {
 			gone = append(gone, s)
 		}
@@ -718,14 +817,14 @@ func (a *bro) noteErase(k *noteInk, p image.Point) {
 	if len(gone) == 0 {
 		return
 	}
-	w.nb.apply(noteOp{page: w.cur, del: gone}, false)
+	w.nb.apply(noteOp{page: k.page, del: gone}, false)
 	k.del = append(k.del, gone...)
 	var r image.Rectangle
 	for _, s := range gone {
-		r = r.Union(w.toScreenRect(s.box))
+		r = r.Union(w.toScreenRect(s.box, k.at))
 	}
-	w.drawPage(a, r)
-	a.Mark(r.Intersect(w.page), true)
+	w.drawPages(a, r)
+	a.Mark(r.Intersect(k.at), true)
 }
 
 // noteLift ends what the pen or the finger did.
@@ -757,15 +856,18 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 	w := k.w
 	switch {
 	case k.erase && len(k.del) > 0:
-		w.edited(noteOp{page: w.cur, del: k.del})
+		w.edited(noteOp{page: k.page, del: k.del})
 	case !k.erase && len(k.s.pts) > 0:
 		k.s.bound()
-		w.nb.pages[w.cur] = append(w.nb.pages[w.cur], k.s)
-		w.edited(noteOp{page: w.cur, add: []*noteStroke{k.s}})
+		for len(w.nb.pages) <= k.page { // written on a page that wasn't yet
+			w.nb.pages = append(w.nb.pages, nil)
+		}
+		w.nb.pages[k.page] = append(w.nb.pages[k.page], k.s)
+		w.edited(noteOp{page: k.page, add: []*noteStroke{k.s}})
 		a.Mark(k.marked, true) // the cleanup: grays (the paper) back under it
 	}
 	if a.shows(w) {
-		w.drawBar(a) // undo can now
+		w.drawBar(a) // undo can now, and there may be a page more
 		a.Mark(w.bar, true)
 	}
 	a.noteFocus(w)
