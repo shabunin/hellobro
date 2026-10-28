@@ -189,6 +189,8 @@ func (w *bookWin) drawStyle(a *bro) {
 		if f.name == st.font {
 			c.Fill(r, kobo.Black)
 			ink = kobo.White
+		} else {
+			c.Frame(r, 2, kobo.Black)
 		}
 		focus(i, r)
 		c.Text(a.familyFace(f), r.Inset(12), f.name, ink, kobo.AlignLeft)
