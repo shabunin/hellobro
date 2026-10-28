@@ -549,8 +549,9 @@ italics), with the book's pictures, headings, italics and centred text.
 - Turn pages by tapping the right two thirds (on) or the left third
   (back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
   k, h (back). Home and End go to the chapter's start and end.
-- **s**, or a tap on the strip under the page (where "Aa" is), opens
-  the style panel, the reader's own: the fonts, each shown in itself
+- Under the page are three buttons: **☰** the contents, **Aa** the
+  style panel, and a ribbon for a bookmark.
+- **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
   (tap one), the size, the lines' spacing, the margins (± each),
   justified and hyphenation (on / off), and a paragraph set as the books
   will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
@@ -558,8 +559,14 @@ italics), with the book's pictures, headings, italics and centred text.
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
   **f** (Shift+F back) goes through the fonts.
-- **t**, Enter or a tap at the top shows the contents: pick a chapter.
-  Esc leaves them; on a page, Esc goes back to the shelf.
+- **t**, Enter, **☰** or a tap at the top shows the contents: pick a
+  chapter. Esc leaves them; on a page, Esc goes back to the shelf.
+- **b**, or a tap on the ribbon, bookmarks the page (a ribbon hangs at
+  its top right then), or takes its bookmark away. The contents' second
+  tab (tap it, or Tab; **b** in the contents) lists the bookmarks, how
+  far in, the chapter and how the page starts: Enter or a tap opens one,
+  **d**, Delete or its × takes it away. They're kept with the book's
+  place in `hellobro.json`.
 - Where each book was left is kept in `hellobro.json` (at most every 20
   s while reading, and when its window closes), as a place in its
   chapter, so another size or font finds the page again. The screen

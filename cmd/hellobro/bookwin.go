@@ -87,6 +87,8 @@ type bookPlace struct {
 	Off   int    `json:"off"`
 	Pct   int    `json:"pct"`  // how far in, for the shelf
 	Read  int64  `json:"read"` // when, Unix seconds
+
+	Marks []bookMark `json:"marks,omitempty"` // bookmarks.go
 }
 
 // bookState is what the readers share: the fonts, the size.
@@ -129,7 +131,9 @@ type bookWin struct {
 	savedAt time.Time
 	pics    map[string]*image.Gray // the page's pictures, scaled
 
+	marks   []bookMark
 	list    bool // the contents (or the shelf) show
+	listMks bool // the list is the bookmarks, not the contents
 	styling bool // the style panel shows (bookstyle.go)
 	sel     int
 	top     int
@@ -173,6 +177,9 @@ func (a *bro) newBookWin(path string) *bookWin {
 	if pl, ok := a.mem.Books[path]; ok && pl.Spine < len(b.Spine) {
 		w.spine, w.at = pl.Spine, book.Pos{Block: pl.Block, Off: pl.Off}
 	}
+	if pl, ok := a.mem.Books[path]; ok {
+		w.marks = slices.DeleteFunc(slices.Clone(pl.Marks), func(m bookMark) bool { return m.Spine >= len(b.Spine) })
+	}
 	return w
 }
 
@@ -212,7 +219,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	}
 	body := p.Body
 	mx := max(16, body.Dx()*bookMargins[a.bookStyle().margin]/100)
-	foot := kobo.TextWidth(a.F.Small, "M")*2 + 8
+	foot := max(64, kobo.TextWidth(a.F.Small, "M")*2+8) // the strip under the page: room for its buttons
 	w.area = image.Rect(body.Min.X+mx, body.Min.Y+max(20, body.Dy()/40), body.Max.X-mx, body.Max.Y-foot)
 }
 
@@ -326,11 +333,8 @@ func (w *bookWin) drawPage(a *bro) {
 		}
 	}
 	w.pics = pics // only this page's are kept
-	// the chapter, under the page
-	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
-	a.C.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, foot.Min.X+foot.Dx()*2/5, foot.Max.Y), w.chapterName(), kobo.Mid, kobo.AlignLeft)
-	a.C.Text(a.F.Small, foot, fmt.Sprintf("%d%%", w.pct()), kobo.Mid, kobo.AlignRight)
-	a.C.Text(a.F.Small, foot, "Aa", kobo.Mid, kobo.AlignCenter) // a tap here: the style panel
+	w.drawPageMark(a)
+	w.drawFoot(a)
 }
 
 // picture is the book's picture src, gray, scaled to size.
@@ -373,6 +377,9 @@ func (w *bookWin) listLines() []string {
 		}
 		return ls
 	}
+	if w.listMks {
+		return w.markLines()
+	}
 	for _, e := range w.b.TOC {
 		ls = append(ls, strings.Repeat("    ", min(e.Depth, 4))+e.Title)
 	}
@@ -384,6 +391,15 @@ func (w *bookWin) listOpen(a *bro, i int) {
 		if i < len(w.shelf) {
 			a.openBook(w, w.shelf[i].path)
 		}
+		return
+	}
+	if w.listMks {
+		if i < len(w.marks) {
+			w.goToMark(a, i)
+		}
+		return
+	}
+	if i >= len(w.b.TOC) {
 		return
 	}
 	e := w.b.TOC[i]
@@ -404,11 +420,21 @@ func (w *bookWin) drawList(a *bro) {
 	f := a.F.Body
 	rowH := kobo.TextWidth(f, "M")*2 + 10
 	area := w.p.Body.Inset(kobo.Pad)
+	w.rows = nil
+	if w.b != nil {
+		w.drawTabs(a, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH))
+		area.Min.Y += rowH + 12
+	}
 	n := max(1, area.Dy()/rowH)
 	if len(lines) == 0 {
 		msg := "no books here: put EPUBs on the Kobo (anywhere but its dot folders)"
-		if w.looking {
+		switch {
+		case w.looking:
 			msg = "looking for books…"
+		case w.listMks:
+			msg = "no bookmarks yet: b, or the ribbon under the page"
+		case w.b != nil:
+			msg = "no contents in this book"
 		}
 		a.C.Text(f, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), msg, kobo.Dark, kobo.AlignLeft)
 		return
@@ -420,7 +446,6 @@ func (w *bookWin) drawList(a *bro) {
 		w.top = w.sel - n + 1
 	}
 	w.top = max(0, min(w.top, len(lines)-n))
-	w.rows = nil
 	for k := 0; k < n && w.top+k < len(lines); k++ {
 		i := w.top + k
 		r := image.Rect(area.Min.X, area.Min.Y+k*rowH, area.Max.X, area.Min.Y+(k+1)*rowH)
@@ -429,7 +454,15 @@ func (w *bookWin) drawList(a *bro) {
 			a.C.Fill(r, kobo.Black)
 			ink = kobo.White
 		}
-		a.C.Text(f, r.Inset(8), lines[i], ink, kobo.AlignLeft)
+		text := r.Inset(8)
+		if w.listMks { // a box to take it away, at the right
+			x := image.Rect(r.Max.X-rowH, r.Min.Y, r.Max.X, r.Max.Y).Inset(6)
+			a.C.Frame(x, 2, ink)
+			a.C.Text(f, x, "×", ink, kobo.AlignCenter)
+			text.Max.X = x.Min.X - 12
+			w.rows = append(w.rows, bookRow{x, func() { w.deleteMark(a, i) }})
+		}
+		a.C.Text(f, text, lines[i], ink, kobo.AlignLeft)
 		w.rows = append(w.rows, bookRow{r, func() { w.listOpen(a, i) }})
 	}
 }
@@ -536,7 +569,7 @@ func (w *bookWin) save(a *bro) {
 	if a.mem.Books == nil {
 		a.mem.Books = map[string]bookPlace{}
 	}
-	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: w.pct(), Read: time.Now().Unix()}
+	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: w.pct(), Read: time.Now().Unix(), Marks: w.marks}
 	a.mem.save()
 	w.savedAt = time.Now()
 }
@@ -577,6 +610,15 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 			return true
 		case code == kobo.KeyEsc && w.b != nil, ch == "t" && w.b != nil:
 			w.list = false
+		case code == kobo.KeyTab && w.b != nil:
+			w.showList(a, !w.listMks)
+			return true
+		case ch == "b" && w.b != nil:
+			w.showList(a, true)
+			return true
+		case (ch == "d" || code == 111) && w.listMks: // Delete
+			w.deleteMark(a, w.sel)
+			return true
 		default:
 			return false
 		}
@@ -608,6 +650,8 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.openContents(a)
 	case ch == "s" && w.b != nil:
 		w.openStyle(a)
+	case ch == "b" && w.b != nil:
+		w.toggleMark(a)
 	case code == kobo.KeyEsc:
 		w.save(a)
 		a.replaceWin(w, a.newBookWin(""))
@@ -617,24 +661,17 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 	return true
 }
 
-// openContents shows the book's contents, the chapter shown picked.
+// openContents shows the book's contents, the chapter shown picked;
+// the bookmarks if it has no contents.
 func (w *bookWin) openContents(a *bro) {
-	if w.b == nil || len(w.b.TOC) == 0 {
-		a.Notify("no contents in this book")
-		return
+	if w.b != nil {
+		w.showList(a, len(w.b.TOC) == 0)
 	}
-	w.list, w.sel = true, 0
-	for i, e := range w.b.TOC {
-		if e.Spine <= w.spine {
-			w.sel = i
-		}
-	}
-	w.top = w.sel - 3
-	w.draw(a)
 }
 
 // tap: on the list or the style panel, a row; on a page, the left
-// third back, the rest on, the top the contents, the bottom the style.
+// third back, the rest on, the top the contents, the strip under it
+// its buttons (bookmarks.go).
 func (w *bookWin) tap(a *bro, p image.Point) {
 	body := w.p.Body
 	if !p.In(body) {
@@ -652,8 +689,7 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 	switch {
 	case p.Y < body.Min.Y+body.Dy()/8:
 		w.openContents(a)
-	case p.Y >= w.area.Max.Y && w.b != nil: // the strip under the page: how it's set
-		w.openStyle(a)
+	case p.Y >= w.area.Max.Y && w.b != nil && w.footTap(a, p):
 	case p.X < body.Min.X+body.Dx()/3:
 		w.turn(a, -1)
 	default:

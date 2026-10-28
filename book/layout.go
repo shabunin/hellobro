@@ -52,7 +52,8 @@ type Item struct {
 // Pos is a place in a chapter: a block, a byte in its text.
 type Pos struct{ Block, Off int }
 
-func (p Pos) before(q Pos) bool { return p.Block < q.Block || p.Block == q.Block && p.Off < q.Off }
+// Before is whether p comes before q in the chapter.
+func (p Pos) Before(q Pos) bool { return p.Block < q.Block || p.Block == q.Block && p.Off < q.Off }
 
 // Page is what's on one page, and where it starts.
 type Page struct {
@@ -64,7 +65,7 @@ type Page struct {
 func PageAt(pages []Page, pos Pos) int {
 	n := 0
 	for i, p := range pages {
-		if pos.before(p.Start) {
+		if pos.Before(p.Start) {
 			break
 		}
 		n = i

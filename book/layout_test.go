@@ -95,10 +95,10 @@ func TestLayoutLines(t *testing.T) {
 	at := pages[2].Start
 	big := Layout(ch, Settings{W: 600, H: 800, Px: 40}, goFaces{}, nil)
 	n := PageAt(big, at)
-	if n == 0 || at.before(big[n].Start) {
+	if n == 0 || at.Before(big[n].Start) {
 		t.Errorf("page %d at %v starts %v", n, at, big[n].Start)
 	}
-	if n+1 < len(big) && !at.before(big[n+1].Start) {
+	if n+1 < len(big) && !at.Before(big[n+1].Start) {
 		t.Errorf("%v is past page %d", at, n)
 	}
 }
