@@ -218,19 +218,19 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 	cur := int32(0)
 	dropping, drops := false, 0
 	button := false
-	keysSeen := map[uint16]bool{} // for the log: what the pen's buttons send
+	seen := map[[2]uint16]bool{} // for the log: what the panel sends, each kind once (a pen, its buttons)
 
 	err := readEvents(t.f, func(typ, code uint16, val int32) {
 		if dropping { // the kernel's buffer overflowed: skip to the next complete frame
 			dropping = !(typ == evSyn && code == synReport)
 			return
 		}
+		if k := [2]uint16{typ, code}; typ != evSyn && !seen[k] {
+			seen[k] = true
+			log.Printf("touch: first type %d code %#x (%d)", typ, code, val)
+		}
 		switch {
-		case typ == evKey && code != btnTouch:
-			if !keysSeen[code] {
-				keysSeen[code] = true
-				log.Printf("touch: key %#x (%d)", code, val)
-			}
+		case typ == evKey:
 			if code == btnStylus || code == btnStylus2 || code == btnToolRubber {
 				button = val != 0
 			}
@@ -239,8 +239,8 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 		case typ == evAbs && code == absMTTrackingID:
 			slot(cur).id = val
 		case typ == evAbs && code == absMTToolType:
-			if val > mtToolPen && !keysSeen[0x1000+uint16(val)] { // not a finger nor the pen: for the log
-				keysSeen[0x1000+uint16(val)] = true
+			if k := [2]uint16{0xffff, uint16(val)}; !seen[k] { // each tool once
+				seen[k] = true
 				log.Printf("touch: tool type %d", val)
 			}
 			slot(cur).tool = val

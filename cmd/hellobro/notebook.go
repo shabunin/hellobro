@@ -7,6 +7,10 @@ package main
 // held, it erases; a finger swiped across turns the page, and turning
 // past the last page that has something on it makes a new one.
 //
+// Till a pen has been seen, fingers write: a stylus without a battery
+// (or a Kobo Stylus whose battery is flat) is a finger to the panel. A
+// pen once seen, it's kept (hellobro.json), and fingers turn pages.
+//
 // A notebook is a file in notebooks/ next to hellobro (NAME.hbnote, its
 // strokes as text, kept a few seconds after the last change and on
 // closing), reached from the switcher and the launcher. Its window comes
@@ -614,12 +618,19 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if !ok || !p.In(w.page) || !a.shows(w) {
 		return false
 	}
+	if ev.Pen && !a.mem.Pen {
+		log.Print("notebook: a pen, so fingers turn pages from now on")
+		a.mem.Pen = true
+		a.mem.save()
+	}
 	if !ev.Pen {
 		if p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth { // the edges' swipes
 			return false
 		}
-		g.Owner = ownLeaf
-		return true
+		if a.mem.Pen {
+			g.Owner = ownLeaf
+			return true
+		}
 	}
 	if a.nt.ink != nil {
 		return false
@@ -632,8 +643,17 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		return true
 	}
 	k.s = &noteStroke{}
-	a.noteInkTo(k, p, ev.Pressure)
+	a.noteInkTo(k, p, a.notePressure(ev))
 	return true
+}
+
+// notePressure is how hard the pen pressed; a finger's is a middling
+// line, whatever it says.
+func (a *bro) notePressure(ev kobo.TouchEv) int32 {
+	if !ev.Pen {
+		return a.PressureMax() * 2 / 5
+	}
+	return ev.Pressure
 }
 
 // noteMove follows the pen.
@@ -658,7 +678,7 @@ func (a *bro) noteMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		k.last = p
 		return true
 	}
-	a.noteInkTo(k, p, ev.Pressure)
+	a.noteInkTo(k, p, a.notePressure(ev))
 	return true
 }
 

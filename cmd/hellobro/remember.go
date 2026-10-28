@@ -28,6 +28,7 @@ type remembered struct {
 	Books    map[string]bookPlace `json:"books,omitempty"`     // where each book was left (bookwin.go)
 	BookFont string               `json:"book-font,omitempty"`
 	BookPx   int                  `json:"book-px,omitempty"`
+	Pen      bool                 `json:"pen,omitempty"` // a pen has written in a notebook: fingers turn its pages (notebook.go)
 	dir      string
 }
 

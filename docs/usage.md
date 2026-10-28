@@ -580,9 +580,15 @@ the launcher has them too, the last three written.
 - **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), **clear
   page** (undone like the rest), and the paper: squares, lines or
   plain, for the whole notebook.
-- A finger swiped across the page turns it (leftward: the next, as
-  pages turn), as do the arrows and Left, Right, PgUp, PgDn. Past the
-  last page, if it has something on it, a new page.
+- The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
+  last page, if it has something on it, a new page. Once a pen has
+  written, a finger swiped across the page turns it too (leftward: the
+  next, as pages turn).
+- Till then fingers write: a stylus without a battery (or a Kobo Stylus
+  with a flat one) is a finger to the screen. A pen seen once is
+  remembered (`pen` in `hellobro.json`); take it out to write with
+  fingers again. Near the left and right edges a finger writes nothing:
+  those are the light's and the workspaces' swipes.
 - The page is the screen's shape, upright, and fitted into the window:
   fullscreen (or a tall window) gives it the most room.
 - It's kept a few seconds after the last stroke and on closing, in
