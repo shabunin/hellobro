@@ -415,6 +415,10 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		return
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {
+		if w, ok := a.windowAt(g.Start).(*bookWin); ok {
+			w.swipe(a, g.Start, g.Last)
+			return
+		}
 		a.termSwipe(g.Start, g.Last)
 	}
 }

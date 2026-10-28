@@ -137,6 +137,7 @@ type bookWin struct {
 	styling bool // the style panel shows (bookstyle.go)
 	sel     int
 	top     int
+	listN   int // the rows the list has room for
 	rows    []bookRow
 	shelf   []shelfBook
 	looking bool // the shelf is being looked for
@@ -418,7 +419,7 @@ func (w *bookWin) listOpen(a *bro, i int) {
 func (w *bookWin) drawList(a *bro) {
 	lines := w.listLines()
 	f := a.F.Body
-	rowH := kobo.TextWidth(f, "M")*2 + 10
+	rowH := max(64, kobo.TextWidth(f, "M")*2+10) // room for a finger
 	area := w.p.Body.Inset(kobo.Pad)
 	w.rows = nil
 	if w.b != nil {
@@ -426,6 +427,7 @@ func (w *bookWin) drawList(a *bro) {
 		area.Min.Y += rowH + 12
 	}
 	n := max(1, area.Dy()/rowH)
+	w.listN = n
 	if len(lines) == 0 {
 		msg := "no books here: put EPUBs on the Kobo (anywhere but its dot folders)"
 		switch {
@@ -670,8 +672,8 @@ func (w *bookWin) openContents(a *bro) {
 }
 
 // tap: on the list or the style panel, a row; on a page, the left
-// third back, the rest on, the top the contents, the strip under it
-// its buttons (bookmarks.go).
+// third back, the rest on, the top the contents but for its right
+// corner, a bookmark, the strip under it its buttons (bookmarks.go).
 func (w *bookWin) tap(a *bro, p image.Point) {
 	body := w.p.Body
 	if !p.In(body) {
@@ -687,6 +689,8 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 		return
 	}
 	switch {
+	case p.In(w.markCorner()) && w.b != nil:
+		w.toggleMark(a)
 	case p.Y < body.Min.Y+body.Dy()/8:
 		w.openContents(a)
 	case p.Y >= w.area.Max.Y && w.b != nil && w.footTap(a, p):

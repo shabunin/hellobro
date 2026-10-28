@@ -254,9 +254,20 @@ func (w *bookWin) showList(a *bro, marks bool) {
 	w.draw(a)
 }
 
-// drawTabs draws the list's tabs in r: the contents, the bookmarks.
+// drawTabs draws the list's tabs in r: the contents, the bookmarks;
+// and at their right the way back to the page, for a finger.
 func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
 	c := a.C
+	button := func(b image.Rectangle, label string, do func()) {
+		c.Frame(b, 2, kobo.Black)
+		c.Text(a.F.Panel, b, label, kobo.Black, kobo.AlignCenter)
+		w.rows = append(w.rows, bookRow{b, do})
+	}
+	shelf := image.Rect(r.Min.X, r.Min.Y, r.Min.X+min(150, r.Dx()/6), r.Max.Y-6)
+	button(shelf, "‹ books", func() { w.save(a); a.replaceWin(w, a.newBookWin("")) })
+	back := image.Rect(r.Max.X-min(260, r.Dx()/4), r.Min.Y, r.Max.X, r.Max.Y-6)
+	button(back, "back to the book", func() { w.list = false; w.draw(a) })
+	r.Min.X, r.Max.X = shelf.Max.X+16, back.Min.X-16
 	c.Fill(image.Rect(r.Min.X, r.Max.Y-2, r.Max.X, r.Max.Y), kobo.Light)
 	half := r.Dx() / 2
 	for k, name := range []string{"Contents", fmt.Sprintf("Bookmarks (%d)", len(w.marks))} {
@@ -269,5 +280,38 @@ func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
 		c.Text(a.F.Body, t, name, ink, kobo.AlignCenter)
 		marks := k == 1
 		w.rows = append(w.rows, bookRow{t, func() { w.showList(a, marks) }})
+	}
+}
+
+// markCorner is the page's top right, where its ribbon hangs: a tap
+// there bookmarks it, or takes its bookmark away.
+func (w *bookWin) markCorner() image.Rectangle {
+	body := w.p.Body
+	return image.Rect(w.area.Max.X-120, body.Min.Y, body.Max.X, w.area.Min.Y+100)
+}
+
+// swipe: on a page, across it turns it (to the left on, to the right
+// back); on a list, up or down goes a screenful on or back.
+func (w *bookWin) swipe(a *bro, from, to image.Point) {
+	d := to.Sub(from)
+	switch {
+	case w.styling:
+	case w.list:
+		if kobo.Abs(d.Y) < 60 || kobo.Abs(d.Y) < 2*kobo.Abs(d.X) {
+			return
+		}
+		n := max(1, w.listN-1)
+		if d.Y > 0 { // the finger down: back
+			n = -n
+		}
+		w.sel += n
+		w.top += n
+		w.draw(a)
+	case kobo.Abs(d.X) >= 60 && kobo.Abs(d.X) > 2*kobo.Abs(d.Y):
+		if d.X < 0 {
+			w.turn(a, 1)
+		} else {
+			w.turn(a, -1)
+		}
 	}
 }

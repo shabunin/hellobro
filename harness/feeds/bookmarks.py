@@ -1,7 +1,8 @@
 # Bookmarks (bookmarks.go): a book in fullscreen, b on a page, the
 # ribbon under another, the ☰ under the page for the contents, Tab to
-# the bookmarks, the first one opened, then one taken away by d, and
-# the Aa for the style panel. HELLOBRO_BOOKS as the books feed's.
+# the bookmarks, the first one opened, then one taken away by d, back
+# to the book by finger, and the Aa for the style panel.
+# HELLOBRO_BOOKS as the books feed's.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,7 +22,7 @@ key(TAB); time.sleep(3)                              # the bookmarks
 key(UP); key(ENTER); time.sleep(3)                   # the first one's page
 keys("t"); time.sleep(2); key(TAB); time.sleep(3)    # the bookmarks again
 keys("d"); time.sleep(3)                             # the first taken away
-key(ESC); time.sleep(3)
+tap(W - 140, 40); time.sleep(3)                      # back to the book, by finger
 tap(W // 2, H - 75); time.sleep(3)                   # Aa: the style panel
 key(ESC); time.sleep(3)
 exit_app()

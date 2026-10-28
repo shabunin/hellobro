@@ -547,7 +547,8 @@ italics), with the book's pictures, headings, italics and centred text.
   dot folders, the last read first, with how far in you are.
 - Tap a book, or pick it with ↑ ↓ and Enter. It opens where you left it.
 - Turn pages by tapping the right two thirds (on) or the left third
-  (back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
+  (back), by a swipe across the page (to the left on, to the right
+  back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
   k, h (back). Home and End go to the chapter's start and end.
 - Under the page are three buttons: **☰** the contents, **Aa** the
   style panel, and a ribbon for a bookmark.
@@ -560,8 +561,10 @@ italics), with the book's pictures, headings, italics and centred text.
 - Without the panel, **+** and **-** make the text bigger and smaller,
   **f** (Shift+F back) goes through the fonts.
 - **t**, Enter, **☰** or a tap at the top shows the contents: pick a
-  chapter. Esc leaves them; on a page, Esc goes back to the shelf.
-- **b**, or a tap on the ribbon, bookmarks the page (a ribbon hangs at
+  chapter, or swipe up and down for more. Esc or "back to the book"
+  leaves them, "‹ books" goes to the shelf (on a page, Esc does too).
+- **b**, a tap on the ribbon or on the page's top right corner
+  bookmarks the page (a ribbon hangs at
   its top right then), or takes its bookmark away. The contents' second
   tab (tap it, or Tab; **b** in the contents) lists the bookmarks, how
   far in, the chapter and how the page starts: Enter or a tap opens one,
