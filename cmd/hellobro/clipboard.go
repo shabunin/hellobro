@@ -266,7 +266,7 @@ func cellText(t *termSession, cols int, from, to image.Point) string {
 		for x := x0; x <= x1; x++ {
 			c := t.emu.CellAt(x, y)
 			switch {
-			case c == nil || c.Content == "":
+			case c == nil || c.Content == "" || isKgHolder(c):
 				row.WriteByte(' ')
 			case len(c.Content) == 4 && c.Content[0] == 0xf3: // an image's, maybe (kgCell)
 				if _, _, _, ok := kgCell(c); ok {

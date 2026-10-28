@@ -90,6 +90,7 @@ type kgPlace struct {
 	c, r       int         // the size asked for in cells, or 0
 	cell       image.Point // the cells' size when it was placed
 	seq        int
+	virtual    bool // shown where its placeholders are (kgholder.go), not at the cursor
 }
 
 // kgCmd is a command's keys and payload.
@@ -100,7 +101,7 @@ type kgCmd struct {
 	i, I, p    uint32
 	x, y, w, h int
 	c, r       int
-	C, m, q    int
+	C, m, q, U int
 	data       []byte
 }
 
@@ -205,6 +206,9 @@ func parseKgCmd(b []byte) (kgCmd, error) {
 			*p = v[0]
 			continue
 		}
+		if c.id(k[0]) == nil && c.num(k[0]) == nil { // the rest (z, X, Y, …) we don't do; z may be below 0
+			continue
+		}
 		n, err := strconv.ParseUint(v, 10, 32)
 		if err != nil {
 			return c, fmt.Errorf("bad %s", k)
@@ -216,7 +220,7 @@ func parseKgCmd(b []byte) (kgCmd, error) {
 				return c, fmt.Errorf("bad %s", k)
 			}
 			*p = int(n)
-		} // the rest (z, X, Y, U, …) we don't do
+		}
 	}
 	return c, nil
 }
@@ -277,12 +281,15 @@ func (c *kgCmd) num(k byte) *int {
 		return &c.m
 	case 'q':
 		return &c.q
+	case 'U':
+		return &c.U
 	}
 	return nil
 }
 
 // gfxRegister has emu answer what the programs ask before they send
-// images: the cells' size in pixels (CSI 14, 16, 18 t).
+// images: the cells' size in pixels (CSI 14, 16, 18 t), and not report
+// sizes without them.
 func (t *termSession) gfxRegister(emu *vt.SafeEmulator) {
 	emu.RegisterCsiHandler(ansi.Command(0, 0, 't'), func(p ansi.Params) bool {
 		n, _, _ := p.Param(0, 0)
@@ -300,6 +307,17 @@ func (t *termSession) gfxRegister(emu *vt.SafeEmulator) {
 		}
 		io.WriteString(emu.InputPipe(), r)
 		return true
+	})
+	// In-band resize (mode 2048): vt's reports say 0×0 pixels, and a
+	// program that asked for them (libvaxis's) believes them over the
+	// pty's size, which has the pixels. Not set, it goes by the pty's.
+	emu.RegisterCsiHandler(ansi.Command('?', 0, 'h'), func(p ansi.Params) bool {
+		for i := range p {
+			if n, _, _ := p.Param(i, 0); n != int(ansi.ModeInBandResize.Mode()) {
+				return false
+			}
+		}
+		return len(p) > 0
 	})
 }
 
@@ -609,7 +627,7 @@ func (t *termSession) gfxPlace(c *kgCmd, img *kgImage) string {
 		return "EINVAL:empty source rectangle"
 	}
 	cell := g.cellSize()
-	pl := &kgPlace{img: img, pid: c.p, src: src, c: c.c, r: c.r, cell: cell}
+	pl := &kgPlace{img: img, pid: c.p, src: src, c: c.c, r: c.r, cell: cell, virtual: c.U == 1}
 	sw, sh := src.Dx(), src.Dy()
 	switch {
 	case c.c > 0 && c.r > 0:
@@ -622,9 +640,9 @@ func (t *termSession) gfxPlace(c *kgCmd, img *kgImage) string {
 		pl.cols, pl.rows = ceilDiv(sw, cell.X), ceilDiv(sh, cell.Y)
 	}
 	pl.cols, pl.rows = max(1, min(kgMaxCells, pl.cols)), max(1, min(kgMaxCells, pl.rows))
-	if c.p != 0 { // a placement of the same id goes
+	if c.p != 0 || pl.virtual { // a placement of the same id goes (a virtual one, of no id, the last such)
 		for k, o := range g.places {
-			if o.img.id == img.id && o.pid == c.p {
+			if o.img.id == img.id && o.pid == c.p && o.virtual == pl.virtual {
 				delete(g.places, k)
 				g.changed = true
 			}
@@ -645,7 +663,11 @@ func (t *termSession) gfxPlace(c *kgCmd, img *kgImage) string {
 	g.seq++
 	pl.key, pl.seq = g.nextKey, g.seq
 	g.places[pl.key] = pl
-	t.gfxShow(pl, c.C == 1)
+	if pl.virtual {
+		g.changed = true // its placeholders may be there already
+	} else {
+		t.gfxShow(pl, c.C == 1)
+	}
 	return "OK"
 }
 

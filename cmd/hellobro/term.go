@@ -581,10 +581,21 @@ func (a *bro) renderTerm(t *termSession) {
 		c := changed{y, -1, -1, false}
 		shown := pn.shown[y]
 		var k cellKey
+		var left *kgHolder
 		for x := range shown {
-			k.set(emu.CellAt(x, y), showCursor && cur.X == x && cur.Y == y)
+			cl := emu.CellAt(x, y)
+			k.set(cl, showCursor && cur.X == x && cur.Y == y)
 			if k.img != 0 {
 				k.place = t.gfx.places[k.img]
+			}
+			if h, ok := kgHolderOf(cl, left); ok { // a placeholder: the image's, or blank
+				k.content, k.width, k.attrs, k.ul = "", 1, 0, 0
+				if pl := t.gfx.virtualFor(h.id, h.pid); pl != nil && h.row < pl.rows && h.col < pl.cols {
+					k.img, k.place, k.iy, k.ix = pl.key, pl, uint8(h.row), uint8(h.col)
+				}
+				left = &h
+			} else {
+				left = nil
 			}
 			k.sel = sel && v.sel.has(x, y) // sel, not a.term() again: a cell at a time, that's a map lookup each
 			if k.same(&shown[x]) {

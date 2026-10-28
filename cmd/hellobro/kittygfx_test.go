@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/vt"
 
 	"hellobro/kobo"
@@ -58,7 +60,8 @@ func TestParseKgCmd(t *testing.T) {
 		{"a=p,i=4294967295,p=3,c=10,r=5,C=1", "a=p f=32 i=4294967295 q=0 data="},
 		{"m=1;xyz", "a=t f=32 i=0 q=0 data=xyz"},
 		{"", "a=t f=32 i=0 q=0 data="},
-		{"z=-1,X=3", "error"},
+		{"a=p,z=-1,X=3,i=2", "a=p f=32 i=2 q=0 data="}, // what we don't do, below 0 or not
+		{"x=-1", "error"},
 		{"a=TT", "error"},
 		{"i=x", "error"},
 		{"i=4294967296", "error"},
@@ -261,5 +264,109 @@ func TestDither16(t *testing.T) {
 	}
 	if avg := sum / len(m.Pix); avg < 120 || avg > 132 {
 		t.Errorf("average %d, want about 126", avg)
+	}
+}
+
+// TestGfxHolder: a virtual placement shows only where its placeholders
+// are, the cells without diacritics taking the next column on, and a
+// placeholder of no image is blank.
+func TestGfxHolder(t *testing.T) {
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	a.tv.fontPx = termFontDefault
+	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1000, 700))}
+	a.C.Fill(a.C.Bounds(), kobo.White)
+	tr := testTerm(a)
+	tr.pane.p = kobo.NewPanel(a.F, "Terminal", image.Rect(10, 10, 990, 690), "")
+	a.paneGeometry(tr)
+	v := &tr.pane
+	tr.emu = vt.NewSafeEmulator(v.cols, v.rows)
+	tr.size = image.Pt(v.cols, v.rows)
+	tr.state = termConnected
+	tr.gfx.cell = a.face(tr).cell()
+	go func() {
+		buf := make([]byte, 256)
+		for {
+			if _, err := tr.emu.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+	defer tr.emu.Close()
+	cw, ch := a.face(tr).cw, a.face(tr).ch
+	tr.write([]byte("\x1b_Ga=T,U=1,i=300,f=100,c=4,r=2,q=2;" + pngB64(t, 8, 8, color.Black) + "\x1b\\"))
+	if c := tr.emu.CursorPosition(); c.X != 0 || c.Y != 0 {
+		t.Errorf("a virtual placement moved the cursor to %v", c)
+	}
+	d := func(i int) string { return string(kgDiacritics[i]) }
+	// Image 300 is 0x00012c: rgb 0,1,44. Row 0 on the 2nd line from the
+	// image's column 2, the next two cells without diacritics; row 1
+	// under it, all four with them; then image 7, which isn't, on the
+	// 4th line.
+	tr.write([]byte("ab\r\n\x1b[38;2;0;1;44m  \U0010EEEE" + d(0) + d(2) + "\U0010EEEE\U0010EEEE" + "\x1b[m x\r\n" +
+		"\x1b[38;2;0;1;44m\U0010EEEE" + d(1) + d(0) + "\U0010EEEE" + d(1) + d(1) + "\U0010EEEE" + d(1) + d(2) + "\U0010EEEE" + d(1) + d(3) + "\x1b[m\r\n" +
+		"\x1b[38;5;7m\U0010EEEE" + d(0) + d(0) + "\x1b[m"))
+	if c := tr.emu.CursorPosition(); c.X != 1 || c.Y != 3 {
+		t.Errorf("placeholders a cell each: cursor at %v", c)
+	}
+	a.renderTerm(tr)
+	g := v.grid.Min
+	px := func(col, row int) uint8 { return a.C.GrayAt(g.X+col*cw+cw/2, g.Y+row*ch+ch/2).Y }
+	for _, tc := range []struct {
+		col, row int
+		want     uint8
+	}{
+		{1, 1, 255},
+		{2, 1, 0},   // the image's 3rd column
+		{3, 1, 0},   // its 4th, inherited
+		{4, 1, 255}, // a 5th: past it, blank
+		{0, 2, 0},   // row 1, all of it
+		{3, 2, 0},
+		{0, 3, 255}, // image 7: none
+		{5, 2, 255},
+	} {
+		if p := px(tc.col, tc.row); p != tc.want {
+			t.Errorf("cell %d,%d: %d, want %d", tc.col, tc.row, p, tc.want)
+		}
+	}
+	if got := cellText(tr, v.cols, image.Pt(0, 1), image.Pt(v.cols-1, 1)); got != "      x" {
+		t.Errorf("text %q", got)
+	}
+}
+
+func TestKgHolderOf(t *testing.T) {
+	d := func(i int) string { return string(kgDiacritics[i]) }
+	cell := func(s string, fg color.Color) *uv.Cell {
+		return &uv.Cell{Content: "\U0010EEEE" + s, Width: 1, Style: uv.Style{Fg: fg}}
+	}
+	rgb := color.RGBA{0, 1, 44, 255}
+	first, ok := kgHolderOf(cell(d(3)+d(5)+d(1), rgb), nil)
+	if !ok || first != (kgHolder{id: 1<<24 | 300, row: 3, col: 5}) {
+		t.Fatalf("first %+v", first)
+	}
+	if h, _ := kgHolderOf(cell("", rgb), &first); h != (kgHolder{id: 1<<24 | 300, row: 3, col: 6}) {
+		t.Errorf("inherited %+v", h)
+	}
+	if h, _ := kgHolderOf(cell(d(4), rgb), &first); h != (kgHolder{id: 300, row: 4, col: 0}) {
+		t.Errorf("another row %+v", h)
+	}
+	if h, _ := kgHolderOf(cell("", ansi.IndexedColor(9)), &first); h != (kgHolder{id: 9}) {
+		t.Errorf("another image %+v", h)
+	}
+	if _, ok := kgHolderOf(&uv.Cell{Content: "x"}, nil); ok {
+		t.Error("x is a placeholder")
+	}
+}
+
+// TestGfxNoInBandResize: mode 2048 isn't taken on (its reports would say
+// 0×0 pixels); the modes set with it are.
+func TestGfxNoInBandResize(t *testing.T) {
+	ts, read := gfxTerm(t, 20, 6)
+	ts.write([]byte("\x1b[?2048h\x1b[c"))
+	if r := read(); strings.HasPrefix(r, "\x1b[48;") {
+		t.Errorf("2048 set: %q", r)
+	}
+	ts.write([]byte("\x1b[?25l\x1b[?25h\x1b[?1049h"))
+	if !ts.emu.IsAltScreen() {
+		t.Error("1049 not set")
 	}
 }
