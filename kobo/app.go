@@ -183,6 +183,7 @@ type App struct {
 	flash      bool            // the next full-screen update should flash
 	flashR     image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
 	blitting   bool
+	ink        bool // Ink's: black & white updates go in pen mode
 	jobs       chan blitJob
 	done       chan error
 	quit       bool
@@ -463,6 +464,9 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			}
 			a.lightBack()
 			a.onTouch(ev)
+			if a.ink {
+				a.flush() // now, not at the next tick: ink follows the hand
+			}
 			idle.Reset(IdleTimeout)
 			a.inputAt = time.Now()
 		case m := <-keys:
@@ -1074,10 +1078,18 @@ func (a *App) flush() {
 		wf = "GL16"
 	default:
 		blackWhite(img)
+		if a.ink {
+			wf = "PEN"
+		}
 	}
 	a.jobs <- blitJob{img, wf, flash}
 	a.blitting = true
 }
+
+// Ink says ink is being written (or not now): the fast updates go in
+// the panel's pen mode then, for the least latency. A grayscale update
+// after (Mark's ui) ends it.
+func (a *App) Ink(on bool) { a.ink = on }
 
 // blackWhite rounds img's grays (text's smoothed edges) to black or
 // white, for the fast waveform. DU can't show gray: sent one, it leaves

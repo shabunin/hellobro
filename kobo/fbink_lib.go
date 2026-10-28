@@ -17,6 +17,7 @@ import "C"
 import (
 	"fmt"
 	"image"
+	"log"
 	"unsafe"
 )
 
@@ -24,6 +25,7 @@ type fbinkLib struct {
 	fd       C.int
 	cfg      C.FBInkConfig
 	inflight []refresh // refreshes that may still be running, oldest first
+	pen      bool      // sunxi's pen mode is on ("PEN" blits)
 }
 
 type refresh struct {
@@ -35,6 +37,10 @@ type refresh struct {
 // updates much faster than it can show them, so without a limit a long
 // stroke builds a backlog and the screen falls further and further behind.
 const maxInflight = 2
+
+// penInflight is the same for ink in pen mode: its pieces are small, and
+// a few may be in the panel at once.
+const penInflight = 4
 
 func openFbinkLib() (fbBackend, error) {
 	l := &fbinkLib{}
@@ -84,19 +90,37 @@ func (l *fbinkLib) blit(img *image.Gray, r image.Rectangle, waveform string, fla
 			copy(pix[(y-r.Min.Y)*r.Dx():], img.Pix[off:off+r.Dx()])
 		}
 	}
+	// Ink as it's written goes in sunxi's pen mode (Nickel's, for the
+	// stylus): DU, low latency, its pieces sent over the ones before
+	// without waiting for them; ink only adds black, so they can't mix
+	// up. The next other update ends it: left on, an eink kernel thread
+	// spins.
+	pen := waveform == "PEN"
+	if pen != l.pen {
+		if rc := C.fbink_sunxi_toggle_ntx_pen_mode(l.fd, C.bool(pen)); rc < 0 {
+			log.Printf("fbink pen mode %v: %d", pen, rc)
+		}
+		l.pen = pen
+	}
+	if pen {
+		waveform = "DU"
+		l.waitInflight(penInflight - 1)
+	}
 	if flash { // let everything else finish, so it doesn't spoil the full refresh
 		l.waitInflight(0)
 	}
 	// An update over pixels the panel is still driving collides with that
 	// refresh: the two get mixed up, and old and new text show on top of
 	// each other. Let the overlapping ones finish first.
-	for i := len(l.inflight) - 1; i >= 0; i-- {
+	for i := len(l.inflight) - 1; i >= 0 && !pen; i-- {
 		if l.inflight[i].r.Overlaps(r) {
 			l.waitInflight(len(l.inflight) - i - 1)
 			break
 		}
 	}
-	l.waitInflight(maxInflight - 1)
+	if !pen {
+		l.waitInflight(maxInflight - 1)
+	}
 	cfg := l.cfg
 	cfg.wfm_mode = waveforms[waveform]
 	cfg.is_flashing = C.bool(flash)

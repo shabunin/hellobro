@@ -46,7 +46,8 @@ type fbBackend interface {
 	// setRota forces a native rotation (-1 = follow the gyro) and returns the new state.
 	setRota(rota int) (ScreenInfo, error)
 	// blit shows r of img. Waveforms: "GC16" (+flash) for full redraws,
-	// "GL16" for UI updates, "DU" for fast black & white ink.
+	// "GL16" for UI updates, "DU" for fast black & white ink, "PEN" for
+	// DU as it's written (sunxi's pen mode, where there is one).
 	blit(img *image.Gray, r image.Rectangle, waveform string, flash bool) error
 	close()
 }
@@ -150,6 +151,9 @@ func (c *fbinkCLI) blit(img *image.Gray, r image.Rectangle, waveform string, fla
 	for y := r.Min.Y; y < r.Max.Y; y++ {
 		off := img.PixOffset(r.Min.X, y)
 		pgm.Write(img.Pix[off : off+r.Dx()])
+	}
+	if waveform == "PEN" { // the CLI has no pen mode
+		waveform = "DU"
 	}
 	args := []string{"-q", "-g", fmt.Sprintf("file=-,x=%d,y=%d", r.Min.X, r.Min.Y), "-W", waveform}
 	if flash {

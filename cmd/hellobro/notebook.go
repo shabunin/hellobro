@@ -590,6 +590,7 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 func (w *noteWin) closing(a *bro) {
 	if a.nt.ink != nil && a.nt.ink.w == w {
 		a.nt.ink = nil
+		a.Ink(false)
 	}
 	w.keep(a)
 	w.place(a, kobo.Panel{})
@@ -643,6 +644,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		return true
 	}
 	k.s = &noteStroke{}
+	a.Ink(true)
 	a.noteInkTo(k, p, a.notePressure(ev))
 	return true
 }
@@ -751,6 +753,7 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		return true
 	}
 	a.nt.ink = nil
+	a.Ink(false)
 	w := k.w
 	switch {
 	case k.erase && len(k.del) > 0:
