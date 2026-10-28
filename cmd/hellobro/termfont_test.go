@@ -39,3 +39,16 @@ func TestTermFontEach(t *testing.T) {
 		}
 	}
 }
+
+// TestTermGlyphStyles: bold, italic and both are each a face of their own.
+func TestTermGlyphStyles(t *testing.T) {
+	f := newTermFace(termFontDefault)
+	seen := map[string]uint8{}
+	for _, st := range []uint8{0, glyphBold, glyphItalic, glyphBold | glyphItalic} {
+		k := string(f.glyph("a", st, 1).Pix)
+		if prev, ok := seen[k]; ok {
+			t.Errorf("style %d draws as style %d", st, prev)
+		}
+		seen[k] = st
+	}
+}

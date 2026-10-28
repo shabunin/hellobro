@@ -737,7 +737,14 @@ func (a *bro) drawCell(pn *termPane, f *termFace, x, y int, k cellKey) {
 	}
 	a.C.Fill(r, bg)
 	if k.content != "" && k.content != " " {
-		mask := f.glyph(k.content, k.attrs&uv.AttrBold != 0, w)
+		var style uint8
+		if k.attrs&uv.AttrBold != 0 {
+			style |= glyphBold
+		}
+		if k.attrs&uv.AttrItalic != 0 {
+			style |= glyphItalic
+		}
+		mask := f.glyph(k.content, style, w)
 		a.C.Mask(r, fg, mask, image.Point{})
 	}
 	if k.ul != 0 {

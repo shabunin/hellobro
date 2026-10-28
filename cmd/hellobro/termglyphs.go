@@ -13,17 +13,33 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/gomono"
 	"golang.org/x/image/font/gofont/gomonobold"
+	"golang.org/x/image/font/gofont/gomonobolditalic"
+	"golang.org/x/image/font/gofont/gomonoitalic"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
 	"hellobro/kobo"
 )
 
-// termFonts are the terminal's faces, in its own size.
-type termFonts struct{ term, bold, fallback font.Face }
+// termFonts are the terminal's faces, in its own size; styled by
+// glyphBold|glyphItalic, styled[0] the plain one.
+type termFonts struct {
+	term     font.Face
+	styled   [4]font.Face
+	fallback font.Face
+}
+
+// A glyph's style: bits of termFonts.styled's index.
+const (
+	glyphBold = 1 << iota
+	glyphItalic
+)
 
 func (f *termFonts) setSize(px int) {
-	f.term, f.bold, f.fallback = kobo.Face(gomono.TTF, float64(px)), kobo.Face(gomonobold.TTF, float64(px)), kobo.Face(goregular.TTF, float64(px))
+	for i, ttf := range [4][]byte{gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF} {
+		f.styled[i] = kobo.Face(ttf, float64(px))
+	}
+	f.term, f.fallback = f.styled[0], kobo.Face(goregular.TTF, float64(px))
 }
 
 // termFace is the terminal font in one size: its faces, its cells' size,
@@ -67,12 +83,12 @@ func (a *bro) face(t *termSession) *termFace {
 
 type glyphKey struct {
 	s     string
-	bold  bool
+	style uint8
 	width int
 }
 
-func (tf *termFace) glyph(s string, bold bool, width int) *image.Alpha {
-	k := glyphKey{s, bold, width}
+func (tf *termFace) glyph(s string, style uint8, width int) *image.Alpha {
+	k := glyphKey{s, style, width}
 	if g, ok := tf.glyphs[k]; ok {
 		return g
 	}
@@ -82,10 +98,7 @@ func (tf *termFace) glyph(s string, bold bool, width int) *image.Alpha {
 	m := image.NewAlpha(image.Rect(0, 0, tf.cw*width, tf.ch))
 	r, _ := utf8.DecodeRuneInString(s)
 	if !drawSpecial(m, r) {
-		f := tf.fonts.term
-		if bold {
-			f = tf.fonts.bold
-		}
+		f := tf.fonts.styled[style&(glyphBold|glyphItalic)]
 		if _, ok := f.GlyphAdvance(r); !ok {
 			f = tf.fonts.fallback // Go Mono lacks it: try the proportional Go font, centered
 		}
