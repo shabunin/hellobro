@@ -28,6 +28,7 @@ type Settings struct {
 	Leading float64 // a line's height, of the size
 	Ragged  bool    // no justified text: the right edge as it comes
 	Lang    string  // the book's language, for hyphenation
+	NoHyph  bool    // no hyphenation, but the book's soft hyphens
 }
 
 type ItemKind uint8
@@ -105,7 +106,10 @@ func Layout(ch *Chapter, s Settings, faces Faces, size func(src string) image.Po
 	if s.Leading == 0 {
 		s.Leading = 1.35
 	}
-	l := &layout{s: s, faces: faces, size: size, hy: hyphenatorFor(s.Lang)}
+	l := &layout{s: s, faces: faces, size: size}
+	if !s.NoHyph {
+		l.hy = hyphenatorFor(s.Lang)
+	}
 	l.newPage(Pos{})
 	for i := range ch.Blocks {
 		b := &ch.Blocks[i]

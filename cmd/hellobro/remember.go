@@ -20,16 +20,20 @@ import (
 const rememberFile = "hellobro.json"
 
 type remembered struct {
-	Light    *int                 `json:"light,omitempty"`     // the frontlight as last set, 0-100
-	LightOn  int                  `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
-	TermFont int                  `json:"term-font,omitempty"` // the terminal font's size, px
-	Hosts    []savedHost          `json:"hosts,omitempty"`     // the SSH tab's, in order
-	Layout   *wm.Saved            `json:"layout,omitempty"`    // the windows, as they were left (wm.go)
-	Books    map[string]bookPlace `json:"books,omitempty"`     // where each book was left (bookwin.go)
-	BookFont string               `json:"book-font,omitempty"`
-	BookPx   int                  `json:"book-px,omitempty"`
-	Pen      bool                 `json:"pen,omitempty"` // a pen has written in a notebook: fingers turn its pages (notebook.go)
-	dir      string
+	Light       *int                 `json:"light,omitempty"`     // the frontlight as last set, 0-100
+	LightOn     int                  `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
+	TermFont    int                  `json:"term-font,omitempty"` // the terminal font's size, px
+	Hosts       []savedHost          `json:"hosts,omitempty"`     // the SSH tab's, in order
+	Layout      *wm.Saved            `json:"layout,omitempty"`    // the windows, as they were left (wm.go)
+	Books       map[string]bookPlace `json:"books,omitempty"`     // where each book was left (bookwin.go)
+	BookFont    string               `json:"book-font,omitempty"`
+	BookPx      int                  `json:"book-px,omitempty"`
+	BookLeading int                  `json:"book-leading,omitempty"` // a line's height, % of the size
+	BookMargin  int                  `json:"book-margin,omitempty"`  // 1-5, the sides' margins
+	BookRagged  bool                 `json:"book-ragged,omitempty"`  // no justified text
+	BookNoHyph  bool                 `json:"book-no-hyphens,omitempty"`
+	Pen         bool                 `json:"pen,omitempty"` // a pen has written in a notebook: fingers turn its pages (notebook.go)
+	dir         string
 }
 
 // loadRemembered reads hellobro.json in dir, the app's.

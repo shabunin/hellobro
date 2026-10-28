@@ -549,8 +549,15 @@ italics), with the book's pictures, headings, italics and centred text.
 - Turn pages by tapping the right two thirds (on) or the left third
   (back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
   k, h (back). Home and End go to the chapter's start and end.
-- **+** and **-** make the text bigger and smaller, **f** (Shift+F back)
-  goes through the fonts. Every book takes them; they're kept.
+- **s**, or a tap on the strip under the page (where "Aa" is), opens
+  the style panel, the reader's own: the fonts, each shown in itself
+  (tap one), the size, the lines' spacing, the margins (± each),
+  justified and hyphenation (on / off), and a paragraph set as the books
+  will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
+  switch; Esc, s or "back to the book" leaves it. Every book takes it;
+  it's kept in `hellobro.json`.
+- Without the panel, **+** and **-** make the text bigger and smaller,
+  **f** (Shift+F back) goes through the fonts.
 - **t**, Enter or a tap at the top shows the contents: pick a chapter.
   Esc leaves them; on a page, Esc goes back to the shelf.
 - Where each book was left is kept in `hellobro.json` (at most every 20

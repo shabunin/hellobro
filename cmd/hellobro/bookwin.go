@@ -18,6 +18,7 @@ import (
 	"time"
 
 	xdraw "golang.org/x/image/draw"
+	"golang.org/x/image/font"
 
 	"hellobro/book"
 	"hellobro/kobo"
@@ -30,7 +31,53 @@ const (
 	bookFlashEvery       = 8                // page turns between flashes, which clear the ghosts
 	bookSaveEvery        = 20 * time.Second // the place is kept at most this often while reading
 	bookShelfMax         = 500
+	bookLeadingDefault   = 135 // a line's height, % of the size
+	bookLeadingMin       = 110
+	bookLeadingMax       = 200
+	bookMarginDefault    = 3 // of 1-5: bookMargins
 )
+
+// bookMargins are the sides' margins, % of the window's width, by level.
+var bookMargins = [6]int{0, 3, 5, 7, 10, 14}
+
+// bookStyle is how books are set, as chosen in the reader's style panel
+// (bookstyle.go): kept in hellobro.json, the same for every book.
+type bookStyle struct {
+	font            string
+	px, leading     int
+	margin          int
+	ragged, noHyphs bool
+}
+
+func (a *bro) bookStyle() bookStyle {
+	m := &a.mem
+	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph}
+	if st.leading < bookLeadingMin || st.leading > bookLeadingMax {
+		st.leading = bookLeadingDefault
+	}
+	if st.margin < 1 || st.margin >= len(bookMargins) {
+		st.margin = bookMarginDefault
+	}
+	return st
+}
+
+// setBookStyle keeps st and sets the books again in it.
+func (a *bro) setBookStyle(st bookStyle) {
+	m := &a.mem
+	if st.font != a.bookFaces().fam.name {
+		a.bk.faces = nil
+	}
+	m.BookFont, m.BookPx, m.BookLeading, m.BookMargin, m.BookRagged, m.BookNoHyph = st.font, st.px, st.leading, st.margin, st.ragged, st.noHyphs
+	a.mem.save()
+	for _, win := range a.windows() {
+		if w, ok := win.(*bookWin); ok && w.b != nil {
+			w.place(a, w.p)
+			if a.shows(w) {
+				w.draw(a)
+			}
+		}
+	}
+}
 
 // bookPlace is where a book was left.
 type bookPlace struct {
@@ -46,6 +93,12 @@ type bookPlace struct {
 type bookState struct {
 	fams  []bookFamily
 	faces *bookFaces
+	names map[string]font.Face // each family's regular, to show it by (bookstyle.go)
+}
+
+type bookLaid struct {
+	w, h int
+	st   bookStyle
 }
 
 type bookRow struct {
@@ -68,7 +121,7 @@ type bookWin struct {
 	ch    *book.Chapter
 	pages []book.Page
 	page  int
-	laid  [4]int // what the pages are laid out for: width, height, size, font
+	laid  bookLaid // what the pages are laid out for
 
 	p       kobo.Panel
 	area    image.Rectangle // the text's, in the body
@@ -77,6 +130,7 @@ type bookWin struct {
 	pics    map[string]*image.Gray // the page's pictures, scaled
 
 	list    bool // the contents (or the shelf) show
+	styling bool // the style panel shows (bookstyle.go)
 	sel     int
 	top     int
 	rows    []bookRow
@@ -157,7 +211,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 		return
 	}
 	body := p.Body
-	mx := max(24, body.Dx()/14)
+	mx := max(16, body.Dx()*bookMargins[a.bookStyle().margin]/100)
 	foot := kobo.TextWidth(a.F.Small, "M")*2 + 8
 	w.area = image.Rect(body.Min.X+mx, body.Min.Y+max(20, body.Dy()/40), body.Max.X-mx, body.Max.Y-foot)
 }
@@ -195,7 +249,7 @@ func (w *bookWin) layout(a *bro) {
 		return
 	}
 	faces := a.bookFaces()
-	laid := [4]int{w.area.Dx(), w.area.Dy(), a.bookPx(), slices.IndexFunc(a.bk.fams, func(f bookFamily) bool { return f.name == faces.fam.name })}
+	laid := bookLaid{w.area.Dx(), w.area.Dy(), a.bookStyle()}
 	if w.ch != nil && laid == w.laid {
 		return
 	}
@@ -209,7 +263,7 @@ func (w *bookWin) layout(a *bro) {
 		}
 	}
 	t := time.Now()
-	w.pages = book.Layout(w.ch, book.Settings{W: w.area.Dx(), H: w.area.Dy(), Px: laid[2], Lang: w.b.Lang}, faces, func(src string) image.Point {
+	w.pages = book.Layout(w.ch, laid.st.settings(w.area.Size(), w.b.Lang), faces, func(src string) image.Point {
 		p, _ := w.b.ImageSize(src)
 		return p
 	})
@@ -227,6 +281,8 @@ func (w *bookWin) draw(a *bro) {
 	body := p.Body
 	a.C.Fill(body, kobo.White)
 	switch {
+	case w.styling:
+		w.drawStyle(a)
 	case w.list:
 		w.drawList(a)
 	case w.err != "" && w.b == nil:
@@ -272,8 +328,9 @@ func (w *bookWin) drawPage(a *bro) {
 	w.pics = pics // only this page's are kept
 	// the chapter, under the page
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
-	a.C.Text(a.F.Small, foot, w.chapterName(), kobo.Mid, kobo.AlignLeft)
+	a.C.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, foot.Min.X+foot.Dx()*2/5, foot.Max.Y), w.chapterName(), kobo.Mid, kobo.AlignLeft)
 	a.C.Text(a.F.Small, foot, fmt.Sprintf("%d%%", w.pct()), kobo.Mid, kobo.AlignRight)
+	a.C.Text(a.F.Small, foot, "Aa", kobo.Mid, kobo.AlignCenter) // a tap here: the style panel
 }
 
 // picture is the book's picture src, gray, scaled to size.
@@ -438,7 +495,7 @@ func (w *bookWin) goTo(spine int, pos book.Pos) {
 		w.ch, w.pics = nil, nil
 	}
 	w.spine, w.at = spine, pos
-	w.laid = [4]int{}
+	w.laid = bookLaid{}
 }
 
 // turn goes d pages on (back if negative), across chapters.
@@ -484,17 +541,13 @@ func (w *bookWin) save(a *bro) {
 	w.savedAt = time.Now()
 }
 
-// restyle lays the books out again in another size or font.
+// restyle sets the books in another size or font, from a key: the
+// note says which.
 func (a *bro) restyle(px int, font string) {
-	a.mem.BookPx, a.mem.BookFont = px, font
-	a.bk.faces = nil
-	a.mem.save()
+	st := a.bookStyle()
+	st.px, st.font = px, font
+	a.setBookStyle(st)
 	a.Notify(fmt.Sprintf("%s · %d px", a.bookFaces().fam.name, a.bookPx()))
-	for _, win := range a.windows() {
-		if w, ok := win.(*bookWin); ok && w.b != nil && a.shows(w) {
-			w.draw(a)
-		}
-	}
 }
 
 func (w *bookWin) press(a *bro, code uint16, value int32) bool {
@@ -506,6 +559,9 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		return false
 	}
 	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
+	if w.styling {
+		return w.styleKey(a, code, ch)
+	}
 	if w.list {
 		switch {
 		case code == 103 || ch == "k": // up
@@ -550,6 +606,8 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		a.restyle(a.bookPx(), fams[(i+d)%len(fams)].name)
 	case ch == "t" || code == kobo.KeyEnter:
 		w.openContents(a)
+	case ch == "s" && w.b != nil:
+		w.openStyle(a)
 	case code == kobo.KeyEsc:
 		w.save(a)
 		a.replaceWin(w, a.newBookWin(""))
@@ -575,14 +633,14 @@ func (w *bookWin) openContents(a *bro) {
 	w.draw(a)
 }
 
-// tap: on the list, a row; on a page, the left third back, the rest
-// on, the top the contents.
+// tap: on the list or the style panel, a row; on a page, the left
+// third back, the rest on, the top the contents, the bottom the style.
 func (w *bookWin) tap(a *bro, p image.Point) {
 	body := w.p.Body
 	if !p.In(body) {
 		return
 	}
-	if w.list {
+	if w.list || w.styling {
 		for _, r := range w.rows {
 			if p.In(r.r) {
 				r.do()
@@ -594,6 +652,8 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 	switch {
 	case p.Y < body.Min.Y+body.Dy()/8:
 		w.openContents(a)
+	case p.Y >= w.area.Max.Y && w.b != nil: // the strip under the page: how it's set
+		w.openStyle(a)
 	case p.X < body.Min.X+body.Dx()/3:
 		w.turn(a, -1)
 	default:
