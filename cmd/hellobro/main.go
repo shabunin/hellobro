@@ -297,6 +297,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		case a.edge == g && p.X >= kobo.EdgeWidth: // the right edge is ours
 		case a.wmTouch(p, g):
 		case a.noteTouch(ev, p, g):
+		case a.cutStart(p, g):
 		default:
 			a.selStart(p, g)
 		}
@@ -305,6 +306,8 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	case a.edge == g && a.edgeSwipe(p, g):
 	case a.tv.sel != nil && a.tv.sel.g == g:
 		a.selMove(p, g)
+	case a.bk.cut != nil && a.bk.cut.g == g:
+		a.cutMove(p, g)
 	case g.Owner == ownPair:
 		a.pairSwipe()
 	}
@@ -402,7 +405,7 @@ func pairDir(g *kobo.Gesture) int {
 }
 
 func (a *bro) Lift(g *kobo.Gesture) {
-	if a.vkLift(g) || a.selLift(g) || a.wmDragLift(g) || a.noteLift(g) {
+	if a.vkLift(g) || a.selLift(g) || a.cutLift(g) || a.wmDragLift(g) || a.noteLift(g) {
 		return
 	}
 	if a.edge == g {

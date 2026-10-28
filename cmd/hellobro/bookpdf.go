@@ -4,15 +4,18 @@ package main
 // the shelf, the contents (its outline), bookmarks, the strip under the
 // page and turning pages are the books' own. Here: a page drawn by MuPDF
 // (package pdf), gray, its white margins trimmed, as big as the window
-// takes it whole, or as wide as the window and then in screenfuls; the
-// next page drawn ahead while the reader reads, so turning to it is at
-// once. Its style panel has the fit and the trimming.
+// takes it whole, or as wide as the window, then zoomed if asked; one
+// bigger than the window is read in screenfuls, across then down. The
+// next page is drawn while the reader reads, so turning to it is at
+// once. Its style panel has the fit, the zoom and the trimming. Cutting
+// a part of a page out is bookcut.go's.
 
 import (
 	"fmt"
 	"image"
 	"log"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,11 +30,32 @@ const (
 	pdfKept    = 3   // pages kept drawn: the one shown, the one before, the one ahead
 )
 
+// pdfZooms are the zooms there are, % of the fit.
+var pdfZooms = []int{100, 125, 150, 175, 200, 250, 300, 400}
+
 // pdfShown is a page drawn for a layout.
 type pdfShown struct {
 	spine int
 	laid  bookLaid
-	img   *image.Gray
+	img   *image.Gray // its bounds: where it is in the page drawn whole
+	zoom  float64     // px a point
+}
+
+// pdfAhead is a page being drawn ahead, away from the main loop.
+type pdfAhead struct {
+	spine int
+	laid  bookLaid
+	done  chan struct{} // closed when it's drawn
+	s     pdfShown
+	err   error
+}
+
+// pdfView is where the page shown is on the screen: its part from sp
+// at dst, zoom px a point.
+type pdfView struct {
+	dst  image.Rectangle
+	sp   image.Point
+	zoom float64
 }
 
 func isPDF(path string) bool { return strings.HasSuffix(strings.ToLower(path), ".pdf") }
@@ -64,10 +88,10 @@ func (a *bro) openPDF(w *bookWin) {
 
 // pdfDraw draws page spine of d for a layout: away from the main loop,
 // it touches nothing of the window's.
-func pdfDraw(d *pdf.Doc, spine int, laid bookLaid) (*image.Gray, error) {
+func pdfDraw(d *pdf.Doc, spine int, laid bookLaid) (pdfShown, error) {
 	size, err := d.Size(spine)
 	if err != nil {
-		return nil, err
+		return pdfShown{}, err
 	}
 	// where its ink is, in points
 	x0, y0, x1, y1 := 0.0, 0.0, size.W, size.H
@@ -75,7 +99,7 @@ func pdfDraw(d *pdf.Doc, spine int, laid bookLaid) (*image.Gray, error) {
 		z := pdfInkPx / size.W
 		m, err := d.Render(spine, z, image.Rectangle{Max: size.Scaled(z)})
 		if err != nil {
-			return nil, err
+			return pdfShown{}, err
 		}
 		if ink := pdf.Ink(m); !ink.Empty() {
 			pad := 4.0 // px of the small drawing, round the ink
@@ -87,26 +111,35 @@ func pdfDraw(d *pdf.Doc, spine int, laid bookLaid) (*image.Gray, error) {
 	if !laid.st.pdfWidth {
 		z = min(z, float64(laid.h)/(y1-y0))
 	}
+	z *= float64(laid.st.pdfZoom) / 100
 	clip := image.Rect(int(x0*z), int(y0*z), int(x1*z+0.5), int(y1*z+0.5))
-	return d.Render(spine, z, clip)
+	img, err := d.Render(spine, z, clip)
+	return pdfShown{spine, laid, img, z}, err
 }
 
 // pdfPage is the page spine drawn for the layout, drawn now if it hasn't
-// been yet.
-func (w *bookWin) pdfPage(spine int, laid bookLaid) (*image.Gray, error) {
+// been yet; if it's being drawn ahead, it's waited for.
+func (w *bookWin) pdfPage(spine int, laid bookLaid) (pdfShown, error) {
 	for _, s := range w.shown {
 		if s.spine == spine && s.laid == laid {
-			return s.img, nil
+			return s, nil
+		}
+	}
+	if ah := w.ahead; ah != nil && ah.spine == spine && ah.laid == laid {
+		<-ah.done // nearly there: rather than draw it twice
+		if ah.err == nil {
+			w.keep(ah.s)
+			return ah.s, nil
 		}
 	}
 	t := time.Now()
-	img, err := pdfDraw(w.pdf, spine, laid)
+	s, err := pdfDraw(w.pdf, spine, laid)
 	if err != nil {
-		return nil, err
+		return pdfShown{}, err
 	}
 	log.Printf("pdf: page %d drawn in %v", spine+1, time.Since(t).Round(time.Millisecond))
-	w.keep(pdfShown{spine, laid, img})
-	return img, nil
+	w.keep(s)
+	return s, nil
 }
 
 // keep keeps a page drawn, and the ones near the page shown.
@@ -120,46 +153,62 @@ func (w *bookWin) keep(s pdfShown) {
 	w.shown = kept
 }
 
-// layoutPDF draws the page and cuts it in screenfuls, if it's taller
-// than the window: a screen page each, starting at a thousandth of its
-// height (Pos.Off), so a place and a bookmark hold at any size.
+// layoutPDF draws the page and cuts it in screenfuls, if it's bigger
+// than the window: a screen page each, across then down, starting at
+// thousandths of its height (Pos.Block) and width (Pos.Off), so a place
+// and a bookmark hold at any size.
 func (w *bookWin) layoutPDF(a *bro, laid bookLaid) {
 	w.ch, w.laid = &book.Chapter{}, laid // laid out: the chapter's there
-	w.pages = []book.Page{{}}
-	w.page = 0
-	img, err := w.pdfPage(w.spine, laid)
+	w.pages, w.tiles, w.page = []book.Page{{}}, []image.Point{{}}, 0
+	s, err := w.pdfPage(w.spine, laid)
 	if err != nil {
 		w.err = err.Error()
 		log.Printf("pdf: page %d: %v", w.spine+1, err)
 		return
 	}
 	w.err = ""
-	h, screen := img.Bounds().Dy(), laid.h
-	if h > screen {
-		step := screen - screen/pdfOverlap
-		w.pages = w.pages[:0]
-		for top := 0; ; top += step {
-			top = min(top, h-screen)
-			w.pages = append(w.pages, book.Page{Start: book.Pos{Off: top * 1000 / h}})
-			if top+screen >= h {
-				break
-			}
+	b := s.img.Bounds()
+	w.pages, w.tiles = nil, nil
+	for _, y := range pdfSteps(b.Dy(), laid.h) {
+		for _, x := range pdfSteps(b.Dx(), laid.w) {
+			w.pages = append(w.pages, book.Page{Start: book.Pos{Block: y * 1000 / b.Dy(), Off: x * 1000 / b.Dx()}})
+			w.tiles = append(w.tiles, image.Pt(x, y))
 		}
 	}
 	w.page = book.PageAt(w.pages, w.at)
 }
 
+// pdfSteps are where the screenfuls start along n px, screen px a
+// screenful, a little of each showing again on the next.
+func pdfSteps(n, screen int) []int {
+	if n <= screen {
+		return []int{0}
+	}
+	step := screen - screen/pdfOverlap
+	var at []int
+	for o := 0; ; o += step {
+		o = min(o, n-screen)
+		at = append(at, o)
+		if o+screen >= n {
+			return at
+		}
+	}
+}
+
 // drawPDF shows the screenful of the page the window's on.
 func (w *bookWin) drawPDF(a *bro) {
+	w.view = pdfView{}
 	if w.err != "" {
 		a.C.Text(a.F.Body, image.Rect(w.area.Min.X, w.area.Min.Y, w.area.Max.X, w.area.Min.Y+40), "can't draw this page: "+w.err, kobo.Dark, kobo.AlignLeft)
-	} else if img, err := w.pdfPage(w.spine, w.laid); err == nil {
-		b := img.Bounds()
-		top := w.pages[w.page].Start.Off * b.Dy() / 1000
-		r := image.Rect(0, 0, b.Dx(), min(b.Dy(), w.area.Dy())).Add(w.area.Min)
-		r = r.Add(image.Pt((w.area.Dx()-r.Dx())/2, (w.area.Dy()-r.Dy())/2)) // in the middle
-		kobo.CopyGray(a.C.Gray, r.Intersect(w.area), img, b.Min.Add(image.Pt(0, top)))
+	} else if s, err := w.pdfPage(w.spine, w.laid); err == nil && w.page < len(w.tiles) {
+		b := s.img.Bounds()
+		size := image.Pt(min(b.Dx(), w.area.Dx()), min(b.Dy(), w.area.Dy()))
+		dst := image.Rectangle{Max: size}.Add(w.area.Min).Add(w.area.Size().Sub(size).Div(2)) // in the middle
+		sp := b.Min.Add(w.tiles[w.page])
+		kobo.CopyGray(a.C.Gray, dst, s.img, sp)
+		w.view = pdfView{dst, sp, s.zoom}
 	}
+	w.drawCut(a)
 	w.drawPageMark(a)
 	w.drawFoot(a)
 	w.drawAhead(a)
@@ -169,7 +218,7 @@ func (w *bookWin) drawPDF(a *bro) {
 // screenful of this one.
 func (w *bookWin) drawAhead(a *bro) {
 	next, laid, d := w.spine+1, w.laid, w.pdf
-	if w.ahead || next >= len(w.b.Spine) || w.page+1 < len(w.pages) {
+	if w.ahead != nil || next >= len(w.b.Spine) || w.page+1 < len(w.pages) {
 		return
 	}
 	for _, s := range w.shown {
@@ -177,17 +226,21 @@ func (w *bookWin) drawAhead(a *bro) {
 			return
 		}
 	}
-	w.ahead = true
+	ah := &pdfAhead{spine: next, laid: laid, done: make(chan struct{})}
+	w.ahead = ah
 	go func() {
 		t := time.Now()
-		img, err := pdfDraw(d, next, laid)
+		ah.s, ah.err = pdfDraw(d, next, laid)
+		close(ah.done)
 		a.Do(func() {
-			w.ahead = false
-			if err != nil || w.pdf != d {
+			if w.ahead == ah {
+				w.ahead = nil
+			}
+			if ah.err != nil || w.pdf != d {
 				return
 			}
 			log.Printf("pdf: page %d drawn ahead in %v", next+1, time.Since(t).Round(time.Millisecond))
-			w.keep(pdfShown{next, laid, img})
+			w.keep(ah.s)
 		})
 	}()
 }
@@ -216,6 +269,43 @@ func (w *bookWin) pdfFootName() string {
 
 // --- its style panel: the fit, the trimming ---
 
+// pdfZoomStep zooms PDFs a step in (d 1) or out (-1).
+func (a *bro) pdfZoomStep(d int) {
+	st := a.bookStyle()
+	i := max(0, slices.Index(pdfZooms, st.pdfZoom))
+	st.pdfZoom = pdfZooms[max(0, min(len(pdfZooms)-1, i+d))]
+	a.setBookStyle(st)
+	a.Notify(fmt.Sprintf("zoom %d%%", st.pdfZoom))
+}
+
+const (
+	pdfStyleFit = iota
+	pdfStyleZoom
+	pdfStyleTrim
+	pdfStyleDone
+	pdfStyleN
+)
+
+// pdfStyleStep changes row i: d -1 or 1 a step down or up, 0 picks it.
+func (w *bookWin) pdfStyleStep(a *bro, i, d int) {
+	st := a.bookStyle()
+	switch i {
+	case pdfStyleFit:
+		st.pdfWidth = !st.pdfWidth
+	case pdfStyleZoom:
+		if d != 0 {
+			a.pdfZoomStep(d)
+		}
+		return
+	case pdfStyleTrim:
+		st.pdfNoTrim = !st.pdfNoTrim
+	case pdfStyleDone:
+		w.closeStyle(a)
+		return
+	}
+	a.setBookStyle(st)
+}
+
 func (w *bookWin) drawPDFStyle(a *bro) {
 	st := a.bookStyle()
 	area := w.p.Body.Inset(kobo.Pad)
@@ -223,30 +313,36 @@ func (w *bookWin) drawPDFStyle(a *bro) {
 	w.rows = nil
 	fit := map[bool]string{false: "whole page", true: "page width"}
 	onOff := map[bool]string{true: "on", false: "off"}
-	rows := []struct {
-		label, val string
-		do         func()
-	}{
-		{"Fit", fit[st.pdfWidth], func() { st.pdfWidth = !st.pdfWidth; a.setBookStyle(st) }},
-		{"Trim white margins", onOff[!st.pdfNoTrim], func() { st.pdfNoTrim = !st.pdfNoTrim; a.setBookStyle(st) }},
-		{"", "back to the book", func() { w.closeStyle(a) }},
-	}
-	w.sel = max(0, min(w.sel, len(rows)-1))
-	y, rowH := area.Min.Y+4, 72
-	for i, row := range rows {
+	labels := [pdfStyleN]string{"Fit", "Zoom", "Trim white margins", ""}
+	w.sel = max(0, min(w.sel, pdfStyleN-1))
+	y, rowH, boxW := area.Min.Y+4, 72, 72
+	for i := range pdfStyleN {
 		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+rowH-8)
 		y += rowH
 		if i == w.sel {
 			c.Frame(r.Inset(-4), 3, kobo.Dark)
 		}
-		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X, r.Max.Y), row.label, kobo.Black, kobo.AlignLeft)
-		b := image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y)
-		c.Frame(b, 2, kobo.Black)
-		c.Text(a.F.Panel, b, row.val, kobo.Black, kobo.AlignCenter)
-		do := row.do
-		w.rows = append(w.rows, bookRow{b, func() { w.sel = i; do() }})
+		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X, r.Max.Y), labels[i], kobo.Black, kobo.AlignLeft)
+		box := func(b image.Rectangle, label string, d int) {
+			c.Frame(b, 2, kobo.Black)
+			c.Text(a.F.Panel, b, label, kobo.Black, kobo.AlignCenter)
+			w.rows = append(w.rows, bookRow{b, func() { w.sel = i; w.pdfStyleStep(a, i, d) }})
+		}
+		switch i {
+		case pdfStyleZoom:
+			box(image.Rect(r.Max.X-boxW, r.Min.Y, r.Max.X, r.Max.Y), "+", 1)
+			vr := image.Rect(r.Max.X-boxW-160, r.Min.Y, r.Max.X-boxW, r.Max.Y)
+			c.Text(a.F.Body, vr, fmt.Sprintf("%d%%", st.pdfZoom), kobo.Black, kobo.AlignCenter)
+			box(image.Rect(vr.Min.X-boxW, r.Min.Y, vr.Min.X, r.Max.Y), "−", -1)
+		case pdfStyleFit:
+			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), fit[st.pdfWidth], 0)
+		case pdfStyleTrim:
+			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), onOff[!st.pdfNoTrim], 0)
+		case pdfStyleDone:
+			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), "back to the book", 0)
+		}
 	}
-	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "a page as wide as the screen is read in screenfuls, top to bottom", kobo.Mid, kobo.AlignLeft)
+	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "a page bigger than the screen is read in screenfuls, across then down; + and - zoom too", kobo.Mid, kobo.AlignLeft)
 }
 
 func (w *bookWin) pdfStyleKey(a *bro, code uint16, ch string) bool {
@@ -255,12 +351,18 @@ func (w *bookWin) pdfStyleKey(a *bro, code uint16, ch string) bool {
 		w.sel = max(0, w.sel-1)
 		w.draw(a)
 	case code == 108 || ch == "j" || code == kobo.KeyTab:
-		w.sel = min(2, w.sel+1)
+		w.sel = min(pdfStyleN-1, w.sel+1)
 		w.draw(a)
-	case code == kobo.KeyEnter || code == kobo.KeySpace || code == 105 || code == 106:
-		if w.sel < len(w.rows) {
-			w.rows[w.sel].do()
-		}
+	case code == 105 || ch == "h": // left
+		w.pdfStyleStep(a, w.sel, -1)
+	case code == 106 || ch == "l":
+		w.pdfStyleStep(a, w.sel, 1)
+	case code == kobo.KeyEnter || code == kobo.KeySpace:
+		w.pdfStyleStep(a, w.sel, 0)
+	case ch == "+" || ch == "=":
+		a.pdfZoomStep(1)
+	case ch == "-":
+		a.pdfZoomStep(-1)
 	case code == kobo.KeyEsc || ch == "s" || ch == "q":
 		w.closeStyle(a)
 	default:

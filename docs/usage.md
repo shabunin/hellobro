@@ -582,11 +582,26 @@ the contents are their outline (if they have one), bookmarks are the
 same. Their pages are drawn gray by MuPDF, linked into hellobro (package
 `pdf`), with their white margins trimmed, as big as the screen takes the
 whole page. **s** or **Aa** has their own panel: **Fit** the whole page
-or the page's width (then a page is read in screenfuls, top to bottom,
-a little of each showing again on the next), and **Trim white margins**
-on or off. The next page is drawn while you read this one, so turning to
-it is at once. PDFs locked with a password don't open (an empty one
-does).
+or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and
+**-** on the page too) and **Trim white margins** on or off. A page
+bigger than the screen is read in screenfuls, across then down, a
+little of each showing again on the next. The next page is drawn while
+you read this one, so turning to it is at once. PDFs locked with a
+password don't open (an empty one does).
+
+To cut a part of a PDF's page out, draw a rectangle across it with the
+pen, or hold a finger still on the page a moment, then move it (as to
+select in a terminal). Under it:
+
+- **copy text**: its words (whole ones, line by line) into the
+  clipboard, which the terminals paste (Ctrl+Shift+V);
+- **save**: a picture of it at 300 dpi, and its text, in `Clips/` on
+  the Kobo's storage (`/mnt/onboard/Clips` in Alpine), named after the
+  book and the page, and as `Clips/latest.png` and `latest.txt` too: a
+  program in Alpine (an LLM's, say) can take the last cut from there;
+- **×**, a tap elsewhere or Esc takes it away, as does turning the page.
+
+A scanned page has no text: save keeps it as a picture.
 
 The layout is the `book` package's: lines broken at spaces and after
 dashes, justified where the book says, a little of the book's CSS

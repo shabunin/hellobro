@@ -50,11 +50,15 @@ type bookStyle struct {
 	ragged, noHyphs bool
 	pdfWidth        bool // PDFs (bookpdf.go): fit their pages' width, not the whole page
 	pdfNoTrim       bool // and keep their white margins
+	pdfZoom         int  // and zoom them, % of the fit (pdfZooms)
 }
 
 func (a *bro) bookStyle() bookStyle {
 	m := &a.mem
-	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim}
+	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim, pdfZoom: m.PDFZoom}
+	if !slices.Contains(pdfZooms, st.pdfZoom) {
+		st.pdfZoom = 100
+	}
 	if st.leading < bookLeadingMin || st.leading > bookLeadingMax {
 		st.leading = bookLeadingDefault
 	}
@@ -71,7 +75,7 @@ func (a *bro) setBookStyle(st bookStyle) {
 		a.bk.faces = nil
 	}
 	m.BookFont, m.BookPx, m.BookLeading, m.BookMargin, m.BookRagged, m.BookNoHyph = st.font, st.px, st.leading, st.margin, st.ragged, st.noHyphs
-	m.PDFWidth, m.PDFNoTrim = st.pdfWidth, st.pdfNoTrim
+	m.PDFWidth, m.PDFNoTrim, m.PDFZoom = st.pdfWidth, st.pdfNoTrim, st.pdfZoom
 	a.mem.save()
 	for _, win := range a.windows() {
 		if w, ok := win.(*bookWin); ok && w.b != nil {
@@ -100,6 +104,7 @@ type bookState struct {
 	fams  []bookFamily
 	faces *bookFaces
 	names map[string]font.Face // each family's regular, to show it by (bookstyle.go)
+	cut   *bookCut             // a gesture cutting a part of a PDF's page out (bookcut.go)
 }
 
 type bookLaid struct {
@@ -119,18 +124,22 @@ type shelfBook struct {
 }
 
 type bookWin struct {
-	path  string // "": the shelf
-	b     *book.Book
-	pdf   *pdf.Doc // a PDF's: b is made of it, a chapter a page (bookpdf.go)
-	shown []pdfShown
-	ahead bool // a page is being drawn ahead
-	err   string
-	spine int
-	at    book.Pos // the page shown starts here
-	ch    *book.Chapter
-	pages []book.Page
-	page  int
-	laid  bookLaid // what the pages are laid out for
+	path    string // "": the shelf
+	b       *book.Book
+	pdf     *pdf.Doc // a PDF's: b is made of it, a chapter a page (bookpdf.go)
+	shown   []pdfShown
+	ahead   *pdfAhead     // a page being drawn ahead
+	tiles   []image.Point // where each screenful starts in the page drawn
+	view    pdfView
+	cut     image.Rectangle // a part cut out, on the screen (bookcut.go)
+	cutRows []bookRow       // its buttons
+	err     string
+	spine   int
+	at      book.Pos // the page shown starts here
+	ch      *book.Chapter
+	pages   []book.Page
+	page    int
+	laid    bookLaid // what the pages are laid out for
 
 	p       kobo.Panel
 	area    image.Rectangle // the text's, in the body
@@ -226,6 +235,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	p.Name = w.Title()
 	w.p = p
 	w.rows = nil
+	w.cut = image.Rectangle{}
 	if p.Outer.Empty() {
 		return
 	}
@@ -499,12 +509,17 @@ func (a *bro) openBook(w *bookWin, path string) {
 	a.replaceWin(w, nw)
 }
 
+// booksRoot is where the books are looked for: the Kobo's storage.
+func booksRoot() string {
+	if root := os.Getenv("HELLOBRO_BOOKS"); root != "" {
+		return root
+	}
+	return "/mnt/onboard"
+}
+
 // findBooks looks for the EPUBs on the Kobo, away from the main loop.
 func (a *bro) findBooks(w *bookWin) {
-	root := os.Getenv("HELLOBRO_BOOKS")
-	if root == "" {
-		root = "/mnt/onboard"
-	}
+	root := booksRoot()
 	w.looking = true
 	known := a.mem.Books
 	go func() {
@@ -553,6 +568,7 @@ func (w *bookWin) goTo(spine int, pos book.Pos) {
 	if spine != w.spine {
 		w.ch, w.pics = nil, nil
 	}
+	w.cut = image.Rectangle{}
 	w.spine, w.at = spine, pos
 	w.laid = bookLaid{}
 }
@@ -576,6 +592,7 @@ func (w *bookWin) turn(a *bro, d int) {
 	default:
 		w.page = n
 		w.at = w.pages[n].Start
+		w.cut = image.Rectangle{}
 	}
 	w.turns++
 	w.draw(a)
@@ -652,6 +669,13 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		return true
 	}
 	switch {
+	case code == kobo.KeyEsc && !w.cut.Empty():
+		w.cut = image.Rectangle{}
+		w.draw(a)
+	case (ch == "+" || ch == "=") && w.pdf != nil:
+		a.pdfZoomStep(1)
+	case ch == "-" && w.pdf != nil:
+		a.pdfZoomStep(-1)
 	case code == kobo.KeySpace || code == 106 || code == 109 || code == 108 || ch == "j" || ch == "l" || ch == "n":
 		w.turn(a, 1)
 	case code == 105 || code == 104 || code == 103 || code == kobo.KeyBackspace || ch == "k" || ch == "h" || ch == "p":
@@ -710,6 +734,17 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 				return
 			}
 		}
+		return
+	}
+	if !w.cut.Empty() { // a part cut out: its buttons, or away with it
+		for _, r := range w.cutRows {
+			if p.In(r.r) {
+				r.do()
+				return
+			}
+		}
+		w.cut = image.Rectangle{}
+		w.draw(a)
 		return
 	}
 	switch {

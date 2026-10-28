@@ -114,6 +114,54 @@ static char *hb_text(hb_doc *d, int i, char **err) {
 	return s;
 }
 
+// hb_chars are page i's characters, in reading order, each with its box
+// (in points, from the page's top left) and its line: *n of them, to be
+// freed.
+typedef struct { int c, line; float x0, y0, x1, y1; } hb_char;
+
+static hb_char *hb_chars(hb_doc *d, int i, int *n, char **err) {
+	fz_context *ctx = d->ctx;
+	fz_page *page = NULL;
+	fz_stext_page *st = NULL;
+	hb_char *out = NULL;
+	fz_var(page);
+	fz_var(st);
+	fz_var(out);
+	*n = 0;
+	fz_try(ctx) {
+		page = fz_load_page(ctx, d->doc, i);
+		fz_rect b = fz_bound_page(ctx, page);
+		st = fz_new_stext_page_from_page(ctx, page, NULL);
+		int cap = 0, line = 0;
+		for (fz_stext_block *bl = st->first_block; bl; bl = bl->next) {
+			if (bl->type != FZ_STEXT_BLOCK_TEXT)
+				continue;
+			for (fz_stext_line *ln = bl->u.t.first_line; ln; ln = ln->next, line++) {
+				for (fz_stext_char *ch = ln->first_char; ch; ch = ch->next) {
+					if (*n == cap) {
+						cap = cap ? 2 * cap : 1024;
+						hb_char *more = realloc(out, cap * sizeof *out);
+						if (!more)
+							fz_throw(ctx, FZ_ERROR_GENERIC, "out of memory");
+						out = more;
+					}
+					fz_rect r = fz_rect_from_quad(ch->quad);
+					out[(*n)++] = (hb_char){ch->c, line, r.x0 - b.x0, r.y0 - b.y0, r.x1 - b.x0, r.y1 - b.y0};
+				}
+			}
+		}
+	} fz_always(ctx) {
+		fz_drop_stext_page(ctx, st);
+		fz_drop_page(ctx, page);
+	} fz_catch(ctx) {
+		*err = hb_err(ctx);
+		free(out);
+		out = NULL;
+		*n = 0;
+	}
+	return out;
+}
+
 static fz_outline *hb_outline(hb_doc *d) {
 	fz_outline *o = NULL;
 	fz_try(d->ctx) o = fz_load_outline(d->ctx, d->doc);
@@ -257,6 +305,30 @@ func (d *Doc) Text(i int) (string, error) {
 	}
 	defer C.free(unsafe.Pointer(s))
 	return C.GoString(s), nil
+}
+
+// Chars are page i's characters, in reading order.
+func (d *Doc) Chars(i int) ([]Char, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.d == nil {
+		return nil, errClosed
+	}
+	var cerr *C.char
+	var n C.int
+	cs := C.hb_chars(d.d, C.int(i), &n, &cerr)
+	if err := cErr(cerr); err != nil {
+		return nil, err
+	}
+	if cs == nil {
+		return nil, nil
+	}
+	defer C.free(unsafe.Pointer(cs))
+	out := make([]Char, int(n))
+	for k, c := range unsafe.Slice(cs, int(n)) {
+		out[k] = Char{R: rune(c.c), Line: int(c.line), Box: Rect{float64(c.x0), float64(c.y0), float64(c.x1), float64(c.y1)}}
+	}
+	return out, nil
 }
 
 // Outline is its outline (the contents), in order, if it has one.

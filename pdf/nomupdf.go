@@ -18,3 +18,5 @@ func (d *Doc) Render(i int, zoom float64, clip image.Rectangle) (*image.Gray, er
 }
 func (d *Doc) Text(i int) (string, error) { return "", ErrNoMuPDF }
 func (d *Doc) Outline() []Entry           { return nil }
+
+func (d *Doc) Chars(i int) ([]Char, error) { return nil, ErrNoMuPDF }

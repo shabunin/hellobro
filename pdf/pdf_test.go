@@ -23,3 +23,27 @@ func TestInk(t *testing.T) {
 		t.Errorf("Scaled: %v, want %v", got, want)
 	}
 }
+
+func TestWords(t *testing.T) {
+	var cs []Char
+	for line, s := range []string{"hello world", "foo bar baz", "the end"} {
+		for k, r := range []rune(s) {
+			x, y := float64(k*10), float64(line*20)
+			cs = append(cs, Char{R: r, Line: line, Box: Rect{x, y, x + 10, y + 10}})
+		}
+	}
+	for _, c := range []struct {
+		r    Rect
+		want string
+	}{
+		{Rect{25, 0, 65, 30}, "hello world\nfoo bar"}, // words cut by its sides, whole
+		{Rect{0, 21, 200, 29}, "foo bar baz"},
+		{Rect{82, 0, 200, 50}, "world\nbaz"}, // "the end" is left of it
+		{Rect{0, 12, 200, 18}, ""},           // between the lines
+		{Rect{48, 0, 52, 30}, ""},            // only spaces' middles: nothing
+	} {
+		if got := Words(cs, c.r); got != c.want {
+			t.Errorf("Words(%v) = %q, want %q", c.r, got, c.want)
+		}
+	}
+}
