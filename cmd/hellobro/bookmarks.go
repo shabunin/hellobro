@@ -79,6 +79,9 @@ func (w *bookWin) toggleMark(a *bro) {
 // pageWords is how the page starts, n bytes or so of it: the chapter's
 // text from there, not the page's words, which hyphens and styles cut.
 func (w *bookWin) pageWords(n int) string {
+	if w.pdf != nil {
+		return w.pdfWords(n)
+	}
 	var b strings.Builder
 	at := w.pages[w.page].Start
 	for bi := at.Block; bi < len(w.ch.Blocks) && b.Len() < 2*n; bi++ {
@@ -166,7 +169,11 @@ func (w *bookWin) drawFoot(a *bro) {
 	c := a.C
 	toc, style, mark := w.footButtons()
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
-	c.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, toc.Min.X-12, foot.Max.Y), w.chapterName(), kobo.Mid, kobo.AlignLeft)
+	name := w.chapterName()
+	if w.pdf != nil {
+		name = w.pdfFootName()
+	}
+	c.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, toc.Min.X-12, foot.Max.Y), name, kobo.Mid, kobo.AlignLeft)
 	c.Text(a.F.Small, image.Rect(mark.Max.X+12, foot.Min.Y, foot.Max.X, foot.Max.Y), fmt.Sprintf("%d%%", w.pct()), kobo.Mid, kobo.AlignRight)
 	// ☰: three lines
 	m := toc.Min.Add(toc.Max).Div(2)

@@ -540,7 +540,8 @@ Kobo's own `/bin/sh`, as root.)
 
 hellobro has a reader of its own for EPUBs, set in the Kobo's fonts
 (Georgia, Caecilia, Malabar, Kobo Nickel…, each with its bold and
-italics), with the book's pictures, headings, italics and centred text.
+italics), with the book's pictures, headings, italics and centred text;
+and for PDFs, drawn by MuPDF (below).
 
 - Open the shelf from a new window ("Books… (tap here)") or the
   switcher (**Books**). It lists the EPUBs anywhere on the Kobo but its
@@ -575,6 +576,17 @@ italics), with the book's pictures, headings, italics and centred text.
   chapter, so another size or font finds the page again. The screen
   flashes clean every 8 pages.
 - In fullscreen (Meta+F) the page has the whole screen.
+
+PDFs are on the same shelf and read the same way: a page at a time,
+the contents are their outline (if they have one), bookmarks are the
+same. Their pages are drawn gray by MuPDF, linked into hellobro (package
+`pdf`), with their white margins trimmed, as big as the screen takes the
+whole page. **s** or **Aa** has their own panel: **Fit** the whole page
+or the page's width (then a page is read in screenfuls, top to bottom,
+a little of each showing again on the next), and **Trim white margins**
+on or off. The next page is drawn while you read this one, so turning to
+it is at once. PDFs locked with a password don't open (an empty one
+does).
 
 The layout is the `book` package's: lines broken at spaces and after
 dashes, justified where the book says, a little of the book's CSS

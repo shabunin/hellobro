@@ -7,7 +7,7 @@ all: $(APPS)
 
 # What every app is made of: the kobo package, and FBInk.
 KOBO_SRC = $(wildcard kobo/*.go) go.mod go.sum
-hellobro: $(wildcard cmd/hellobro/*.go)
+hellobro: $(wildcard cmd/hellobro/*.go book/*.go pdf/*.go) third_party/mupdf/libmupdf.a
 brotools: $(wildcard cmd/brotools/*.go)
 
 # The build's version: the commit, and when it was built (hellobro --version).
@@ -28,6 +28,10 @@ $(APPS): $(KOBO_SRC) $(wildcard share/*.go radio/*.go audio/*.go) third_party/fb
 .cross-image: tools/Containerfile
 	podman build -t $(CROSS) -f tools/Containerfile tools
 	touch $@
+
+# MuPDF, for the reader's PDFs: a pinned release, built once, not in git; see build-mupdf.sh.
+third_party/mupdf/libmupdf.a: build-mupdf.sh | .cross-image
+	./build-mupdf.sh
 
 # FBInk with image support (KOReader's can't show images); see build-fbink.sh.
 bin/fbink third_party/fbink/libfbink.a: | .cross-image

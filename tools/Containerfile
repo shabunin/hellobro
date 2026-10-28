@@ -1,6 +1,7 @@
 # Cross-build environment for the Kobo (32-bit ARM, hard float): Go + an ARM C toolchain,
-# for building FBInk and linking it into hellobro via cgo.
+# for building FBInk and MuPDF and linking them into hellobro via cgo (MuPDF's
+# make wants g++ too, for files that come out empty without OCR and barcodes).
 FROM docker.io/library/golang:1.26
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-		gcc-arm-linux-gnueabihf libc6-dev-armhf-cross make autoconf automake libtool pkg-config git \
+		gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-dev-armhf-cross make autoconf automake libtool pkg-config git \
 	&& rm -rf /var/lib/apt/lists/*

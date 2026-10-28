@@ -71,6 +71,11 @@ func (a *bro) familyFace(fam bookFamily) font.Face {
 
 func (w *bookWin) openStyle(a *bro) {
 	w.styling, w.list = true, false
+	if w.pdf != nil {
+		w.sel = 0
+		w.draw(a)
+		return
+	}
 	cur := a.bookFaces().fam.name
 	w.sel = 0
 	for i, f := range a.bk.fams {
@@ -119,6 +124,9 @@ func (w *bookWin) styleStep(a *bro, i, d int) {
 }
 
 func (w *bookWin) styleKey(a *bro, code uint16, ch string) bool {
+	if w.pdf != nil {
+		return w.pdfStyleKey(a, code, ch)
+	}
 	n := len(a.bk.fams) + styleN
 	switch {
 	case code == 103 || ch == "k": // up
@@ -163,6 +171,10 @@ func (st bookStyle) settings(size image.Point, lang string) book.Settings {
 }
 
 func (w *bookWin) drawStyle(a *bro) {
+	if w.pdf != nil {
+		w.drawPDFStyle(a)
+		return
+	}
 	faces := a.bookFaces()
 	fams := a.bk.fams
 	st := a.bookStyle()

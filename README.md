@@ -35,7 +35,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   modifiers in strips at the sides, for when there's no Bluetooth
   keyboard: shown always, or by itself while none is connected.
 - **Books**: a reader for EPUBs, in the Kobo's own fonts, with the
-  books' pictures and styles, a page at a time, with bookmarks.
+  books' pictures and styles, a page at a time, with bookmarks; and
+  PDFs, drawn by MuPDF, their margins trimmed.
 - **Shell**: Alpine Linux in a jail, with `apk` for tools, or the same
   terminal on the Kobo itself.
 - **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to

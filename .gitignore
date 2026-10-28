@@ -31,3 +31,4 @@
 # harness runs: harness/run.sh OUT ...
 /harness/out*/
 __pycache__/
+/third_party/mupdf/

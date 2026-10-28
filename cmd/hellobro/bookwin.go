@@ -22,6 +22,7 @@ import (
 
 	"hellobro/book"
 	"hellobro/kobo"
+	"hellobro/pdf"
 )
 
 const (
@@ -47,11 +48,13 @@ type bookStyle struct {
 	px, leading     int
 	margin          int
 	ragged, noHyphs bool
+	pdfWidth        bool // PDFs (bookpdf.go): fit their pages' width, not the whole page
+	pdfNoTrim       bool // and keep their white margins
 }
 
 func (a *bro) bookStyle() bookStyle {
 	m := &a.mem
-	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph}
+	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim}
 	if st.leading < bookLeadingMin || st.leading > bookLeadingMax {
 		st.leading = bookLeadingDefault
 	}
@@ -68,6 +71,7 @@ func (a *bro) setBookStyle(st bookStyle) {
 		a.bk.faces = nil
 	}
 	m.BookFont, m.BookPx, m.BookLeading, m.BookMargin, m.BookRagged, m.BookNoHyph = st.font, st.px, st.leading, st.margin, st.ragged, st.noHyphs
+	m.PDFWidth, m.PDFNoTrim = st.pdfWidth, st.pdfNoTrim
 	a.mem.save()
 	for _, win := range a.windows() {
 		if w, ok := win.(*bookWin); ok && w.b != nil {
@@ -117,6 +121,9 @@ type shelfBook struct {
 type bookWin struct {
 	path  string // "": the shelf
 	b     *book.Book
+	pdf   *pdf.Doc // a PDF's: b is made of it, a chapter a page (bookpdf.go)
+	shown []pdfShown
+	ahead bool // a page is being drawn ahead
 	err   string
 	spine int
 	at    book.Pos // the page shown starts here
@@ -166,6 +173,10 @@ func (a *bro) newBookWin(path string) *bookWin {
 	if path == "" {
 		w.list = true
 		a.findBooks(w)
+		return w
+	}
+	if isPDF(path) {
+		a.openPDF(w)
 		return w
 	}
 	b, err := book.Open(path)
@@ -219,9 +230,12 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 		return
 	}
 	body := p.Body
-	mx := max(16, body.Dx()*bookMargins[a.bookStyle().margin]/100)
+	mx, my := max(16, body.Dx()*bookMargins[a.bookStyle().margin]/100), max(20, body.Dy()/40)
+	if w.pdf != nil { // its own margins are enough
+		mx, my = 8, 8
+	}
 	foot := max(64, kobo.TextWidth(a.F.Small, "M")*2+8) // the strip under the page: room for its buttons
-	w.area = image.Rect(body.Min.X+mx, body.Min.Y+max(20, body.Dy()/40), body.Max.X-mx, body.Max.Y-foot)
+	w.area = image.Rect(body.Min.X+mx, body.Min.Y+my, body.Max.X-mx, body.Max.Y-foot)
 }
 
 func (w *bookWin) panel(a *bro) kobo.Panel {
@@ -238,6 +252,8 @@ func (w *bookWin) status() string {
 		return fmt.Sprintf("%d books", len(w.shelf))
 	case w.b == nil || len(w.pages) == 0:
 		return ""
+	case w.pdf != nil:
+		return fmt.Sprintf("%d/%d · %d%%", w.spine+1, len(w.b.Spine), w.pct())
 	}
 	return fmt.Sprintf("%d/%d · %d%%", w.page+1, len(w.pages), w.pct())
 }
@@ -259,6 +275,10 @@ func (w *bookWin) layout(a *bro) {
 	faces := a.bookFaces()
 	laid := bookLaid{w.area.Dx(), w.area.Dy(), a.bookStyle()}
 	if w.ch != nil && laid == w.laid {
+		return
+	}
+	if w.pdf != nil {
+		w.layoutPDF(a, laid)
 		return
 	}
 	if w.ch == nil {
@@ -309,6 +329,10 @@ func (w *bookWin) draw(a *bro) {
 
 func (w *bookWin) drawPage(a *bro) {
 	if w.page >= len(w.pages) {
+		return
+	}
+	if w.pdf != nil {
+		w.drawPDF(a)
 		return
 	}
 	faces := a.bookFaces()
@@ -495,8 +519,8 @@ func (a *bro) findBooks(w *bookWin) {
 				}
 				return nil
 			}
-			if strings.HasSuffix(strings.ToLower(d.Name()), ".epub") && len(found) < bookShelfMax {
-				b := shelfBook{path: p, name: strings.TrimSuffix(strings.TrimSuffix(d.Name(), ".epub"), ".kepub")}
+			if (strings.HasSuffix(strings.ToLower(d.Name()), ".epub") || isPDF(d.Name())) && len(found) < bookShelfMax {
+				b := shelfBook{path: p, name: strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(d.Name(), ".epub"), ".kepub"), ".pdf")}
 				if pl, ok := known[p]; ok {
 					b.pct, b.read = pl.Pct, pl.Read
 					if pl.Title != "" {
@@ -703,7 +727,9 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 
 func (w *bookWin) closing(a *bro) {
 	w.save(a)
-	if w.b != nil {
+	if w.pdf != nil {
+		w.pdf.Close()
+	} else if w.b != nil {
 		w.b.Close()
 	}
 	w.place(a, kobo.Panel{})
