@@ -93,7 +93,7 @@ func (a *bro) openMenu(title, hint string, entries []pickEntry, extra func(strin
 }
 
 func (a *bro) showPicker(p *picker) {
-	b := a.C.Bounds()
+	b := a.screenFree()
 	w := min(1100, b.Dx()-80)
 	n := len(p.all)
 	if p.extra != nil {

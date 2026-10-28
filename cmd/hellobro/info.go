@@ -26,7 +26,7 @@ type infoBox struct {
 const infoRowH = 46
 
 func (a *bro) showInfo(title string, rows [][2]string) {
-	b := a.C.Bounds()
+	b := a.screenFree()
 	w := min(1100, b.Dx()-80)
 	h := min(b.Dy()-80, 32+56+16+len(rows)*infoRowH+24+68+32)
 	top := b.Min.Y + (b.Dy()-h)/2

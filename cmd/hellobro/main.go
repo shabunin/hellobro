@@ -60,6 +60,7 @@ type bro struct {
 	pv     powerView
 	pw     powerState
 	kbd    kbdState
+	vk     vkbdState   // the on-screen keyboard (vkbd.go)
 	lay    kobo.Layout // the last layout, to lay out again
 }
 
@@ -101,8 +102,10 @@ func main() {
 		pickRowH, statH = 92, 56
 	}
 	a := &bro{media: mediaState{kick: make(chan struct{}, 1)}}
+	a.vk = vkbdState{held: map[*kobo.Gesture]vkHeld{}, latched: map[uint16]bool{}, since: time.Now()}
 	a.loadStatBar()
 	a.set = loadSettings()
+	a.vk.on = a.setting("vkbd") == "on"
 	a.mem = loadRemembered(kobo.AppFile(""))
 	a.tv.hosts = a.mem.hosts()
 	radio.StateDir = kobo.AppFile("")
@@ -127,11 +130,12 @@ func main() {
 
 func (a *bro) Layout(L kobo.Layout) {
 	a.lay = L
-	// The windows' area: the page, less the gaps at its edges and the
-	// status bar under it. Full screen, the window has it all.
-	a.wm.area = L.Page.Inset(wmGap / 2)
-	if L.Full {
-		a.wm.area = L.Page
+	// The windows' area: the page, less the on-screen keyboard, the gaps
+	// at its edges and the status bar under it. Full screen, the window
+	// has it all, but the keyboard.
+	a.wm.area = a.vkPlace(L.Page)
+	if !L.Full {
+		a.wm.area = a.wm.area.Inset(wmGap / 2)
 	}
 	a.layoutStat()
 	if a.tv.fontPx != 0 {
@@ -175,6 +179,7 @@ func (a *bro) Tap(p image.Point) {
 
 func (a *bro) Tick() {
 	a.sleepWhenIdle()
+	a.vkTick()
 	a.keysTick()
 	a.netTick()
 	a.termTick()
@@ -273,6 +278,9 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	switch {
 	case g == nil:
 	case ev.Kind == kobo.TouchDown:
+		if a.vkTouch(p, g) {
+			return
+		}
 		if !ev.Pen && a.pairUp(g) {
 			return
 		}
@@ -287,6 +295,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		default:
 			a.selStart(p, g)
 		}
+	case a.vkMove(p, g):
 	case a.edge == g && a.edgeSwipe(p, g):
 	case a.tv.sel != nil && a.tv.sel.g == g:
 		a.selMove(p, g)
@@ -387,7 +396,7 @@ func pairDir(g *kobo.Gesture) int {
 }
 
 func (a *bro) Lift(g *kobo.Gesture) {
-	if a.selLift(g) || a.wmDragLift(g) {
+	if a.vkLift(g) || a.selLift(g) || a.wmDragLift(g) {
 		return
 	}
 	if a.edge == g {
@@ -396,7 +405,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.pair[0] == g || a.pair[1] == g {
 		a.pair = [2]*kobo.Gesture{}
 	}
-	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge {
+	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge || g.Owner == ownKey {
 		return
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {

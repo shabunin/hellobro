@@ -84,8 +84,8 @@ and the time. It looks again every 15 s. In a binding mode (Meta+R,
 say) it says which (`grab` too, while the keys are grabbed), and what plays, and for a moment what was copied.
 
 A swipe up or down along the right edge of the screen opens the menu:
-rotate the screen, touch calibration, sleep, lock, the switcher, and
-quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
+rotate the screen, touch calibration, the on-screen keyboard, sleep,
+lock, the switcher, and quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
 it. A swipe in from the right edge, at any height, goes to the next
 workspace, in from the left edge to the one before, as pages turn; so
 do two fingers swiped left or right anywhere, where the screen tells
@@ -119,6 +119,30 @@ dashed frame shows where it is. Enter or Space presses the button in
 focus; a list takes ↑ ↓, PgUp/PgDn, Home/End and Enter. The frame shows
 once Tab is used, and a touch takes it away. The terminals keep Tab for
 the shell.
+
+### The on-screen keyboard
+
+Without a keyboard, one on the screen: a laptop's rows under the
+windows (numbers, letters, Backspace, Enter, the space bar, the arrows
+in a cross at the right), a strip at the left (Home, PgUp, PgDn, End,
+Tab, Shift) and one at the right (Esc, Del, Tab, Mod, Alt, Ctrl,
+Shift). Its keys are a keyboard's: the window manager's keys, the
+terminals', kitty's, all as from a real one. Shift, Ctrl, Alt and Mod
+(Meta, the window keys') hold till the next key is up, shown in black;
+tapped again they let go. Held Shift, the keys show their capitals and
+symbols. A key held goes on, as a keyboard's does.
+
+The keys at the screen's edges (the strips, and the rows' ends) wait
+before they're pressed: a tap is a key, a hold presses it (and goes
+on), and a finger that moves is the edge's swipe, the menu's or a
+workspace's, as it is without the keyboard. The light's swipe is above
+the left strip.
+
+Settings, **On-screen keyboard**: off; auto, shown once no keyboard has
+been connected for 10 s (and hidden as one connects); or always. The
+menu's **On-screen keyboard: show / hide** (keys.conf: `keyboard`) sets
+it on or off. While it shows, a keyboard gone doesn't bring up the
+Bluetooth window.
 
 A question over the page (a saved host's menu, read-only or
 read-write, restart into a new build) has its answers as buttons: the
@@ -328,7 +352,7 @@ of the screen's short side) and straight, so a brush in a bag isn't
 one; the keyboard back, they're gone. keys.conf: `lock`.
 
 Unlocked, a keyboard gone for 15 s brings up the Bluetooth window, full
-screen, to connect it again; when it's back the window goes (or, if it
+screen (unless the on-screen keyboard shows), to connect it again; when it's back the window goes (or, if it
 was open already, goes back to its place). A keyboard back within the
 15 s, napping, say, shows nothing, and asleep or just awake it waits:
 Bluetooth comes back on with the keyboard. Settings, **The keyboard

@@ -46,7 +46,7 @@ func (a *bro) openKeys(sel *command) {
 }
 
 func (a *bro) askKeyFor(c *command) {
-	b := a.C.Bounds()
+	b := a.screenFree()
 	w := min(1100, b.Dx()-80)
 	h := 400
 	top := b.Min.Y + (b.Dy()-h)/2

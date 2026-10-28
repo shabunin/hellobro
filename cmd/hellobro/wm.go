@@ -580,7 +580,7 @@ func (a *bro) menu() {
 		a.closePicker()
 	}
 	var entries []pickEntry
-	for _, id := range []string{"rotate", "calibrate", "sleep", "lock", "palette", "quit"} {
+	for _, id := range []string{"rotate", "calibrate", "keyboard", "sleep", "lock", "palette", "quit"} {
 		if c := commandByID(id); c != nil {
 			entries = append(entries, pickEntry{kind: "command", title: c.title, detail: a.keyLabels(c.id), do: func() { c.run(a) }})
 		}
@@ -696,6 +696,7 @@ func (a *bro) Draw() {
 	if a.sketching() {
 		a.drawSketch()
 		a.drawStat(true)
+		a.drawVkbd(nil)
 		return
 	}
 	for _, n := range t.Shown() {
@@ -705,6 +706,7 @@ func (a *bro) Draw() {
 	}
 	a.drawFloats(image.Rectangle{})
 	a.drawStat(true)
+	a.drawVkbd(nil)
 }
 
 // sketching says the windows show as boxes: the resize mode. Each step

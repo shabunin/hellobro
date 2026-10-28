@@ -38,7 +38,7 @@ func (a *bro) ask(title, text, yes string, do func()) {
 // choose puts a question up with these answers: side by side if two, the
 // second being no; else one under another.
 func (a *bro) choose(title, text string, opts ...askOpt) {
-	b := a.C.Bounds()
+	b := a.screenFree()
 	w := min(1000, b.Dx()-80)
 	h := 330
 	if len(opts) > 2 {

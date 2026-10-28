@@ -52,6 +52,9 @@ var settingList = []setting{
 	{key: "kbd-gone", label: "The keyboard gone", title: "The keyboard gone: Bluetooth",
 		values: []string{"15", "30", "60", "off"},
 		shown:  []string{"Bluetooth full screen after 15 s", "Bluetooth full screen after 30 s", "Bluetooth full screen after 1 min", "nothing comes up"}},
+	{key: "vkbd", label: "On-screen keyboard%s", cmd: "keyboard",
+		values: []string{"off", "auto", "on"},
+		shown:  []string{"off", "when no keyboard is connected (after 10 s)", "always"}},
 	{key: "touch-marks", group: "Touch", label: "Touch marks",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "a ring where it touched, a dot where it lifted, for 3 s"}},
@@ -283,6 +286,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.applyMod()
 		case "touch-marks":
 			a.SetTouchMarks(a.setting(st.key) == "on")
+		case "vkbd":
+			a.vkApply()
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))

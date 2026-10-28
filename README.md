@@ -31,6 +31,9 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   come back as they were left.
 - **SSH**: an xterm-256color terminal, as many as you like, mouse,
   reconnects by itself. tmux, htop, helix, Claude Code all work.
+- **On-screen keyboard**: a laptop's rows under the windows and the
+  modifiers in strips at the sides, for when there's no Bluetooth
+  keyboard: shown always, or by itself while none is connected.
 - **Shell**: Alpine Linux in a jail, with `apk` for tools, or the same
   terminal on the Kobo itself.
 - **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to

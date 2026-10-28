@@ -28,6 +28,7 @@ type kbdState struct {
 // kbdGone starts the while.
 func (a *bro) kbdGone() {
 	a.kbd.gen++
+	a.vk.since = time.Now()
 	gen, wait := a.kbd.gen, a.kbdWait()
 	if wait == 0 {
 		return
@@ -39,6 +40,7 @@ func (a *bro) kbdStillGone(gen int) {
 	switch {
 	case gen != a.kbd.gen || a.Keyboard != "":
 	case a.Locked(): // the lock screen has its swipes
+	case a.vk.on: // there's the on-screen one
 	case a.slp.asleep || time.Since(a.slp.wokeAt) < 3*a.kbdWait():
 		a.kbdGone() // later
 	case a.guiFocused("bluetooth"): // there already
