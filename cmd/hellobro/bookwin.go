@@ -209,7 +209,7 @@ func (w *bookWin) layout(a *bro) {
 		}
 	}
 	t := time.Now()
-	w.pages = book.Layout(w.ch, book.Settings{W: w.area.Dx(), H: w.area.Dy(), Px: laid[2]}, faces, func(src string) image.Point {
+	w.pages = book.Layout(w.ch, book.Settings{W: w.area.Dx(), H: w.area.Dy(), Px: laid[2], Lang: w.b.Lang}, faces, func(src string) image.Point {
 		p, _ := w.b.ImageSize(src)
 		return p
 	})

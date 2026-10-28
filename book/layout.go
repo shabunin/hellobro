@@ -9,6 +9,7 @@ package book
 import (
 	"image"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/image/font"
@@ -26,6 +27,7 @@ type Settings struct {
 	Px      int     // the body text's size
 	Leading float64 // a line's height, of the size
 	Ragged  bool    // no justified text: the right edge as it comes
+	Lang    string  // the book's language, for hyphenation
 }
 
 type ItemKind uint8
@@ -79,6 +81,7 @@ type frag struct {
 	space bool
 	br    bool // a line break
 	w     fixed.Int26_6
+	soft  []int // where the book has soft hyphens in it (byte offsets)
 }
 
 type layout struct {
@@ -92,7 +95,8 @@ type layout struct {
 		bottom, w int
 		side      Float
 	}
-	placed bool // the page has something on it
+	placed bool        // the page has something on it
+	hy     *hyphenator // nil: no hyphenation but the book's soft hyphens
 }
 
 // Layout lays ch out in pages. size gives a picture's size in its own
@@ -101,7 +105,7 @@ func Layout(ch *Chapter, s Settings, faces Faces, size func(src string) image.Po
 	if s.Leading == 0 {
 		s.Leading = 1.35
 	}
-	l := &layout{s: s, faces: faces, size: size}
+	l := &layout{s: s, faces: faces, size: size, hy: hyphenatorFor(s.Lang)}
 	l.newPage(Pos{})
 	for i := range ch.Blocks {
 		b := &ch.Blocks[i]
@@ -225,8 +229,19 @@ func (l *layout) frags(b *Block) []frag {
 		face := l.faces.Face(sp.Style&^(Sup|Sub), px)
 		add := func(text string, at int, space, br bool) {
 			f := frag{text: text, style: sp.Style, px: px, off: at, space: space, br: br}
+			if strings.Contains(text, "\u00ad") { // soft hyphens: not shown, but where it breaks
+				var t strings.Builder
+				for _, r := range text {
+					if r == '\u00ad' {
+						f.soft = append(f.soft, t.Len())
+					} else {
+						t.WriteRune(r)
+					}
+				}
+				f.text = t.String()
+			}
 			if !br {
-				f.w = font.MeasureString(face, text)
+				f.w = font.MeasureString(face, f.text)
 			}
 			fs = append(fs, f)
 		}
@@ -346,6 +361,10 @@ func (l *layout) text(b *Block, bi int) {
 			w += f.w
 			j++
 		}
+		hyph := false
+		if lineEnd < 0 && j < len(fs) && j > i && fs[i].w <= limit {
+			fs, hyph = l.hyphenate(fs, j, limit-w, b)
+		}
 		end, next, broke := j, j, false
 		switch {
 		case lineEnd == i: // an empty line
@@ -355,6 +374,8 @@ func (l *layout) text(b *Block, bi int) {
 			end, next = i+1, i+1
 		case lineEnd >= 0:
 			end, next, broke = lineEnd, lineEnd+1, true
+		case hyph: // the word that didn't fit, broken: its first part on the line
+			end, next = j+1, j+1
 		case j < len(fs) && lastBreak > i:
 			end, next = lastBreak, lastBreak+1
 		}
@@ -455,6 +476,53 @@ func (l *layout) setLine(line []frag, b *Block, bi, left, width int, align Align
 	l.page.Items = items
 	l.y += h
 	l.placed = true
+}
+
+// hyphenate breaks the word fs[j] where it may (as the book's soft
+// hyphens say, else the patterns), as late as still fits in room with
+// a hyphen; false if it can't.
+func (l *layout) hyphenate(fs []frag, j int, room fixed.Int26_6, b *Block) ([]frag, bool) {
+	f := fs[j]
+	if f.space || f.br || f.text == "\u200b" || b.Pre || b.Head > 0 || b.Align == Center || b.Align == Right {
+		return fs, false
+	}
+	pts := f.soft
+	if pts == nil && l.hy != nil {
+		// the word's letters, without the quotes and stops around them
+		start := strings.IndexFunc(f.text, unicode.IsLetter)
+		end := strings.LastIndexFunc(f.text, unicode.IsLetter)
+		if start < 0 {
+			return fs, false
+		}
+		if r, _ := utf8.DecodeRuneInString(f.text[start:]); unicode.IsUpper(r) {
+			return fs, false // a name, likely: left whole
+		}
+		_, n := utf8.DecodeRuneInString(f.text[end:])
+		for _, p := range l.hy.points(f.text[start : end+n]) {
+			pts = append(pts, start+p)
+		}
+	}
+	face := l.faces.Face(f.style&^(Sup|Sub), f.px)
+	for k := len(pts) - 1; k >= 0; k-- {
+		p := pts[k]
+		head := f.text[:p] + "-"
+		w := font.MeasureString(face, head)
+		if w > room {
+			continue
+		}
+		a, c := f, f
+		a.text, a.w, a.soft = head, w, nil
+		c.text, c.off, c.soft = f.text[p:], f.off+p, nil
+		c.w = font.MeasureString(face, c.text)
+		for _, q := range pts[k+1:] {
+			if f.soft != nil {
+				c.soft = append(c.soft, q-p)
+			}
+		}
+		out := append(fs[:j:j], a, c)
+		return append(out, fs[j+1:]...), true
+	}
+	return fs, false
 }
 
 // splitFrag breaks fs[i] where it stops fitting in room: as much as

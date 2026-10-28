@@ -23,6 +23,7 @@ import (
 // Book is an open EPUB.
 type Book struct {
 	Title, Author string
+	Lang          string   // dc:language: "en", "en-US"…
 	Spine         []string // the chapters' files, in reading order
 	TOC           []TOCEntry
 	z             *zip.ReadCloser
@@ -110,6 +111,7 @@ func (b *Book) readOPF() error {
 	var p struct {
 		Title   []string `xml:"metadata>title"`
 		Creator []string `xml:"metadata>creator"`
+		Lang    []string `xml:"metadata>language"`
 		Items   []struct {
 			ID    string `xml:"id,attr"`
 			Href  string `xml:"href,attr"`
@@ -129,6 +131,9 @@ func (b *Book) readOPF() error {
 	}
 	if len(p.Title) > 0 {
 		b.Title = strings.TrimSpace(p.Title[0])
+	}
+	if len(p.Lang) > 0 {
+		b.Lang = strings.TrimSpace(p.Lang[0])
 	}
 	if len(p.Creator) > 0 {
 		b.Author = strings.TrimSpace(p.Creator[0])

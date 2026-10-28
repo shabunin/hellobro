@@ -560,9 +560,12 @@ italics), with the book's pictures, headings, italics and centred text.
 - In fullscreen (Meta+F) the page has the whole screen.
 
 The layout is the `book` package's: lines broken at spaces and after
-dashes, justified where the book says (no hyphenation yet), a little of
-the book's CSS (alignment, italics, bold, sizes, indents, margins,
-floated pictures such as Gutenberg's drop caps).
+dashes, justified where the book says, a little of the book's CSS
+(alignment, italics, bold, sizes, indents, margins, floated pictures
+such as Gutenberg's drop caps). A word that doesn't fit at the end of a
+line is hyphenated: by TeX's patterns in a book in English (or one that
+doesn't say its language), names left whole; in any book where it has
+soft hyphens.
 
 ## Music
 

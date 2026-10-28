@@ -183,7 +183,7 @@ func TestRender(t *testing.T) {
 		t.Fatal(err)
 	}
 	faces := goFaces{}
-	s := Settings{W: 1264 - 160, H: 1680 - 200, Px: 34}
+	s := Settings{W: 1264 - 160, H: 1680 - 200, Px: 34, Lang: b.Lang}
 	pages := Layout(ch, s, faces, func(src string) image.Point { p, _ := b.ImageSize(src); return p })
 	t.Logf("%d pages", len(pages))
 	for i, p := range pages {
@@ -223,5 +223,33 @@ func scale(dst *image.Gray, r image.Rectangle, src image.Image) {
 			c := src.At(sb.Min.X+(x-r.Min.X)*sb.Dx()/r.Dx(), sb.Min.Y+(y-r.Min.Y)*sb.Dy()/r.Dy())
 			dst.Set(x, y, c)
 		}
+	}
+}
+
+// TestLayoutHyphens: English breaks words at the end of a line; a book
+// in another language doesn't, but where it has soft hyphens.
+func TestLayoutHyphens(t *testing.T) {
+	broken := func(lang string, text string) (n int, all string) {
+		ch := &Chapter{Blocks: []Block{para(text)}}
+		for _, p := range Layout(ch, Settings{W: 320, H: 4000, Px: 30, Lang: lang}, goFaces{}, nil) {
+			for _, it := range p.Items {
+				if strings.HasSuffix(it.Text, "-") && !strings.HasSuffix(it.Text, "daisy-") {
+					n++
+				}
+				all += it.Text
+			}
+		}
+		return n, all
+	}
+	if n, _ := broken("en", lorem(200)); n == 0 {
+		t.Error("English: no word hyphenated")
+	}
+	if n, _ := broken("ru", lorem(200)); n != 0 {
+		t.Errorf("Russian: %d words hyphenated by English patterns", n)
+	}
+	soft := strings.Repeat("con\u00adsid\u00ader\u00ading ", 30)
+	n, all := broken("ru", soft)
+	if n == 0 || strings.Contains(all, "\u00ad") {
+		t.Errorf("soft hyphens: %d breaks, shown: %v", n, strings.Contains(all, "\u00ad"))
 	}
 }
