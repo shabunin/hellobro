@@ -63,9 +63,13 @@ type noteStroke struct {
 	pts   []notePt
 	box   image.Rectangle // in page units, with the pen's width
 	attrs []xml.Attr      // from its file: the tool, its color… (nil: ours, black)
+	pic   *notePic        // a picture in box, not a stroke (notepic.go)
 }
 
 func (s *noteStroke) bound() {
+	if s.pic != nil {
+		return
+	}
 	s.box = image.Rectangle{}
 	for _, p := range s.pts {
 		r := int(p.r)/10 + 1
@@ -268,7 +272,7 @@ func segDist(p, a, b image.Point) float64 {
 
 // hits says whether the eraser at p (page units) takes s.
 func (s *noteStroke) hits(p image.Point) bool {
-	if !p.In(s.box.Inset(-noteEraser)) {
+	if s.pic != nil || !p.In(s.box.Inset(-noteEraser)) { // a picture, as in Xournal++: the eraser leaves it
 		return false
 	}
 	pt := func(i int) image.Point { return image.Pt(int(s.pts[i].x), int(s.pts[i].y)) }
@@ -402,7 +406,7 @@ func (w *noteWin) layBar(a *bro) {
 	if w.shown() == 2 {
 		clear = "clear pages"
 	}
-	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paper", label: w.nb.paper}}
+	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper", label: w.nb.paper}}
 	pages := []noteBtn{{id: "prev"}, {id: "next"}}
 	width := func(b noteBtn) int { return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8) }
 	for i := range tools {
@@ -416,7 +420,7 @@ func (w *noteWin) layBar(a *bro) {
 		counter = kobo.TextWidth(a.F.Small, "999–999 / 999")
 	}
 	room := w.bar.Dx() - width(pages[0]) - width(pages[1]) - counter - 4*gap
-	for _, drop := range []string{"paper", "redo", "clear"} {
+	for _, drop := range []string{"paper", "redo", "paste", "clear"} {
 		need := 0
 		for _, t := range tools {
 			need += width(t) + gap
@@ -519,9 +523,11 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 				c.Fill(image.Rect(pg.Min.X, y, pg.Max.X, y+1).Intersect(cl), kobo.Light)
 			}
 		}
-		for _, s := range w.strokes(w.cur + i) {
-			if w.toScreenRect(s.box, pg).Overlaps(cl) {
-				w.drawStroke(a, s, pg, cl)
+		for _, pics := range []bool{true, false} { // the pictures under the ink
+			for _, s := range w.strokes(w.cur + i) {
+				if (s.pic != nil) == pics && w.toScreenRect(s.box, pg).Overlaps(cl) {
+					w.drawStroke(a, s, pg, cl)
+				}
 			}
 		}
 	}
@@ -551,6 +557,10 @@ func (w *noteWin) toPage(p image.Point, at image.Rectangle) image.Point {
 func (w *noteWin) radius(p notePt) int { return max(1, int(float64(p.r)/10*w.scale+0.5)) }
 
 func (w *noteWin) drawStroke(a *bro, s *noteStroke, at, clip image.Rectangle) {
+	if s.pic != nil {
+		w.drawPic(a, s, at, clip)
+		return
+	}
 	prev := w.toScreen(s.pts[0], at)
 	a.C.Disc(prev, w.radius(s.pts[0]), kobo.Black, clip)
 	for _, p := range s.pts[1:] {
@@ -662,6 +672,8 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 			w.changed = time.Now()
 			w.place(a, w.p) // its button says another word
 			w.show(a)
+		case "paste":
+			w.paste(a)
 		case "prev":
 			w.turn(a, -1)
 		case "next":
@@ -675,6 +687,7 @@ const (
 	keyE = 18
 	keyP = 25
 	keyY = 21
+	keyV = 47
 )
 
 func (w *noteWin) press(a *bro, code uint16, value int32) bool {
@@ -691,6 +704,8 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		w.doUndo(a, !m.shift)
 	case m.ctrl && code == keyY:
 		w.doUndo(a, false)
+	case m.ctrl && code == keyV:
+		w.paste(a)
 	case value == 1 && !m.ctrl && (code == keyE || code == keyP):
 		w.erasing = code == keyE
 		if a.shows(w) {

@@ -593,15 +593,16 @@ To cut a part of a PDF's page out, draw a rectangle across it with the
 pen, or hold a finger still on the page a moment, then move it (as to
 select in a terminal). Under it:
 
-- **copy text**: its words (whole ones, line by line) into the
-  clipboard, which the terminals paste (Ctrl+Shift+V);
+- **copy**: its words (whole ones, line by line) into the clipboard,
+  which the terminals paste (Ctrl+Shift+V), and its picture, which a
+  notebook pastes ([Notebooks](#notebooks));
 - **save**: a picture of it at 300 dpi, and its text, in `Clips/` on
   the Kobo's storage (`/mnt/onboard/Clips` in Alpine), named after the
   book and the page, and as `Clips/latest.png` and `latest.txt` too: a
   program in Alpine (an LLM's, say) can take the last cut from there;
 - **×**, a tap elsewhere or Esc takes it away, as does turning the page.
 
-A scanned page has no text: save keeps it as a picture.
+A scanned page has no text: copy and save keep it as a picture.
 
 The layout is the `book` package's: lines broken at spaces and after
 dashes, justified where the book says, a little of the book's CSS
@@ -637,14 +638,19 @@ the launcher has them too, the last three written.
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
   writing on the second makes it a page. **clear pages** clears both.
+- **paste** (or Ctrl+V) puts the picture last copied from a PDF on the
+  page (the left one of two), under what's written on it, shrunk to the
+  margins if need be; if there's no room left there, on the next page.
+  It's under the ink: write over it. The eraser leaves it; undo and
+  clear page take it away.
 - It's kept a few seconds after the last stroke and on closing, as
   `Notebooks/NAME.xopp` on the Kobo's storage: over USB, or file
   sharing (`sftp kobo.local`). A notebook's window comes back with the
   others.
 - `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
   on a computer to go on writing, add text, or export a PDF. What
-  hellobro doesn't draw yet (text, pictures, the highlighter, a PDF under
-  the page) stays as it was when it writes the notebook again; only the
+  hellobro doesn't draw yet (text, the highlighter, a PDF under the
+  page) stays as it was when it writes the notebook again; only the
   layers become one. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
 
@@ -860,7 +866,7 @@ Kobo's storage:
 | `hellobro.json` | the saved SSH hosts, and how it was left: the windows (each terminal's font size with it), the light, the font size for new terminals |
 | `ssh.conf.old` | the hosts as kept before, taken in once |
 | `keys.conf` | the keys ([Keys](#keys)) |
-| `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |
+| `clipboard`, `clipboard.png` | what's copied, and the picture of a PDF's part copied ([Copy and paste](#copy-and-paste), [Notebooks](#notebooks)) |
 | `notebooks/NAME.hbnote` | the first notebooks, till they're opened: then they're `Notebooks/NAME.xopp` on the Kobo's storage ([Notebooks](#notebooks)) |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |

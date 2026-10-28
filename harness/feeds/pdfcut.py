@@ -1,6 +1,6 @@
 # Zoom and cutting a part of a PDF's page out (bookpdf.go, bookcut.go):
 # the paper (third on the shelf), + twice (150%), screenfuls on, - back;
-# then the pen drawn across the abstract, its text copied, the cut saved
+# then the pen drawn across the abstract, copied (text and picture), saved
 # (HELLOBRO_BOOKS/Clips), Esc; then the same with a finger held still a
 # moment, then moved, and × to take it away. HELLOBRO_BOOKS as pdf's.
 # app: hellobro
@@ -17,9 +17,9 @@ def held(x0, y0, x1, y1):                 # a finger: still a moment, then acros
         frame(0, **at(x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12), P=30); time.sleep(0.05)
     frame(0, ID=-1); time.sleep(3)
 
-def buttons(x1, y1):                       # where drawCut puts copy text, save, × under a cut
-    x0 = x1 - (210 + 150 + 74)
-    return (x0 + 100, y1 + 42), (x0 + 280, y1 + 42), (x0 + 392, y1 + 42)
+def buttons(x1, y1):                       # where drawCut puts copy, save, × under a cut
+    x0 = x1 - (150 + 150 + 74)
+    return (x0 + 70, y1 + 42), (x0 + 220, y1 + 42), (x0 + 332, y1 + 42)
 
 start()
 gui("books"); time.sleep(4)

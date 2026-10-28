@@ -2,8 +2,9 @@ package main
 
 // Cutting a part of a PDF's page out: the pen drawn across the page, or
 // a finger held still a moment then moved (as in the terminals), makes a
-// rectangle, and by it its buttons: copy its text (into the clipboard,
-// which the terminals paste), save it (a picture at 300 dpi and its
+// rectangle, and by it its buttons: copy it (its text into the
+// clipboard, which the terminals paste; and its picture, which a
+// notebook pastes: notepic.go), save it (a picture at 300 dpi and its
 // text, in Clips/ on the Kobo's storage, and as Clips/latest.png and
 // latest.txt too, for a program in Alpine to take: an LLM's, say), or
 // ×. A tap elsewhere or Esc takes it away, as does turning the page.
@@ -25,9 +26,10 @@ import (
 )
 
 const (
-	cutDPI   = 300  // a cut saved: as sharp as a print
-	cutMaxPx = 3000 // but no bigger, along its longer side
-	cutMin   = 24   // px: a rectangle smaller isn't one
+	cutCopyDPI = 227  // a cut copied: a notebook's page unit a pixel, the Elipsa's screen
+	cutDPI     = 300  // a cut saved: as sharp as a print
+	cutMaxPx   = 3000 // but no bigger, along its longer side
+	cutMin     = 24   // px: a rectangle smaller isn't one
 )
 
 // bookCut is a gesture cutting a part out, while it's on.
@@ -123,8 +125,8 @@ func (w *bookWin) drawCut(a *bro) {
 	c.Frame(r.Inset(-3), 3, kobo.White)
 	c.Frame(r, 3, kobo.Black)
 	const h, gap = 64, 10
-	labels := []string{"copy text", "save", "×"}
-	widths := []int{200, 140, 64}
+	labels := []string{"copy", "save", "×"}
+	widths := []int{140, 140, 64}
 	total := 0
 	for _, bw := range widths {
 		total += bw + gap
@@ -157,17 +159,30 @@ func (w *bookWin) cutRect() pdf.Rect {
 	return pdf.Rect{X0: x0, Y0: y0, X1: x1, Y1: y1}
 }
 
-// cutCopy copies the cut's text.
+// cutCopy copies the cut: its text, for a terminal, and its picture,
+// for a notebook.
 func (w *bookWin) cutCopy(a *bro) {
-	text, err := w.pdf.TextIn(w.spine, w.cutRect())
-	switch {
-	case err != nil:
+	r := w.cutRect()
+	text, err := w.pdf.TextIn(w.spine, r)
+	if err != nil {
 		a.Notify("can't read it: " + err.Error())
-	case strings.TrimSpace(text) == "":
-		a.Notify("no text in it (a scan?): save keeps it as a picture")
-	default:
-		a.copyText(text, "")
+		return
 	}
+	z := cutCopyDPI / 72.0
+	m, err := w.pdf.Render(w.spine, z, image.Rect(int(r.X0*z), int(r.Y0*z), int(r.X1*z+0.5), int(r.Y1*z+0.5)))
+	if err == nil {
+		err = copyPicture(m)
+	}
+	if err != nil {
+		log.Printf("pdf: copying a cut's picture: %v", err)
+		a.Notify("can't copy its picture: " + err.Error())
+		return
+	}
+	if strings.TrimSpace(text) == "" { // a scan's: the picture only
+		a.Notify("copied its picture (no text in it): paste it in a notebook")
+		return
+	}
+	a.copyText(text, "its text and picture")
 }
 
 // cutSave saves the cut, a picture and its text, away from the main
