@@ -12,10 +12,12 @@ package main
 // (or a Kobo Stylus whose battery is flat) is a finger to the panel. A
 // pen once seen, it's kept (hellobro.json), and fingers turn pages.
 //
-// A notebook is a file in notebooks/ next to hellobro (NAME.hbnote, its
-// strokes as text, kept a few seconds after the last change and on
-// closing), reached from the switcher and the launcher. Its window comes
-// back with the others.
+// A notebook is a file in Notebooks/ on the Kobo's storage, as
+// Xournal++ keeps them (NAME.xopp, notexopp.go): kept a few seconds
+// after the last change and on closing, reached from the switcher and
+// the launcher. Its window comes back with the others. The first ones
+// were NAME.hbnote in notebooks/ next to hellobro, a line of points per
+// stroke: they become .xopp when they're opened.
 //
 // The ink shows as it's written with the fast waveform, black on white;
 // once the pen lifts, what it went over gets a grayscale update, which
@@ -23,7 +25,7 @@ package main
 
 import (
 	"bufio"
-	"bytes"
+	"encoding/xml"
 	"fmt"
 	"image"
 	"io"
@@ -45,7 +47,8 @@ const (
 	noteEraser           = 16         // how near the eraser takes a stroke, in page units
 	noteKeepAfter        = 3 * time.Second
 	noteSwipe            = 120 // px across a finger goes, to turn the page
-	noteExt              = ".hbnote"
+	noteExt              = ".xopp"
+	noteOldExt           = ".hbnote"
 	notePapers           = "squares lines plain"
 
 	ownInk  = 7 // the pen writing or erasing in a notebook
@@ -57,8 +60,9 @@ const (
 type notePt struct{ x, y, r int16 }
 
 type noteStroke struct {
-	pts []notePt
-	box image.Rectangle // in page units, with the pen's width
+	pts   []notePt
+	box   image.Rectangle // in page units, with the pen's width
+	attrs []xml.Attr      // from its file: the tool, its color… (nil: ours, black)
 }
 
 func (s *noteStroke) bound() {
@@ -73,13 +77,16 @@ type notebook struct {
 	name  string
 	paper string // one of notePapers
 	pages [][]*noteStroke
+	meta  []notePage // what else the pages have, as their file had it
+	attrs []xml.Attr // the file's own
+	old   string     // the .hbnote it was, to go once it's kept as .xopp
 }
 
 // --- the file ---
 
-// parseNotebook reads a notebook as noteText writes it: a line saying
-// what it is, its paper, then each page, a line of points per stroke.
-func parseNotebook(name string, r io.Reader) (*notebook, error) {
+// parseHbnote reads a notebook as it was first kept: a line saying what
+// it is, its paper, then each page, a line of points per stroke.
+func parseHbnote(name string, r io.Reader) (*notebook, error) {
 	nb := &notebook{name: name, paper: "squares"}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(nil, 16<<20) // a stroke is a line, and may be long
@@ -130,67 +137,81 @@ func parseNotebook(name string, r io.Reader) (*notebook, error) {
 	return nb, sc.Err()
 }
 
-// noteText is nb as its file has it. Empty pages at the end aren't kept.
-func (nb *notebook) noteText() []byte {
-	var b bytes.Buffer
-	b.WriteString("hellobro notebook 1\npaper " + nb.paper + "\n")
-	n := len(nb.pages)
-	for n > 1 && len(nb.pages[n-1]) == 0 {
-		n--
-	}
-	for _, pg := range nb.pages[:n] {
-		b.WriteString("page\n")
-		for _, s := range pg {
-			b.WriteString("s")
-			for _, p := range s.pts {
-				fmt.Fprintf(&b, " %d,%d,%d", p.x, p.y, p.r)
-			}
-			b.WriteString("\n")
-		}
-	}
-	return b.Bytes()
-}
+// notesDir is where the notebooks are: Notebooks/ on the Kobo's storage,
+// to be seen over USB and file sharing (Nickel leaves .xopp be).
+func notesDir() string { return filepath.Join(shareRoot, "Notebooks") }
 
-func notesDir() string { return kobo.AppFile("notebooks") }
+// oldNotesDir is where they were, as .hbnote.
+var oldNotesDir = func() string { return kobo.AppFile("notebooks") }
 
 func notePath(name string) string { return filepath.Join(notesDir(), name+noteExt) }
 
-// loadNotebook reads the notebook name; a new one if there's no such file.
+// loadNotebook reads the notebook name: its .xopp, or the .hbnote it
+// was; a new one if there's neither.
 func loadNotebook(name string) (*notebook, error) {
 	f, err := os.Open(notePath(name))
-	if os.IsNotExist(err) {
-		return &notebook{name: name, paper: "squares", pages: [][]*noteStroke{nil}}, nil
+	if err == nil {
+		defer f.Close()
+		return parseXopp(name, f)
 	}
-	if err != nil {
+	if !os.IsNotExist(err) {
 		return nil, err
 	}
-	defer f.Close()
-	return parseNotebook(name, f)
+	old := filepath.Join(oldNotesDir(), name+noteOldExt)
+	if f, err = os.Open(old); err == nil {
+		defer f.Close()
+		nb, err := parseHbnote(name, f)
+		if nb != nil {
+			nb.old = old
+		}
+		return nb, err
+	}
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+	return &notebook{name: name, paper: "squares", pages: [][]*noteStroke{nil}}, nil
 }
 
 // save writes nb, a new file over the old one: a crash halfway leaves
-// the old one whole.
+// the old one whole. The .hbnote it was goes, once it's written.
 func (nb *notebook) save() error {
 	if err := os.MkdirAll(notesDir(), 0o755); err != nil {
 		return err
 	}
-	tmp := notePath(nb.name) + ".new"
-	if err := os.WriteFile(tmp, nb.noteText(), 0o644); err != nil {
+	b, err := nb.xopp()
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, notePath(nb.name))
+	tmp := notePath(nb.name) + ".new"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, notePath(nb.name)); err != nil {
+		return err
+	}
+	if nb.old != "" {
+		if err := os.Remove(nb.old); err != nil {
+			log.Printf("notebook %s: %v", nb.name, err)
+		}
+		nb.old = ""
+	}
+	return nil
 }
 
 // noteNames are the notebooks there are, the last written first.
 func noteNames() []string {
-	es, _ := os.ReadDir(notesDir())
 	type named struct {
 		name string
 		at   time.Time
 	}
 	var ns []named
-	for _, e := range es {
-		if n, ok := strings.CutSuffix(e.Name(), noteExt); ok && !e.IsDir() {
+	for _, d := range []struct{ dir, ext string }{{notesDir(), noteExt}, {oldNotesDir(), noteOldExt}} {
+		es, _ := os.ReadDir(d.dir)
+		for _, e := range es {
+			n, ok := strings.CutSuffix(e.Name(), d.ext)
+			if !ok || e.IsDir() || slices.ContainsFunc(ns, func(o named) bool { return o.name == n }) {
+				continue
+			}
 			var at time.Time
 			if fi, err := e.Info(); err == nil {
 				at = fi.ModTime()
@@ -919,7 +940,11 @@ func (a *bro) noteOpen(name string) *noteWin {
 		a.Notify("can't read notebook " + name + ": " + err.Error())
 		return nil
 	}
-	return &noteWin{nb: nb}
+	w := &noteWin{nb: nb}
+	if nb.old != "" { // as .xopp, soon
+		w.changed = time.Now()
+	}
+	return w
 }
 
 // openNotebook focuses the notebook name's window, or opens it; "" opens

@@ -607,10 +607,16 @@ the launcher has them too, the last three written.
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
   writing on the second makes it a page. **clear pages** clears both.
-- It's kept a few seconds after the last stroke and on closing, in
-  `notebooks/` next to hellobro (see [Files on the
-  Kobo](#files-on-the-kobo)). A notebook's window comes back with the
+- It's kept a few seconds after the last stroke and on closing, as
+  `Notebooks/NAME.xopp` on the Kobo's storage: over USB, or file
+  sharing (`sftp kobo.local`). A notebook's window comes back with the
   others.
+- `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
+  on a computer to go on writing, add text, or export a PDF. What
+  hellobro doesn't draw yet (text, pictures, the highlighter, a PDF under
+  the page) stays as it was when it writes the notebook again; only the
+  layers become one. The first notebooks, `notebooks/NAME.hbnote` next
+  to hellobro, become `.xopp` when they're opened.
 
 ## Music
 
@@ -825,7 +831,7 @@ Kobo's storage:
 | `ssh.conf.old` | the hosts as kept before, taken in once |
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |
-| `notebooks/NAME.hbnote` | the notebooks ([Notebooks](#notebooks)): a line of points per stroke |
+| `notebooks/NAME.hbnote` | the first notebooks, till they're opened: then they're `Notebooks/NAME.xopp` on the Kobo's storage ([Notebooks](#notebooks)) |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |
 | `hellobro.log` | the log (`make push-log`) |

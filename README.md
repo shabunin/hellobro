@@ -50,7 +50,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   sharing: SFTP and SSH for a paired computer (`kobo.local`). Updates go
   over the air.
 - **Notebooks**: pages to write on with the pen, in a window: squared
-  paper, an eraser, undo, a finger's swipe to turn the page.
+  paper, an eraser, undo, two pages side by side in landscape. Kept as
+  Xournal++ files, to go on with on a computer.
 - **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
   what's using it, powertop style.
 - **From afar**: a relay through a VPS, so the Kobo and your PC reach

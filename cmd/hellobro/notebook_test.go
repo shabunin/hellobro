@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"image"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestNotebookFile(t *testing.T) {
+func TestNotebookOldFile(t *testing.T) {
 	in := "hellobro notebook 1\npaper lines\npage\ns 10,20,15 30,40,25\ns 5,5,40\npage\npage\ns 1,2,3\npage\npage\n"
-	nb, err := parseNotebook("x", strings.NewReader(in))
+	nb, err := parseHbnote("x", strings.NewReader(in))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,18 +24,92 @@ func TestNotebookFile(t *testing.T) {
 	if s := nb.pages[0][0]; s.pts[1] != (notePt{30, 40, 25}) || s.box != image.Rect(8, 18, 34, 44) {
 		t.Errorf("stroke %v, box %v", s.pts, s.box)
 	}
-	want := "hellobro notebook 1\npaper lines\npage\ns 10,20,15 30,40,25\ns 5,5,40\npage\npage\ns 1,2,3\n" // the empty pages at the end go
-	if got := string(nb.noteText()); got != want {
-		t.Errorf("written:\n%s\nwant:\n%s", got, want)
-	}
 	for _, bad := range []string{"", "a shopping list\n", "hellobro notebook 1\ns 1,2\n", "hellobro notebook 1\ns 1,x,3\n"} {
-		if _, err := parseNotebook("x", strings.NewReader(bad)); err == nil {
+		if _, err := parseHbnote("x", strings.NewReader(bad)); err == nil {
 			t.Errorf("%q: no error", bad)
 		}
 	}
-	nb, _ = parseNotebook("x", strings.NewReader("hellobro notebook 1\npaper wallpaper\n"))
-	if nb.paper != "squares" || len(nb.pages) != 1 {
-		t.Errorf("a notebook of nothing: paper %q, %d pages", nb.paper, len(nb.pages))
+}
+
+func TestNotebookXopp(t *testing.T) {
+	nb := &notebook{name: "x", paper: "lines", pages: [][]*noteStroke{
+		{{pts: []notePt{{10, 20, 15}, {30, 40, 25}, {1400, 1870, 40}}}, {pts: []notePt{{5, 5, 40}}}},
+		nil,
+		{{pts: []notePt{{-3, 2000, 20}, {7, 8, 21}}}},
+		nil, nil,
+	}}
+	b, err := nb.xopp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := parseXopp("x", bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.paper != "lines" || len(back.pages) != 3 {
+		t.Fatalf("paper %q, %d pages (the empty ones at the end go)", back.paper, len(back.pages))
+	}
+	for i, pg := range nb.pages[:3] {
+		for j, s := range pg {
+			want := s.pts
+			if len(want) == 1 { // a dot is two points to Xournal++
+				want = append(want, want[0])
+			}
+			if got := back.pages[i][j].pts; !slices.Equal(got, want) {
+				t.Errorf("page %d stroke %d: %v, want %v", i, j, got, want)
+			}
+		}
+	}
+	text := string(nb.xoppText())
+	for _, want := range []string{`<xournal creator="hellobro"`, `style="ruled"`, `tool="pen"`, `width="0.95 1.59 2.54"`} {
+		if !strings.Contains(text, want) {
+			t.Errorf("no %s in\n%s", want, text)
+		}
+	}
+}
+
+// What Xournal++ wrote, with what we don't draw: it comes back as it was.
+func TestNotebookXoppKept(t *testing.T) {
+	in := `<?xml version="1.0" standalone="no"?>
+<xournal creator="Xournal++ 1.2.3" fileversion="4"><title>t</title><preview>AAAA</preview>
+<page width="595.28" height="841.89"><background type="solid" color="#ffffffff" style="graph"/>
+<layer><stroke tool="pen" ts="0" fn="" color="#ff0000ff" width="2.26 1.5 2.0">10 20 30 40 50 60</stroke>
+<stroke tool="highlighter" color="#ffff0080" width="8">1 2 3 4</stroke>
+<text font="Sans" size="12" x="100" y="100" color="#000000ff" ts="0" fn="">x² + 1 &amp; so</text></layer>
+<layer><stroke tool="pen" color="#000000ff" width="1">5 5 6 6</stroke></layer></page>
+<page width="595.28" height="841.89"><background type="pdf" pageno="1" domain="absolute" filename="a.pdf"/><layer/></page>
+</xournal>`
+	var gz bytes.Buffer
+	z := gzip.NewWriter(&gz)
+	z.Write([]byte(in))
+	z.Close()
+	for _, src := range [][]byte{[]byte(in), gz.Bytes()} {
+		nb, err := parseXopp("x", bytes.NewReader(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if nb.paper != "squares" || len(nb.pages) != 2 || len(nb.pages[0]) != 2 || len(nb.meta[0].extra) != 2 {
+			t.Fatalf("paper %q, %d pages, %d strokes, %d kept", nb.paper, len(nb.pages), len(nb.pages[0]), len(nb.meta[0].extra))
+		}
+		if p := nb.pages[0][0].pts[2]; p != (notePt{158, 189, 32}) {
+			t.Errorf("a point: %v", p)
+		}
+		nb.paper = "plain"
+		out := string(nb.xoppText())
+		for _, want := range []string{`creator="Xournal++ 1.2.3"`, `color="#ff0000ff"`, `tool="highlighter"`, `x² + 1 &amp; so`,
+			`width="595.28" height="841.89"`, `style="plain"`, `type="pdf" pageno="1"`} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s in\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, `filename="a.pdf" style`) {
+			t.Error("a PDF's background got a style")
+		}
+	}
+	for _, bad := range []string{"", "hellobro notebook 1\n", `<xournal><page><layer><stroke tool="pen" width="1">1 x</stroke></layer></page></xournal>`} {
+		if _, err := parseXopp("x", strings.NewReader(bad)); err == nil {
+			t.Errorf("%q: no error", bad)
+		}
 	}
 }
 
@@ -133,5 +212,35 @@ func TestNoteTurn(t *testing.T) {
 		if got := w.turnTo(tc.by); got != tc.want {
 			t.Errorf("%d pages, at %d, %d shown, by %d: %d, want %d", len(tc.pages), tc.cur, tc.shown, tc.by, got, tc.want)
 		}
+	}
+}
+
+func TestNotebookMoves(t *testing.T) {
+	root, old := t.TempDir(), t.TempDir()
+	defer func(r string, o func() string) { shareRoot, oldNotesDir = r, o }(shareRoot, oldNotesDir)
+	shareRoot, oldNotesDir = root, func() string { return old }
+	os.WriteFile(filepath.Join(old, "sums.hbnote"), []byte("hellobro notebook 1\npaper plain\npage\ns 1,2,15 3,4,15\n"), 0o644)
+	if got := noteNames(); !slices.Equal(got, []string{"sums"}) {
+		t.Fatalf("names: %v", got)
+	}
+	nb, err := loadNotebook("sums")
+	if err != nil || nb.old == "" || len(nb.pages[0]) != 1 {
+		t.Fatalf("%v, %+v", err, nb)
+	}
+	if err := nb.save(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(old, "sums.hbnote")); !os.IsNotExist(err) {
+		t.Errorf("the old one's still there: %v", err)
+	}
+	nb, err = loadNotebook("sums")
+	if err != nil || nb.old != "" || nb.paper != "plain" || len(nb.pages[0]) != 1 {
+		t.Fatalf("as .xopp: %v, %+v", err, nb)
+	}
+	if got := noteNames(); !slices.Equal(got, []string{"sums"}) {
+		t.Errorf("names after: %v", got)
+	}
+	if _, err := os.Stat(filepath.Join(root, "Notebooks", "sums.xopp")); err != nil {
+		t.Error(err)
 	}
 }
