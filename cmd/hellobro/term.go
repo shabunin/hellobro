@@ -484,6 +484,8 @@ func (a *bro) drawConnect(t *termSession) {
 	default:
 		add(nil, "ssh> "+t.input)
 	}
+	add(nil, "")
+	add(run(func() { a.replaceWin(t, a.newBookWin("")) }), "Books: the EPUBs on this Kobo, to read (tap here)")
 	guiLine := len(lines)
 	add(nil, "", "Settings, in a window:   "+strings.Join(guiNames(), "   "))
 	add(nil, "", keys, "Esc: close this window.")

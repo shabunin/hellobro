@@ -536,6 +536,34 @@ Kobo's own `/bin/sh`, as root.)
   have to be closed first. The next Alpine window starts over, asking
   the size anew.
 
+## Books
+
+hellobro has a reader of its own for EPUBs, set in the Kobo's fonts
+(Georgia, Caecilia, Malabar, Kobo Nickel…, each with its bold and
+italics), with the book's pictures, headings, italics and centred text.
+
+- Open the shelf from a new window ("Books… (tap here)") or the
+  switcher (**Books**). It lists the EPUBs anywhere on the Kobo but its
+  dot folders, the last read first, with how far in you are.
+- Tap a book, or pick it with ↑ ↓ and Enter. It opens where you left it.
+- Turn pages by tapping the right two thirds (on) or the left third
+  (back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
+  k, h (back). Home and End go to the chapter's start and end.
+- **+** and **-** make the text bigger and smaller, **f** (Shift+F back)
+  goes through the fonts. Every book takes them; they're kept.
+- **t**, Enter or a tap at the top shows the contents: pick a chapter.
+  Esc leaves them; on a page, Esc goes back to the shelf.
+- Where each book was left is kept in `hellobro.json` (at most every 20
+  s while reading, and when its window closes), as a place in its
+  chapter, so another size or font finds the page again. The screen
+  flashes clean every 8 pages.
+- In fullscreen (Meta+F) the page has the whole screen.
+
+The layout is the `book` package's: lines broken at spaces and after
+dashes, justified where the book says (no hyphenation yet), a little of
+the book's CSS (alignment, italics, bold, sizes, indents, margins,
+floated pictures such as Gutenberg's drop caps).
+
 ## Music
 
 hellobro has no player of its own: the music is a Linux player's, in the

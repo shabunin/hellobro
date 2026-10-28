@@ -103,6 +103,8 @@ func winWord(w wm.Window) string {
 	switch w := w.(type) {
 	case *guiWin:
 		return "gui:" + w.key
+	case *bookWin:
+		return "book:" + w.path
 	case *termSession:
 		if w.fontPx != 0 {
 			return strconv.Itoa(w.fontPx) + "px/" + termWord(w)
@@ -157,6 +159,9 @@ func (a *bro) wmRestore(s wm.Saved) (ok bool) {
 			gui[arg] = true
 			n++
 			return &guiWin{key: arg}
+		case "book":
+			n++
+			return a.newBookWin(arg)
 		case "launcher":
 		case "alpine", "sh":
 			starts = append(starts, func() { a.termStartShell(t, kind == "alpine") })

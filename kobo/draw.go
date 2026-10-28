@@ -160,16 +160,21 @@ func (c Canvas) Text(f font.Face, r image.Rectangle, s string, g uint8, align in
 	}
 	m := f.Metrics()
 	baseline := r.Min.Y + (r.Dy()+m.Ascent.Ceil()-m.Descent.Ceil())/2
+	c.TextAt(f, x, baseline, s, g, r)
+}
+
+// TextAt draws s with its baseline starting at x, y, clipped to clip.
+func (c Canvas) TextAt(f font.Face, x, y int, s string, g uint8, clip image.Rectangle) {
 	// font.Drawer's DrawString, with our Mask for its draw.DrawMask.
-	dot, prev := fixed.P(x, baseline), rune(-1)
+	dot, prev := fixed.P(x, y), rune(-1)
 	for _, ch := range s {
 		if prev >= 0 {
 			dot.X += f.Kern(prev, ch)
 		}
 		dr, mask, mp, advance, ok := glyph(f, dot, ch)
 		if ok {
-			if clip := dr.Intersect(r); !clip.Empty() {
-				c.Mask(clip, g, mask, mp.Add(clip.Min.Sub(dr.Min)))
+			if in := dr.Intersect(clip); !in.Empty() {
+				c.Mask(in, g, mask, mp.Add(in.Min.Sub(dr.Min)))
 			}
 		}
 		dot.X += advance
@@ -1025,7 +1030,7 @@ func (a *App) DrawPanelTitle(p Panel, status string) {
 		c.Text(a.F.Small, p.Button, p.ButtonLabel, Black, AlignCenter)
 		t.Max.X = p.Button.Min.X - 16
 	}
-	nameW := TextWidth(a.F.Panel, p.Name)
+	nameW := min(TextWidth(a.F.Panel, p.Name), max(0, t.Dx()-2)) // shortened if it would run into the buttons
 	c.Text(a.F.Panel, image.Rect(t.Min.X, t.Min.Y, t.Min.X+nameW+2, t.Max.Y), p.Name, ink, AlignLeft)
 	if n := p.New; !n.Empty() {
 		box(n)

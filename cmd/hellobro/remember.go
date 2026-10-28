@@ -20,11 +20,14 @@ import (
 const rememberFile = "hellobro.json"
 
 type remembered struct {
-	Light    *int        `json:"light,omitempty"`     // the frontlight as last set, 0-100
-	LightOn  int         `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
-	TermFont int         `json:"term-font,omitempty"` // the terminal font's size, px
-	Hosts    []savedHost `json:"hosts,omitempty"`     // the SSH tab's, in order
-	Layout   *wm.Saved   `json:"layout,omitempty"`    // the windows, as they were left (wm.go)
+	Light    *int                 `json:"light,omitempty"`     // the frontlight as last set, 0-100
+	LightOn  int                  `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
+	TermFont int                  `json:"term-font,omitempty"` // the terminal font's size, px
+	Hosts    []savedHost          `json:"hosts,omitempty"`     // the SSH tab's, in order
+	Layout   *wm.Saved            `json:"layout,omitempty"`    // the windows, as they were left (wm.go)
+	Books    map[string]bookPlace `json:"books,omitempty"`     // where each book was left (bookwin.go)
+	BookFont string               `json:"book-font,omitempty"`
+	BookPx   int                  `json:"book-px,omitempty"`
 	dir      string
 }
 

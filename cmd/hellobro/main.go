@@ -61,6 +61,7 @@ type bro struct {
 	pw     powerState
 	kbd    kbdState
 	vk     vkbdState   // the on-screen keyboard (vkbd.go)
+	bk     bookState   // the reader's fonts (bookwin.go)
 	lay    kobo.Layout // the last layout, to lay out again
 }
 

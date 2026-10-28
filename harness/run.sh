@@ -24,6 +24,8 @@
 #      FANCY_CAT (the fancycat feed's: an armv7 fancy-cat, run by qemu-arm; READ_DOCS too)
 #      BOOKOKRAT (the bookokrat feed's: the command running an armv7 build; see the feed)
 #      GOREAD, GOREAD_BOOK (the goread feed's: PC builds of goread and read-kitty; an EPUB)
+#      HELLOBRO_BOOKS, HELLOBRO_FONTS (the books feed's: a directory of EPUBs; one of fonts
+#      named as the Kobo's, Name-Regular/-Bold/-Italic/-BoldItalic)
 #
 # The ssh, fullscreen, stress, connect, flash and zoom feeds want
 # the server running: (cd server && go run .); the relay feed wants
