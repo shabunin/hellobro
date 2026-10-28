@@ -62,6 +62,7 @@ type bro struct {
 	kbd    kbdState
 	vk     vkbdState   // the on-screen keyboard (vkbd.go)
 	bk     bookState   // the reader's fonts (bookwin.go)
+	nt     noteState   // the notebooks' pen (notebook.go)
 	lay    kobo.Layout // the last layout, to lay out again
 }
 
@@ -191,12 +192,14 @@ func (a *bro) Tick() {
 	a.updateTick()
 	a.trialTick()
 	a.ipcTick()
+	a.noteTick()
 	a.wmSettle(false)
 	a.wmKeep(false)
 	a.updateRing()
 }
 
 func (a *bro) Exit() {
+	a.noteExit()
 	a.wmKeep(true)
 	a.ipcExit()
 	a.termCloseAll()
@@ -293,9 +296,11 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		case a.overlay():
 		case a.edge == g && p.X >= kobo.EdgeWidth: // the right edge is ours
 		case a.wmTouch(p, g):
+		case a.noteTouch(ev, p, g):
 		default:
 			a.selStart(p, g)
 		}
+	case a.noteMove(ev, p, g):
 	case a.vkMove(p, g):
 	case a.edge == g && a.edgeSwipe(p, g):
 	case a.tv.sel != nil && a.tv.sel.g == g:
@@ -397,7 +402,7 @@ func pairDir(g *kobo.Gesture) int {
 }
 
 func (a *bro) Lift(g *kobo.Gesture) {
-	if a.vkLift(g) || a.selLift(g) || a.wmDragLift(g) {
+	if a.vkLift(g) || a.selLift(g) || a.wmDragLift(g) || a.noteLift(g) {
 		return
 	}
 	if a.edge == g {

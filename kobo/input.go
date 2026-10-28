@@ -26,8 +26,11 @@ const (
 	synReport  = 0x00
 	synDropped = 0x03
 
-	btnTouch = 0x14a
-	keyPower = 116
+	btnTouch      = 0x14a
+	btnToolRubber = 0x141
+	btnStylus     = 0x14b // the pen's buttons
+	btnStylus2    = 0x14c
+	keyPower      = 116
 
 	absX            = 0x00
 	absY            = 0x01
@@ -149,6 +152,7 @@ type TouchEv struct {
 	x, y     int32 // raw panel units
 	Pen      bool
 	Pressure int32
+	Button   bool // a button on the pen is held (or its eraser end is down)
 	At       time.Time
 }
 
@@ -213,6 +217,8 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 	prev := map[int32]contact{} // slot states as of the previous frame
 	cur := int32(0)
 	dropping, drops := false, 0
+	button := false
+	keysSeen := map[uint16]bool{} // for the log: what the pen's buttons send
 
 	err := readEvents(t.f, func(typ, code uint16, val int32) {
 		if dropping { // the kernel's buffer overflowed: skip to the next complete frame
@@ -220,11 +226,23 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 			return
 		}
 		switch {
+		case typ == evKey && code != btnTouch:
+			if !keysSeen[code] {
+				keysSeen[code] = true
+				log.Printf("touch: key %#x (%d)", code, val)
+			}
+			if code == btnStylus || code == btnStylus2 || code == btnToolRubber {
+				button = val != 0
+			}
 		case typ == evAbs && code == absMTSlot:
 			cur = val
 		case typ == evAbs && code == absMTTrackingID:
 			slot(cur).id = val
 		case typ == evAbs && code == absMTToolType:
+			if val > mtToolPen && !keysSeen[0x1000+uint16(val)] { // not a finger nor the pen: for the log
+				keysSeen[0x1000+uint16(val)] = true
+				log.Printf("touch: tool type %d", val)
+			}
 			slot(cur).tool = val
 		case typ == evAbs && code == absMTPressure:
 			slot(cur).pressure = val
@@ -257,7 +275,8 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 					kind = TouchHover
 				}
 				if kind >= 0 {
-					out <- TouchEv{kind, n, c.x, c.y, c.tool == mtToolPen || (kind == TouchUp && p.tool == mtToolPen), c.pressure, now}
+					pen := c.tool == mtToolPen || (kind == TouchUp && p.tool == mtToolPen)
+					out <- TouchEv{Kind: kind, slot: n, x: c.x, y: c.y, Pen: pen, Pressure: c.pressure, Button: pen && button, At: now}
 				}
 				prev[n] = *c
 			}

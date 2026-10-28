@@ -488,6 +488,10 @@ func (a *bro) drawConnect(t *termSession) {
 	add(run(func() { a.replaceWin(t, a.newBookWin("")) }), "Books: the EPUBs on this Kobo, to read (tap here)")
 	guiLine := len(lines)
 	add(nil, "", "Settings, in a window:   "+strings.Join(guiNames(), "   "))
+	notes := append([]string{"new"}, noteNames()...)
+	notes = notes[:min(len(notes), 4)] // the last three written
+	noteLine := len(lines)
+	add(nil, "Notebooks, to write in with the pen:   "+strings.Join(notes, "   "))
 	add(nil, "", keys, "Esc: close this window.")
 	add(nil, "", "This Kobo's key, for ~/.ssh/authorized_keys (also in id_ed25519.pub next to hellobro):")
 	if s, err := clientKey(); err == nil {
@@ -517,6 +521,17 @@ func (a *bro) drawConnect(t *termSession) {
 		for i, key := range guiKeys {
 			w := kobo.TextWidth(a.F.Body, guiName(key))
 			pn.picks = append(pn.picks, launchPick{image.Rect(x-8, r.Min.Y, x+w+8, r.Max.Y), func() { a.replaceWin(t, &guiWin{key: guiKeys[i]}) }})
+			x += w + kobo.TextWidth(a.F.Body, "   ")
+		}
+	}
+	if r := rows[noteLine]; !r.Empty() && idle {
+		x := r.Min.X + kobo.TextWidth(a.F.Body, "Notebooks, to write in with the pen:   ")
+		for i, n := range notes {
+			w := kobo.TextWidth(a.F.Body, n)
+			if i == 0 {
+				n = ""
+			}
+			pn.picks = append(pn.picks, launchPick{image.Rect(x-8, r.Min.Y, x+w+8, r.Max.Y), func() { a.launchNotebook(t, n) }})
 			x += w + kobo.TextWidth(a.F.Body, "   ")
 		}
 	}

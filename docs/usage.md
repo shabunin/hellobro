@@ -567,6 +567,29 @@ line is hyphenated: by TeX's patterns in a book in English (or one that
 doesn't say its language), names left whole; in any book where it has
 soft hyphens.
 
+## Notebooks
+
+A notebook is pages to write on with the pen: sums worked out by hand,
+say. "Notebook" in the switcher (Meta+D) opens a new one; the ones
+you have are listed there by name (the date and time each was made);
+the launcher has them too, the last three written.
+
+- The pen writes; a heavier hand, a thicker line. **eraser** (or E)
+  takes off each stroke the pen goes over; **pen** (or P) is back to
+  writing. Holding a button on the pen erases too.
+- **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), **clear
+  page** (undone like the rest), and the paper: squares, lines or
+  plain, for the whole notebook.
+- A finger swiped across the page turns it (leftward: the next, as
+  pages turn), as do the arrows and Left, Right, PgUp, PgDn. Past the
+  last page, if it has something on it, a new page.
+- The page is the screen's shape, upright, and fitted into the window:
+  fullscreen (or a tall window) gives it the most room.
+- It's kept a few seconds after the last stroke and on closing, in
+  `notebooks/` next to hellobro (see [Files on the
+  Kobo](#files-on-the-kobo)). A notebook's window comes back with the
+  others.
+
 ## Music
 
 hellobro has no player of its own: the music is a Linux player's, in the
@@ -780,6 +803,7 @@ Kobo's storage:
 | `ssh.conf.old` | the hosts as kept before, taken in once |
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard` | what's copied ([Copy and paste](#copy-and-paste)) |
+| `notebooks/NAME.hbnote` | the notebooks ([Notebooks](#notebooks)): a line of points per stroke |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |
 | `hellobro.log` | the log (`make push-log`) |

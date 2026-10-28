@@ -105,6 +105,8 @@ func winWord(w wm.Window) string {
 		return "gui:" + w.key
 	case *bookWin:
 		return "book:" + w.path
+	case *noteWin:
+		return "note:" + w.nb.name
 	case *termSession:
 		if w.fontPx != 0 {
 			return strconv.Itoa(w.fontPx) + "px/" + termWord(w)
@@ -138,6 +140,7 @@ func (a *bro) wmRestore(s wm.Saved) (ok bool) {
 		}
 	}()
 	gui := map[string]bool{}
+	var notes []*noteWin
 	var starts []func()
 	n := 0
 	leaves := a.wm.tree.Load(s, func(word string) wm.Window {
@@ -162,6 +165,17 @@ func (a *bro) wmRestore(s wm.Saved) (ok bool) {
 		case "book":
 			n++
 			return a.newBookWin(arg)
+		case "note":
+			if a.noteWindow(arg) != nil || slices.ContainsFunc(notes, func(w *noteWin) bool { return w.nb.name == arg }) {
+				return nil
+			}
+			w := a.noteOpen(arg)
+			if w == nil {
+				return nil
+			}
+			notes = append(notes, w)
+			n++
+			return w
 		case "launcher":
 		case "alpine", "sh":
 			starts = append(starts, func() { a.termStartShell(t, kind == "alpine") })
