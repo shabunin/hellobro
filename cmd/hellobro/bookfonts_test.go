@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"compress/zlib"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 // TestBookFamilies: the Kobo's fonts as families of four styles, Georgia
@@ -34,5 +39,46 @@ func TestBookFamilies(t *testing.T) {
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("families:\n%v\nwant\n%v", got, want)
+	}
+}
+
+// TestParseFontQTD: the Kobo's fonts are zlib'd behind "QTD" and a size;
+// KOBO_FONTS=dir (copies of the Kobo's) reads each of its book fonts.
+func TestParseFontQTD(t *testing.T) {
+	var z bytes.Buffer
+	z.WriteString("QTD")
+	binary.Write(&z, binary.BigEndian, uint32(len(goregular.TTF)))
+	w := zlib.NewWriter(&z)
+	w.Write(goregular.TTF)
+	w.Close()
+	f, err := parseFont(z.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := f.Name(nil, 1); n != "Go" {
+		t.Errorf("family %q", n)
+	}
+	if _, err := parseFont(goregular.TTF); err != nil {
+		t.Errorf("a plain TTF: %v", err)
+	}
+	dir := os.Getenv("KOBO_FONTS")
+	if dir == "" {
+		return
+	}
+	t.Setenv("HELLOBRO_FONTS", dir)
+	for _, fam := range bookFamilies() {
+		for _, p := range fam.files {
+			if p == "" {
+				continue
+			}
+			b, _ := os.ReadFile(p)
+			f, err := parseFont(b)
+			if err != nil {
+				t.Errorf("%s: %v", p, err)
+				continue
+			}
+			n, _ := f.Name(nil, 4)
+			t.Logf("%s: %s", filepath.Base(p), n)
+		}
 	}
 }

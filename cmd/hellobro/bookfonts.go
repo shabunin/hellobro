@@ -5,6 +5,11 @@ package main
 // fonts when there are none (the harness). Code is set in Go Mono.
 
 import (
+	"bytes"
+	"compress/zlib"
+	"encoding/binary"
+	"errors"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -112,7 +117,7 @@ func newBookFaces(fam bookFamily) *bookFaces {
 		if data == nil {
 			data = gos[i]
 		}
-		o, err := opentype.Parse(data)
+		o, err := parseFont(data)
 		if err != nil {
 			log.Printf("book: %s: %v", fam.name, err)
 			o, _ = opentype.Parse(gos[i])
@@ -120,6 +125,35 @@ func newBookFaces(fam bookFamily) *bookFaces {
 		f.fonts[i] = o
 	}
 	return f
+}
+
+// parseFont reads a font file as the Kobo keeps them: "QTD", the
+// font's size (big-endian) and the font, zlib'd; often a collection, of
+// which the first is the one. A plain TTF or OTF is read as it is.
+func parseFont(data []byte) (*opentype.Font, error) {
+	if len(data) > 7 && string(data[:3]) == "QTD" {
+		size := binary.BigEndian.Uint32(data[3:7])
+		if size > 32<<20 {
+			return nil, errors.New("QTD: too big")
+		}
+		z, err := zlib.NewReader(bytes.NewReader(data[7:]))
+		if err != nil {
+			return nil, err
+		}
+		raw, err := io.ReadAll(io.LimitReader(z, int64(size)+1))
+		if err != nil {
+			return nil, err
+		}
+		data = raw
+	}
+	if len(data) > 4 && string(data[:4]) == "ttcf" {
+		c, err := opentype.ParseCollection(data)
+		if err != nil {
+			return nil, err
+		}
+		return c.Font(0)
+	}
+	return opentype.Parse(data)
 }
 
 // Face is the font for style s, px pixels.
