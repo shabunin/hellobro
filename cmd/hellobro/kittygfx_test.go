@@ -370,3 +370,14 @@ func TestGfxNoInBandResize(t *testing.T) {
 		t.Error("1049 not set")
 	}
 }
+
+// TestGfxQueries: ratatui-image's questions, answered as it reads them.
+func TestGfxQueries(t *testing.T) {
+	ts, read := gfxTerm(t, 20, 6)
+	ts.write([]byte("\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[16t\x1b[5n\x1b[6n"))
+	for _, want := range []string{"\x1b_Gi=31;OK\x1b\\", "\x1b[6;20;10t", "\x1b[0n", "\x1b[1;1R"} {
+		if r := read(); r != want {
+			t.Errorf("%q, want %q", r, want)
+		}
+	}
+}

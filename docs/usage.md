@@ -419,8 +419,9 @@ gone**: after 15 s, 30 s or 1 min, or nothing comes up.
   ask for it (`CSI 16 t`, and the pty's pixel size; not in-band resize,
   mode 2048, whose reports can't say the pixels). Unicode placeholders
   too: an image placed virtually (`U=1`) shows where the program writes
-  its U+10EEEE cells (ratatui-image's way). fancy-cat, a PDF viewer,
-  works. No animation.
+  its U+10EEEE cells (ratatui-image's way). fancy-cat (PDF) and
+  bookokrat (EPUB, PDF, DjVu) work, their pictures and pages too. No
+  animation.
 - A session calls out with the bell, or with a message as programs send a
   desktop notification (OSC 9 or 777: `make; printf '\e]9;make done\a'`).
   The light comes on a moment if it's off; the session's title strip

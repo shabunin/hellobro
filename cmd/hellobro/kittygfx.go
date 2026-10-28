@@ -288,8 +288,8 @@ func (c *kgCmd) num(k byte) *int {
 }
 
 // gfxRegister has emu answer what the programs ask before they send
-// images: the cells' size in pixels (CSI 14, 16, 18 t), and not report
-// sizes without them.
+// images: the cells' size in pixels (CSI 14, 16, 18 t), the device's
+// status as it should, and not report sizes without the pixels.
 func (t *termSession) gfxRegister(emu *vt.SafeEmulator) {
 	emu.RegisterCsiHandler(ansi.Command(0, 0, 't'), func(p ansi.Params) bool {
 		n, _, _ := p.Param(0, 0)
@@ -306,6 +306,16 @@ func (t *termSession) gfxRegister(emu *vt.SafeEmulator) {
 			return false
 		}
 		io.WriteString(emu.InputPipe(), r)
+		return true
+	})
+	// Device status (CSI 5 n): "OK" is CSI 0 n; vt says CSI ? 0 n, the
+	// DEC private one's answer, which ratatui-image waits for in vain
+	// (and so takes no images, at 10×20 pixels a cell).
+	emu.RegisterCsiHandler(ansi.Command(0, 0, 'n'), func(p ansi.Params) bool {
+		if n, _, _ := p.Param(0, 0); n != 5 || len(p) != 1 {
+			return false
+		}
+		io.WriteString(emu.InputPipe(), "\x1b[0n")
 		return true
 	})
 	// In-band resize (mode 2048): vt's reports say 0×0 pixels, and a
