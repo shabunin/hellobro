@@ -10,6 +10,8 @@ package main
 // text, in Clips/ on the Kobo's storage, and as Clips/latest.png and
 // latest.txt too, for a program in Alpine to take: an LLM's, say), or
 // ×. A tap elsewhere or Esc takes it away, as does turning the page.
+// With the select tool in hand and nothing cut, "copy page" copies the
+// whole page so: to paste it in a notebook, to write on.
 
 import (
 	"bytes"
@@ -193,6 +195,9 @@ func (w *bookWin) drawCut(a *bro) {
 		drawCorner(c, *w.corner, true, w.view.dst)
 	}
 	if r.Empty() {
+		if w.selecting {
+			w.pageButton(a)
+		}
 		return
 	}
 	c.Frame(r.Inset(-3), 3, kobo.White)
@@ -225,6 +230,29 @@ func (w *bookWin) drawCut(a *bro) {
 	}
 }
 
+// pageButton is "copy page", at the page's foot on the right.
+func (w *bookWin) pageButton(a *bro) {
+	const h, gap = 64, 10
+	bw := kobo.TextWidth(a.F.Panel, "copy page") + 48
+	b := image.Rect(w.area.Max.X-gap-bw, w.area.Max.Y-gap-h, w.area.Max.X-gap, w.area.Max.Y-gap)
+	c := a.C
+	c.Fill(b.Inset(-3), kobo.White)
+	c.Frame(b, 3, kobo.Black)
+	c.Text(a.F.Panel, b, "copy page", kobo.Black, kobo.AlignCenter)
+	w.cutRows = append(w.cutRows, bookRow{b, func() { w.copyPage(a) }})
+}
+
+// copyPage copies the whole page, as a cut of it all.
+func (w *bookWin) copyPage(a *bro) {
+	sz, err := w.pdf.Size(w.spine)
+	if err != nil {
+		a.Notify("can't copy it: " + err.Error())
+		return
+	}
+	log.Printf("pdf: page %d copied", w.spine+1)
+	w.copyPart(a, pdf.Rect{X1: sz.W, Y1: sz.H}, "the page's")
+}
+
 // cutRect is the cut in the page's points.
 func (w *bookWin) cutRect() pdf.Rect {
 	v := w.view
@@ -239,8 +267,10 @@ func (w *bookWin) cutRect() pdf.Rect {
 
 // cutCopy copies the cut: its text, for a terminal, and its picture,
 // for a notebook.
-func (w *bookWin) cutCopy(a *bro) {
-	r := w.cutRect()
+func (w *bookWin) cutCopy(a *bro) { w.copyPart(a, w.cutRect(), "its") }
+
+// copyPart copies r of the page (in points): its text and its picture.
+func (w *bookWin) copyPart(a *bro, r pdf.Rect, what string) {
 	text, err := w.pdf.TextIn(w.spine, r)
 	if err != nil {
 		a.Notify("can't read it: " + err.Error())
@@ -257,10 +287,10 @@ func (w *bookWin) cutCopy(a *bro) {
 		return
 	}
 	if strings.TrimSpace(text) == "" { // a scan's: the picture only
-		a.Notify("copied its picture (no text in it): paste it in a notebook")
+		a.Notify("copied " + what + " picture (no text in it): paste it in a notebook")
 		return
 	}
-	a.copyText(text, "its text and picture")
+	a.copyText(text, what+" text and picture")
 }
 
 // cutSave saves the cut, a picture and its text, away from the main

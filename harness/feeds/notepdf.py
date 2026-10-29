@@ -1,8 +1,8 @@
-# Writing on a PDF (notepdf.go) and exporting (noteexport.go): the first
-# book, a PDF, in fullscreen; "write" (the pen, the last button under
-# the page): its notebook, beside it, on that page; fullscreen; a circle
-# and a wave written over the PDF's page; Right, the next PDF page, a
-# line; Ctrl+E exports: OUT's Notebooks/NAME.pdf, Clips/latest.png.
+# A PDF's page copied to a notebook, written on, exported (bookcut.go,
+# noteexport.go): the first book, a PDF, in fullscreen; the select tool,
+# "copy page"; a new notebook, fullscreen, Ctrl+V: the page, taken; pen,
+# a circle and a wave over it; Ctrl+E exports: OUT's Notebooks/NAME.pdf,
+# Clips/latest.png.
 # HELLOBRO_BOOKS: a directory with a PDF first by name.
 # app: hellobro
 import os, sys
@@ -18,14 +18,16 @@ start()
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
 fullscreen(); time.sleep(5)
-tap(W // 2 + 200, H - 75); time.sleep(10)         # write: the notebook, beside
-fullscreen(); time.sleep(10)                      # its page drawn, a moment after
-land = W > H
-cx = W // 4 if land else W // 2
+tap(W // 2 + 150, H - 75); time.sleep(3)          # the select tool
+tap(W - 110, H - 160); time.sleep(6)              # copy page, at the page's foot on the right
+fullscreen(); time.sleep(3)
+gui("notebook"); time.sleep(3)
+fullscreen(); time.sleep(4)
+key(47, ctrl=True); time.sleep(6)                 # Ctrl+V: the page, taken
+key(25); time.sleep(2)                            # P: the pen
+cx = W // 4 if W > H else W // 2
 stroke(circle(cx, H // 3, 120), pen=True, pressure=lambda t: 2500); time.sleep(2)
 stroke(wave(H // 2, cx - 250, cx + 250), pen=True, pressure=lambda t: 2500); time.sleep(3)
-key(RIGHT); time.sleep(10)
-stroke([(cx - 200 + i * 20, H * 2 // 3) for i in range(21)], pen=True, pressure=lambda t: 2500); time.sleep(3)
 key(18, ctrl=True); time.sleep(20)                # Ctrl+E
 fullscreen(); time.sleep(3)
 exit_app()

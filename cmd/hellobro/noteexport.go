@@ -2,8 +2,8 @@ package main
 
 // Exporting a notebook: "export" (or Ctrl+E) writes it as a PDF, NAME.pdf
 // by its .xopp in Notebooks/, a picture of each page (200 dpi, gray: for
-// a computer, a printer, or an LLM to read); of a notebook on a PDF, the
-// pages written on. And the page shown as a PNG in Clips/, as NAME pN.png
+// a computer, a printer, or an LLM to read); of pages on a PDF (from
+// Xournal++), the pages written on. And the page shown as a PNG in Clips/, as NAME pN.png
 // and latest.png, as a PDF's cut is (bookcut.go): for a program in Alpine
 // to take. It's drawn away from the screen's loop, from what the pages
 // were when it was asked; a note says when it's written.
@@ -77,7 +77,11 @@ func (w *noteWin) export(a *bro) {
 	}
 	w.exporting = true
 	name, paper, pdfPath := w.nb.name, w.nb.paper, w.nb.pdfPath()
-	a.Notify(fmt.Sprintf("exporting %d pages…", len(pages)))
+	count := fmt.Sprintf("%d pages", len(pages))
+	if len(pages) == 1 {
+		count = "a page"
+	}
+	a.Notify("exporting " + count + "…")
 	go func() {
 		msg, err := exportNotebook(name, paper, pdfPath, pages, shown)
 		a.Do(func() {
@@ -87,7 +91,7 @@ func (w *noteWin) export(a *bro) {
 				a.Notify("not exported: " + err.Error())
 				return
 			}
-			log.Printf("notebook %s: exported, %d pages", name, len(pages))
+			log.Printf("notebook %s: exported, %s", name, count)
 			a.Notify(msg)
 		})
 	}()

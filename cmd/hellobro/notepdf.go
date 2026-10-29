@@ -1,23 +1,18 @@
 package main
 
-// Notebooks on PDFs: a PDF's pages as the paper, written over. "write"
-// under a PDF's page in the reader (bookmarks.go) opens its notebook
-// (named as the PDF) at that page, made the first time: a page for each
-// of the PDF's, as big as it is. In the .xopp each page's background is
-// that page of the PDF, as Xournal++ has it (type="pdf", pageno from 1,
-// the PDF's path on the first page only), so Xournal++ opens it too,
-// asking where the PDF is if it's not where the Kobo has it.
+// Notebooks on PDFs: a page whose background is a PDF's page, as
+// Xournal++ has it (type="pdf", pageno from 1, the PDF's path on the
+// first page that has it), shows that page under the ink: a notebook
+// written on a PDF in Xournal++ and copied here, with its PDF where the
+// .xopp says it is.
 //
 // A page of a PDF is drawn by MuPDF, away from the screen's loop (it
 // takes most of a second on the Elipsa), blank till it's done; each is
 // drawn once at a size and kept, a few of them.
 
 import (
-	"encoding/xml"
 	"image"
 	"log"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -206,90 +201,5 @@ func (w *noteWin) drawPage(a *bro, n int, pg, cl image.Rectangle, lines bool) {
 				w.drawStroke(a, s, pg, cl)
 			}
 		}
-	}
-}
-
-// pdfNotebook is a new notebook on the PDF at path: a page for each of
-// its pages.
-func pdfNotebook(name, path string, doc *pdf.Doc) (*notebook, error) {
-	nb := &notebook{name: name, paper: "plain"}
-	at := func(n, v string) xml.Attr { return xml.Attr{Name: xml.Name{Local: n}, Value: v} }
-	for i := range doc.Pages() {
-		sz, err := doc.Size(i)
-		if err != nil {
-			return nil, err
-		}
-		bg := &xoppAny{XMLName: xml.Name{Local: "background"}, Attrs: []xml.Attr{at("type", "pdf")}}
-		if i == 0 {
-			bg.Attrs = append(bg.Attrs, at("domain", "absolute"), at("filename", path))
-		}
-		bg.Attrs = append(bg.Attrs, at("pageno", strconv.Itoa(i+1)))
-		nb.pages = append(nb.pages, nil)
-		nb.meta = append(nb.meta, notePage{w: sz.W, h: sz.H, bg: bg})
-	}
-	if len(nb.pages) == 0 {
-		return nil, os.ErrInvalid
-	}
-	return nb, nil
-}
-
-// writePDF opens the notebook on the PDF at path at its page (from 0):
-// made the first time, named as the PDF (or "NAME (2)"… if a notebook
-// of that name is on something else).
-func (a *bro) writePDF(path string, page int) {
-	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	for i := 1; ; i++ {
-		name := base
-		if i > 1 {
-			name = base + " (" + strconv.Itoa(i) + ")"
-		}
-		if w := a.noteWindow(name); w != nil {
-			if w.nb.pdfPath() != path {
-				continue
-			}
-			w.goPDFPage(a, page)
-			a.wm.tree.Focus(a.nodeOf(w))
-			a.wmApply()
-			return
-		}
-		if _, err := os.Stat(notePath(name)); err == nil {
-			w := a.noteOpen(name)
-			if w == nil || w.nb.pdfPath() != path {
-				continue
-			}
-			w.goPDFPage(nil, page)
-			a.openWin(w)
-			return
-		}
-		doc, err := pdf.Open(path)
-		if err == nil {
-			var nb *notebook
-			if nb, err = pdfNotebook(name, path, doc); err == nil {
-				w := &noteWin{nb: nb, changed: time.Now()}
-				w.pdf = &notePDF{path: path, doc: doc, drawn: map[pdfKey]*image.Gray{}, pending: map[pdfKey]bool{}}
-				w.goPDFPage(nil, page)
-				log.Printf("notebook %s: on %s, %d pages", name, path, len(nb.pages))
-				a.openWin(w)
-				return
-			}
-			doc.Close()
-		}
-		log.Printf("notebook on %s: %v", path, err)
-		a.Notify("can't write on it: " + err.Error())
-		return
-	}
-}
-
-// goPDFPage shows the page that's the PDF's page i (a nil a: not
-// shown yet).
-func (w *noteWin) goPDFPage(a *bro, i int) {
-	for n := range w.nb.pages {
-		if w.pdfPage(n) == i {
-			w.cur, w.overview = n, false
-			break
-		}
-	}
-	if a != nil {
-		w.show(a)
 	}
 }

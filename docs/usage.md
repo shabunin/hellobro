@@ -555,8 +555,8 @@ and for PDFs, drawn by MuPDF (below).
   back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
   k, h (back). Home and End go to the chapter's start and end.
 - Under the page are three buttons: **☰** the contents, **Aa** the
-  style panel, and a ribbon for a bookmark (a PDF's has two more: the
-  select tool and a pen, below).
+  style panel, and a ribbon for a bookmark (a PDF's has the select
+  tool too, below).
 - **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
   (tap one), the size, the lines' spacing, the margins (± each),
   justified and hyphenation (on / off), and a paragraph set as the books
@@ -601,7 +601,9 @@ while it's in hand): tap one corner, then the opposite one, without
 dragging. Each corner then has a dot: tap one (it fills in black) and tap
 where it should be, the corner across staying where it is; a finger
 dragged on the page draws a rectangle at once too. Tap the tool again,
-or Esc, to put it down. Under the rectangle:
+or Esc, to put it down. With the tool in hand and nothing cut, **copy
+page** (at the page's foot, on the right) copies the whole page, as
+**copy** does a part: paste it in a notebook to write on it. Under the rectangle:
 
 - **copy**: its words (whole ones, line by line) into the clipboard,
   which the terminals paste (Ctrl+Shift+V), and its picture, which a
@@ -613,10 +615,6 @@ or Esc, to put it down. Under the rectangle:
 - **×**, a tap elsewhere or Esc takes it away, as does turning the page.
 
 A scanned page has no text: copy and save keep it as a picture.
-
-The pen in the strip under a PDF's page writes on it: it opens the
-PDF's notebook at that page, made the first time, its pages the PDF's
-([Notebooks](#notebooks)).
 
 The layout is the `book` package's: lines broken at spaces and after
 dashes, justified where the book says, a little of the book's CSS
@@ -703,19 +701,13 @@ the launcher has them too, the last three written.
   `Notebooks/NAME.xopp` on the Kobo's storage: over USB, or file
   sharing (`sftp kobo.local`). A notebook's window comes back with the
   others.
-- A PDF written on: the pen under its page in the reader ([Books](#books))
-  opens its notebook, named as the PDF (`NAME (2)` if a notebook of
-  that name is something else), at that page. Each page is the PDF's,
-  as big as it is, drawn under the ink (blank a moment the first time:
-  MuPDF takes most of a second a page). The pages strip, select, paste
-  and the pens work as on paper; a page put in is plain paper. In the
-  `.xopp` the PDF is each page's background as Xournal++ has it, so it
-  opens there too (it asks where the PDF is, if it's not at the Kobo's
-  path).
+- A notebook written on a PDF in Xournal++ shows the PDF's pages under
+  the ink, if the PDF is where the `.xopp` says (blank a moment the
+  first time: MuPDF takes most of a second a page).
 - **export** (or Ctrl+E) writes the notebook as a PDF next to its
   `.xopp`, `Notebooks/NAME.pdf`: a picture of each page at 200 dpi, gray,
   to send, print, or hand an LLM. All the pages to the last written
-  on; a PDF's notebook, only the pages written on. The page shown goes
+  on (of one on a PDF, only the pages written on). The page shown goes
   to `Clips/NAME pN.png` and `Clips/latest.png` too, as a PDF's cut
   does, for a program in Alpine to take. It's done aside; a note says
   when it's written.
