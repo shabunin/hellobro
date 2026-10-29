@@ -921,7 +921,11 @@ hellobro's own too, as grabbed (Meta+Shift+G gives them back here, and
 again to it); the bar says `typing into …`. Ctrl+] ends it.
 
 The first time, the other device asks on its screen whether this one
-may type there (allow / no). Allowed, the key is kept there for typing
+may type there (allow / no). A keyboard there can do what any can, a
+shell included, so it's asked with care: Enter says no, the keys don't
+answer for 2 s (a tap does), an address told no isn't asked again for
+10 minutes, and the device itself (a program in its Alpine) is never
+asked. The launcher lists 16 devices at most. Allowed, the key is kept there for typing
 only, `command="hellobro-keys"`: no shell, no files. Settings, Sharing
 there lists it, to forget. Each one says it's there over mDNS
 (`_hellobro._tcp`); the launcher looks again each time it's drawn,

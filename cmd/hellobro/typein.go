@@ -15,6 +15,7 @@ package main
 import (
 	"io"
 	"log"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,8 @@ const (
 	nearbyWait  = 1500 * time.Millisecond // how long the answers take
 	nearbyStale = 20 * time.Second        // a launcher drawn after that looks again
 	askKeysWait = time.Minute             // the question about a device stays this long
+	askKeysCalm = 2 * time.Second         // keys don't answer it till then: it came unasked, mid-typing maybe
+	askKeysOff  = 10 * time.Minute        // after a no, the same address isn't asked again for this long
 )
 
 // deviceName is what other devices call this one: HELLOBRO_DEVICE_NAME,
@@ -57,7 +60,12 @@ type nearbyState struct {
 	peers   []share.Peer
 	at      time.Time // when it last looked
 	looking bool
+	refused map[string]time.Time // the addresses told no about typing here, and when
 }
+
+// nearbyMax is how many other hellobros the launcher shows: what the
+// network says is a stranger's word, and a flood of it isn't tiles.
+const nearbyMax = 16
 
 // nearbyLook has another look around, if the last one is old: for a
 // launcher being drawn.
@@ -72,6 +80,7 @@ func (a *bro) nearbyLook() {
 		if err != nil {
 			log.Printf("nearby: %v", err)
 		}
+		peers = peers[:min(len(peers), nearbyMax)]
 		a.Do(func() {
 			n.looking, n.at = false, time.Now()
 			if !samePeers(peers, n.peers) {
@@ -152,17 +161,35 @@ func grabFor(w, grab, typing window) (window, window) {
 
 // askKeys asks on the screen whether who may type here (the share
 // server's AskKeys, from its goroutine): no while locked, or no answer.
+// A keyboard typing here can do what the keys do, a root shell among
+// them, so it's asked carefully: no is what Enter says, the keys wait a
+// moment (a tap doesn't), an address told no isn't asked again for a
+// while, and this device's own (a program in Alpine) is never asked.
 func (a *bro) askKeys(who, addr string) bool {
+	if ownAddress(addr) {
+		log.Printf("keys: %s (%s) asked to type here: no, it's this device", who, addr)
+		return false
+	}
 	answer := make(chan bool, 1)
 	var q *askBox
 	a.Do(func() {
-		if a.Locked() || a.asking != nil {
+		n := &a.tv.nearby
+		if a.Locked() || a.asking != nil || time.Since(n.refused[addr]) < askKeysOff {
 			answer <- false
 			return
 		}
-		a.choose(who+" wants to type here", "It's at "+addr+" on the network. Allowed, it may type here from now on, and do nothing else (Settings, Sharing: forget it).",
-			askOpt{"allow", "a", func() { answer <- true }}, askOpt{"no", "n", func() { answer <- false }})
+		no := func() {
+			if n.refused == nil {
+				n.refused = map[string]time.Time{}
+			}
+			n.refused[addr] = time.Now()
+			answer <- false
+		}
+		a.choose(who+" wants to type here", "It's at "+addr+" on the network. Allowed, it may type here from now on, as a keyboard can: any key, a shell too (Settings, Sharing: forget it).",
+			askOpt{"allow", "", func() { answer <- true }}, askOpt{"no", "n", no})
 		q = a.asking
+		q.sel, q.keysAt = 1, time.Now().Add(askKeysCalm)
+		a.drawAsk()
 	})
 	select {
 	case ok := <-answer:
@@ -179,12 +206,31 @@ func (a *bro) askKeys(who, addr string) bool {
 	}
 }
 
+// ownAddress says whether ip is one of this device's.
+func ownAddress(ip string) bool {
+	p := net.ParseIP(ip)
+	if p == nil {
+		return false
+	}
+	if p.IsLoopback() {
+		return true
+	}
+	addrs, _ := net.InterfaceAddrs()
+	for _, ad := range addrs {
+		if n, ok := ad.(*net.IPNet); ok && n.IP.Equal(p) {
+			return true
+		}
+	}
+	return false
+}
+
 // isKeys says whether cmd asks for the keyboard.
 func isKeys(cmd string) bool { return strings.TrimSpace(cmd) == share.KeysUser }
 
 // keysSession is a keyboard here (uinput) made of what another device's
 // terminal sends: hellobro-keys. Ctrl+] ends it.
 type keysSession struct {
+	mu   sync.Mutex // the keyboard and the decoder: the keys come on one goroutine, the end on another
 	kb   *keyfeed.Keyboard
 	dec  keyfeed.Decoder
 	r    *io.PipeReader
@@ -213,15 +259,19 @@ func startKeys(here string) (share.Shell, error) {
 
 // Write is what's typed.
 func (s *keysSession) Write(p []byte) (int, error) {
+	s.mu.Lock()
 	select {
 	case <-s.done:
+		s.mu.Unlock()
 		return 0, io.EOF
 	default:
 	}
 	if err := s.kb.Send(s.dec.Feed(p)); err != nil {
 		log.Printf("keys: %v", err)
 	}
-	if s.dec.Quit {
+	quit := s.dec.Quit
+	s.mu.Unlock()
+	if quit {
 		s.finish()
 	}
 	return len(p), nil
@@ -242,14 +292,18 @@ func (s *keysSession) Close() error {
 
 func (s *keysSession) finish() {
 	s.once.Do(func() {
+		s.mu.Lock()
 		s.kb.Send(s.dec.ReleaseAll())
 		s.kb.Close()
-		if !s.dec.Kitty {
+		kitty := s.dec.Kitty
+		close(s.done)
+		s.mu.Unlock()
+		if !kitty {
 			s.say <- "(a plain terminal: no Super, so hellobro's Mod key is best Alt here: Settings, Keyboard)\r\n"
 		}
 		s.say <- keyfeed.KittyOff + "bye\r\n"
 		close(s.say)
-		close(s.done)
+		time.AfterFunc(5*time.Second, func() { s.r.Close() }) // nobody reading: the writer above goes
 		log.Print("keys: done")
 	})
 }

@@ -9,6 +9,7 @@ package main
 
 import (
 	"image"
+	"time"
 
 	"hellobro/kobo"
 )
@@ -25,8 +26,9 @@ type askBox struct {
 	opts        []askOpt
 	box         image.Rectangle
 	optR        []image.Rectangle
-	sel         int    // the answer Enter picks
-	want, typed string // askTyped's: the words wanted, and what's typed so far
+	sel         int       // the answer Enter picks
+	keysAt      time.Time // the keys answer from then on (a tap at once)
+	want, typed string    // askTyped's: the words wanted, and what's typed so far
 	field       image.Rectangle
 }
 
@@ -147,6 +149,9 @@ func (a *bro) askKey(code uint16, value int32) {
 		return
 	}
 	q := a.asking
+	if time.Now().Before(q.keysAt) {
+		return
+	}
 	if d := askStep(code, a.tv.mods.shift); d != 0 { // the arrows, Tab: another answer
 		q.sel = (q.sel + d + len(q.opts)) % len(q.opts)
 		a.drawAsk()

@@ -140,11 +140,12 @@ type App struct {
 	F          Fonts
 	L          Layout
 	Tab        int
-	Full       bool          // the page has the whole screen
-	Keyboard   string        // the keyboard connected, if any
-	LightIdle  time.Duration // the light goes off after this long untouched (0: never)
-	LightStart *int          // the light's level at start; nil: Nickel's
-	LightKept  func(int)     // the reader set the light to this
+	Full       bool           // the page has the whole screen
+	Keyboard   string         // the keyboard connected, if any
+	kbds       map[string]int // the keyboards connected, by name: how many of each
+	LightIdle  time.Duration  // the light goes off after this long untouched (0: never)
+	LightStart *int           // the light's level at start; nil: Nickel's
+	LightKept  func(int)      // the reader set the light to this
 
 	prog  Program
 	cfg   Config
@@ -934,11 +935,23 @@ func (a *App) onKey(m KeyMsg) {
 		}
 		return
 	case m.Connected != "" || m.Gone != "":
+		if a.kbds == nil {
+			a.kbds = map[string]int{}
+		}
 		if m.Connected != "" {
 			log.Printf("keyboard connected: %s", m.Connected)
+			a.kbds[m.Connected]++
 			a.Keyboard = m.Connected
 		} else {
 			log.Printf("keyboard gone: %s", m.Gone)
+			if a.kbds[m.Gone]--; a.kbds[m.Gone] <= 0 {
+				delete(a.kbds, m.Gone)
+			}
+			a.devs = inputDevices()
+			for k := range a.kbds { // another's still here (a typing device's went, say): no keyboard's gone
+				a.Keyboard = k
+				return
+			}
 			a.Keyboard = ""
 			// What it held won't come up now.
 			a.ctrl, a.alt = [2]bool{}, [2]bool{}

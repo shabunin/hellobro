@@ -33,3 +33,11 @@ func TestGrabFor(t *testing.T) {
 	typing.state = termConnected
 	step("connected again", typing, typing)
 }
+
+func TestOwnAddress(t *testing.T) {
+	for ip, want := range map[string]bool{"127.0.0.1": true, "::1": true, "203.0.113.7": false, "nonsense": false} {
+		if got := ownAddress(ip); got != want {
+			t.Errorf("%s: %v, want %v", ip, got, want)
+		}
+	}
+}

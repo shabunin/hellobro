@@ -74,6 +74,10 @@ func (h *browsed) read(c net.PacketConn, until time.Time) {
 	}
 }
 
+// browseMax is the most of each kind of answer taken in: the LAN's
+// word, and a flood of it isn't kept.
+const browseMax = 64
+
 // take reads one answer.
 func (h *browsed) take(p []byte) {
 	var m dnsmessage.Message
@@ -87,13 +91,17 @@ func (h *browsed) take(p []byte) {
 		name := strings.ToLower(r.Header.Name.String())
 		switch b := r.Body.(type) {
 		case *dnsmessage.PTRResource:
-			if name == HelloType && !slices.Contains(h.inst, b.PTR.String()) {
+			if name == HelloType && len(h.inst) < browseMax && !slices.Contains(h.inst, b.PTR.String()) {
 				h.inst = append(h.inst, b.PTR.String())
 			}
 		case *dnsmessage.SRVResource:
-			h.srv[name] = *b
+			if _, ok := h.srv[name]; ok || len(h.srv) < browseMax {
+				h.srv[name] = *b
+			}
 		case *dnsmessage.AResource:
-			h.addrs[name] = net.IP(b.A[:])
+			if _, ok := h.addrs[name]; ok || len(h.addrs) < browseMax {
+				h.addrs[name] = net.IP(b.A[:])
+			}
 		}
 	}
 }

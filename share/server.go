@@ -664,6 +664,10 @@ func (s *Server) session(c *conn, ch ssh.Channel, reqs <-chan *ssh.Request) {
 				}()
 				continue // window changes yet
 			}
+			if isForced && cmd == KeysUser { // a keyboard wants a terminal: no shell runs it without
+				req.Reply(false, nil)
+				return
+			}
 			req.Reply(true, nil)
 			exit(ch, s.run(cmd, cc, ch.Stderr()))
 			return

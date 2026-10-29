@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -289,5 +290,29 @@ func TestPeerName(t *testing.T) {
 		if got := PeerName(v); got != want {
 			t.Errorf("%q: %q, want %q", v, got, want)
 		}
+	}
+}
+
+// A key for typing only, without a terminal, runs nothing: the shell
+// that would run hellobro-keys is a root one.
+func TestKeysNoPty(t *testing.T) {
+	state := t.TempDir()
+	s, err := Start(Config{Addr: "127.0.0.1:0", StateDir: state, Root: t.TempDir(), Notify: func(Event) {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	keys := newKey(t)
+	os.WriteFile(filepath.Join(state, authorizedFile), []byte(`command="hellobro-keys" `+
+		strings.TrimSpace(string(ssh.MarshalAuthorizedKey(keys.PublicKey())))+" kobo\n"), 0o600)
+	c, err := dial(s, keys, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	sess, _ := c.NewSession()
+	var exited *ssh.ExitError
+	if out, err := sess.Output("id"); err == nil || errors.As(err, &exited) { // ran, and ended: refused is wanted
+		t.Errorf("ran without a terminal: %q, %v", out, err)
 	}
 }
