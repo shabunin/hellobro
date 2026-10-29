@@ -6,9 +6,9 @@ package main
 // first, as the pen pressed. Xournal++ (Linux, Mac, Windows) opens them,
 // to go on writing on a computer, add text, make a PDF.
 //
-// What we don't draw (text, a highlighter's strokes, a PDF under the
-// page) is kept as it came and written back; only all the layers become
-// one. Pictures (images) are drawn, under the ink.
+// What we don't draw (text, a PDF under the page) is kept as it came and
+// written back; only all the layers become one. Pictures (images) are
+// drawn, under the ink, and highlighters' strokes (notepen.go).
 
 import (
 	"bufio"
@@ -141,9 +141,11 @@ func parseXopp(name string, r io.Reader) (*notebook, error) {
 	return nb, nil
 }
 
-// xoppToStroke makes a stroke of the pen's ours; nil for another tool's.
+// xoppToStroke makes a stroke of the pen's or the highlighter's ours;
+// nil for another tool's.
 func xoppToStroke(xs xoppStroke) (*noteStroke, error) {
-	if t := attr(xs.Attrs, "tool"); t != "" && t != "pen" {
+	t := attr(xs.Attrs, "tool")
+	if t != "" && t != "pen" && t != "highlighter" {
 		return nil, nil
 	}
 	nums := func(s string) ([]float64, error) {
@@ -170,7 +172,8 @@ func xoppToStroke(xs xoppStroke) (*noteStroke, error) {
 	}
 	unit := func(v float64) int16 { return int16(max(-1<<15, min(1<<15-1, math.Round(v/notePt72)))) }
 	radius := func(w float64) int16 { return int16(max(1, min(1<<15-1, math.Round(w*5/notePt72)))) } // tenths of a unit, half the width
-	s := &noteStroke{}
+	s := &noteStroke{marker: t == "highlighter"}
+	s.gray = colorGray(attr(xs.Attrs, "color"), s.marker)
 	for _, a := range xs.Attrs {
 		if a.Name.Local != "width" {
 			s.attrs = append(s.attrs, a)

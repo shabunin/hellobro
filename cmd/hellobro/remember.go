@@ -36,6 +36,8 @@ type remembered struct {
 	PDFZoom     int                  `json:"pdf-zoom,omitempty"`      // % of the fit
 	PDFNoTrim   bool                 `json:"pdf-no-trim,omitempty"`   // their white margins kept
 	Pen         bool                 `json:"pen,omitempty"`           // a pen has written in a notebook: fingers turn its pages (notebook.go)
+	NoteWidth   string               `json:"note-width,omitempty"`    // the notebooks' pen: fine, medium, bold (notepen.go)
+	NoteInk     string               `json:"note-ink,omitempty"`      // black, gray, marker
 	dir         string
 }
 

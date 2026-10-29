@@ -631,6 +631,12 @@ the launcher has them too, the last three written.
 - The pen writes; a heavier hand, a thicker line. **eraser** (or E)
   takes off each stroke the pen goes over; **pen** (or P) is back to
   writing. Holding a button on the pen erases too.
+- Tap **pen** while it's in hand for its choices, under it: **fine**,
+  **medium**, **bold**; **black**, **gray**, or **marker** (a
+  highlighter: wide, light gray, under the ink, yellow in Xournal++).
+  The button says which (`bold gray`, `marker`); the choice is kept.
+  Touch the page to put them away. A notebook from Xournal++ shows its
+  colors as the grays they are, its highlighters as markers.
 - **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), **clear
   page** (undone like the rest), and the paper: squares, lines or
   plain, for the whole notebook.
@@ -670,8 +676,7 @@ the launcher has them too, the last three written.
   others.
 - `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
   on a computer to go on writing, add text, or export a PDF. What
-  hellobro doesn't draw yet (text, the highlighter, a PDF under the
-  page) stays as it was when it writes the notebook again; only the
+  hellobro doesn't draw yet (text, a PDF under the page) stays as it was when it writes the notebook again; only the
   layers become one. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
 

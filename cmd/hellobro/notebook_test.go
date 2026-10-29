@@ -88,11 +88,14 @@ func TestNotebookXoppKept(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if nb.paper != "squares" || len(nb.pages) != 2 || len(nb.pages[0]) != 2 || len(nb.meta[0].extra) != 2 {
+		if nb.paper != "squares" || len(nb.pages) != 2 || len(nb.pages[0]) != 3 || len(nb.meta[0].extra) != 1 { // the text kept
 			t.Fatalf("paper %q, %d pages, %d strokes, %d kept", nb.paper, len(nb.pages), len(nb.pages[0]), len(nb.meta[0].extra))
 		}
 		if p := nb.pages[0][0].pts[2]; p != (notePt{158, 189, 32}) {
 			t.Errorf("a point: %v", p)
+		}
+		if red, hl := nb.pages[0][0], nb.pages[0][1]; red.gray != 0x4C || red.marker || !hl.marker || hl.gray != noteMarker {
+			t.Errorf("the red pen %#x, the highlighter %#x %v", red.gray, hl.gray, hl.marker)
 		}
 		nb.paper = "plain"
 		out := string(nb.xoppText())

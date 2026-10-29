@@ -61,10 +61,12 @@ const (
 type notePt struct{ x, y, r int16 }
 
 type noteStroke struct {
-	pts   []notePt
-	box   image.Rectangle // in page units, with the pen's width
-	attrs []xml.Attr      // from its file: the tool, its color… (nil: ours, black)
-	pic   *notePic        // a picture in box, not a stroke (notepic.go)
+	pts    []notePt
+	box    image.Rectangle // in page units, with the pen's width
+	attrs  []xml.Attr      // from its file: the tool, its color… (nil: ours, black)
+	pic    *notePic        // a picture in box, not a stroke (notepic.go)
+	gray   uint8           // its ink: black, or a gray (notepen.go)
+	marker bool            // a highlighter's: under the ink
 }
 
 func (s *noteStroke) bound() {
@@ -295,7 +297,9 @@ type noteWin struct {
 	selecting  bool          // the select tool in hand (notesel.go)
 	sel        []*noteStroke // what it's taken, on selPage
 	selPage    int
-	mark       *noteMark  // where the next paste goes
+	mark       *noteMark // where the next paste goes
+	penMenu    bool      // the pen's choices out (notepen.go)
+	penOpts    []noteBtn
 	undo, redo [][]noteOp // each step's changes
 	changed    time.Time  // not kept since; zero: kept
 
@@ -412,7 +416,7 @@ func (w *noteWin) layBar(a *bro) {
 	if w.shown() == 2 {
 		clear = "clear pages"
 	}
-	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper", label: w.nb.paper}}
+	tools := []noteBtn{{id: "pen", label: a.penLabel()}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper", label: w.nb.paper}}
 	pages := []noteBtn{{id: "prev"}, {id: "next"}}
 	width := func(b noteBtn) int { return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8) }
 	for i := range tools {
@@ -448,6 +452,7 @@ func (w *noteWin) layBar(a *bro) {
 		w.btns = append(w.btns, t)
 		x = t.r.Min.X - counter - 2*gap
 	}
+	w.layPenMenu(a)
 }
 
 func (w *noteWin) panel(a *bro) kobo.Panel { return a.winPanel(w.p, a.focusedWin() == window(w)) }
@@ -459,7 +464,7 @@ func (w *noteWin) draw(a *bro) {
 	pn := w.panel(a)
 	a.DrawPanel(pn, "")
 	w.drawBar(a)
-	w.drawPages(a, w.pages())
+	w.drawPages(a, w.paperArea())
 	a.Mark(pn.Outer, true)
 }
 
@@ -529,9 +534,18 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 				c.Fill(image.Rect(pg.Min.X, y, pg.Max.X, y+1).Intersect(cl), kobo.Light)
 			}
 		}
-		for _, pics := range []bool{true, false} { // the pictures under the ink
+		layer := func(s *noteStroke) int { // the pictures under the markers, under the ink
+			switch {
+			case s.pic != nil:
+				return 0
+			case s.marker:
+				return 1
+			}
+			return 2
+		}
+		for l := range 3 {
 			for _, s := range w.strokes(w.cur + i) {
-				if (s.pic != nil) == pics && w.toScreenRect(s.box, pg).Overlaps(cl) {
+				if layer(s) == l && w.toScreenRect(s.box, pg).Overlaps(cl) {
 					w.drawStroke(a, s, pg, cl)
 				}
 			}
@@ -544,6 +558,7 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 		}
 	}
 	w.drawSel(a, clip)
+	w.drawPenMenu(a, clip)
 }
 
 // toScreen is p of the page at on screen.
@@ -569,10 +584,10 @@ func (w *noteWin) drawStroke(a *bro, s *noteStroke, at, clip image.Rectangle) {
 		return
 	}
 	prev := w.toScreen(s.pts[0], at)
-	a.C.Disc(prev, w.radius(s.pts[0]), kobo.Black, clip)
+	a.C.Disc(prev, w.radius(s.pts[0]), s.gray, clip)
 	for _, p := range s.pts[1:] {
 		q := w.toScreen(p, at)
-		a.C.Line(prev, q, w.radius(p), kobo.Black, clip)
+		a.C.Line(prev, q, w.radius(p), s.gray, clip)
 		prev = q
 	}
 }
@@ -583,7 +598,7 @@ func (w *noteWin) show(a *bro) {
 		return
 	}
 	w.drawBar(a)
-	w.drawPages(a, w.pages())
+	w.drawPages(a, w.paperArea()) // the pen's choices too, by the pages
 	a.Mark(image.Rect(w.p.Body.Min.X, w.bar.Min.Y, w.p.Body.Max.X, w.p.Body.Max.Y), true)
 }
 
@@ -656,6 +671,12 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		}
 		switch b.id {
 		case "pen", "eraser", "select":
+			if b.id == "pen" && !w.erasing && !w.selecting { // in hand: its choices
+				w.penMenu = !w.penMenu
+				w.show(a)
+				break
+			}
+			w.closePenMenu(a)
 			w.setTool(a, b.id)
 		case "undo", "redo":
 			w.doUndo(a, b.id == "undo")
@@ -762,6 +783,13 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if !ok || !a.shows(w) {
 		return false
 	}
+	if w.penMenu { // its choices: by the edge too
+		if w.penMenuTap(a, p) {
+			g.Owner = ownLeaf
+			return true
+		}
+		w.closePenMenu(a)
+	}
 	slot := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return p.In(r) })
 	if slot < 0 {
 		return false
@@ -793,7 +821,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		a.noteErase(k, p)
 		return true
 	}
-	k.s = &noteStroke{}
+	k.s = a.newStroke()
 	a.Ink(true)
 	a.noteInkTo(k, p, a.notePressure(ev))
 	return true
@@ -845,14 +873,18 @@ func (a *bro) noteInkTo(k *noteInk, p image.Point, pressure int32) {
 	w := k.w
 	pp := w.toPage(p, k.at)
 	frac := math.Min(1, float64(pressure)/float64(a.PressureMax()))
-	pt := notePt{int16(pp.X), int16(pp.Y), int16(15 + 25*frac)} // 1.5 to 4 units
+	pt := notePt{int16(pp.X), int16(pp.Y), a.penRadius(frac)}
 	k.s.pts = append(k.s.pts, pt)
 	r := w.radius(pt)
 	from := k.last
 	if len(k.s.pts) == 1 {
 		from = p
 	}
-	a.C.Line(from, p, r, kobo.Black, k.at)
+	ink := uint8(kobo.Black)
+	if k.s.gray != kobo.Black { // the fast waveform has no grays: dark till it lifts
+		ink = kobo.Dark
+	}
+	a.C.Line(from, p, r, ink, k.at)
 	box := image.Rectangle{from, from}.Union(image.Rectangle{p, p}).Inset(-r - 1).Intersect(k.at)
 	k.marked = k.marked.Union(box)
 	k.last = p
@@ -922,6 +954,9 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		}
 		w.nb.pages[k.page] = append(w.nb.pages[k.page], k.s)
 		w.edited(noteOp{page: k.page, add: []*noteStroke{k.s}})
+		if k.s.gray != kobo.Black { // in its own gray, a marker under the ink
+			w.drawPages(a, k.marked)
+		}
 		a.Mark(k.marked, true) // the cleanup: grays (the paper) back under it
 	}
 	if a.shows(w) {
