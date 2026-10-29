@@ -819,7 +819,10 @@ its gray.
   file, then in the old one's place); if the card won't take it (full,
   say), a note says so, the window keeps it, and it's tried again, even
   closed. A picture over 16 million pixels isn't drawn, but stays in
-  the file. The first notebooks, `notebooks/NAME.hbnote` next
+  the file. Written on a computer meanwhile (Xournal++ over sftp), an
+  open notebook is read again within seconds, if it has nothing unkept
+  here; if it has, the computer's file is left be and this one is kept
+  beside it as `NAME (Kobo).xopp`, to be put together there. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
 
 ## Music

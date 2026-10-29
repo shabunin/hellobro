@@ -91,6 +91,24 @@ type notebook struct {
 	meta  []notePage // what else the pages have, as their file had it
 	attrs []xml.Attr // the file's own
 	old   string     // the .hbnote it was, to go once it's kept as .xopp
+	disk  fileStamp  // its file as it was read or written: another change is the computer's
+}
+
+// fileStamp is a file's time and size: changed by something else, they
+// differ (FAT's two seconds won't tell two writes apart that close,
+// but the size most likely will).
+type fileStamp struct {
+	mod  time.Time
+	size int64
+}
+
+// stampOf is path's stamp; false if there's no file.
+func stampOf(path string) (fileStamp, bool) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return fileStamp{}, false
+	}
+	return fileStamp{fi.ModTime(), fi.Size()}, true
 }
 
 // --- the file ---
@@ -163,7 +181,12 @@ func loadNotebook(name string) (*notebook, error) {
 	f, err := os.Open(notePath(name))
 	if err == nil {
 		defer f.Close()
-		return parseXopp(name, f)
+		st, _ := stampOf(notePath(name))
+		nb, err := parseXopp(name, f)
+		if nb != nil {
+			nb.disk = st
+		}
+		return nb, err
 	}
 	if !os.IsNotExist(err) {
 		return nil, err
@@ -184,8 +207,15 @@ func loadNotebook(name string) (*notebook, error) {
 }
 
 // save writes nb, a new file over the old one: a crash halfway leaves
-// the old one whole. The .hbnote it was goes, once it's written.
+// the old one whole. The .hbnote it was goes, once it's written. If its
+// file changed since it was read (Xournal++ on a computer, over sftp),
+// that's left be and nb goes beside it, as NAME (Kobo): what both wrote
+// is kept, to be put together there.
 func (nb *notebook) save() error {
+	if st, ok := stampOf(notePath(nb.name)); ok && st != nb.disk {
+		nb.name = keptBeside(nb.name)
+		log.Printf("notebook: its file changed meanwhile: kept as %s", nb.name)
+	}
 	if err := os.MkdirAll(filepath.Dir(notePath(nb.name)), 0o755); err != nil {
 		return err
 	}
@@ -196,6 +226,7 @@ func (nb *notebook) save() error {
 	if err := writeAtomic(notePath(nb.name), b); err != nil {
 		return err
 	}
+	nb.disk, _ = stampOf(notePath(nb.name))
 	if nb.old != "" {
 		if err := os.Remove(nb.old); err != nil {
 			log.Printf("notebook %s: %v", nb.name, err)
@@ -203,6 +234,20 @@ func (nb *notebook) save() error {
 		nb.old = ""
 	}
 	return nil
+}
+
+// keptBeside is a name beside name's for this device's notebook, one no
+// file has: "plan (Kobo)", "plan (Kobo 2)"…
+func keptBeside(name string) string {
+	for i := 1; ; i++ {
+		n := name + " (Kobo)"
+		if i > 1 {
+			n = fmt.Sprintf("%s (Kobo %d)", name, i)
+		}
+		if !fileExists(notePath(n)) {
+			return n
+		}
+	}
 }
 
 // noteNames are the notebooks there are, the last written first: a
@@ -377,10 +422,11 @@ type noteInk struct {
 }
 
 type noteState struct {
-	ink     *noteInk
-	drag    *noteDrag   // the select tool's
-	unsaved []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here
-	triedAt time.Time   // when they were last tried
+	ink      *noteInk
+	drag     *noteDrag   // the select tool's
+	unsaved  []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here
+	triedAt  time.Time   // when they were last tried
+	lookedAt time.Time   // when the open ones' files were last looked at
 }
 
 const (
@@ -908,7 +954,14 @@ func (w *noteWin) keep(a *bro) bool {
 	if w.changed.IsZero() {
 		return true
 	}
-	if err := w.nb.save(); err != nil {
+	name := w.nb.name
+	err := w.nb.save()
+	if w.nb.name != name { // its file changed meanwhile: this one's beside it now
+		a.Notify(name + " changed on the computer: this is " + path.Base(w.nb.name) + " now, beside it")
+		w.drawTitle(a)
+		a.wm.changed = time.Now()
+	}
+	if err != nil {
 		log.Printf("notebook %s: %v", w.nb.name, err)
 		if err.Error() != w.keepErr { // said once, not every try
 			a.Notify("notebook not kept: " + err.Error())
@@ -1257,6 +1310,44 @@ func (a *bro) noteTick() {
 	if len(a.nt.unsaved) > 0 && time.Since(a.nt.triedAt) > noteKeepAfter {
 		a.keepUnsaved()
 	}
+	if time.Since(a.nt.lookedAt) > noteLookEvery {
+		a.nt.lookedAt = time.Now()
+		for _, w := range a.noteWins() {
+			if w.changed.IsZero() && w.readAgain(a) {
+				a.Notify(path.Base(w.nb.name) + ": changed on the computer, read again")
+			}
+		}
+	}
+}
+
+// noteLookEvery is how often an open notebook's file is looked at, for
+// a change from a computer.
+const noteLookEvery = 3 * time.Second
+
+// readAgain reads w's notebook again if its file changed (w has
+// nothing unkept): written on a computer meanwhile, that's what it is
+// now. True if it did.
+func (w *noteWin) readAgain(a *bro) bool {
+	st, ok := stampOf(notePath(w.nb.name))
+	if !ok || st == w.nb.disk {
+		return false
+	}
+	nb, err := loadNotebook(w.nb.name)
+	if err != nil {
+		log.Printf("notebook %s: changed, but: %v", w.nb.name, err)
+		w.nb.disk = st // not again till it changes again
+		return false
+	}
+	log.Printf("notebook %s: changed on its file, read again", nb.name)
+	w.nb = nb
+	w.undo, w.redo, w.sel, w.mark = nil, nil, nil, nil
+	w.cur, w.ovSel = min(w.cur, len(nb.pages)-1), min(w.ovSel, len(nb.pages)-1)
+	w.closePDF() // its background may be another now
+	w.place(a, w.p)
+	if a.shows(w) {
+		w.draw(a)
+	}
+	return true
 }
 
 func (a *bro) noteExit() {

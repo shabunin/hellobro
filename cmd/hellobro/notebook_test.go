@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"hellobro/kobo"
+	"hellobro/wm"
 )
 
 func TestNotebookOldFile(t *testing.T) {
@@ -288,5 +291,54 @@ func TestNoteNameOK(t *testing.T) {
 		if err := noteNameOK(name); (err == nil) != ok {
 			t.Errorf("%q: %v", name, err)
 		}
+	}
+}
+
+// A notebook's file written on a computer meanwhile is never written
+// over: unchanged here, it's read again; changed here too, this one goes
+// beside it.
+func TestNoteChangedOnDisk(t *testing.T) {
+	defer func(r string) { shareRoot = r }(shareRoot)
+	shareRoot = t.TempDir()
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
+	a.wm.wins = map[*wm.Node]window{}
+	nb := &notebook{name: "plan", paper: "plain", pages: [][]*noteStroke{nil}}
+	if err := nb.save(); err != nil {
+		t.Fatal(err)
+	}
+	ink := func() []*noteStroke {
+		s := &noteStroke{pts: []notePt{{10, 10, 20}, {50, 50, 20}}}
+		s.bound()
+		return []*noteStroke{s}
+	}
+	pc := &notebook{name: "plan", paper: "plain", pages: [][]*noteStroke{ink(), ink(), ink()}} // the computer's: three pages
+	pcWrite := func() {
+		b, _ := pc.xopp()
+		os.WriteFile(notePath("plan"), b, 0o644)
+		os.Chtimes(notePath("plan"), time.Now(), time.Now().Add(time.Minute))
+	}
+	pcWrite()
+	w := &noteWin{nb: nb}
+	w.readAgain(a)
+	if len(w.nb.pages) != 3 {
+		t.Fatalf("not read again: %d pages", len(w.nb.pages))
+	}
+	w.nb.pages = append(w.nb.pages, ink()) // changed here
+	pc.pages = pc.pages[:2]
+	pcWrite() // and there
+	if err := w.nb.save(); err != nil {
+		t.Fatal(err)
+	}
+	if w.nb.name != "plan (Kobo)" {
+		t.Fatalf("written as %q", w.nb.name)
+	}
+	there, _ := loadNotebook("plan")
+	here, _ := loadNotebook("plan (Kobo)")
+	if len(there.pages) != 2 || len(here.pages) != 4 {
+		t.Errorf("there %d pages, here %d", len(there.pages), len(here.pages))
+	}
+	if err := w.nb.save(); err != nil || w.nb.name != "plan (Kobo)" { // its own file now: written over
+		t.Errorf("again: %q, %v", w.nb.name, err)
 	}
 }
