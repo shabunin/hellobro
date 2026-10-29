@@ -15,6 +15,9 @@ Kobo e-reader. Bring a Bluetooth keyboard.
   <img src="docs/screenshots/tiling.png" width="48.5%" alt="Wi-Fi, Sharing, Bluetooth and Settings, tiled">
   <img src="docs/screenshots/switcher.png" width="48.5%" alt="The switcher, over them">
 </p>
+<p align="center">
+  <img src="docs/screenshots/launcher.png" width="98%" alt="The launcher: terminals, books and notebooks, settings, the Kobo, as tiles for a finger">
+</p>
 
 hellobro takes the screen over from Nickel, draws its own e-ink UI through
 [FBInk](https://github.com/NiLuJe/FBInk), and gives Nickel back when you
