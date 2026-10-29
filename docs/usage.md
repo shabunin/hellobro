@@ -559,8 +559,9 @@ and for PDFs, drawn by MuPDF (below).
   tool too, below).
 - **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
   (tap one), the size, the lines' spacing, the margins (± each),
-  justified and hyphenation (on / off), and a paragraph set as the books
-  will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
+  justified and hyphenation (on / off), **Pages** (one page, two side
+  by side, or two if wide: two when the window is wider than tall, a
+  landscape screen), and a paragraph set as the books will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
   switch; Esc, s or "back to the book" leaves it. Every book takes it;
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
@@ -580,6 +581,8 @@ and for PDFs, drawn by MuPDF (below).
   chapter, so another size or font finds the page again. The screen
   flashes clean every 8 pages.
 - In fullscreen (Meta+F) the page has the whole screen.
+- Two pages side by side (**Pages** in the style panel) turn two at a
+  time; each chapter starts on the left.
 
 PDFs are on the same shelf and read the same way: a page at a time,
 the contents are their outline (if they have one), bookmarks are the
@@ -587,7 +590,10 @@ same. Their pages are drawn gray by MuPDF, linked into hellobro (package
 `pdf`), with their white margins trimmed, as big as the screen takes the
 whole page. **s** or **Aa** has their own panel: **Fit** the whole page
 or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and
-**-** on the page too) and **Trim white margins** on or off. A page
+**-** on the page too), **Trim white margins** on or off, and **Pages**
+as for EPUBs (the setting is the readers'): two side by side are each
+whole, meeting in the middle as a book's do, turned two at a time, the
+next two drawn while you read. A cut works on either. A page
 bigger than the screen is read in screenfuls, across then down, a
 little of each showing again on the next. The next page is drawn while
 you read this one, so turning to it is at once. PDFs locked with a

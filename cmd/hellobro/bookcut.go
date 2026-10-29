@@ -38,6 +38,7 @@ const (
 type bookCut struct {
 	w        *bookWin
 	g        *kobo.Gesture
+	v        pdfView // the page it's on
 	early    float64 // how far the finger got in its first moment
 	on       bool    // cutting: the gesture is ours
 	from, to image.Point
@@ -48,10 +49,14 @@ type bookCut struct {
 // cutStart notes a contact on a PDF's page: it may become a cut.
 func (a *bro) cutStart(p image.Point, g *kobo.Gesture) bool {
 	w, ok := a.windowAt(p).(*bookWin)
-	if !ok || w.pdf == nil || w.list || w.styling || !p.In(w.view.dst) {
+	if !ok || w.pdf == nil || w.list || w.styling {
 		return false
 	}
-	a.bk.cut = &bookCut{w: w, g: g, from: p, to: p}
+	v, on := w.viewAt(p)
+	if !on {
+		return false
+	}
+	a.bk.cut = &bookCut{w: w, v: v, g: g, from: p, to: p}
 	return true
 }
 
@@ -80,6 +85,7 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 			w.cut = image.Rectangle{}
 			w.draw(a)
 		}
+		w.view = s.v
 		log.Print("pdf: cutting")
 	}
 	s.to = p
@@ -88,7 +94,7 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 	}
 	s.drawn = time.Now()
 	r := image.Rectangle{s.from, s.to}.Canon().Intersect(w.view.dst)
-	if sh, err := w.pdfPage(w.spine, w.laid); err == nil && !s.shown.Empty() { // the page back under the old frame
+	if sh, err := w.pdfPage(w.view.spine, w.laid); err == nil && !s.shown.Empty() { // the page back under the old frame
 		old := s.shown.Intersect(w.view.dst)
 		kobo.CopyGray(a.C.Gray, old, sh.img, old.Min.Sub(w.view.dst.Min).Add(w.view.sp))
 	}
@@ -137,7 +143,11 @@ func (w *bookWin) selectTap(a *bro, p image.Point) {
 			return
 		}
 	}
+	if v, ok := w.viewAt(p); ok && w.cut.Empty() && w.corner == nil { // a new cut: on this page
+		w.view = v
+	}
 	in := w.view.dst
+	at := p
 	p = image.Pt(max(in.Min.X, min(in.Max.X-1, p.X)), max(in.Min.Y, min(in.Max.Y-1, p.Y)))
 	if !w.cut.Empty() {
 		cs := w.corners()
@@ -159,6 +169,11 @@ func (w *bookWin) selectTap(a *bro, p image.Point) {
 			}
 		}
 		w.dropCut() // elsewhere: another cut, from here
+		if v, ok := w.viewAt(at); ok {
+			w.view = v
+			in = v.dst
+			p = image.Pt(max(in.Min.X, min(in.Max.X-1, at.X)), max(in.Min.Y, min(in.Max.Y-1, at.Y)))
+		}
 	}
 	if w.corner == nil {
 		w.corner = &p
@@ -241,13 +256,13 @@ func (w *bookWin) cutRect() pdf.Rect {
 // for a notebook.
 func (w *bookWin) cutCopy(a *bro) {
 	r := w.cutRect()
-	text, err := w.pdf.TextIn(w.spine, r)
+	text, err := w.pdf.TextIn(w.view.spine, r)
 	if err != nil {
 		a.Notify("can't read it: " + err.Error())
 		return
 	}
 	z := cutCopyDPI / 72.0
-	m, err := w.pdf.Render(w.spine, z, image.Rect(int(r.X0*z), int(r.Y0*z), int(r.X1*z+0.5), int(r.Y1*z+0.5)))
+	m, err := w.pdf.Render(w.view.spine, z, image.Rect(int(r.X0*z), int(r.Y0*z), int(r.X1*z+0.5), int(r.Y1*z+0.5)))
 	if err == nil {
 		err = copyPicture(m)
 	}
@@ -266,7 +281,7 @@ func (w *bookWin) cutCopy(a *bro) {
 // cutSave saves the cut, a picture and its text, away from the main
 // loop: drawn big, it takes a moment.
 func (w *bookWin) cutSave(a *bro) {
-	d, spine, r := w.pdf, w.spine, w.cutRect()
+	d, spine, r := w.pdf, w.view.spine, w.cutRect()
 	dir := filepath.Join(booksRoot(), "Clips")
 	name := fmt.Sprintf("%s, p%d, %s", fileName(w.Title(), 40), spine+1, time.Now().Format("2006-01-02 150405"))
 	a.Notify("saving…")

@@ -48,14 +48,35 @@ type bookStyle struct {
 	px, leading     int
 	margin          int
 	ragged, noHyphs bool
-	pdfWidth        bool // PDFs (bookpdf.go): fit their pages' width, not the whole page
-	pdfNoTrim       bool // and keep their white margins
-	pdfZoom         int  // and zoom them, % of the fit (pdfZooms)
+	pdfWidth        bool   // PDFs (bookpdf.go): fit their pages' width, not the whole page
+	pdfNoTrim       bool   // and keep their white margins
+	pdfZoom         int    // and zoom them, % of the fit (pdfZooms)
+	pages           string // one, two side by side, or auto: two in a window wider than tall
 }
+
+// bookPageModes are the ways the pages show, and their switches' words.
+var (
+	bookPageModes = []string{"one", "two", "auto"}
+	bookPageWords = map[string]string{"one": "one page", "two": "two side by side", "auto": "two if wide"}
+)
+
+// nextPages is the mode d (1 or -1; 0: 1) on from pages.
+func nextPages(pages string, d int) string {
+	if d == 0 {
+		d = 1
+	}
+	n := len(bookPageModes)
+	return bookPageModes[(slices.Index(bookPageModes, pages)+d+n)%n]
+}
+
+const bookGutter = 48 // px between two pages side by side
 
 func (a *bro) bookStyle() bookStyle {
 	m := &a.mem
-	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim, pdfZoom: m.PDFZoom}
+	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim, pdfZoom: m.PDFZoom, pages: m.BookPages}
+	if !slices.Contains(bookPageModes, st.pages) {
+		st.pages = "one"
+	}
 	if !slices.Contains(pdfZooms, st.pdfZoom) {
 		st.pdfZoom = 100
 	}
@@ -75,7 +96,7 @@ func (a *bro) setBookStyle(st bookStyle) {
 		a.bk.faces = nil
 	}
 	m.BookFont, m.BookPx, m.BookLeading, m.BookMargin, m.BookRagged, m.BookNoHyph = st.font, st.px, st.leading, st.margin, st.ragged, st.noHyphs
-	m.PDFWidth, m.PDFNoTrim, m.PDFZoom = st.pdfWidth, st.pdfNoTrim, st.pdfZoom
+	m.PDFWidth, m.PDFNoTrim, m.PDFZoom, m.BookPages = st.pdfWidth, st.pdfNoTrim, st.pdfZoom, st.pages
 	a.mem.save()
 	for _, win := range a.windows() {
 		if w, ok := win.(*bookWin); ok && w.b != nil {
@@ -108,8 +129,9 @@ type bookState struct {
 }
 
 type bookLaid struct {
-	w, h int
+	w, h int // a page's: half the window's width, less the gutter, if two show
 	st   bookStyle
+	two  bool // two pages side by side
 }
 
 type bookRow struct {
@@ -128,9 +150,10 @@ type bookWin struct {
 	b         *book.Book
 	pdf       *pdf.Doc // a PDF's: b is made of it, a chapter a page (bookpdf.go)
 	shown     []pdfShown
-	ahead     *pdfAhead     // a page being drawn ahead
-	tiles     []image.Point // where each screenful starts in the page drawn
-	view      pdfView
+	ahead     *pdfAhead       // a page being drawn ahead
+	tiles     []image.Point   // where each screenful starts in the page drawn
+	view      pdfView         // the page a cut is on, or would be: the left one of two
+	views     []pdfView       // the pages showing
 	cut       image.Rectangle // a part cut out, on the screen (bookcut.go)
 	cutRows   []bookRow       // its buttons
 	selecting bool            // the select tool: taps place the cut's corners
@@ -290,7 +313,11 @@ func (w *bookWin) layout(a *bro) {
 		return
 	}
 	faces := a.bookFaces()
-	laid := bookLaid{w.area.Dx(), w.area.Dy(), a.bookStyle()}
+	laid := bookLaid{w: w.area.Dx(), h: w.area.Dy(), st: a.bookStyle()}
+	if laid.st.pages == "two" || laid.st.pages == "auto" && w.area.Dx() > w.area.Dy() {
+		laid.two, laid.w = true, (w.area.Dx()-bookGutter)/2
+		laid.st.pdfWidth, laid.st.pdfZoom = false, 100 // a PDF's pages whole, each
+	}
 	if w.ch != nil && laid == w.laid {
 		return
 	}
@@ -308,12 +335,15 @@ func (w *bookWin) layout(a *bro) {
 		}
 	}
 	t := time.Now()
-	w.pages = book.Layout(w.ch, laid.st.settings(w.area.Size(), w.b.Lang), faces, func(src string) image.Point {
+	w.pages = book.Layout(w.ch, laid.st.settings(image.Pt(laid.w, laid.h), w.b.Lang), faces, func(src string) image.Point {
 		p, _ := w.b.ImageSize(src)
 		return p
 	})
 	w.laid = laid
 	w.page = book.PageAt(w.pages, w.at)
+	if laid.two { // a spread starts on an even page
+		w.page -= w.page % 2
+	}
 	log.Printf("book: chapter %d: %d pages in %v", w.spine, len(w.pages), time.Since(t).Round(time.Millisecond))
 }
 
@@ -352,10 +382,21 @@ func (w *bookWin) drawPage(a *bro) {
 		w.drawPDF(a)
 		return
 	}
-	faces := a.bookFaces()
-	at := w.area.Min
 	pics := map[string]*image.Gray{}
-	for _, it := range w.pages[w.page].Items {
+	w.drawLaid(a, w.page, w.area.Min, pics)
+	if w.laid.two && w.page+1 < len(w.pages) {
+		w.drawLaid(a, w.page+1, w.area.Min.Add(image.Pt(w.laid.w+bookGutter, 0)), pics)
+	}
+	w.pics = pics // only these pages' are kept
+	w.drawPageMark(a)
+	w.drawFoot(a)
+}
+
+// drawLaid draws page n of the chapter with its top left at at; the
+// pictures drawn go in pics.
+func (w *bookWin) drawLaid(a *bro, n int, at image.Point, pics map[string]*image.Gray) {
+	faces := a.bookFaces()
+	for _, it := range w.pages[n].Items {
 		switch it.Kind {
 		case book.ItemText:
 			a.C.TextAt(faces.Face(it.Style, it.Px), at.X+it.X, at.Y+it.Y, it.Text, kobo.Black, w.p.Body)
@@ -374,9 +415,6 @@ func (w *bookWin) drawPage(a *bro) {
 			}
 		}
 	}
-	w.pics = pics // only this page's are kept
-	w.drawPageMark(a)
-	w.drawFoot(a)
 }
 
 // picture is the book's picture src, gray, scaled to size.
@@ -593,18 +631,28 @@ func (w *bookWin) turn(a *bro, d int) {
 	if w.b == nil || len(w.pages) == 0 {
 		return
 	}
+	two, step := w.laid.two, 1 // two side by side: a PDF's chapters, its pages, go two at a time too
+	if two && (d == 1 || d == -1) {
+		d *= 2
+	}
+	if two && w.pdf != nil {
+		step = 2
+	}
 	switch n := w.page + d; {
 	case n >= len(w.pages):
-		if w.spine+1 >= len(w.b.Spine) {
+		if w.spine+step >= len(w.b.Spine) {
 			return
 		}
-		w.goTo(w.spine+1, book.Pos{})
+		w.goTo(w.spine+step, book.Pos{})
 	case n < 0:
 		if w.spine == 0 {
 			return
 		}
-		w.goTo(w.spine-1, book.Pos{Block: 1 << 30}) // its last page
+		w.goTo(max(0, w.spine-step), book.Pos{Block: 1 << 30}) // its last page
 	default:
+		if two {
+			n -= n % 2
+		}
 		w.page = n
 		w.at = w.pages[n].Start
 		w.dropCut()
