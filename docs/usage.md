@@ -707,6 +707,27 @@ line is hyphenated: by TeX's patterns in a book in English (or one that
 doesn't say its language), names left whole; in any book where it has
 soft hyphens.
 
+### ":" commands in a book
+
+As in vim: **:** opens a line at the window's foot (and the on-screen
+keyboard, if there's no other). A command and Enter runs it; Esc,
+Backspace on nothing, or a tap leaves it. A name can be cut short while
+it's the only one so begun (`:ex` is export); the line shows what what's
+typed could be. `:help` notes them all.
+
+| Command | |
+|---|---|
+| `:12` | page 12: a PDF's, or of the chapter shown in an EPUB |
+| `:40%` | 40% into the book |
+| `:ch 3` | chapter 3 (of the book's files, in order) |
+| `:/word`, `:f word` | the next page with the word on it (an EPUB's; any case); `:/` again: the next |
+| `:toc`, `:marks`, `:mark` | the contents, the bookmarks; a bookmark here (or not) |
+| `:back` | back from a link followed |
+| `:s`, `:size 30`, `:font lit` | the style panel; the size; the font that matches best |
+| `:z 200`, `:pages` | a PDF's zoom (100–400); its pages |
+| `:rename NAME` | as the shelf's rename |
+| `:shelf`, `:q` | All Books; close the window |
+
 ## Notebooks
 
 A notebook is pages to write on with the pen: sums worked out by hand,
@@ -843,6 +864,22 @@ its gray.
   here; if it has, the computer's file is left be and this one is kept
   beside it as `NAME (Kobo).xopp`, to be put together there. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
+
+### ":" commands in a notebook
+
+The same line as a book's ([":" commands in a book](#-commands-in-a-book)).
+
+| Command | |
+|---|---|
+| `:3`, `:p 3` | page 3 |
+| `:new`, `:copy`, `:delete`, `:clear` | a page after this one, a copy of it, this one gone, cleared (all undone with Ctrl+Z) |
+| `:pen`, `:eraser`, `:select`, `:u`, `:redo` | the tools; undo, redo |
+| `:paper lines` | squares, lines or plain |
+| `:o` | the pages' view, on or off |
+| `:w`, `:export` | written now; the PDF export |
+| `:e NAME` | another notebook here: its name, or the one it begins; none so named, a new one beside this |
+| `:rename NAME`, `:mv FOLDER` | renamed; moved to the folder (made if need be; `:mv /` the top) |
+| `:ls`, `:q` | All Notebooks; close the window (`:wq` too: it's written anyway) |
 
 ## Music
 

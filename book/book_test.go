@@ -266,3 +266,34 @@ func TestNote(t *testing.T) {
 		t.Errorf("spine")
 	}
 }
+
+// TestFind: on from the place, into the next chapters, round to the
+// start; any case.
+func TestFind(t *testing.T) {
+	b, err := Open(testEPUB(t, map[string]string{
+		"OPS/text/one.xhtml":   `<html><body><p>The Rabbit ran.</p><p>A rabbit again.</p></body></html>`,
+		"OPS/text/two b.xhtml": `<html><body><p>No hare here.</p><p>The last rabbit.</p></body></html>`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	never := func() bool { return false }
+	for _, c := range []struct {
+		spine int
+		at    Pos
+		q     string
+		want  string
+	}{
+		{0, Pos{}, "rabbit", "0 {0 4} true"},
+		{0, Pos{0, 4}, "rabbit", "0 {1 2} true"},
+		{0, Pos{1, 2}, "RABBIT", "1 {1 9} true"},
+		{1, Pos{1, 9}, "rabbit", "0 {0 4} true"},
+		{0, Pos{}, "fox", "0 {0 0} false"},
+	} {
+		s, at, ok := b.Find(c.spine, c.at, c.q, never)
+		if got := fmt.Sprint(s, " ", at, " ", ok); got != c.want {
+			t.Errorf("%d %v %q: %s, want %s", c.spine, c.at, c.q, got, c.want)
+		}
+	}
+}

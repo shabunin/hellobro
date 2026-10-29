@@ -394,6 +394,7 @@ type noteWin struct {
 
 	p     kobo.Panel
 	bar   image.Rectangle // the tools' strip
+	ex    *exLine         // a ":" command being typed (noteex.go)
 	btns  []noteBtn
 	slots []image.Rectangle // the pages on screen, left to right: cur, cur+1
 	scale float64           // screen px a page unit
@@ -565,6 +566,9 @@ func (w *noteWin) draw(a *bro) {
 	a.DrawPanel(pn, "")
 	w.drawBar(a)
 	w.drawPages(a, w.paperArea())
+	if w.ex != nil {
+		a.drawEx(a.exStrip(w.p.Body), w.ex, w.exCmds(a))
+	}
 	a.Mark(pn.Outer, true)
 }
 
@@ -714,6 +718,9 @@ func (w *noteWin) show(a *bro) {
 	w.fitSlots(a)
 	w.drawBar(a)
 	w.drawPages(a, w.paperArea()) // the pen's choices too, by the pages
+	if w.ex != nil {
+		a.drawEx(a.exStrip(w.p.Body), w.ex, w.exCmds(a))
+	}
 	a.Mark(image.Rect(w.p.Body.Min.X, w.bar.Min.Y, w.p.Body.Max.X, w.p.Body.Max.Y), true)
 }
 
@@ -818,6 +825,12 @@ func (w *noteWin) showBar(a *bro) {
 }
 
 func (w *noteWin) tap(a *bro, p image.Point) {
+	if w.ex != nil { // a tap leaves the line
+		w.ex = nil
+		a.exAsk(false)
+		w.draw(a)
+		return
+	}
 	if kobo.Hit(p, w.counterRect()) {
 		w.overviewOn(a, !w.overview)
 		return
@@ -899,6 +912,29 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		return false
 	}
 	m := a.tv.mods
+	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
+	if e := w.ex; e != nil {
+		done, ok := exKey(e, code, ch)
+		if !done {
+			a.drawEx(a.exStrip(w.p.Body), e, w.exCmds(a))
+			return true
+		}
+		w.ex = nil
+		a.exAsk(false)
+		if ok {
+			a.exRun(w.exCmds(a), e.text)
+		}
+		if a.shows(w) {
+			w.draw(a)
+		}
+		return true
+	}
+	if ch == ":" && !m.ctrl {
+		w.ex = &exLine{}
+		a.exAsk(true)
+		a.drawEx(a.exStrip(w.p.Body), w.ex, w.exCmds(a))
+		return true
+	}
 	if !m.ctrl && code == keyO {
 		w.overviewOn(a, !w.overview)
 		return true
@@ -932,6 +968,10 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 }
 
 func (w *noteWin) closing(a *bro) {
+	if w.ex != nil {
+		w.ex = nil
+		a.exAsk(false)
+	}
 	if a.nt.ink != nil && a.nt.ink.w == w {
 		a.nt.ink = nil
 		a.Ink(false)

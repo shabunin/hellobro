@@ -202,6 +202,9 @@ type bookWin struct {
 	named      string    // the name it was given, if it was (bookrename.go)
 	note       *bookNote // a link's target over the page (booknote.go)
 	from       *bookFrom // where a link was followed from
+	ex         *exLine   // a ":" command being typed (bookex.go)
+	found      *bookFind // the word looked for last
+	finding    time.Time // the look going on, if it's still wanted
 	edit       *noteEdit // a shelf's book's name being typed: key its path
 }
 
@@ -516,6 +519,9 @@ func (w *bookWin) draw(a *bro) {
 	default:
 		w.drawPage(a)
 		w.pageShown = true
+	}
+	if w.ex != nil {
+		a.drawEx(a.exStrip(body), w.ex, w.exCmds(a))
 	}
 	if w.turns >= bookFlashEvery {
 		w.turns = 0
@@ -962,6 +968,28 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		}
 		return true
 	}
+	if e := w.ex; e != nil {
+		done, ok := exKey(e, code, ch)
+		if !done {
+			a.drawEx(a.exStrip(w.p.Body), e, w.exCmds(a))
+			return true
+		}
+		w.ex = nil
+		a.exAsk(false)
+		if ok {
+			a.exRun(w.exCmds(a), e.text)
+		}
+		if !w.gone {
+			w.draw(a)
+		}
+		return true
+	}
+	if ch == ":" && w.b != nil && !w.styling {
+		w.ex, w.note = &exLine{}, nil
+		a.exAsk(true)
+		w.draw(a)
+		return true
+	}
 	if w.list && w.listPages {
 		by := map[uint16]int{103: -w.listCols, 108: w.listCols, 105: -1, 106: 1, 104: -w.listN, 109: w.listN}
 		switch {
@@ -1112,6 +1140,12 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 	if !p.In(body) {
 		return
 	}
+	if w.ex != nil { // a tap elsewhere leaves the line
+		w.ex = nil
+		a.exAsk(false)
+		w.draw(a)
+		return
+	}
 	if w.list || w.styling {
 		for _, r := range w.rows {
 			if p.In(r.r) {
@@ -1159,6 +1193,10 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 }
 
 func (w *bookWin) closing(a *bro) {
+	if w.ex != nil {
+		w.ex = nil
+		a.exAsk(false)
+	}
 	if w.edit != nil {
 		w.edit = nil
 		a.vk.ask = false

@@ -160,6 +160,47 @@ func (b *Book) Note(link string) ([]Block, error) {
 	return bs, nil
 }
 
+// Find looks for text, in any case, from just after at in chapter
+// spine on, round to the book's start and back to at: the chapter and
+// the place it's found at; false if it's nowhere. stop, true, gives up.
+func (b *Book) Find(spine int, at Pos, text string, stop func() bool) (int, Pos, bool) {
+	q := strings.ToLower(text)
+	n := len(b.Spine)
+	if q == "" || n == 0 {
+		return 0, Pos{}, false
+	}
+	for k := 0; k <= n; k++ {
+		i := (spine + k) % n
+		ch, err := b.Chapter(i)
+		if err != nil || stop() {
+			if stop() {
+				return 0, Pos{}, false
+			}
+			continue
+		}
+		for bi, blk := range ch.Blocks {
+			var t strings.Builder
+			for _, sp := range blk.Spans {
+				t.WriteString(sp.Text)
+			}
+			s := strings.ToLower(t.String())
+			from := 0
+			switch {
+			case k == 0 && bi < at.Block:
+				continue
+			case k == 0 && bi == at.Block:
+				from = min(len(s), at.Off+1)
+			case k == n && bi > at.Block: // round again: up to where it began
+				return 0, Pos{}, false
+			}
+			if j := strings.Index(s[from:], q); j >= 0 && (k < n || bi < at.Block || from+j <= at.Off) {
+				return i, Pos{Block: bi, Off: from + j}, true
+			}
+		}
+	}
+	return 0, Pos{}, false
+}
+
 // SpineOf is where file is in the spine; -1 if it's not.
 func (b *Book) SpineOf(file string) int { return slices.Index(b.Spine, file) }
 
