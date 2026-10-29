@@ -1055,7 +1055,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		w.clearUnask(a)
 	}
 	if w.overview { // the pages, small: a tap or a swipe
-		if !p.In(w.paperArea()) || !ev.Pen && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
+		if !p.In(w.paperArea()) || !ev.Pen && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
 			return false
 		}
 		g.Owner = ownNoteOv
@@ -1073,7 +1073,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		a.mem.Pen = true
 		a.mem.save()
 	}
-	if !ev.Pen && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) { // the edges' swipes
+	if !ev.Pen && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) { // the edges' swipes (none full screen)
 		return false
 	}
 	if w.selecting {

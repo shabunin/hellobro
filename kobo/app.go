@@ -105,14 +105,14 @@ type Gesture struct {
 	lightZone bool // started on the left edge: may become a light swipe
 	light     bool // is a light swipe
 	lightFrom int  // light level when the swipe started
-	unfull    int  // fullscreen, started on the top (1) or bottom (-1) edge: in from it leaves fullscreen
+	unfull    int  // fullscreen, started on the top edge (1): down from it leaves fullscreen
 	unfulled  bool // it did
 }
 
 const (
 	EdgeWidth  = 110 // px from the left (light) or right edge where edge swipes start
 	SwipeStart = 40  // px of vertical travel before an edge swipe counts
-	unfullEdge = 80  // px from the top or bottom where a swipe in leaves fullscreen
+	unfullEdge = 80  // px from the top where a swipe down leaves fullscreen
 	unfullMove = 150 // px it takes
 )
 
@@ -745,14 +745,12 @@ func (a *App) onTouch(ev TouchEv) {
 		}
 		a.addMark(p, false)
 		a.prog.Touch(ev, p, g)
-		g.lightZone = a.light != nil && !ev.Pen && p.X < EdgeWidth && g.Owner == 0
-		if a.Full && !ev.Pen && !g.lightZone && g.Owner == 0 { // no fullscreen key without a keyboard: a way out by touch
-			switch {
-			case p.Y < unfullEdge:
-				g.unfull = 1
-			case p.Y >= a.C.Bounds().Dy()-unfullEdge:
-				g.unfull = -1
-			}
+		// Full screen, the edges are the page's: the light stays as it is,
+		// and a swipe down from the top is the one way out by touch (no
+		// fullscreen key without a keyboard).
+		g.lightZone = a.light != nil && !a.Full && !ev.Pen && p.X < EdgeWidth && g.Owner == 0
+		if a.Full && !ev.Pen && g.Owner == 0 && p.Y < unfullEdge {
+			g.unfull = 1
 		}
 
 	case TouchMove:
@@ -769,7 +767,7 @@ func (a *App) onTouch(ev TouchEv) {
 		}
 		if dy := (p.Y - g.Start.Y) * g.unfull; g.unfull != 0 && !g.unfulled && dy > unfullMove && dy > 2*Abs(p.X-g.Start.X) {
 			g.unfulled = true
-			log.Printf("fullscreen: swiped in from the %s edge", map[int]string{1: "top", -1: "bottom"}[g.unfull])
+			log.Print("fullscreen: swiped down from the top")
 			a.SetFull(false)
 		}
 		if g.unfulled {

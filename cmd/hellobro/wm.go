@@ -331,8 +331,8 @@ func (a *bro) openGUI(key string) {
 	a.openWin(&guiWin{key: key})
 }
 
-// fullWin puts w full screen, in focus. Out of it: a swipe in from the
-// top or bottom edge, or Meta+F.
+// fullWin puts w full screen, in focus. Out of it: a swipe down from the
+// top, or Meta+F.
 func (a *bro) fullWin(w window) {
 	if n := a.nodeOf(w); n != nil {
 		a.wm.tree.Focus(n)

@@ -291,7 +291,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			return
 		}
 		a.focusTouched(p)
-		if !ev.Pen && !a.overlay() && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
+		if !ev.Pen && !a.overlay() && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
 			a.edge = g
 		}
 		switch {
@@ -377,7 +377,7 @@ func (a *bro) pairUp(g *kobo.Gesture) bool {
 // before (to the right), once both have gone far enough across.
 func (a *bro) pairSwipe() {
 	f, g := a.pair[0], a.pair[1]
-	if f == nil || g == nil {
+	if f == nil || g == nil || a.Full { // full screen, only a swipe from the top leaves it
 		return
 	}
 	dir := pairDir(f) + pairDir(g)

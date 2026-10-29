@@ -47,8 +47,10 @@ focus), a **+** for a launcher next to it, and at its end **float**
 (floats it over the others; floating, it's **tile**, which puts it
 back), **fullscreen**, and **close** (a terminal's shell or connection
 ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
-one that has it. Full screen, a swipe in from the top (or bottom) edge
-of the screen, or Meta+F, puts it back.
+one that has it. Full screen, a swipe down from the top edge of the
+screen, or Meta+F, puts it back. It's the only swipe there: the edges
+are the window's, so no light or menu by swiping, and no workspace
+swipes.
 
 New windows open next to the one in focus, along its container: side
 by side, or one above another after Meta+V (split vertically; Meta+B,
@@ -1060,7 +1062,8 @@ It's only installed when asked for: `make install-tools`.
 In both: swipe the left edge for the frontlight (in hellobro also
 Meta+] / Meta+[, and Meta+\ for on/off; in brotools Ctrl+Alt+Up/Down
 and Ctrl+Alt+L). Fullscreen (Meta+F in
-hellobro): swipe in from the top or bottom edge to leave it. The exit
+hellobro): swipe down from the top edge to leave it; the left edge's
+light and the right edge's menu wait till then. The exit
 button leaves, and so does Esc in brotools, Meta+Shift+E in hellobro (where Esc
 is the terminal's, or closes what's open);
 the power button sleeps. brotools also leaves after 3 minutes idle;
