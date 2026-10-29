@@ -7,7 +7,8 @@ package main
 // With it the rectangle changes by fingers too: a corner's dot dragged
 // moves that corner, a side dragged that side, the inside the whole of
 // it; or a dot tapped picks it, and the next tap puts it there. By the
-// rectangle are its buttons: copy it (its text into the
+// rectangle are its buttons: zoom (the page so the rectangle fills the
+// window: bookzoom.go), copy it (its text into the
 // clipboard, which the terminals paste; and its picture, which a
 // notebook pastes: notepic.go), save it (a picture at 300 dpi and its
 // text, in Clips/ on the Kobo's storage, and as Clips/latest.png and
@@ -22,6 +23,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -318,8 +320,12 @@ func (w *bookWin) drawCut(a *bro) {
 		}
 	}
 	const h, gap = 64, 10
-	labels := []string{"copy", "save", "×"}
-	widths := []int{140, 140, 64}
+	labels := []string{"copy", "save", "zoom", "×"}
+	widths := []int{140, 140, 140, 64}
+	do := []func(){func() { w.cutCopy(a) }, func() { w.cutSave(a) }, func() { w.zoomCut(a) }, func() { w.dropCut(); w.draw(a) }}
+	if !w.canZoom() { // two side by side: whole, each
+		labels, widths, do = slices.Delete(labels, 2, 3), slices.Delete(widths, 2, 3), slices.Delete(do, 2, 3)
+	}
 	total := 0
 	for _, bw := range widths {
 		total += bw + gap
@@ -329,7 +335,6 @@ func (w *bookWin) drawCut(a *bro) {
 		y = max(w.area.Min.Y, r.Min.Y-gap-h)
 	}
 	x := max(w.area.Min.X, min(r.Max.X, w.area.Max.X)-total)
-	do := []func(){func() { w.cutCopy(a) }, func() { w.cutSave(a) }, func() { w.dropCut(); w.draw(a) }}
 	for i, label := range labels {
 		b := image.Rect(x, y, x+widths[i], y+h)
 		x += widths[i] + gap

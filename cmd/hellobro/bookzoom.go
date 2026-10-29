@@ -6,7 +6,8 @@ package main
 // the window, and the zoom; the page is drawn again when they lift); a finger dragged on a page bigger than
 // the window moves it, anywhere. Taps, keys and swipes still go a
 // screenful at a time, from where it is. + and - and the style panel
-// zoom too, a step at a time, round the middle.
+// zoom too, a step at a time, round the middle; and a cut's zoom button,
+// the cut as big as the window takes it, in its middle.
 
 import (
 	"fmt"
@@ -86,14 +87,38 @@ func (w *bookWin) setZoom(a *bro, z int, p image.Point) {
 	if z == w.zoom || w.pdf == nil {
 		return
 	}
-	fx, fy := 0.5, 0.5 // where p is on the page, as fractions of it
-	if s, err := w.pdfPage(w.spine, w.laid); err == nil && !w.laid.two {
-		b, v := s.img.Bounds(), w.view
-		if p.In(v.dst) {
-			fx = float64(p.X-v.dst.Min.X+v.sp.X-b.Min.X) / float64(b.Dx())
-			fy = float64(p.Y-v.dst.Min.Y+v.sp.Y-b.Min.Y) / float64(b.Dy())
-		}
+	fx, fy := w.pageFrac(p)
+	w.zoomTo(a, z, fx, fy, p)
+}
+
+// pageFrac is where p on the screen is on the page shown, as fractions
+// of it: its middle if p's off it.
+func (w *bookWin) pageFrac(p image.Point) (float64, float64) {
+	s, err := w.pdfPage(w.spine, w.laid)
+	if err != nil || w.laid.two || !p.In(w.view.dst) {
+		return 0.5, 0.5
 	}
+	b, v := s.img.Bounds(), w.view
+	return float64(p.X-v.dst.Min.X+v.sp.X-b.Min.X) / float64(b.Dx()), float64(p.Y-v.dst.Min.Y+v.sp.Y-b.Min.Y) / float64(b.Dy())
+}
+
+// zoomCut zooms so the cut fills the window as far as it can, in its
+// middle; the cut goes.
+func (w *bookWin) zoomCut(a *bro) {
+	r := w.cut
+	if r.Empty() || !w.canZoom() {
+		return
+	}
+	fx, fy := w.pageFrac(r.Min.Add(r.Max).Div(2))
+	k := min(float64(w.area.Dx())/float64(r.Dx()), float64(w.area.Dy())/float64(r.Dy()))
+	z := max(pdfZoomMin, min(pdfZoomMax, int(float64(w.zoom)*k)/5*5))
+	w.dropCut()
+	w.zoomTo(a, z, fx, fy, w.area.Min.Add(w.area.Max).Div(2))
+}
+
+// zoomTo zooms to z, the page's point at fractions fx, fy of it at p on
+// the screen, as near as it can.
+func (w *bookWin) zoomTo(a *bro, z int, fx, fy float64, p image.Point) {
 	w.zoom = z
 	w.layout(a)
 	if s, err := w.pdfPage(w.spine, w.laid); err == nil {

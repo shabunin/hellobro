@@ -154,18 +154,25 @@ func (w *bookWin) deleteMark(a *bro, i int) {
 
 // --- the strip under the page ---
 
-const footButton = 100 // a button's width
+const (
+	footButton = 100 // a button's width
+	zoomButton = 84  // a PDF's zoom buttons': − 100% +
+	zoomGap    = 24  // between them and the rest
+)
 
 // footButtons are the strip's buttons: the contents, the style, a
 // bookmark, and in a PDF the select tool (bookcut.go), side by side in
-// its middle.
+// its middle (with the zoom buttons, if they show).
 func (w *bookWin) footButtons() (toc, style, mark, sel image.Rectangle) {
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y)
-	n := 3
+	n, width := 3, 3*footButton
 	if w.pdf != nil {
-		n = 4
+		n, width = 4, 4*footButton
 	}
-	x := (foot.Min.X+foot.Max.X)/2 - n*footButton/2
+	if w.zoomShows() {
+		width += zoomGap + 3*zoomButton
+	}
+	x := (foot.Min.X+foot.Max.X)/2 - width/2
 	bs := make([]image.Rectangle, 4)
 	for i := range n {
 		bs[i] = image.Rect(x+i*footButton, foot.Min.Y, x+(i+1)*footButton, foot.Max.Y)
@@ -173,12 +180,30 @@ func (w *bookWin) footButtons() (toc, style, mark, sel image.Rectangle) {
 	return bs[0], bs[1], bs[2], bs[3]
 }
 
+// zoomShows is whether the strip has a PDF's zoom buttons: it zooms
+// (one page at a time), and there's room for them.
+func (w *bookWin) zoomShows() bool {
+	return w.pdf != nil && !w.laid.two && w.area.Dx() >= 4*footButton+zoomGap+3*zoomButton+2*160
+}
+
+// zoomButtons are a PDF's zoom buttons, right of the select tool:
+// out, back to the fit (100%), in. Empty if they don't show.
+func (w *bookWin) zoomButtons() (out, fit, in image.Rectangle) {
+	if !w.zoomShows() {
+		return
+	}
+	_, _, _, sel := w.footButtons()
+	r := image.Rect(sel.Max.X+zoomGap, sel.Min.Y, sel.Max.X+zoomGap+zoomButton, sel.Max.Y)
+	return r, r.Add(image.Pt(zoomButton, 0)), r.Add(image.Pt(2*zoomButton, 0))
+}
+
 // drawFoot draws the strip: the chapter, the buttons, how far in.
 func (w *bookWin) drawFoot(a *bro) {
 	c := a.C
 	toc, style, mark, sel := w.footButtons()
+	out, fit, in := w.zoomButtons()
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
-	last := mark.Union(sel)
+	last := mark.Union(sel).Union(in)
 	name := w.chapterName()
 	if w.pdf != nil {
 		name = w.pdfFootName()
@@ -205,6 +230,18 @@ func (w *bookWin) drawFoot(a *bro) {
 		for _, p := range []image.Point{r.Min, {r.Max.X - 1, r.Min.Y}, r.Max.Sub(image.Pt(1, 1)), {r.Min.X, r.Max.Y - 1}} {
 			c.Disc(p, 4, ink, sel)
 		}
+	}
+	if !in.Empty() {
+		m = out.Min.Add(out.Max).Div(2) // −, + : bars, as ☰'s
+		c.Fill(image.Rect(m.X-14, m.Y-2, m.X+14, m.Y+2), kobo.Dark)
+		m = in.Min.Add(in.Max).Div(2)
+		c.Fill(image.Rect(m.X-14, m.Y-2, m.X+14, m.Y+2), kobo.Dark)
+		c.Fill(image.Rect(m.X-2, m.Y-14, m.X+2, m.Y+14), kobo.Dark)
+		ink := uint8(kobo.Dark)
+		if w.zoom == pdfZoomMin { // there already
+			ink = kobo.Mid
+		}
+		c.Text(a.F.Small, fit, "100%", ink, kobo.AlignCenter)
 	}
 }
 
@@ -248,7 +285,14 @@ func ribbon(c kobo.Canvas, r image.Rectangle, filled bool, g uint8) {
 // it's on a button.
 func (w *bookWin) footTap(a *bro, p image.Point) bool {
 	toc, style, mark, sel := w.footButtons()
+	out, fit, in := w.zoomButtons()
 	switch {
+	case p.In(out):
+		w.zoomStep(a, -1)
+	case p.In(in):
+		w.zoomStep(a, 1)
+	case p.In(fit):
+		w.setZoom(a, pdfZoomMin, w.area.Min.Add(w.area.Max).Div(2))
 	case p.In(sel):
 		w.selecting = !w.selecting
 		w.dropCut()

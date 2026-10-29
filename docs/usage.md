@@ -591,7 +591,8 @@ same. Their pages are drawn gray by MuPDF, linked into hellobro (package
 `pdf`), with their white margins trimmed, as big as the screen takes the
 whole page. **s** or **Aa** has their own panel: **Fit** the whole page
 or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and
-**-** on the page too; each PDF its own, kept with its place), **Trim
+**-** on the page too, and − **100%** + in the strip under it, right of
+the select tool; each PDF its own, kept with its place), **Trim
 white margins** on or off, and **Pages**
 as for EPUBs (each PDF its own): two side by side are each
 whole, meeting in the middle as a book's do, turned two at a time, the
@@ -634,6 +635,8 @@ again, or Esc, to put it down. Under the rectangle:
   the Kobo's storage (`/mnt/onboard/Clips` in Alpine), named after the
   book and the page, and as `Clips/latest.png` and `latest.txt` too: a
   program in Alpine (an LLM's, say) can take the last cut from there;
+- **zoom**: the page zoomed so the rectangle fills the screen, as far
+  as 400% goes, in its middle (one page at a time only);
 - **×**, a tap elsewhere or Esc takes it away, as does turning the page.
 
 A scanned page has no text: copy and save keep it as a picture.
