@@ -2,7 +2,7 @@ package main
 
 // The notebook: pages to write on with the pen, sums worked out by hand,
 // say. Its window shows a page, fitted in, under a strip of tools: the
-// pen or the eraser, undo and redo, clearing the page, the paper
+// pen or the eraser, undo and redo, the paper
 // (squares, lines, plain) and the pages: two side by side where there's
 // room for them (a landscape screen). The pen writes; a button on it
 // held, it erases; a finger swiped across turns the page, and turning
@@ -435,14 +435,10 @@ func (w *noteWin) counter() string {
 // layBar lays the tools along the strip, as many as fit: what's left
 // out goes from the least needed.
 func (w *noteWin) layBar(a *bro) {
-	clear := "clear page"
-	if w.shown() == 2 {
-		clear = "clear pages"
-	}
-	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper"}, {id: "export"}}
-	drops := []string{"paper", "export", "redo", "paste", "clear"}
+	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}}
+	drops := []string{"paper", "export", "redo", "paste"}
 	if w.overview {
-		tools = []noteBtn{{id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
+		tools = []noteBtn{{id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
 		drops = []string{"undo", "copy page", "new before"}
 	}
 	pages := []noteBtn{{id: "prev"}, {id: "next"}}
@@ -770,6 +766,9 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		case "undo", "redo":
 			w.doUndo(a, b.id == "undo")
 		case "clear":
+			if w.ovOff("clear") {
+				break
+			}
 			if !w.clearAsking() { // it asks first
 				asked := time.Now()
 				w.clearAsked = asked
@@ -784,21 +783,7 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 				break
 			}
 			w.clearUnask(a)
-			var ops []noteOp
-			for n := w.cur; n < w.cur+w.shown(); n++ {
-				if pg := w.strokes(n); len(pg) > 0 {
-					if n == w.selPage {
-						w.sel = nil
-					}
-					ops = append(ops, noteOp{page: n, del: slices.Clone(pg)})
-					w.nb.apply(ops[len(ops)-1], false)
-				}
-			}
-			if len(ops) > 0 {
-				w.edited(ops...)
-				w.show(a)
-				a.MarkFlash(w.pages())
-			}
+			w.pageAct(a, "clear")
 		case "paper":
 			ps := strings.Fields(notePapers)
 			w.nb.paper = ps[(slices.Index(ps, w.nb.paper)+1)%len(ps)]

@@ -633,8 +633,7 @@ Its buttons are pictures (below by their names): the pen, an eraser,
 a dotted rectangle (select), arrows round (undo, redo), a clipboard
 (paste), a page as the paper is (squares, lines, plain), a tray with
 an arrow out (export). Under the pen, a line as it writes: its width,
-its gray. **clear page** is words, and asks: tap it again within a few
-seconds to clear (it says "tap again"); anything else, and it doesn't.
+its gray.
 
 - The pen writes; a heavier hand, a thicker line. **eraser** (or E)
   takes off each stroke the pen goes over; **pen** (or P) is back to
@@ -645,8 +644,7 @@ seconds to clear (it says "tap again"); anything else, and it doesn't.
   The line under the button shows which; the choice is kept.
   Touch the page to put them away. A notebook from Xournal++ shows its
   colors as the grays they are, its highlighters as markers.
-- **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), **clear
-  page** (twice; undone like the rest), and the paper: squares, lines or
+- **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), and the paper: squares, lines or
   plain, for the whole notebook.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
   last page, if it has something on it, a new page. Once a pen has
@@ -658,8 +656,9 @@ seconds to clear (it says "tap again"); anything else, and it doesn't.
   Tap a page to choose it (or the arrow keys), again to open it (or
   Enter, or **open**, corners as a frame). The strip has then: **new
   before** and **new after** (a + by a page), **copy page** (a copy
-  after it; two pages), **delete** (a bin, or Delete; the only page is
-  cleared instead), **earlier** and **later** (arrows: moving it), and
+  after it; two pages), **clear page** (words: it asks, tap it again
+  within a few seconds; it says "tap again"), **delete** (a bin, or
+  Delete; the only page is cleared instead), **earlier** and **later** (arrows: moving it), and
   **undo**: each is undone like a stroke. The counter again,
   or O, goes back to the page.
 - Till then fingers write: a stylus without a battery (or a Kobo Stylus
@@ -670,7 +669,7 @@ seconds to clear (it says "tap again"); anything else, and it doesn't.
 - A page is the screen's shape, upright, fitted into the window. Where
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
-  writing on the second makes it a page. **clear pages** clears both.
+  writing on the second makes it a page.
 - **select** (or S) takes what's written, and pictures, to change
   them; the pen and fingers both work with it. Tap a stroke or a
   picture to take it (the ink over a picture first), or draw a
@@ -703,7 +702,7 @@ seconds to clear (it says "tap again"); anything else, and it doesn't.
   be, or on the next page if there's no room left there. It comes in
   taken by the select tool: drag it where it should go, then **pen** to
   write. It's under the ink: write over it. The eraser leaves it; undo
-  and clear page take it away.
+  and clear page (in the overview) take it away.
 - It's kept a few seconds after the last stroke and on closing, as
   `Notebooks/NAME.xopp` on the Kobo's storage: over USB, or file
   sharing (`sftp kobo.local`). A notebook's window comes back with the

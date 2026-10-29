@@ -4,8 +4,9 @@ package main
 // shows them small, a screenful at a time (the arrows, or a finger
 // swiped across, for more), and a tile after the last for a new one.
 // Tap a page to choose it, again to open it. The strip then has: open,
-// new before, new after, copy page, delete, earlier and later (moving
-// it). Each is a change to undo, as strokes are.
+// new before, new after, copy page, clear page (asking first), delete,
+// earlier and later (moving it). Each is a change to undo, as strokes
+// are.
 
 import (
 	"fmt"
@@ -190,6 +191,8 @@ func (w *noteWin) ovTap(a *bro, p image.Point) {
 func (w *noteWin) ovOff(id string) bool {
 	tiles, _ := w.ovLayout()
 	switch id {
+	case "clear":
+		return w.ovSel >= len(w.nb.pages) || len(w.nb.pages[w.ovSel]) == 0
 	case "earlier":
 		return w.ovSel == 0
 	case "later":
@@ -270,6 +273,11 @@ func (w *noteWin) pageEdit(id string) bool {
 			copies = append(copies, s.moved(image.Point{}))
 		}
 		ops, w.ovSel = []noteOp{{kind: pageIns, page: n + 1, add: copies, meta: nb.meta[n]}}, n+1
+	case "clear":
+		if len(nb.pages[n]) == 0 {
+			return false
+		}
+		ops = []noteOp{{page: n, del: slices.Clone(nb.pages[n])}}
 	case "delete":
 		ops = []noteOp{nb.delPageOp(n)}
 		if len(nb.pages) == 1 { // the last: cleared, not gone

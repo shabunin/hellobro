@@ -33,6 +33,7 @@ func TestNotePages(t *testing.T) {
 		{0, "new before", "02131", 0, 0},
 		{0, "delete", "2131", 0, 0},
 		{3, "new after", "21310", 4, 0},
+		{0, "clear", "01310", 0, 0},
 	} {
 		w.ovSel = st.sel
 		if !w.pageEdit(st.id) {
@@ -41,6 +42,9 @@ func TestNotePages(t *testing.T) {
 		if got := names(); got != st.want || w.ovSel != st.wantSel || len(nb.meta) != len(nb.pages) {
 			t.Errorf("%s on %d: %s, chosen %d, %d metas; want %s, %d", st.id, st.sel, got, w.ovSel, len(nb.meta), st.want, st.wantSel)
 		}
+	}
+	if w.pageEdit("clear") { // the page cleared again
+		t.Error("an empty page cleared")
 	}
 	if nb.meta[1].w != 100 { // the first page, now second
 		t.Errorf("its meta: %v", nb.meta)

@@ -1,10 +1,10 @@
 # The notebook's buttons as pictures (noteicons.go), and "clear" asking
 # first: a new notebook, fullscreen, a wave; the pen's choices, bold gray
-# (its button shows the line it writes), a second wave. "clear" once: it
-# asks ("tap again"), and forgets after a few seconds; twice: the page
-# cleared, Ctrl+Z back. S and a rectangle round the first wave: the
-# selection's buttons; O: the pages' strip. Finds the buttons on the
-# screen (OUT/screen/screen.raw).
+# (its button shows the line it writes), a second wave. O: the pages'
+# strip; "clear page" once: it asks ("tap again"), and forgets after a
+# few seconds; twice: the page cleared, Ctrl+Z back; O again. S and a
+# rectangle round the first wave: the selection's buttons. Finds the
+# buttons on the screen (OUT/screen/screen.raw).
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,13 +42,14 @@ tap(*bar[0]); time.sleep(3)                        # the pen's choices
 ch = buttons(62, 140)
 tap(*ch[2]); time.sleep(2); tap(*ch[4]); time.sleep(2)   # bold, gray
 stroke(wave(H // 2, x0, x1), pen=True, pressure=lambda t: 2000); time.sleep(3)
-tap(*bar[5]); time.sleep(2)                        # clear: it asks
+key(24); time.sleep(5)                             # O: the pages, small
+strip = buttons(0, 60)                             # open, new before, new after, copy page, clear page, …
+tap(*strip[4]); time.sleep(2)                      # clear: it asks
 time.sleep(5)                                      # and forgets
-tap(*bar[5]); time.sleep(1); tap(*bar[5]); time.sleep(4)  # twice: cleared
+tap(*strip[4]); time.sleep(1); tap(*strip[4]); time.sleep(4)  # twice: cleared
 key(44, ctrl=True); time.sleep(4)                  # Ctrl+Z: back
+key(24); time.sleep(4)                             # the page again
 key(31); time.sleep(2)                             # S: the select tool
 stroke(line(x0 - 30, H // 4 - 100, x1 + 30, H // 4 + 100), pen=True); time.sleep(5)
-key(24); time.sleep(5)                             # O: the pages, small
-key(24); time.sleep(3)
 fullscreen(); time.sleep(3)
 exit_app()
