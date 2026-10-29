@@ -19,6 +19,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -338,6 +339,14 @@ func (w *notesWin) rename(a *bro, e *noteEdit) error {
 				nw.drawTitle(a)
 			}
 		}
+		for _, nb := range a.nt.unsaved {
+			if rest, ok := strings.CutPrefix(nb.name, e.key+"/"); ok {
+				nb.name = to + "/" + rest
+			}
+		}
+		if rest, ok := strings.CutPrefix(w.back, e.key+"/"); ok { // the notebook to go back to went with it
+			w.back = to + "/" + rest
+		}
 		a.wm.changed = time.Now() // the layout names them
 		if w.dir == e.key || strings.HasPrefix(w.dir, e.key+"/") {
 			w.dir = to + strings.TrimPrefix(w.dir, e.key)
@@ -364,8 +373,15 @@ func renameNotebook(a *bro, from, to string) error {
 		return fmt.Errorf("there's a %s already", path.Base(to))
 	}
 	nw := a.noteWindow(from)
-	if nw != nil {
-		nw.keep(a)
+	if nw != nil && !nw.keep(a) {
+		return errors.New("it can't be written now, so it's not renamed")
+	}
+	if nb := a.unsavedNote(from); nb != nil { // closed unkept: it's kept as it's to be called, when it can be
+		nb.name = to
+		if fileExists(notePath(from)) {
+			os.Rename(notePath(from), notePath(to))
+		}
+		return nil
 	}
 	if _, err := os.Stat(notePath(from)); err == nil {
 		if err := os.Rename(notePath(from), notePath(to)); err != nil {
@@ -381,8 +397,10 @@ func renameNotebook(a *bro, from, to string) error {
 			return err
 		}
 	}
-	if pdf := filepath.Join(notesDir(), filepath.FromSlash(from)+".pdf"); fileExists(pdf) { // its export
-		os.Rename(pdf, filepath.Join(notesDir(), filepath.FromSlash(to)+".pdf"))
+	for i, p := range exportPaths(from) { // its export, and only that: a PDF of the same name may be someone else's
+		if isExport(p) && !fileExists(exportPaths(to)[i]) {
+			os.Rename(p, exportPaths(to)[i])
+		}
 	}
 	if nw != nil {
 		nw.nb.name, nw.nb.old = to, ""
@@ -422,6 +440,8 @@ func (w *notesWin) remove(a *bro, it libItem) {
 	w.asked = ""
 	if err := removeNote(a, it); err != nil {
 		a.Notify(err.Error())
+	} else if w.back == it.key { // nothing to go back to now
+		w.back = ""
 	}
 	w.load()
 	w.draw(a)
@@ -437,6 +457,9 @@ func removeNote(a *bro, it libItem) error {
 	}
 	if nw := a.noteWindow(it.key); nw != nil {
 		a.closeWin(nw) // kept first, then it goes
+	}
+	if nb := a.unsavedNote(it.key); nb != nil { // it's not to be kept now
+		a.nt.unsaved = slices.DeleteFunc(a.nt.unsaved, func(n *notebook) bool { return n == nb })
 	}
 	trash := filepath.Join(notesDir(), ".trash")
 	if err := os.MkdirAll(trash, 0o755); err != nil {

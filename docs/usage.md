@@ -708,7 +708,8 @@ and the last two written.
 - **rename** on a row (or F2) types its name in the row: Enter or
   **ok** keeps it, Esc or **cancel** doesn't. Without a keyboard, the
   one on the screen shows for it. A notebook's PDF export is renamed
-  with it; a folder's notebooks go with it, open ones too.
+  with it (only one hellobro wrote); a folder's notebooks go with it,
+  open ones too.
 - **×** (or Delete) asks **delete?**: tap it again within 4 s. A
   notebook goes to `Notebooks/.trash` (its window closes first), to
   be fished out over USB or sftp; a folder goes only if it's empty.
@@ -799,7 +800,9 @@ its gray.
   first time: MuPDF takes most of a second a page).
 - **export** (or Ctrl+E) writes the notebook as a PDF next to its
   `.xopp`, `Notebooks/NAME.pdf`: a picture of each page at 200 dpi, gray,
-  to send, print, or hand an LLM. All the pages to the last written
+  to send, print, or hand an LLM. If a PDF hellobro didn't write is
+  there (Xournal++'s lecture beside its notes), it's left be, and the
+  export is `NAME (notebook).pdf`. All the pages to the last written
   on (of one on a PDF, only the pages written on). The page shown goes
   to `Clips/NAME pN.png` and `Clips/latest.png` too, as a PDF's cut
   does, for a program in Alpine to take. It's done aside; a note says
@@ -807,7 +810,11 @@ its gray.
 - `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
   on a computer to go on writing, add text, or export a PDF. What
   hellobro doesn't draw yet (text, a picture background) stays as it was when it writes the notebook again; only the
-  layers become one. The first notebooks, `notebooks/NAME.hbnote` next
+  layers become one. A notebook is written whole or not at all (a new
+  file, then in the old one's place); if the card won't take it (full,
+  say), a note says so, the window keeps it, and it's tried again, even
+  closed. A picture over 16 million pixels isn't drawn, but stays in
+  the file. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
 
 ## Music

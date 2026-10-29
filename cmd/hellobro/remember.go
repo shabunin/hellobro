@@ -112,11 +112,41 @@ func (a *bro) saveHosts() error {
 
 func (r remembered) save() error {
 	b, _ := json.MarshalIndent(r, "", "\t")
-	err := os.WriteFile(filepath.Join(r.dir, rememberFile), append(b, '\n'), 0o644)
+	err := writeAtomic(filepath.Join(r.dir, rememberFile), append(b, '\n'))
 	if err != nil {
 		log.Printf("%s: %v", rememberFile, err)
 	}
 	return err
+}
+
+// writeAtomic writes b to path by way of a new file, on the card before
+// it takes the old one's place: a crash or a dead battery halfway leaves
+// the old one whole (FAT keeps no journal).
+func writeAtomic(path string, b []byte) error {
+	tmp := path + ".new"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return err
+	}
+	if d, err := os.Open(filepath.Dir(path)); err == nil { // the rename, on the card too
+		d.Sync()
+		d.Close()
+	}
+	return nil
 }
 
 // applyLightStart starts the light as it was left, unless the setting

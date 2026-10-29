@@ -193,11 +193,7 @@ func (nb *notebook) save() error {
 	if err != nil {
 		return err
 	}
-	tmp := notePath(nb.name) + ".new"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, notePath(nb.name)); err != nil {
+	if err := writeAtomic(notePath(nb.name), b); err != nil {
 		return err
 	}
 	if nb.old != "" {
@@ -349,6 +345,7 @@ type noteWin struct {
 	ovFirst    int         // the first shown
 	undo, redo [][]noteOp  // each step's changes
 	changed    time.Time   // not kept since; zero: kept
+	keepErr    string      // the last write's error, said once
 
 	p     kobo.Panel
 	bar   image.Rectangle // the tools' strip
@@ -380,8 +377,10 @@ type noteInk struct {
 }
 
 type noteState struct {
-	ink  *noteInk
-	drag *noteDrag // the select tool's
+	ink     *noteInk
+	drag    *noteDrag   // the select tool's
+	unsaved []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here
+	triedAt time.Time   // when they were last tried
 }
 
 const (
@@ -895,23 +894,54 @@ func (w *noteWin) closing(a *bro) {
 		a.nt.drag = nil
 		a.Ink(false)
 	}
-	w.keep(a)
+	if !w.keep(a) {
+		a.nt.unsaved = append(a.nt.unsaved, w.nb)
+		a.Notify("notebook " + w.nb.name + " not kept: it's held, and kept once it can be")
+	}
 	w.closePDF()
 	w.place(a, kobo.Panel{})
 }
 
-// keep writes the notebook, if it changed.
-func (w *noteWin) keep(a *bro) {
+// keep writes the notebook, if it changed; false if it couldn't, and
+// it's tried again in a while.
+func (w *noteWin) keep(a *bro) bool {
 	if w.changed.IsZero() {
-		return
+		return true
 	}
-	w.changed = time.Time{}
 	if err := w.nb.save(); err != nil {
 		log.Printf("notebook %s: %v", w.nb.name, err)
-		a.Notify("notebook not kept: " + err.Error())
-		return
+		if err.Error() != w.keepErr { // said once, not every try
+			a.Notify("notebook not kept: " + err.Error())
+		}
+		w.changed, w.keepErr = time.Now(), err.Error()
+		return false
 	}
+	w.changed, w.keepErr = time.Time{}, ""
 	log.Printf("notebook %s kept", w.nb.name)
+	return true
+}
+
+// unsavedNote is the notebook name closed unkept, if it's one.
+func (a *bro) unsavedNote(name string) *notebook {
+	for _, nb := range a.nt.unsaved {
+		if nb.name == name {
+			return nb
+		}
+	}
+	return nil
+}
+
+// keepUnsaved tries the notebooks closed unkept again.
+func (a *bro) keepUnsaved() {
+	a.nt.triedAt = time.Now()
+	a.nt.unsaved = slices.DeleteFunc(a.nt.unsaved, func(nb *notebook) bool {
+		if err := nb.save(); err != nil {
+			log.Printf("notebook %s: still not kept: %v", nb.name, err)
+			return false
+		}
+		log.Printf("notebook %s kept, at last", nb.name)
+		return true
+	})
 }
 
 // --- the pen and fingers ---
@@ -1171,6 +1201,10 @@ func (a *bro) noteOpen(name string) *noteWin {
 			return err == nil || a.noteWindow(n) != nil
 		})
 	}
+	if nb := a.unsavedNote(name); nb != nil { // newer than its file
+		a.nt.unsaved = slices.DeleteFunc(a.nt.unsaved, func(n *notebook) bool { return n == nb })
+		return &noteWin{nb: nb, changed: time.Now()}
+	}
 	nb, err := loadNotebook(name)
 	if err != nil {
 		log.Printf("notebook %s: %v", name, err)
@@ -1220,10 +1254,14 @@ func (a *bro) noteTick() {
 			w.keep(a)
 		}
 	}
+	if len(a.nt.unsaved) > 0 && time.Since(a.nt.triedAt) > noteKeepAfter {
+		a.keepUnsaved()
+	}
 }
 
 func (a *bro) noteExit() {
 	for _, w := range a.noteWins() {
 		w.keep(a)
 	}
+	a.keepUnsaved()
 }

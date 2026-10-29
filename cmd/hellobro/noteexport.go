@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -125,7 +126,7 @@ func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown expor
 			return "", err
 		}
 	}
-	out := filepath.Join(notesDir(), name+".pdf")
+	out := exportPath(name)
 	if err := writeAtomic(out, imagesPDF(imgs)); err != nil {
 		return "", err
 	}
@@ -141,16 +142,42 @@ func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown expor
 			return "", err
 		}
 	}
-	return fmt.Sprintf("exported: Notebooks/%s.pdf; page %d as Clips/latest.png", name, shown.n+1), nil
+	rel, _ := filepath.Rel(notesDir(), out)
+	return fmt.Sprintf("exported: Notebooks/%s; page %d as Clips/latest.png", filepath.ToSlash(rel), shown.n+1), nil
 }
 
-// writeAtomic writes b to path by way of a new file: never half of it.
-func writeAtomic(path string, b []byte) error {
-	tmp := path + ".new"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return err
+// exportMark is in the PDFs exports write: what's written over, or
+// moved with a notebook renamed, is only ever one of those.
+const exportMark = "%hellobro notebook export\n"
+
+// exportPaths are where the notebook name's export may be: NAME.pdf,
+// or, if a PDF of someone else's is there (Xournal++'s lecture.pdf
+// beside lecture.xopp), NAME (notebook).pdf.
+func exportPaths(name string) [2]string {
+	p := filepath.Join(notesDir(), filepath.FromSlash(name))
+	return [2]string{p + ".pdf", p + " (notebook).pdf"}
+}
+
+// exportPath is where the notebook name is exported to: the first of
+// its exportPaths that's free or an export already.
+func exportPath(name string) string {
+	ps := exportPaths(name)
+	if !fileExists(ps[0]) || isExport(ps[0]) {
+		return ps[0]
 	}
-	return os.Rename(tmp, path)
+	return ps[1]
+}
+
+// isExport says whether the file at p is one an export wrote.
+func isExport(p string) bool {
+	f, err := os.Open(p)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	head := make([]byte, 64)
+	n, _ := io.ReadFull(f, head)
+	return bytes.Contains(head[:n], []byte(exportMark))
 }
 
 // renderNotePage draws pg at dpi: its paper (the PDF's page, or the
@@ -223,7 +250,7 @@ func imagesPDF(pages []pdfImagePage) []byte {
 		}
 		b.WriteString("\nendobj\n")
 	}
-	b.WriteString("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+	b.WriteString("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n" + exportMark)
 	kids := ""
 	for i := range pages {
 		kids += fmt.Sprintf("%d 0 R ", 3+3*i)

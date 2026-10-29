@@ -34,7 +34,18 @@ type notePic struct {
 	scaled *image.Gray
 }
 
+// notePicMax is the most pixels a picture is decoded with: a phone's
+// photo in a .xopp would be hundreds of MB, and crash every start.
+const notePicMax = 16 << 20
+
 func newNotePic(data []byte) (*notePic, error) {
+	cfg, err := png.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > notePicMax/cfg.Height {
+		return nil, fmt.Errorf("%d × %d, too big a picture", cfg.Width, cfg.Height)
+	}
 	m, err := png.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
