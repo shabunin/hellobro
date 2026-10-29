@@ -1,10 +1,14 @@
 package main
 
 import (
+	"image"
 	"slices"
 	"testing"
 
 	"hellobro/book"
+	"hellobro/kobo"
+	"hellobro/pdf"
+	"hellobro/wm"
 )
 
 func TestBookMarks(t *testing.T) {
@@ -54,5 +58,25 @@ func TestBookMarks(t *testing.T) {
 		if got := w.tocName(spine); got != want {
 			t.Errorf("tocName(%d): %q, want %q", spine, got, want)
 		}
+	}
+}
+
+// A book opened (away from the main loop) is where it was left, its
+// bookmarks too, a PDF's as an EPUB's; one closed while it opened is
+// let go.
+func TestBookOpened(t *testing.T) {
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
+	a.wm.wins = map[*wm.Node]window{}
+	a.mem.Books = map[string]bookPlace{"/b/x.pdf": {Spine: 2, Pages: "two", Zoom: 150, Marks: []bookMark{{Spine: 1}, {Spine: 9}}}}
+	w := &bookWin{path: "/b/x.pdf", opening: true}
+	w.opened(a, bookOpened{b: &book.Book{Spine: make([]string, 5)}, pdf: &pdf.Doc{}})
+	if w.opening || w.b == nil || w.spine != 2 || w.pageMode != "two" || w.zoom != 150 || !w.panned || len(w.marks) != 1 {
+		t.Errorf("opened: spine %d, pages %q, zoom %d, panned %v, marks %v", w.spine, w.pageMode, w.zoom, w.panned, w.marks)
+	}
+	g := &bookWin{path: "/b/x.pdf", opening: true, gone: true}
+	g.opened(a, bookOpened{b: &book.Book{Spine: make([]string, 5)}, pdf: &pdf.Doc{}})
+	if g.b != nil {
+		t.Errorf("closed, it took the book")
 	}
 }

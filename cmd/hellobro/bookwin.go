@@ -159,6 +159,8 @@ type bookWin struct {
 	corner    *image.Point    // the first corner, placed
 	grab      int             // a corner of the cut picked, to be moved: 1–4; 0 none
 	err       string
+	opening   bool // the book's being opened (newBookWin)
+	gone      bool // the window's closed
 	spine     int
 	at        book.Pos // the page shown starts here
 	ch        *book.Chapter
@@ -202,7 +204,7 @@ func (w *bookWin) Title() string {
 		t, _, _ := strings.Cut(w.b.Title, " / ") // Gutenberg's: "Alice… / Illustrated by…"
 		return t
 	}
-	return strings.TrimSuffix(filepath.Base(w.path), ".epub")
+	return strings.TrimSuffix(filepath.Base(w.path), filepath.Ext(w.path))
 }
 func (w *bookWin) Class() string    { return "hellobro" }
 func (w *bookWin) Instance() string { return "book" }
@@ -220,25 +222,67 @@ func (a *bro) newBookWin(path string) *bookWin {
 		a.findBooks(w)
 		return w
 	}
+	w.opening = true
+	go func() { // a big book, or a damaged PDF MuPDF reads whole, takes a while: the screen doesn't wait
+		t := time.Now()
+		o := openBookFile(path)
+		log.Printf("book: %s opened in %v", filepath.Base(path), time.Since(t).Round(time.Millisecond))
+		a.Do(func() { w.opened(a, o) })
+	}()
+	return w
+}
+
+// bookOpened is a book as opened, away from the main loop.
+type bookOpened struct {
+	b   *book.Book
+	pdf *pdf.Doc // a PDF's
+	err error
+}
+
+// openBookFile opens the book at path: an EPUB, or a PDF as a book.
+func openBookFile(path string) bookOpened {
 	if isPDF(path) {
-		a.openPDF(w)
-		return w
+		d, b, err := openPDF(path)
+		return bookOpened{b: b, pdf: d, err: err}
 	}
 	b, err := book.Open(path)
-	if err != nil {
-		w.err = err.Error()
-		log.Printf("book: %s: %v", path, err)
-		return w
+	return bookOpened{b: b, err: err}
+}
+
+// opened puts the book opened in w, where it was left, and shows it.
+func (w *bookWin) opened(a *bro, o bookOpened) {
+	w.opening = false
+	if w.gone { // closed while it opened
+		if o.pdf != nil {
+			o.pdf.Close()
+		} else if o.b != nil {
+			o.b.Close()
+		}
+		return
 	}
-	w.b = b
-	if pl, ok := a.mem.Books[path]; ok && pl.Spine < len(b.Spine) {
-		w.spine, w.at = pl.Spine, book.Pos{Block: pl.Block, Off: pl.Off}
+	if o.err != nil {
+		w.err = o.err.Error()
+		log.Printf("book: %s: %v", w.path, o.err)
+	} else {
+		b := o.b
+		w.b, w.pdf = b, o.pdf
+		w.loadPageMode(a)
+		if w.pdf != nil {
+			w.loadZoom(a)
+		}
+		if pl, ok := a.mem.Books[w.path]; ok {
+			if pl.Spine < len(b.Spine) {
+				w.spine, w.at = pl.Spine, book.Pos{Block: pl.Block, Off: pl.Off}
+				w.panned = w.pdf != nil && w.zoom > pdfZoomMin // zoomed: just where it was, maybe moved by a finger
+			}
+			w.marks = slices.DeleteFunc(slices.Clone(pl.Marks), func(m bookMark) bool { return m.Spine >= len(b.Spine) })
+		}
 	}
-	if pl, ok := a.mem.Books[path]; ok {
-		w.marks = slices.DeleteFunc(slices.Clone(pl.Marks), func(m bookMark) bool { return m.Spine >= len(b.Spine) })
+	w.place(a, w.p) // its title, its margins
+	a.wmBar()
+	if a.shows(w) {
+		w.draw(a)
 	}
-	w.loadPageMode(a)
-	return w
 }
 
 // loadPageMode takes the book's way of showing its pages, as kept.
@@ -385,6 +429,8 @@ func (w *bookWin) draw(a *bro) {
 		w.drawStyle(a)
 	case w.list:
 		w.drawList(a)
+	case w.opening:
+		a.C.Text(a.F.Body, image.Rect(w.area.Min.X, w.area.Min.Y, w.area.Max.X, w.area.Min.Y+40), "opening "+filepath.Base(w.path)+"…", kobo.Mid, kobo.AlignLeft)
 	case w.err != "" && w.b == nil:
 		a.C.Text(a.F.Body, image.Rect(w.area.Min.X, w.area.Min.Y, w.area.Max.X, w.area.Min.Y+40), "can't read it: "+w.err, kobo.Dark, kobo.AlignLeft)
 	default:
@@ -994,6 +1040,7 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 }
 
 func (w *bookWin) closing(a *bro) {
+	w.gone = true
 	w.save(a)
 	if w.pdf != nil {
 		w.pdf.Close()

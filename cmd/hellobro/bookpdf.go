@@ -74,33 +74,26 @@ func (w *bookWin) viewAt(p image.Point) (pdfView, bool) {
 
 func isPDF(path string) bool { return strings.HasSuffix(strings.ToLower(path), ".pdf") }
 
-// openPDF opens w's PDF and makes its book: a chapter a page, the
-// outline its contents.
-func (a *bro) openPDF(w *bookWin) {
-	d, err := pdf.Open(w.path)
+// openPDF opens the PDF at path and makes its book: a chapter a page,
+// the outline its contents. Away from the main loop: it touches nothing
+// of a window's.
+func openPDF(path string) (*pdf.Doc, *book.Book, error) {
+	d, err := pdf.Open(path)
 	if err != nil {
-		w.err = err.Error()
-		log.Printf("pdf: %s: %v", w.path, err)
-		return
+		return nil, nil, err
 	}
 	n := d.Pages()
 	b := &book.Book{Title: d.Title(), Spine: make([]string, n)}
 	if b.Title == "" {
-		b.Title = strings.TrimSuffix(filepath.Base(w.path), filepath.Ext(w.path))
+		b.Title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	}
 	for _, e := range d.Outline() {
 		if e.Page < n {
 			b.TOC = append(b.TOC, book.TOCEntry{Title: e.Title, Spine: e.Page, Depth: e.Depth})
 		}
 	}
-	w.pdf, w.b = d, b
-	w.loadPageMode(a)
-	w.loadZoom(a)
-	if pl, ok := a.mem.Books[w.path]; ok && pl.Spine < n {
-		w.spine, w.at = pl.Spine, book.Pos{Block: pl.Block, Off: pl.Off}
-		w.panned = w.zoom > pdfZoomMin // zoomed: just where it was, maybe moved by a finger
-	}
-	log.Printf("pdf: %s: %d pages, %d in the outline", filepath.Base(w.path), n, len(b.TOC))
+	log.Printf("pdf: %s: %d pages, %d in the outline", filepath.Base(path), n, len(b.TOC))
+	return d, b, nil
 }
 
 // pdfDraw draws page spine of d for a layout: away from the main loop,
