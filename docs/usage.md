@@ -555,7 +555,8 @@ and for PDFs, drawn by MuPDF (below).
   back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
   k, h (back). Home and End go to the chapter's start and end.
 - Under the page are three buttons: **☰** the contents, **Aa** the
-  style panel, and a ribbon for a bookmark.
+  style panel, and a ribbon for a bookmark (a PDF's has two more: the
+  select tool and a pen, below).
 - **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
   (tap one), the size, the lines' spacing, the margins (± each),
   justified and hyphenation (on / off), and a paragraph set as the books
@@ -612,6 +613,10 @@ or Esc, to put it down. Under the rectangle:
 - **×**, a tap elsewhere or Esc takes it away, as does turning the page.
 
 A scanned page has no text: copy and save keep it as a picture.
+
+The pen in the strip under a PDF's page writes on it: it opens the
+PDF's notebook at that page, made the first time, its pages the PDF's
+([Notebooks](#notebooks)).
 
 The layout is the `book` package's: lines broken at spaces and after
 dashes, justified where the book says, a little of the book's CSS
@@ -698,9 +703,25 @@ the launcher has them too, the last three written.
   `Notebooks/NAME.xopp` on the Kobo's storage: over USB, or file
   sharing (`sftp kobo.local`). A notebook's window comes back with the
   others.
+- A PDF written on: the pen under its page in the reader ([Books](#books))
+  opens its notebook, named as the PDF (`NAME (2)` if a notebook of
+  that name is something else), at that page. Each page is the PDF's,
+  as big as it is, drawn under the ink (blank a moment the first time:
+  MuPDF takes most of a second a page). The pages strip, select, paste
+  and the pens work as on paper; a page put in is plain paper. In the
+  `.xopp` the PDF is each page's background as Xournal++ has it, so it
+  opens there too (it asks where the PDF is, if it's not at the Kobo's
+  path).
+- **export** (or Ctrl+E) writes the notebook as a PDF next to its
+  `.xopp`, `Notebooks/NAME.pdf`: a picture of each page at 200 dpi, gray,
+  to send, print, or hand an LLM. All the pages to the last written
+  on; a PDF's notebook, only the pages written on. The page shown goes
+  to `Clips/NAME pN.png` and `Clips/latest.png` too, as a PDF's cut
+  does, for a program in Alpine to take. It's done aside; a note says
+  when it's written.
 - `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
   on a computer to go on writing, add text, or export a PDF. What
-  hellobro doesn't draw yet (text, a PDF under the page) stays as it was when it writes the notebook again; only the
+  hellobro doesn't draw yet (text, a picture background) stays as it was when it writes the notebook again; only the
   layers become one. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
 
@@ -916,7 +937,7 @@ Kobo's storage:
 | `hellobro.json` | the saved SSH hosts, and how it was left: the windows (each terminal's font size with it), the light, the font size for new terminals |
 | `ssh.conf.old` | the hosts as kept before, taken in once |
 | `keys.conf` | the keys ([Keys](#keys)) |
-| `clipboard`, `clipboard.png` | what's copied, and the picture of a PDF's part copied ([Copy and paste](#copy-and-paste), [Notebooks](#notebooks)) |
+| `clipboard`, `clipboard.png`, `clipboard.xopp` | what's copied, the picture of a PDF's part copied, and ink copied from a notebook ([Copy and paste](#copy-and-paste), [Notebooks](#notebooks)) |
 | `notebooks/NAME.hbnote` | the first notebooks, till they're opened: then they're `Notebooks/NAME.xopp` on the Kobo's storage ([Notebooks](#notebooks)) |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |

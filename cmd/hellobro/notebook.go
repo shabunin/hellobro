@@ -311,11 +311,14 @@ type noteWin struct {
 	mark       *noteMark // where the next paste goes
 	penMenu    bool      // the pen's choices out (notepen.go)
 	penOpts    []noteBtn
-	overview   bool       // the pages shown small (notepages.go)
-	ovSel      int        // the page chosen there
-	ovFirst    int        // the first shown
-	undo, redo [][]noteOp // each step's changes
-	changed    time.Time  // not kept since; zero: kept
+	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
+	slotSize   image.Point // the page size the slots are for
+	exporting  bool        // a PDF of it being written (noteexport.go)
+	overview   bool        // the pages shown small (notepages.go)
+	ovSel      int         // the page chosen there
+	ovFirst    int         // the first shown
+	undo, redo [][]noteOp  // each step's changes
+	changed    time.Time   // not kept since; zero: kept
 
 	p     kobo.Panel
 	bar   image.Rectangle // the tools' strip
@@ -356,18 +359,18 @@ const (
 	noteSpread = 0.8 // two pages side by side, if they're this big as one alone would be, or more
 )
 
-// noteSlots fits the pages into area: one, or two side by side if
-// there's room for two nearly as big (a landscape screen). It gives
-// where they go, and the scale.
-func noteSlots(area image.Rectangle) ([]image.Rectangle, float64) {
-	h := float64(area.Dy()) / notePageH
-	one := math.Min(float64(area.Dx())/notePageW, h)
-	two := math.Min(float64(area.Dx()-noteGap)/(2*notePageW), h)
+// noteSlots fits pages of size (page units) into area: one, or two side
+// by side if there's room for two nearly as big (a landscape screen).
+// It gives where they go, and the scale.
+func noteSlots(area image.Rectangle, size image.Point) ([]image.Rectangle, float64) {
+	h := float64(area.Dy()) / float64(size.Y)
+	one := math.Min(float64(area.Dx())/float64(size.X), h)
+	two := math.Min(float64(area.Dx()-noteGap)/float64(2*size.X), h)
 	n, scale := 1, one
 	if two >= noteSpread*one {
 		n, scale = 2, two
 	}
-	pw, ph := int(notePageW*scale), int(notePageH*scale)
+	pw, ph := int(float64(size.X)*scale), int(float64(size.Y)*scale)
 	x := area.Min.X + (area.Dx()-n*pw-(n-1)*noteGap)/2
 	y := area.Min.Y + (area.Dy()-ph)/2
 	var slots []image.Rectangle
@@ -389,7 +392,8 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 	}
 	b := p.Body.Inset(kobo.Pad / 2)
 	w.bar = image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+h)
-	w.slots, w.scale = noteSlots(image.Rect(b.Min.X, w.bar.Max.Y+kobo.Pad/2, b.Max.X, b.Max.Y))
+	w.slotSize = w.pageSize(w.cur)
+	w.slots, w.scale = noteSlots(image.Rect(b.Min.X, w.bar.Max.Y+kobo.Pad/2, b.Max.X, b.Max.Y), w.slotSize)
 	w.layBar(a)
 }
 
@@ -434,8 +438,8 @@ func (w *noteWin) layBar(a *bro) {
 	if w.shown() == 2 {
 		clear = "clear pages"
 	}
-	tools := []noteBtn{{id: "pen", label: a.penLabel()}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper", label: w.nb.paper}}
-	drops := []string{"paper", "redo", "paste", "clear"}
+	tools := []noteBtn{{id: "pen", label: a.penLabel()}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper", label: w.nb.paper}, {id: "export"}}
+	drops := []string{"paper", "export", "redo", "paste", "clear"}
 	if w.overview {
 		tools = []noteBtn{{id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
 		drops = []string{"undo", "copy page", "new before"}
@@ -484,6 +488,7 @@ func (w *noteWin) draw(a *bro) {
 	if w.p.Outer.Empty() {
 		return
 	}
+	w.fitSlots(a)
 	pn := w.panel(a)
 	a.DrawPanel(pn, "")
 	w.drawBar(a)
@@ -561,29 +566,8 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 	area := image.Rect(w.p.Body.Min.X, w.bar.Max.Y, w.p.Body.Max.X, w.p.Body.Max.Y).Intersect(clip)
 	c.Fill(area, kobo.White)
 	for i, pg := range w.slots {
-		cl := clip.Intersect(pg)
-		if cl.Empty() {
-			continue
-		}
-		switch w.nb.paper {
-		case "squares":
-			for u := noteRule; u < notePageW; u += noteRule {
-				x := pg.Min.X + int(float64(u)*w.scale)
-				c.Fill(image.Rect(x, pg.Min.Y, x+1, pg.Max.Y).Intersect(cl), kobo.Light)
-			}
-			fallthrough
-		case "lines":
-			for u := 2 * noteRule; u < notePageH; u += noteRule {
-				y := pg.Min.Y + int(float64(u)*w.scale)
-				c.Fill(image.Rect(pg.Min.X, y, pg.Max.X, y+1).Intersect(cl), kobo.Light)
-			}
-		}
-		for l := range 3 {
-			for _, s := range w.strokes(w.cur + i) {
-				if strokeLayer(s) == l && w.toScreenRect(s.box, pg).Overlaps(cl) {
-					w.drawStroke(a, s, pg, cl)
-				}
-			}
+		if cl := clip.Intersect(pg); !cl.Empty() {
+			w.drawPage(a, w.cur+i, pg, cl, true) // notepdf.go
 		}
 	}
 	if all := w.pages(); len(w.slots) > 1 || all.Max.X < w.p.Body.Max.X-kobo.Pad || all.Min.X > w.p.Body.Min.X+kobo.Pad { // two, or narrower than the window: the pages' edges
@@ -644,9 +628,18 @@ func (w *noteWin) show(a *bro) {
 	if !a.shows(w) {
 		return
 	}
+	w.fitSlots(a)
 	w.drawBar(a)
 	w.drawPages(a, w.paperArea()) // the pen's choices too, by the pages
 	a.Mark(image.Rect(w.p.Body.Min.X, w.bar.Min.Y, w.p.Body.Max.X, w.p.Body.Max.Y), true)
+}
+
+// fitSlots lays the pages out again if the page shown is another size
+// than they're laid out for (a PDF's).
+func (w *noteWin) fitSlots(a *bro) {
+	if !w.overview && w.pageSize(w.cur) != w.slotSize {
+		w.place(a, w.p)
+	}
 }
 
 // edited notes a change made: to undo, and to keep.
@@ -763,6 +756,8 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 			w.show(a)
 		case "paste":
 			w.paste(a)
+		case "export":
+			w.export(a)
 		case "open", "new before", "new after", "copy page", "delete", "earlier", "later":
 			w.pageAct(a, b.id)
 		case "prev":
@@ -809,6 +804,8 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		w.doUndo(a, false)
 	case m.ctrl && code == keyV:
 		w.paste(a)
+	case m.ctrl && code == keyE:
+		w.export(a)
 	case len(w.sel) > 0 && (code == keyDelete || code == kobo.KeyBackspace):
 		w.deleteSel(a)
 	case len(w.sel) > 0 && m.ctrl && (code == keyC || code == keyX || code == keyD):
@@ -831,6 +828,7 @@ func (w *noteWin) closing(a *bro) {
 		a.Ink(false)
 	}
 	w.keep(a)
+	w.closePDF()
 	w.place(a, kobo.Panel{})
 }
 

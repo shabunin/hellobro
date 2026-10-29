@@ -75,10 +75,11 @@ func (w *noteWin) ovLayout() ([]image.Rectangle, int) {
 	}
 	cols := max(2, (area.Dx()+noteThumbGap)/(noteThumbW+noteThumbGap))
 	tw := (area.Dx() - (cols-1)*noteThumbGap) / cols
-	th := tw * notePageH / notePageW
+	size := w.pageSize(0)
+	th := tw * size.Y / size.X
 	if th+noteThumbLab > area.Dy() { // a short window: one row, as tall as it goes
 		th = area.Dy() - noteThumbLab
-		tw = th * notePageW / notePageH
+		tw = th * size.X / size.Y
 		cols = max(1, (area.Dx()+noteThumbGap)/(tw+noteThumbGap))
 	}
 	rows := max(1, (area.Dy()+noteThumbGap)/(th+noteThumbLab+noteThumbGap))
@@ -145,15 +146,8 @@ func (w *noteWin) drawOverview(a *bro, clip image.Rectangle) {
 			c.Text(a.F.Small, t, "+ new page", kobo.Dark, kobo.AlignCenter)
 			continue
 		}
-		w.scale = float64(t.Dx()) / notePageW
-		cl := t.Intersect(clip)
-		for l := range 3 {
-			for _, s := range w.strokes(n) {
-				if strokeLayer(s) == l {
-					w.drawStroke(a, s, t, cl)
-				}
-			}
-		}
+		w.scale = float64(t.Dx()) / float64(w.pageSize(n).X)
+		w.drawPage(a, n, t, t.Intersect(clip), false)
 		frame, ink := 1, uint8(kobo.Mid)
 		if n == w.ovSel {
 			frame, ink = 5, kobo.Black

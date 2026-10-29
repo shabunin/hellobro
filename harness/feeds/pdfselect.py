@@ -17,7 +17,7 @@ start()
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
 fullscreen(); time.sleep(5)
-tool = (W // 2 + 150, H - 75)                        # the fourth of the strip's buttons, over the status bar
+tool = (W // 2 + 100, H - 75)                        # the fourth of five buttons under a PDF, over the status bar
 tap(*tool); time.sleep(3)
 half = int(min(W, H) * 0.2)
 x0, y0, x1, y1 = W // 2 - half, int(H * 0.30), W // 2 + half, int(H * 0.42)

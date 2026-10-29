@@ -177,7 +177,7 @@ func TestNoteSlots(t *testing.T) {
 		{image.Rect(0, 0, 1388, 860), 2},  // portrait, the top half: wide
 		{image.Rect(0, 0, 1388, 1500), 1}, // a little short
 	} {
-		slots, scale := noteSlots(tc.area)
+		slots, scale := noteSlots(tc.area, image.Pt(notePageW, notePageH))
 		if len(slots) != tc.n {
 			t.Errorf("%v: %d pages, want %d (scale %.2f)", tc.area, len(slots), tc.n, scale)
 		}

@@ -157,28 +157,30 @@ func (w *bookWin) deleteMark(a *bro, i int) {
 const footButton = 100 // a button's width
 
 // footButtons are the strip's buttons: the contents, the style, a
-// bookmark, and in a PDF the select tool (bookcut.go), side by side in
-// its middle.
-func (w *bookWin) footButtons() (toc, style, mark, sel image.Rectangle) {
+// bookmark, and in a PDF the select tool (bookcut.go) and the pen, to
+// write on it (notepdf.go), side by side in its middle; narrower in a
+// narrow window, room left for the chapter and how far in.
+func (w *bookWin) footButtons() (toc, style, mark, sel, write image.Rectangle) {
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y)
 	n := 3
 	if w.pdf != nil {
-		n = 4
+		n = 5
 	}
-	x := (foot.Min.X+foot.Max.X)/2 - n*footButton/2
-	bs := make([]image.Rectangle, 4)
+	bw := max(56, min(footButton, (foot.Dx()-2*90)/n))
+	x := (foot.Min.X+foot.Max.X)/2 - n*bw/2
+	bs := make([]image.Rectangle, 5)
 	for i := range n {
-		bs[i] = image.Rect(x+i*footButton, foot.Min.Y, x+(i+1)*footButton, foot.Max.Y)
+		bs[i] = image.Rect(x+i*bw, foot.Min.Y, x+(i+1)*bw, foot.Max.Y)
 	}
-	return bs[0], bs[1], bs[2], bs[3]
+	return bs[0], bs[1], bs[2], bs[3], bs[4]
 }
 
 // drawFoot draws the strip: the chapter, the buttons, how far in.
 func (w *bookWin) drawFoot(a *bro) {
 	c := a.C
-	toc, style, mark, sel := w.footButtons()
+	toc, style, mark, sel, write := w.footButtons()
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
-	last := mark.Union(sel)
+	last := mark.Union(sel).Union(write)
 	name := w.chapterName()
 	if w.pdf != nil {
 		name = w.pdfFootName()
@@ -205,6 +207,12 @@ func (w *bookWin) drawFoot(a *bro) {
 		for _, p := range []image.Point{r.Min, {r.Max.X - 1, r.Min.Y}, r.Max.Sub(image.Pt(1, 1)), {r.Min.X, r.Max.Y - 1}} {
 			c.Disc(p, 4, ink, sel)
 		}
+	}
+	if !write.Empty() { // a pen, slanted: to write on the page
+		m = write.Min.Add(write.Max).Div(2)
+		c.Line(image.Pt(m.X-9, m.Y+9), image.Pt(m.X+11, m.Y-11), 4, kobo.Dark, write)
+		c.Line(image.Pt(m.X-15, m.Y+15), image.Pt(m.X-9, m.Y+9), 1, kobo.Dark, write)
+		c.Fill(image.Rect(m.X-16, m.Y+17, m.X+6, m.Y+19), kobo.Dark)
 	}
 }
 
@@ -247,8 +255,11 @@ func ribbon(c kobo.Canvas, r image.Rectangle, filled bool, g uint8) {
 // footTap does what a tap at p on the strip under the page asks, if
 // it's on a button.
 func (w *bookWin) footTap(a *bro, p image.Point) bool {
-	toc, style, mark, sel := w.footButtons()
+	toc, style, mark, sel, write := w.footButtons()
 	switch {
+	case p.In(write):
+		log.Printf("pdf: write on page %d", w.spine+1)
+		a.writePDF(w.path, w.spine)
 	case p.In(sel):
 		w.selecting = !w.selecting
 		w.dropCut()

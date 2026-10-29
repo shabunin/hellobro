@@ -502,7 +502,7 @@ func (w *noteWin) replaceSel(page int, made []*noteStroke, what string) {
 	if len(w.sel) == 0 || len(made) == 0 {
 		return
 	}
-	if d := into(boxOf(made), image.Rect(0, 0, notePageW, notePageH)); d != (image.Point{}) {
+	if d := into(boxOf(made), w.pageBounds(page)); d != (image.Point{}) {
 		for i, s := range made {
 			made[i] = s.moved(d)
 		}
@@ -688,7 +688,7 @@ func (w *noteWin) duplicateSel() {
 
 // addTaken puts made on page, kept on it, as one change, and takes it.
 func (w *noteWin) addTaken(page int, made []*noteStroke, what string) {
-	if d := into(boxOf(made), image.Rect(0, 0, notePageW, notePageH)); d != (image.Point{}) {
+	if d := into(boxOf(made), w.pageBounds(page)); d != (image.Point{}) {
 		for i, s := range made {
 			made[i] = s.moved(d)
 		}
@@ -762,7 +762,7 @@ func (w *noteWin) pasteWhere(size image.Point) (int, image.Rectangle) {
 	page, box := w.pastePlace(size)
 	if m := w.mark; m != nil {
 		page, box = m.page, image.Rectangle{Max: box.Size()}.Add(m.at)
-		box = box.Add(into(box, image.Rect(0, 0, notePageW, notePageH)))
+		box = box.Add(into(box, w.pageBounds(m.page)))
 		w.mark = nil
 	}
 	return page, box
