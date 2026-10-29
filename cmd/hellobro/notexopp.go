@@ -213,7 +213,7 @@ func (nb *notebook) xoppText() []byte {
 	}
 	style := map[string]string{"squares": "graph", "lines": "ruled", "plain": "plain"}[nb.paper]
 	for i, strokes := range nb.pages[:n] {
-		pg := notePage{w: math.Round(notePageW*notePt72*100) / 100, h: math.Round(notePageH*notePt72*100) / 100}
+		pg := defaultMeta()
 		if i < len(nb.meta) {
 			pg = nb.meta[i]
 		}

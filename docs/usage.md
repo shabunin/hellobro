@@ -644,6 +644,15 @@ the launcher has them too, the last three written.
   last page, if it has something on it, a new page. Once a pen has
   written, a finger swiped across the page turns it too (leftward: the
   next, as pages turn).
+- The page counter between the arrows (or O) shows all the pages
+  small, a screenful at a time (the arrows, PgUp, PgDn or a finger
+  swiped across for more), and a **+ new page** tile after the last.
+  Tap a page to choose it (or the arrow keys), again to open it (or
+  Enter, or **open**). The strip has then: **new before**, **new
+  after**, **copy page** (a copy after it), **delete** (or Delete; the
+  only page is cleared instead), **earlier** and **later** (moving
+  it), and **undo**: each is undone like a stroke. The counter again,
+  or O, goes back to the page.
 - Till then fingers write: a stylus without a battery (or a Kobo Stylus
   with a flat one) is a finger to the screen. A pen seen once is
   remembered (`pen` in `hellobro.json`); take it out to write with

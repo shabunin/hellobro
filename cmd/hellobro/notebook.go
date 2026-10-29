@@ -247,14 +247,25 @@ func newNoteName(now time.Time, taken func(string) bool) string {
 // --- editing ---
 
 // noteOp is a change to a page, to undo and redo: strokes added, or
-// taken away.
+// taken away; or the page put in (its strokes add) or taken out
+// (notepages.go).
 type noteOp struct {
+	kind     int // pageStrokes, pageIns, pageDel
 	page     int
 	add, del []*noteStroke
+	meta     notePage // a page put in or taken out: the rest of it
 }
 
 // apply makes op on nb, or undoes it.
 func (nb *notebook) apply(op noteOp, undo bool) {
+	if op.kind != pageStrokes {
+		if (op.kind == pageIns) != undo {
+			nb.insertPage(op.page, op.add, op.meta)
+		} else {
+			nb.removePage(op.page)
+		}
+		return
+	}
 	add, del := op.add, op.del
 	if undo {
 		add, del = del, add
@@ -300,6 +311,9 @@ type noteWin struct {
 	mark       *noteMark // where the next paste goes
 	penMenu    bool      // the pen's choices out (notepen.go)
 	penOpts    []noteBtn
+	overview   bool       // the pages shown small (notepages.go)
+	ovSel      int        // the page chosen there
+	ovFirst    int        // the first shown
 	undo, redo [][]noteOp // each step's changes
 	changed    time.Time  // not kept since; zero: kept
 
@@ -399,8 +413,12 @@ func (w *noteWin) strokes(n int) []*noteStroke {
 	return nil
 }
 
-// counter says which pages show, of how many.
+// counter says which pages show, of how many; in the overview, which
+// is chosen.
 func (w *noteWin) counter() string {
+	if w.overview {
+		return fmt.Sprintf("%d / %d", w.ovSel+1, len(w.nb.pages))
+	}
 	n := w.shown()
 	all := max(len(w.nb.pages), w.cur+n)
 	if n == 2 {
@@ -417,6 +435,11 @@ func (w *noteWin) layBar(a *bro) {
 		clear = "clear pages"
 	}
 	tools := []noteBtn{{id: "pen", label: a.penLabel()}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper", label: w.nb.paper}}
+	drops := []string{"paper", "redo", "paste", "clear"}
+	if w.overview {
+		tools = []noteBtn{{id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
+		drops = []string{"undo", "copy page", "new before"}
+	}
 	pages := []noteBtn{{id: "prev"}, {id: "next"}}
 	width := func(b noteBtn) int { return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8) }
 	for i := range tools {
@@ -430,7 +453,7 @@ func (w *noteWin) layBar(a *bro) {
 		counter = kobo.TextWidth(a.F.Small, "999–999 / 999")
 	}
 	room := w.bar.Dx() - width(pages[0]) - width(pages[1]) - counter - 4*gap
-	for _, drop := range []string{"paper", "redo", "paste", "clear"} {
+	for _, drop := range drops {
 		need := 0
 		for _, t := range tools {
 			need += width(t) + gap
@@ -482,6 +505,9 @@ func (w *noteWin) drawBar(a *bro) {
 		on := b.id == "pen" && !w.erasing && !w.selecting || b.id == "eraser" && w.erasing || b.id == "select" && w.selecting
 		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 ||
 			b.id == "prev" && w.cur == 0 || b.id == "next" && w.turnTo(1) < 0
+		if w.overview && b.id != "undo" {
+			off = w.ovOff(b.id)
+		}
 		bg, ink := uint8(kobo.White), uint8(kobo.Black)
 		switch {
 		case on:
@@ -504,15 +530,33 @@ func (w *noteWin) drawBar(a *bro) {
 			}
 		}
 	}
-	if n := len(w.btns); n >= 2 {
-		r := image.Rect(w.btns[n-1].r.Max.X, w.bar.Min.Y, w.btns[n-2].r.Min.X, w.bar.Max.Y)
-		c.Text(a.F.Small, r, w.counter(), kobo.Black, kobo.AlignCenter)
+	if r := w.counterRect(); !r.Empty() { // a button too: the pages, small
+		bg, ink := uint8(kobo.White), uint8(kobo.Black)
+		if w.overview {
+			bg, ink = kobo.Black, kobo.White
+		}
+		c.Fill(r, bg)
+		c.Frame(r, 2, kobo.Black)
+		c.Text(a.F.Small, r, w.counter(), ink, kobo.AlignCenter)
 	}
+}
+
+// counterRect is the page counter's, between the arrows.
+func (w *noteWin) counterRect() image.Rectangle {
+	n := len(w.btns)
+	if n < 2 {
+		return image.Rectangle{}
+	}
+	return image.Rect(w.btns[n-1].r.Max.X+6, w.bar.Min.Y+4, w.btns[n-2].r.Min.X-6, w.bar.Max.Y-4)
 }
 
 // drawPages draws the pages where they're in clip: the paper, then the
 // strokes over it.
 func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
+	if w.overview {
+		w.drawOverview(a, clip)
+		return
+	}
 	c := a.C
 	area := image.Rect(w.p.Body.Min.X, w.bar.Max.Y, w.p.Body.Max.X, w.p.Body.Max.Y).Intersect(clip)
 	c.Fill(area, kobo.White)
@@ -534,18 +578,9 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 				c.Fill(image.Rect(pg.Min.X, y, pg.Max.X, y+1).Intersect(cl), kobo.Light)
 			}
 		}
-		layer := func(s *noteStroke) int { // the pictures under the markers, under the ink
-			switch {
-			case s.pic != nil:
-				return 0
-			case s.marker:
-				return 1
-			}
-			return 2
-		}
 		for l := range 3 {
 			for _, s := range w.strokes(w.cur + i) {
-				if layer(s) == l && w.toScreenRect(s.box, pg).Overlaps(cl) {
+				if strokeLayer(s) == l && w.toScreenRect(s.box, pg).Overlaps(cl) {
 					w.drawStroke(a, s, pg, cl)
 				}
 			}
@@ -559,6 +594,18 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 	}
 	w.drawSel(a, clip)
 	w.drawPenMenu(a, clip)
+}
+
+// strokeLayer is which s is drawn with: the pictures under the
+// markers, under the ink.
+func strokeLayer(s *noteStroke) int {
+	switch {
+	case s.pic != nil:
+		return 0
+	case s.marker:
+		return 1
+	}
+	return 2
 }
 
 // toScreen is p of the page at on screen.
@@ -627,6 +674,10 @@ func (w *noteWin) turnTo(by int) int {
 }
 
 func (w *noteWin) turn(a *bro, by int) {
+	if w.overview {
+		w.ovTurn(a, by)
+		return
+	}
 	n := w.turnTo(by)
 	if n < 0 {
 		return
@@ -648,7 +699,7 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 	}
 	ops := (*from)[len(*from)-1]
 	*from = (*from)[:len(*from)-1]
-	w.sel = nil // what it took may be gone, or back
+	w.sel, w.mark = nil, nil // what it took may be gone, or back
 	*to = append(*to, ops)
 	for i := range ops {
 		if undo {
@@ -657,7 +708,11 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 			w.nb.apply(ops[i], false)
 		}
 	}
-	if pg := ops[0].page; pg < w.cur || pg >= w.cur+w.shown() { // where it was: in sight
+	if pg := min(ops[0].page, len(w.nb.pages)-1); w.overview { // where it was: in sight
+		w.ovSel = pg
+		w.ovShow()
+		w.place(a, w.p)
+	} else if pg < w.cur || pg >= w.cur+w.shown() {
 		w.cur = pg
 	}
 	w.changed = time.Now()
@@ -665,6 +720,10 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 }
 
 func (w *noteWin) tap(a *bro, p image.Point) {
+	if kobo.Hit(p, w.counterRect()) {
+		w.overviewOn(a, !w.overview)
+		return
+	}
 	for _, b := range w.btns {
 		if !kobo.Hit(p, b.r) {
 			continue
@@ -704,6 +763,8 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 			w.show(a)
 		case "paste":
 			w.paste(a)
+		case "open", "new before", "new after", "copy page", "delete", "earlier", "later":
+			w.pageAct(a, b.id)
 		case "prev":
 			w.turn(a, -1)
 		case "next":
@@ -720,6 +781,7 @@ const (
 	keyC = 46
 	keyX = 45
 	keyD = 32
+	keyO = 24
 	keyY = 21
 	keyV = 47
 )
@@ -729,6 +791,13 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		return false
 	}
 	m := a.tv.mods
+	if !m.ctrl && code == keyO {
+		w.overviewOn(a, !w.overview)
+		return true
+	}
+	if w.overview && !m.ctrl && w.ovKey(a, code) {
+		return true
+	}
 	switch {
 	case code == keyLeft || code == keyPgUp || code == keyUp:
 		w.turn(a, -1)
@@ -795,6 +864,13 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		}
 		w.closePenMenu(a)
 	}
+	if w.overview { // the pages, small: a tap or a swipe
+		if !p.In(w.paperArea()) || !ev.Pen && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
+			return false
+		}
+		g.Owner = ownNoteOv
+		return true
+	}
 	if w.selecting && p.In(w.selArea(a)) { // what's taken: its dots and buttons, by the edges too
 		return a.noteSelTouch(w, -1, p, g)
 	}
@@ -848,7 +924,7 @@ func (a *bro) notePressure(ev kobo.TouchEv) int32 {
 func (a *bro) noteMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	k := a.nt.ink
 	switch g.Owner {
-	case ownLeaf:
+	case ownLeaf, ownNoteOv:
 		return true
 	case ownNoteSel:
 		a.noteDragTo(p, g)
@@ -940,6 +1016,18 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		return true
 	case ownNoteSel:
 		a.noteDragEnd(g)
+		return true
+	case ownNoteOv:
+		if w, ok := a.windowAt(g.Start).(*noteWin); ok && w.overview {
+			a.noteFocus(w)
+			dx, dy := g.Last.X-g.Start.X, g.Last.Y-g.Start.Y
+			switch {
+			case kobo.Abs(dx) > noteSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy):
+				w.ovTurn(a, map[bool]int{true: 1, false: -1}[dx < 0])
+			case g.Moved < noteSelStill:
+				w.ovTap(a, g.Last)
+			}
+		}
 		return true
 	case ownInk:
 	default:
