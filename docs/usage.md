@@ -546,10 +546,19 @@ hellobro has a reader of its own for EPUBs, set in the Kobo's fonts
 italics), with the book's pictures, headings, italics and centred text;
 and for PDFs, drawn by MuPDF (below).
 
-- Open the shelf from a new window ("Books… (tap here)") or the
-  switcher (**Books**). It lists the EPUBs anywhere on the Kobo but its
-  dot folders, the last read first, with how far in you are.
+- Open the shelf, **All Books**, from a new window ("Books… (tap here)")
+  or the switcher (**Books**). It has the EPUBs and PDFs anywhere on
+  the Kobo but its dot folders, in three tabs: **Recent** (the last read
+  first, then the rest by name), **All** (by name) and **Folders** (a
+  folder at a time: its folders first, each with how many books are in
+  it, then its books; the top row goes up a folder). Tab goes to the
+  next tab, Backspace up a folder; the tab and the folder are kept.
+  Beside a book read is how far in you are.
 - Tap a book, or pick it with ↑ ↓ and Enter. It opens where you left it.
+- The book's lists and panels (its contents, bookmarks, pages and
+  style) all have the same header: **‹ All Books** at the top left, the
+  shelf, and **back to the book** at the top right. The shelf opened
+  from a book has **back to the book** in the same place (or Esc).
 - Turn pages by tapping the right two thirds (on) or the left third
   (back), by a swipe across the page (to the left on, to the right
   back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
@@ -563,13 +572,13 @@ and for PDFs, drawn by MuPDF (below).
   kept with its place: one page, two side by side, or two if wide: two
   when the window is wider than tall, a landscape screen), and a
   paragraph set as the books will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
-  switch; Esc, s or "back to the book" leaves it. Every book takes it;
+  switch; Esc, s or "back to the book" (at the top right) leaves it. Every book takes it;
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
   **f** (Shift+F back) goes through the fonts.
 - **t**, Enter, **☰** or a tap at the top shows the contents: pick a
   chapter, or swipe up and down for more. Esc or "back to the book"
-  leaves them, "‹ books" goes to the shelf (on a page, Esc does too).
+  leaves them, "‹ All Books" goes to the shelf (on a page, Esc does too).
 - **b**, a tap on the ribbon or on the page's top right corner
   bookmarks the page (a ribbon hangs at
   its top right then), or takes its bookmark away. The contents' second

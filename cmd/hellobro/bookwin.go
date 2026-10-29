@@ -2,7 +2,8 @@ package main
 
 // The reader: a book in a window, a page at a time, in the Kobo's own
 // fonts (bookfonts.go), laid out by package book. Without a book it's
-// the shelf: the EPUBs on the Kobo, the last read first. Where each
+// the shelf, All Books: the EPUBs and PDFs on the Kobo, in tabs, the
+// last read first, all by name, or a folder at a time (library.go). Where each
 // book was left is kept in hellobro.json, as a place in a chapter, so a
 // new size or font finds the page again.
 
@@ -186,7 +187,10 @@ type bookWin struct {
 	listN      int // the rows the list has room for
 	rows       []bookRow
 	shelf      []shelfBook
-	looking    bool // the shelf is being looked for
+	looking    bool   // the shelf is being looked for
+	shelfTab   int    // its tab: libRecent, libAll, libFolders
+	shelfDir   string // the folder it shows, under booksRoot
+	back       string // the book it was opened from, to go back to
 }
 
 func (w *bookWin) Title() string {
@@ -211,6 +215,7 @@ func (a *bro) newBookWin(path string) *bookWin {
 	w := &bookWin{path: path}
 	if path == "" {
 		w.list = true
+		w.shelfTab, w.shelfDir = max(0, min(libFolders, a.mem.ShelfTab)), a.mem.ShelfDir
 		a.findBooks(w)
 		return w
 	}
@@ -464,15 +469,52 @@ func (w *bookWin) chapterName() string {
 
 // --- lists: the contents, the shelf ---
 
+// shelfItems are the shelf's rows, as its tab and folder have them.
+func (w *bookWin) shelfItems() []libItem {
+	root := booksRoot()
+	var es []libEntry
+	for _, b := range w.shelf {
+		rel, err := filepath.Rel(root, b.path)
+		if err != nil {
+			rel = filepath.Base(b.path)
+		}
+		e := libEntry{key: b.path, rel: filepath.ToSlash(rel), name: b.name, at: b.read}
+		if b.read > 0 {
+			e.note = fmt.Sprintf("%d%%", b.pct)
+		}
+		es = append(es, e)
+	}
+	return libView(es, w.shelfTab, w.shelfDir)
+}
+
+// shelfGo shows the shelf's tab, in folder dir; the choice at the top.
+func (w *bookWin) shelfGo(a *bro, tab int, dir string) {
+	w.shelfTab, w.shelfDir, w.sel, w.top = tab, dir, 0, 0
+	a.mem.ShelfTab, a.mem.ShelfDir = tab, dir
+	a.mem.save()
+	w.draw(a)
+}
+
+// toShelf puts the shelf where the book is, to come back to it.
+func (w *bookWin) toShelf(a *bro) {
+	w.save(a)
+	s := a.newBookWin("")
+	s.back = w.path
+	a.replaceWin(w, s)
+}
+
+// fromShelf goes back to the book the shelf was opened from.
+func (w *bookWin) fromShelf(a *bro) {
+	if w.back != "" {
+		a.replaceWin(w, a.newBookWin(w.back))
+	}
+}
+
 func (w *bookWin) listLines() []string {
 	var ls []string
 	if w.path == "" {
-		for _, b := range w.shelf {
-			s := b.name
-			if b.read > 0 {
-				s += fmt.Sprintf("   · %d%%", b.pct)
-			}
-			ls = append(ls, s)
+		for _, it := range w.shelfItems() {
+			ls = append(ls, it.name)
 		}
 		return ls
 	}
@@ -487,8 +529,13 @@ func (w *bookWin) listLines() []string {
 
 func (w *bookWin) listOpen(a *bro, i int) {
 	if w.path == "" {
-		if i < len(w.shelf) {
-			a.openBook(w, w.shelf[i].path)
+		items := w.shelfItems()
+		switch {
+		case i >= len(items):
+		case items[i].dir:
+			w.shelfGo(a, libFolders, items[i].key)
+		default:
+			a.openBook(w, items[i].key)
 		}
 		return
 	}
@@ -519,6 +566,10 @@ func (w *bookWin) listOpen(a *bro, i int) {
 }
 
 func (w *bookWin) drawList(a *bro) {
+	if w.path == "" {
+		w.drawShelf(a)
+		return
+	}
 	lines := w.listLines()
 	f := a.F.Body
 	rowH := max(64, kobo.TextWidth(f, "M")*2+10) // room for a finger
@@ -535,14 +586,9 @@ func (w *bookWin) drawList(a *bro) {
 	n := max(1, area.Dy()/rowH)
 	w.listN = n
 	if len(lines) == 0 {
-		msg := "no books here: put EPUBs on the Kobo (anywhere but its dot folders)"
-		switch {
-		case w.looking:
-			msg = "looking for books…"
-		case w.listMks:
+		msg := "no contents in this book"
+		if w.listMks {
 			msg = "no bookmarks yet: b, or the ribbon under the page"
-		case w.b != nil:
-			msg = "no contents in this book"
 		}
 		a.C.Text(f, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), msg, kobo.Dark, kobo.AlignLeft)
 		return
@@ -572,6 +618,44 @@ func (w *bookWin) drawList(a *bro) {
 		}
 		a.C.Text(f, text, lines[i], ink, kobo.AlignLeft)
 		w.rows = append(w.rows, bookRow{r, func() { w.listOpen(a, i) }})
+	}
+}
+
+// drawShelf draws the shelf: the header, its tab's rows.
+func (w *bookWin) drawShelf(a *bro) {
+	rowH := a.libRowH()
+	area := w.p.Body.Inset(kobo.Pad)
+	back := ""
+	if w.back != "" {
+		back = "back to the book"
+	}
+	h := a.drawLibHeader(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), "All Books", true,
+		func() { w.shelfGo(a, w.shelfTab, "") }, back, func() { w.fromShelf(a) },
+		libTabs(w.shelfTab, func(k int) { w.shelfGo(a, k, w.shelfDir) }))
+	w.rows = h.rows
+	area.Min.Y += rowH + 12
+	items := w.shelfItems()
+	n := max(1, area.Dy()/rowH)
+	w.listN = n
+	if len(items) == 0 {
+		msg := "no books here: put EPUBs or PDFs on the Kobo (anywhere but its dot folders)"
+		if w.looking {
+			msg = "looking for books…"
+		}
+		a.C.Text(a.F.Body, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), msg, kobo.Dark, kobo.AlignLeft)
+		return
+	}
+	w.sel = max(0, min(w.sel, len(items)-1))
+	if w.sel < w.top {
+		w.top = w.sel
+	} else if w.sel >= w.top+n {
+		w.top = w.sel - n + 1
+	}
+	w.top = max(0, min(w.top, len(items)-n))
+	for k := 0; k < n && w.top+k < len(items); k++ {
+		i := w.top + k
+		r := image.Rect(area.Min.X, area.Min.Y+k*rowH, area.Max.X, area.Min.Y+(k+1)*rowH)
+		w.rows = append(w.rows, a.drawLibRow(r, items[i], i == w.sel, func() { w.listOpen(a, i) })...)
 	}
 }
 
@@ -756,6 +840,15 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		case code == kobo.KeyEnter:
 			w.listOpen(a, w.sel)
 			return true
+		case code == kobo.KeyTab && w.path == "": // the shelf's next tab
+			w.shelfGo(a, (w.shelfTab+1)%len(libTabNames), w.shelfDir)
+			return true
+		case code == kobo.KeyBackspace && w.path == "" && w.shelfTab == libFolders && w.shelfDir != "": // up a folder
+			w.listOpen(a, 0)
+			return true
+		case code == kobo.KeyEsc && w.path == "" && w.back != "":
+			w.fromShelf(a)
+			return true
 		case code == kobo.KeyEsc && w.b != nil, ch == "t" && w.b != nil:
 			w.list = false
 		case code == kobo.KeyTab && w.b != nil && w.listMks && w.pdf != nil, ch == "o" && w.pdf != nil:
@@ -816,8 +909,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 	case ch == "o" && w.pdf != nil:
 		w.showPages(a)
 	case code == kobo.KeyEsc:
-		w.save(a)
-		a.replaceWin(w, a.newBookWin(""))
+		w.toShelf(a)
 	default:
 		return false
 	}

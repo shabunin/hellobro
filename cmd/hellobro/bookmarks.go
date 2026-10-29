@@ -333,22 +333,10 @@ func (w *bookWin) showList(a *bro, marks bool) {
 	w.draw(a)
 }
 
-// drawTabs draws the list's tabs in r: the contents, the bookmarks, a
-// PDF's pages (bookpages.go);
-// and at their right the way back to the page, for a finger.
+// drawTabs draws the list's header in r (library.go): All Books, the
+// tabs, the contents, the bookmarks, a PDF's pages (bookpages.go); and
+// at their right the way back to the page.
 func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
-	c := a.C
-	button := func(b image.Rectangle, label string, do func()) {
-		c.Frame(b, 2, kobo.Black)
-		c.Text(a.F.Panel, b, label, kobo.Black, kobo.AlignCenter)
-		w.rows = append(w.rows, bookRow{b, do})
-	}
-	shelf := image.Rect(r.Min.X, r.Min.Y, r.Min.X+min(150, r.Dx()/6), r.Max.Y-6)
-	button(shelf, "‹ books", func() { w.save(a); a.replaceWin(w, a.newBookWin("")) })
-	back := image.Rect(r.Max.X-min(260, r.Dx()/4), r.Min.Y, r.Max.X, r.Max.Y-6)
-	button(back, "back to the book", func() { w.list = false; w.draw(a) })
-	r.Min.X, r.Max.X = shelf.Max.X+16, back.Min.X-16
-	c.Fill(image.Rect(r.Min.X, r.Max.Y-2, r.Max.X, r.Max.Y), kobo.Light)
 	names := []string{"Contents", fmt.Sprintf("Bookmarks (%d)", len(w.marks))}
 	if w.pdf != nil {
 		names = append(names, "Pages")
@@ -360,21 +348,16 @@ func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
 	case w.listMks:
 		on = 1
 	}
-	each := r.Dx() / len(names)
+	var tabs []libTab
 	for k, name := range names {
-		t := image.Rect(r.Min.X+k*each, r.Min.Y, r.Min.X+(k+1)*each, r.Max.Y)
-		ink := uint8(kobo.Mid)
-		if k == on {
-			ink = kobo.Black
-			c.Fill(image.Rect(t.Min.X, t.Max.Y-5, t.Max.X, t.Max.Y), kobo.Black)
-		}
-		c.Text(a.F.Body, t, name, ink, kobo.AlignCenter)
 		show := func() { w.showList(a, k == 1) }
 		if k == 2 {
 			show = func() { w.showPages(a) }
 		}
-		w.rows = append(w.rows, bookRow{t, show})
+		tabs = append(tabs, libTab{name, k == on, show})
 	}
+	h := a.drawLibHeader(r, "All Books", false, func() { w.toShelf(a) }, "back to the book", func() { w.list = false; w.draw(a) }, tabs)
+	w.rows = append(w.rows, h.rows...)
 }
 
 // markCorner is the page's top right, where its ribbon hangs: a tap

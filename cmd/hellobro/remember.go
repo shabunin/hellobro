@@ -27,6 +27,8 @@ type remembered struct {
 	Layout      *wm.Saved            `json:"layout,omitempty"`    // the windows, as they were left (wm.go)
 	Books       map[string]bookPlace `json:"books,omitempty"`     // where each book was left (bookwin.go)
 	BookFont    string               `json:"book-font,omitempty"`
+	ShelfTab    int                  `json:"shelf-tab,omitempty"` // the shelf's tab, and folder (library.go)
+	ShelfDir    string               `json:"shelf-dir,omitempty"`
 	BookPx      int                  `json:"book-px,omitempty"`
 	BookLeading int                  `json:"book-leading,omitempty"` // a line's height, % of the size
 	BookMargin  int                  `json:"book-margin,omitempty"`  // 1-5, the sides' margins

@@ -379,12 +379,19 @@ func (w *bookWin) drawPDFStyle(a *bro) {
 	area := w.p.Body.Inset(kobo.Pad)
 	c := a.C
 	w.rows = nil
+	head := w.styleHeader(a, &area, func() { w.pdfStyleStep(a, pdfStyleDone, 0) })
 	fit := map[bool]string{false: "whole page", true: "page width"}
 	onOff := map[bool]string{true: "on", false: "off"}
 	labels := [pdfStyleN]string{"Fit", "Zoom", "Trim white margins", "Pages", ""}
 	w.sel = max(0, min(w.sel, pdfStyleN-1))
 	y, rowH, boxW := area.Min.Y+4, 72, 72
 	for i := range pdfStyleN {
+		if i == pdfStyleDone { // in the header, at its right
+			if i == w.sel {
+				c.Frame(head.Inset(-4), 3, kobo.Dark)
+			}
+			continue
+		}
 		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+rowH-8)
 		y += rowH
 		if i == w.sel {
@@ -408,8 +415,6 @@ func (w *bookWin) drawPDFStyle(a *bro) {
 			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), onOff[!st.pdfNoTrim], 0)
 		case pdfStylePages:
 			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), bookPageWords[w.pageMode], 0)
-		case pdfStyleDone:
-			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), "back to the book", 0)
 		}
 	}
 	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "a page bigger than the screen is read in screenfuls, across then down; + and - zoom too; two side by side are whole", kobo.Mid, kobo.AlignLeft)

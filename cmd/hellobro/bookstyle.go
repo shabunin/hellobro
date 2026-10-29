@@ -176,6 +176,18 @@ func (st bookStyle) settings(size image.Point, lang string) book.Settings {
 	return book.Settings{W: size.X, H: size.Y, Px: st.px, Leading: float64(st.leading) / 100, Ragged: st.ragged, NoHyph: st.noHyphs, Lang: lang}
 }
 
+// styleHeader draws the style panel's header at the top of area (as the
+// lists', library.go), done its "back to the book"; area is what's under
+// it then. It gives back where that button is, for the keys' frame.
+func (w *bookWin) styleHeader(a *bro, area *image.Rectangle, done func()) image.Rectangle {
+	rowH := a.libRowH()
+	h := a.drawLibHeader(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), "All Books", false,
+		func() { w.styling = false; w.toShelf(a) }, "back to the book", done, []libTab{{"Style", true, func() {}}})
+	w.rows = append(w.rows, h.rows...)
+	area.Min.Y += rowH + 12
+	return h.back
+}
+
 func (w *bookWin) drawStyle(a *bro) {
 	if w.pdf != nil {
 		w.drawPDFStyle(a)
@@ -187,6 +199,7 @@ func (w *bookWin) drawStyle(a *bro) {
 	area := w.p.Body.Inset(kobo.Pad)
 	c := a.C
 	w.rows = nil
+	head := w.styleHeader(a, &area, func() { w.styleStep(a, len(fams)+styleDone, 0) })
 	focus := func(i int, r image.Rectangle) {
 		if i == w.sel {
 			c.Frame(r.Inset(-4), 3, kobo.Dark)
@@ -220,6 +233,10 @@ func (w *bookWin) drawStyle(a *bro) {
 	vals := st.values()
 	for k := range styleN {
 		i := len(fams) + k
+		if k == styleDone { // in the header, at its right
+			focus(i, head)
+			break
+		}
 		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+rowH-8)
 		y += rowH
 		focus(i, r)
@@ -228,10 +245,6 @@ func (w *bookWin) drawStyle(a *bro) {
 			c.Frame(b, 2, kobo.Black)
 			c.Text(a.F.Panel, b, label, kobo.Black, kobo.AlignCenter)
 			w.rows = append(w.rows, bookRow{b, func() { w.sel = i; do() }})
-		}
-		if k == styleDone {
-			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), "back to the book", func() { w.styleStep(a, i, 0) })
-			break
 		}
 		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X, r.Max.Y), styleLabels[k], kobo.Black, kobo.AlignLeft)
 		right := r.Max.X
