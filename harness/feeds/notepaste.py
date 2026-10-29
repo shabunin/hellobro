@@ -15,7 +15,7 @@ fullscreen(); time.sleep(5)
 half = int(min(W, H) * 0.25)
 x0, y0, x1, y1 = W // 2 - half, int(H * 0.30), W // 2 + half, int(H * 0.46)
 stroke([(x0 + (x1 - x0) * i / 20, y0 + (y1 - y0) * i / 20) for i in range(21)], pen=True); time.sleep(4)
-tap(x1 - 374 + 70, y1 + 42); time.sleep(4)           # copy
+tap(x1 - 524 + 70, y1 + 42); time.sleep(4)           # copy (of copy, save, zoom, ×)
 fullscreen(); time.sleep(4)
 gui("notebook"); time.sleep(5)                       # a notebook beside it
 key(47, ctrl=True); time.sleep(4)                    # Ctrl+V

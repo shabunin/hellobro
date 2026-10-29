@@ -17,9 +17,9 @@ def held(x0, y0, x1, y1):                 # a finger: still a moment, then acros
         frame(0, **at(x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12), P=30); time.sleep(0.05)
     frame(0, ID=-1); time.sleep(3)
 
-def buttons(x1, y1):                       # where drawCut puts copy, save, × under a cut
-    x0 = x1 - (150 + 150 + 74)
-    return (x0 + 70, y1 + 42), (x0 + 220, y1 + 42), (x0 + 332, y1 + 42)
+def buttons(x1, y1):                       # where drawCut puts copy, save, zoom, × under a cut
+    x0 = x1 - (150 + 150 + 150 + 74)
+    return (x0 + 70, y1 + 42), (x0 + 220, y1 + 42), (x0 + 482, y1 + 42)
 
 start()
 gui("books"); time.sleep(4)
