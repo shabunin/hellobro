@@ -715,6 +715,10 @@ and the last two written.
   one on the screen shows for it. A notebook's PDF export is renamed
   with it (only one hellobro wrote); a folder's notebooks go with it,
   open ones too.
+- **move** on a row (or m) moves it to another folder: Folders shows
+  where it is, with **move here** and **cancel** at the top; open a
+  folder (or go up) and tap **move here** (or m again; Esc doesn't).
+  Its export and its open window go with it, as with a rename.
 - **×** (or Delete) asks **delete?**: tap it again within 4 s. A
   notebook goes to `Notebooks/.trash` (its window closes first), to
   be fished out over USB or sftp; a folder goes only if it's empty.

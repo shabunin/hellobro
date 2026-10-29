@@ -109,3 +109,40 @@ func TestKeepUnsaved(t *testing.T) {
 		t.Errorf("not kept: %d left", len(a.nt.unsaved))
 	}
 }
+
+// TestNoteMove: a notebook goes into a folder with its export; a folder
+// out of the one it's in, with what's in it; not into itself.
+func TestNoteMove(t *testing.T) {
+	defer func(r string) { shareRoot = r }(shareRoot)
+	shareRoot = t.TempDir()
+	nd := filepath.Join(shareRoot, "Notebooks")
+	os.MkdirAll(filepath.Join(nd, "Work", "Old"), 0o755)
+	a := &bro{}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
+	for _, n := range []string{"plan", "Work/Old/notes"} {
+		nb := &notebook{name: n, paper: "plain", pages: [][]*noteStroke{nil}}
+		if err := nb.save(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeAtomic(filepath.Join(nd, "plan.pdf"), imagesPDF([]pdfImagePage{{image.NewGray(image.Rect(0, 0, 4, 4)), 10, 10}}))
+	w := &notesWin{back: "plan"}
+	if err := w.moveTo(a, "plan", false, "Work/plan"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.moveTo(a, "Work", true, "Work/Old/Work"); err == nil {
+		t.Errorf("a folder into itself")
+	}
+	if err := w.moveTo(a, "Work/Old", true, "Old"); err != nil {
+		t.Fatal(err)
+	}
+	for f, want := range map[string]bool{"plan.xopp": false, "plan.pdf": false, "Work/plan.xopp": true, "Work/plan.pdf": true,
+		"Work/Old": false, "Old/notes.xopp": true} {
+		if fileExists(filepath.Join(nd, filepath.FromSlash(f))) != want {
+			t.Errorf("%s there: %v, want %v", f, !want, want)
+		}
+	}
+	if w.back != "Work/plan" {
+		t.Errorf("back to %q", w.back)
+	}
+}

@@ -5,7 +5,9 @@ package main
 // (library.go): Recent, the last written first; All, by name; Folders,
 // a folder at a time. Under the header: a new notebook (in the folder
 // shown) and a new folder. Each row renames it, or deletes it: tapped
-// twice, it goes to Notebooks/.trash (a folder, only if it's empty). A
+// twice, it goes to Notebooks/.trash (a folder, only if it's empty).
+// Moved, the Folders tab shows where to: a folder opened, "move here".
+// A
 // name is typed in its row, the keyboard's or the one on the screen,
 // which shows for it while there's no keyboard. A notebook's bar has
 // "‹ All Notebooks" at its left (notebook.go); opened from one, the
@@ -42,6 +44,7 @@ type notesWin struct {
 	edit  *noteEdit // a name being typed
 	asked string    // a delete asked for: what
 	askAt time.Time
+	move  *libItem // what's being moved: the folders show where to
 }
 
 // noteEdit is a name being typed: a notebook's or a folder's new one, or
@@ -74,6 +77,9 @@ func (w *notesWin) load() {
 		w.dir = ""
 	}
 	w.items = libView(es, dirs, w.tab, w.dir)
+	if m := w.move; m != nil && m.dir { // a folder doesn't go into itself
+		w.items = slices.DeleteFunc(w.items, func(it libItem) bool { return !it.up && it.key == m.key })
+	}
 }
 
 func isNoteDir(dir string) bool {
@@ -100,6 +106,9 @@ func (w *notesWin) drawTitle(a *bro) {
 
 // show shows tab, in folder dir; the choice at the top.
 func (w *notesWin) show(a *bro, tab int, dir string) {
+	if w.move != nil { // where to: a folder
+		tab = libFolders
+	}
 	w.tab, w.dir, w.sel, w.top, w.edit, w.asked = tab, dir, 0, 0, nil, ""
 	a.mem.NotesTab, a.mem.NotesDir = tab, dir
 	a.mem.save()
@@ -125,16 +134,26 @@ func (w *notesWin) draw(a *bro) {
 		libTabs(w.tab, func(k int) { w.show(a, k, w.dir) }))
 	w.rows = h.rows
 	area.Min.Y += rowH + 12
-	// what's made here: a notebook, a folder
+	// what's made here: a notebook, a folder; or, moving, here or not
 	x := area.Min.X
-	for _, b := range []libTab{{"+ new notebook", false, func() { w.newNotebook(a) }}, {"+ new folder", false, func() { w.startEdit(a, "", true, "") }}} {
+	bs := []libTab{{"+ new notebook", false, func() { w.newNotebook(a) }}, {"+ new folder", false, func() { w.startEdit(a, "", true, "") }}}
+	if w.move != nil {
+		bs = []libTab{{"move here", false, func() { w.moveHere(a) }}, {"cancel", false, func() { w.moving(a, nil) }}}
+	}
+	for _, b := range bs {
 		r := image.Rect(x, area.Min.Y, x+kobo.TextWidth(a.F.Panel, b.name)+48, area.Min.Y+rowH-12)
 		c.Frame(r, 2, kobo.Black)
 		c.Text(a.F.Panel, r, b.name, kobo.Black, kobo.AlignCenter)
 		w.rows = append(w.rows, bookRow{r, b.do})
 		x = r.Max.X + 16
 	}
-	if w.tab == libFolders && w.dir != "" {
+	if m := w.move; m != nil {
+		where := "to the top"
+		if w.dir != "" {
+			where = "to " + w.dir
+		}
+		c.Text(a.F.Small, image.Rect(x+16, area.Min.Y, area.Max.X, area.Min.Y+rowH-12), m.name+" "+where+"?", kobo.Mid, kobo.AlignLeft)
+	} else if w.tab == libFolders && w.dir != "" {
 		c.Text(a.F.Small, image.Rect(x+16, area.Min.Y, area.Max.X, area.Min.Y+rowH-12), "in "+w.dir, kobo.Mid, kobo.AlignLeft)
 	}
 	area.Min.Y += rowH
@@ -165,12 +184,13 @@ func (w *notesWin) draw(a *bro) {
 			continue
 		}
 		var btns []libTab
-		if !it.up {
+		if !it.up && w.move == nil {
 			del := "×"
 			if w.asking(it.key) {
 				del = "delete?"
 			}
-			btns = []libTab{{"rename", false, func() { w.startEdit(a, it.key, it.dir, path.Base(it.key)) }}, {del, false, func() { w.remove(a, it) }}}
+			btns = []libTab{{"rename", false, func() { w.startEdit(a, it.key, it.dir, path.Base(it.key)) }},
+				{"move", false, func() { w.moving(a, &it) }}, {del, false, func() { w.remove(a, it) }}}
 		}
 		w.rows = append(w.rows, a.drawLibRow(r, it, i == w.sel, func() { w.open(a, it) }, btns...)...)
 	}
@@ -211,13 +231,48 @@ func (w *notesWin) drawEdit(a *bro, r image.Rectangle) {
 }
 
 // open opens the folder, or the notebook in this window (or focuses
-// it, if it's open elsewhere).
+// it, if it's open elsewhere). Moving, only folders open.
 func (w *notesWin) open(a *bro, it libItem) {
 	if it.dir {
 		w.show(a, libFolders, it.key)
 		return
 	}
-	w.toNotebook(a, it.key)
+	if w.move == nil {
+		w.toNotebook(a, it.key)
+	}
+}
+
+// moving starts moving it (the folders shown, from where it is), or
+// stops (nil).
+func (w *notesWin) moving(a *bro, it *libItem) {
+	w.move = it
+	if it == nil {
+		w.load()
+		w.draw(a)
+		return
+	}
+	dir := path.Dir(it.key)
+	if dir == "." {
+		dir = ""
+	}
+	w.show(a, libFolders, dir)
+}
+
+// moveHere moves what's being moved to the folder shown.
+func (w *notesWin) moveHere(a *bro) {
+	m := w.move
+	w.move = nil
+	to := path.Join(w.dir, path.Base(m.key))
+	if err := w.moveTo(a, m.key, m.dir, to); err != nil {
+		a.Notify(err.Error())
+	}
+	w.load()
+	for i, it := range w.items {
+		if it.key == to && !it.up {
+			w.sel = i
+		}
+	}
+	w.draw(a)
 }
 
 // toNotebook puts the notebook name in the list's place; if it's open
@@ -316,17 +371,26 @@ func (w *notesWin) rename(a *bro, e *noteEdit) error {
 		log.Printf("notebooks: folder %s made", dir)
 		return nil
 	}
-	to := path.Join(path.Dir(e.key), name)
-	if to == e.key {
+	return w.moveTo(a, e.key, e.dir, path.Join(path.Dir(e.key), name))
+}
+
+// moveTo renames the notebook key, or the folder (dir), as to: in
+// another folder, or the same one. Open notebooks follow.
+func (w *notesWin) moveTo(a *bro, key string, dir bool, to string) error {
+	if to == key {
 		return nil
 	}
-	if e.dir {
-		from, dst := filepath.Join(notesDir(), filepath.FromSlash(e.key)), filepath.Join(notesDir(), filepath.FromSlash(to))
+	if dir {
+		if strings.HasPrefix(to, key+"/") {
+			return errors.New("a folder doesn't go into itself")
+		}
+		name := path.Base(to)
+		from, dst := filepath.Join(notesDir(), filepath.FromSlash(key)), filepath.Join(notesDir(), filepath.FromSlash(to))
 		if _, err := os.Stat(dst); err == nil {
 			return fmt.Errorf("there's a %s already", name)
 		}
 		for _, nw := range a.noteWins() { // what's open in it, kept first
-			if strings.HasPrefix(nw.nb.name, e.key+"/") {
+			if strings.HasPrefix(nw.nb.name, key+"/") {
 				nw.keep(a)
 			}
 		}
@@ -334,35 +398,35 @@ func (w *notesWin) rename(a *bro, e *noteEdit) error {
 			return err
 		}
 		for _, nw := range a.noteWins() {
-			if rest, ok := strings.CutPrefix(nw.nb.name, e.key+"/"); ok {
+			if rest, ok := strings.CutPrefix(nw.nb.name, key+"/"); ok {
 				nw.nb.name = to + "/" + rest
 				nw.drawTitle(a)
 			}
 		}
 		for _, nb := range a.nt.unsaved {
-			if rest, ok := strings.CutPrefix(nb.name, e.key+"/"); ok {
+			if rest, ok := strings.CutPrefix(nb.name, key+"/"); ok {
 				nb.name = to + "/" + rest
 			}
 		}
-		if rest, ok := strings.CutPrefix(w.back, e.key+"/"); ok { // the notebook to go back to went with it
+		if rest, ok := strings.CutPrefix(w.back, key+"/"); ok { // the notebook to go back to went with it
 			w.back = to + "/" + rest
 		}
 		a.wm.changed = time.Now() // the layout names them
-		if w.dir == e.key || strings.HasPrefix(w.dir, e.key+"/") {
-			w.dir = to + strings.TrimPrefix(w.dir, e.key)
+		if w.dir == key || strings.HasPrefix(w.dir, key+"/") {
+			w.dir = to + strings.TrimPrefix(w.dir, key)
 			a.mem.NotesDir = w.dir
 			a.mem.save()
 		}
-		log.Printf("notebooks: folder %s is %s now", e.key, to)
+		log.Printf("notebooks: folder %s is %s now", key, to)
 		return nil
 	}
-	if err := renameNotebook(a, e.key, to); err != nil {
+	if err := renameNotebook(a, key, to); err != nil {
 		return err
 	}
-	if w.back == e.key {
+	if w.back == key {
 		w.back = to
 	}
-	log.Printf("notebooks: %s is %s now", e.key, to)
+	log.Printf("notebooks: %s is %s now", key, to)
 	return nil
 }
 
@@ -486,8 +550,9 @@ func removeNote(a *bro, it libItem) error {
 }
 
 // press: ↑ ↓ PgUp PgDn and Enter; Tab the next tab, Backspace up a
-// folder; n a new notebook, F2 rename, Delete delete (twice); Esc back
-// to the notebook. A name being typed takes the keys.
+// folder; n a new notebook, F2 rename, m move (m again: here, Esc: not),
+// Delete delete (twice); Esc back to the notebook. A name being typed
+// takes the keys.
 func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 	if value == 0 {
 		return false
@@ -539,6 +604,21 @@ func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 	case ch == "n":
 		w.newNotebook(a)
 		return true
+	case w.move != nil && (ch == "m" || code == kobo.KeyEsc):
+		if ch == "m" {
+			w.moveHere(a)
+		} else {
+			w.moving(a, nil)
+		}
+		return true
+	case w.move != nil:
+		if code == kobo.KeyTab || ch == "n" || code == 60 || code == 111 {
+			return true // the folders only, while moving
+		}
+		return false
+	case ch == "m" && ok && !it.up:
+		w.moving(a, &it)
+		return true
 	case code == 60 && ok && !it.up: // F2
 		w.startEdit(a, it.key, it.dir, path.Base(it.key))
 		return true
@@ -580,6 +660,7 @@ func (w *notesWin) swipe(a *bro, from, to image.Point) {
 }
 
 func (w *notesWin) closing(a *bro) {
+	w.move = nil
 	if w.edit != nil {
 		w.edit = nil
 		a.vk.ask = false
