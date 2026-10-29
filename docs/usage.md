@@ -601,9 +601,7 @@ while it's in hand): tap one corner, then the opposite one, without
 dragging. Each corner then has a dot: tap one (it fills in black) and tap
 where it should be, the corner across staying where it is; a finger
 dragged on the page draws a rectangle at once too. Tap the tool again,
-or Esc, to put it down. With the tool in hand and nothing cut, **copy
-page** (at the page's foot, on the right) copies the whole page, as
-**copy** does a part: paste it in a notebook to write on it. Under the rectangle:
+or Esc, to put it down. Under the rectangle:
 
 - **copy**: its words (whole ones, line by line) into the clipboard,
   which the terminals paste (Ctrl+Shift+V), and its picture, which a
