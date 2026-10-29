@@ -4,8 +4,11 @@ package main
 // for a finger, in groups: the terminals (Alpine, the Kobo's sh, the
 // saved hosts, the nearby hellobros, by number as they always were),
 // books and notebooks, the settings' windows, and the Kobo itself.
-// Under them, the ssh> line for a host not saved, which the keys type
-// into; a tap on it brings the keyboard on the screen if there's no
+// Under them, the find> line, which the keys type into: it narrows the
+// tiles to what matches, best first (every notebook and every book read
+// too, not only the last ones), and Enter opens the first. With an @ in
+// it, or nothing matching, it's ssh> again: Enter logs in to the host
+// typed. A tap on it brings the keyboard on the screen if there's no
 // other. The arrows go from tile to tile, Enter opens the one lit. While
 // SSH logs in, or a host's line is edited, the launcher is lines of
 // text again (drawConnect).
@@ -119,7 +122,64 @@ func (a *bro) launchGroups(t *termSession) []launchGroup {
 			a.ask("Quit?", "hellobro closes, Nickel comes back", "quit", func() { a.Quit() })
 		}},
 	}
-	return []launchGroup{{"Terminals", terms}, {"Read and write", read}, {"Settings", set}, {"This Kobo", self}}
+	gs := []launchGroup{{"Terminals", terms}, {"Read and write", read}, {"Settings", set}, {"This Kobo", self}}
+	if q := launchQuery(t); q != "" {
+		return a.launchFound(t, gs, q)
+	}
+	return gs
+}
+
+// launchQuery is what's typed in the launcher's line to look for; ""
+// if nothing is, or it's a host (an @ in it).
+func launchQuery(t *termSession) string {
+	q := strings.TrimSpace(t.input)
+	if strings.Contains(q, "@") {
+		return ""
+	}
+	return q
+}
+
+// launchFound is the tiles that match q, best first, with every notebook
+// and every book read (the groups have the last two of each).
+func (a *bro) launchFound(t *termSession, gs []launchGroup, q string) []launchGroup {
+	type scored struct {
+		tl    launchTile
+		score int
+	}
+	var found []scored
+	seen := map[string]bool{}
+	add := func(tl launchTile) {
+		if s := fuzzy(q, tl.name+" "+tl.note); s >= 0 && !seen[tl.name+"\x00"+tl.note] {
+			seen[tl.name+"\x00"+tl.note] = true
+			found = append(found, scored{tl, s})
+		}
+	}
+	for _, g := range gs {
+		for _, tl := range g.tiles {
+			if tl.icon != "reading" && tl.icon != "notebook" { // the last ones: all of them come below
+				add(tl)
+			}
+		}
+	}
+	for _, n := range noteNames() {
+		note := "notebook"
+		if d := path.Dir(n); d != "." {
+			note = "notebook in " + d
+		}
+		add(launchTile{path.Base(n), note, "notebook", 0, func() { a.launchNotebook(t, n) }})
+	}
+	for _, b := range a.lastBooks(len(a.mem.Books)) {
+		add(launchTile{b.name, b.note, "reading", 0, func() { a.replaceWin(t, a.newBookWin(b.key)) }})
+	}
+	slices.SortStableFunc(found, func(x, y scored) int { return y.score - x.score })
+	g := launchGroup{name: "nothing matches: Enter logs in to " + q + " (ssh)"}
+	if len(found) > 0 {
+		g.name = fmt.Sprintf("%d matching %q", len(found), q)
+	}
+	for _, f := range found {
+		g.tiles = append(g.tiles, f.tl)
+	}
+	return []launchGroup{g}
 }
 
 // guiNotes say what's in each settings' window, on its tile.
@@ -340,11 +400,15 @@ func (a *bro) drawMenu(t *termSession) {
 	}
 	field := image.Rect(bottom.Min.X, y+8, bottom.Max.X, y+8+fieldH)
 	c.Frame(field, 2, kobo.Black)
-	label := image.Rect(field.Min.X+14, field.Min.Y, field.Min.X+14+kobo.TextWidth(a.F.Small, "ssh>")+12, field.Max.Y)
-	c.Text(a.F.Small, label, "ssh>", kobo.Mid, kobo.AlignLeft)
+	prompt := "find>"
+	if t.input != "" && launchQuery(t) == "" || t.input != "" && len(tiles) == 0 {
+		prompt = "ssh>"
+	}
+	label := image.Rect(field.Min.X+14, field.Min.Y, field.Min.X+14+kobo.TextWidth(a.F.Small, "find>")+12, field.Max.Y)
+	c.Text(a.F.Small, label, prompt, kobo.Mid, kobo.AlignLeft)
 	text := image.Rect(label.Max.X, field.Min.Y, field.Max.X-14, field.Max.Y)
 	if t.input == "" {
-		c.Text(a.F.Small, text, "user@host[:port] [command], Enter: a host not saved (saved once it connects)", kobo.Mid, kobo.AlignLeft)
+		c.Text(a.F.Small, text, "type to find an app, a book, a notebook; user@host[:port] [command]: log in", kobo.Mid, kobo.AlignLeft)
 	} else {
 		c.Text(a.F.Body, text, t.input+"█", kobo.Black, kobo.AlignLeft)
 	}
@@ -362,6 +426,7 @@ func (a *bro) drawMenu(t *termSession) {
 func (a *bro) launchDo(t *termSession, do func()) func() {
 	return func() {
 		a.launchUnask(t)
+		t.input = ""
 		do()
 	}
 }

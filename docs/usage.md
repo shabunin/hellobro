@@ -384,10 +384,15 @@ A tile opens in the launcher's place; Rotate, Light and the like leave
 it there. The numbers (1–9) still pick the terminals; the arrows light
 a tile (Alpine is lit at first) and Enter opens it. The tiles are as
 big as the window has room for; in a small one only their names show,
-and a swipe up or down scrolls them. At the bottom is the **ssh>** line
-for a host not saved ([Terminal](#terminal)): typing goes there, and a
-tap on it brings the on-screen keyboard if no keyboard is connected.
-How the last session ended is noted above it.
+and a swipe up or down scrolls them. At the bottom is the **find>**
+line: typing goes there, and narrows the tiles to what matches (fuzzy,
+as the switcher; every notebook and every book read, not only the last
+two), the best first and lit: Enter opens it, the arrows light another,
+Esc clears what's typed (and then closes the window). With an `@` in
+it, or nothing matching, it's the **ssh>** line for a host not saved
+([Terminal](#terminal)): Enter logs in. A tap on it brings the
+on-screen keyboard if no keyboard is connected. How the last session
+ended is noted above it.
 
 ## Terminal
 
@@ -395,7 +400,8 @@ How the last session ended is noted above it.
   ([The launcher](#the-launcher)): **1** Alpine, **2** the Kobo's sh
   (Enter alone: the tile lit, Alpine at first), **3** and on a saved
   host, or a host typed in. Esc closes it.
-- Type `user@host[:port] [command]` and Enter; the prompt also takes
+- Type `user@host[:port] [command]` and Enter (a name alone logs in
+  too, when no tile matches it); the prompt also takes
   `ssh -p PORT [-J user@jumphost] user@host [command]`. A host typed
   there is saved once it connects (in `hellobro.json`), and gets its
   tile.

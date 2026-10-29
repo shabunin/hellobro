@@ -1234,8 +1234,11 @@ func (a *bro) termKey(code uint16, value int32) bool {
 				break
 			}
 			a.hostSave(t, h, line)
-		case t.edit == nil && t.input == "" && a.menuKey(t, code):
+		case t.edit == nil && (t.input == "" || launchQuery(t) != "") && a.menuKey(t, code):
 			return true
+		case code == kobo.KeyEsc && t.input != "": // what's typed goes first
+			t.input = ""
+			t.pane.menu.lit, t.pane.menu.top = 0, 0
 		case code == kobo.KeyEsc:
 			a.launchUnask(t)
 			a.closeWin(t)
@@ -1256,6 +1259,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 			if r := []rune(t.input); len(r) > 0 {
 				t.input = string(r[:len(r)-1])
 			}
+			t.pane.menu.lit, t.pane.menu.top = 0, 0 // what matches now: the best lit
 		case printable && t.input == "" && t.edit == nil && ch >= "1" && ch <= "9":
 			a.launchUnask(t)
 			switch i := int(ch[0] - '1'); {
@@ -1270,6 +1274,9 @@ func (a *bro) termKey(code uint16, value int32) bool {
 			}
 		case printable && !m.ctrl:
 			t.input += ch
+			if t.edit == nil {
+				t.pane.menu.lit, t.pane.menu.top = 0, 0
+			}
 		default:
 			return false // Esc, F-keys: the app's
 		}

@@ -2,6 +2,8 @@ package main
 
 import (
 	"image"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -57,5 +59,38 @@ func TestMenuStep(t *testing.T) {
 	}
 	if got := menuStep(nil, 0, 1, 0); got != -1 {
 		t.Errorf("no tiles: %d, want -1", got)
+	}
+}
+
+// TestLaunchFound: what's typed narrows the tiles, best first, and finds
+// every notebook, not only the last ones; an @ is a host, not a search.
+func TestLaunchFound(t *testing.T) {
+	defer func(r string) { shareRoot = r }(shareRoot)
+	shareRoot = t.TempDir()
+	os.MkdirAll(filepath.Join(shareRoot, "Notebooks", "Work"), 0o755)
+	for _, n := range []string{"Work/wifi plan", "shopping"} {
+		os.WriteFile(filepath.Join(shareRoot, "Notebooks", n+noteExt), []byte("x"), 0o644)
+	}
+	a := &bro{}
+	gs := []launchGroup{{"Settings", []launchTile{{name: "Wi-Fi", note: "networks"}, {name: "Bluetooth", note: "keyboards"}}},
+		{"Read and write", []launchTile{{name: "shopping", note: "notebook", icon: "notebook"}}}}
+	names := func(q string) []string {
+		var ns []string
+		for _, tl := range a.launchFound(&termSession{}, gs, q)[0].tiles {
+			ns = append(ns, tl.name)
+		}
+		return ns
+	}
+	if got := names("wifi"); len(got) != 2 || !slices.Contains(got, "Wi-Fi") || got[0] != "wifi plan" { // a run of it first
+		t.Errorf("wifi: %q", got)
+	}
+	if got := names("shop"); len(got) != 1 || got[0] != "shopping" {
+		t.Errorf("shop, once: %q", got)
+	}
+	if got := names("zzz"); len(got) != 0 {
+		t.Errorf("zzz: %q", got)
+	}
+	if q := launchQuery(&termSession{input: "bro@host"}); q != "" {
+		t.Errorf("a host looked for: %q", q)
 	}
 }
