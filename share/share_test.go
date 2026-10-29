@@ -217,7 +217,7 @@ func TestForcedCommand(t *testing.T) {
 
 // Browse makes peers of what a responder answers, and leaves itself out.
 func TestBrowseAnswers(t *testing.T) {
-	z := zone{host: "reader.local.", instance: "Another Reader", ip: [4]byte{192, 168, 1, 30}, port: 2023}
+	z := zone{host: "reader.local.", instance: "Another Reader", ip: [4]byte{192, 168, 1, 30}, port: 2023, txt: []string{"u=root", "k=SHA256:abc"}}
 	ans, extra := z.answer([]dnsmessage.Question{{Name: dnsmessage.MustNewName(HelloType), Type: dnsmessage.TypePTR, Class: dnsmessage.ClassINET}})
 	b, err := (&dnsmessage.Message{Header: dnsmessage.Header{Response: true}, Answers: ans, Additionals: extra}).Pack()
 	if err != nil {
@@ -225,7 +225,7 @@ func TestBrowseAnswers(t *testing.T) {
 	}
 	var h browsed
 	h.take(b)
-	want := []Peer{{"Another Reader", "192.168.1.30:2023"}}
+	want := []Peer{{"Another Reader", "192.168.1.30:2023", "SHA256:abc"}}
 	if got := h.peers(net.IPv4(192, 168, 1, 20)); fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("peers %v, want %v", got, want)
 	}
@@ -242,8 +242,11 @@ func TestAskKeys(t *testing.T) {
 	var asked string
 	s, err := Start(Config{Addr: "127.0.0.1:0", StateDir: state, Root: t.TempDir(),
 		StartShell: func(cmd string, cols, rows int) (Shell, error) { return nil, fmt.Errorf("ran %q", cmd) },
-		AskKeys: func(who, addr string) bool {
+		AskKeys: func(who, addr, key string) bool {
 			asked = who + " at " + addr
+			if !strings.HasPrefix(key, "SHA256:") {
+				t.Errorf("its key: %q", key)
+			}
 			return <-allow
 		}})
 	if err != nil {

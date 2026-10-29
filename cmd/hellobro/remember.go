@@ -24,6 +24,7 @@ type remembered struct {
 	LightOn     int                  `json:"light-on,omitempty"`  // and as last set on: light.toggle's way back
 	TermFont    int                  `json:"term-font,omitempty"` // the terminal font's size, px
 	Hosts       []savedHost          `json:"hosts,omitempty"`     // the SSH tab's, in order
+	Devices     map[string]string    `json:"devices,omitempty"`   // the hellobros typed into: host key fingerprint → name (typein.go)
 	Layout      *wm.Saved            `json:"layout,omitempty"`    // the windows, as they were left (wm.go)
 	Books       map[string]bookPlace `json:"books,omitempty"`     // where each book was left (bookwin.go)
 	BookFont    string               `json:"book-font,omitempty"`

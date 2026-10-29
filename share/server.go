@@ -52,10 +52,11 @@ type Config struct {
 	// Notify hears what happens (connections, pairing), from the server's
 	// goroutines.
 	Notify func(Event)
-	// AskKeys asks on the screen whether who (at addr) may type here:
-	// another device logging in as KeysUser with a key not paired yet.
-	// Allowed, its key is saved to do only that. nil: nobody's asked.
-	AskKeys func(who, addr string) bool
+	// AskKeys asks on the screen whether who (at addr, with the key
+	// whose fingerprint is key) may type here: another device logging in
+	// as KeysUser with a key not paired yet. Allowed, its key is saved to
+	// do only that. nil: nobody's asked.
+	AskKeys func(who, addr, key string) bool
 }
 
 // KeysUser is the user another device logs in as to type here, and the
@@ -284,7 +285,7 @@ func (s *Server) askKeys(meta ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permiss
 	}
 	defer s.asking.Unlock()
 	who, addr := PeerName(string(meta.ClientVersion())), hostOf(meta.RemoteAddr())
-	if !s.cfg.AskKeys(who, addr) {
+	if !s.cfg.AskKeys(who, addr, ssh.FingerprintSHA256(key)) {
 		return nil, errors.New("not allowed to type here")
 	}
 	comment := fmt.Sprintf("keys-%s-%s@%s", time.Now().Format("2006-01-02"), strings.ReplaceAll(who, " ", "_"), addr)

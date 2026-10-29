@@ -21,6 +21,7 @@ import (
 type Peer struct {
 	Name string // its instance: "Kobo Elipsa"
 	Addr string // where its server is: "192.168.1.20:2022"
+	Key  string // its server's host key, as its TXT says ("k=SHA256:…"); "" from an older one
 }
 
 // Browse asks on iface who's there, listens for wait, and returns who
@@ -59,6 +60,7 @@ type browsed struct {
 	inst  []string
 	srv   map[string]dnsmessage.SRVResource
 	addrs map[string]net.IP
+	txt   map[string][]string
 }
 
 // read takes answers in till until.
@@ -85,7 +87,7 @@ func (h *browsed) take(p []byte) {
 		return
 	}
 	if h.srv == nil {
-		h.srv, h.addrs = map[string]dnsmessage.SRVResource{}, map[string]net.IP{}
+		h.srv, h.addrs, h.txt = map[string]dnsmessage.SRVResource{}, map[string]net.IP{}, map[string][]string{}
 	}
 	for _, r := range append(m.Answers, m.Additionals...) {
 		name := strings.ToLower(r.Header.Name.String())
@@ -101,6 +103,10 @@ func (h *browsed) take(p []byte) {
 		case *dnsmessage.AResource:
 			if _, ok := h.addrs[name]; ok || len(h.addrs) < browseMax {
 				h.addrs[name] = net.IP(b.A[:])
+			}
+		case *dnsmessage.TXTResource:
+			if _, ok := h.txt[name]; ok || len(h.txt) < browseMax {
+				h.txt[name] = b.TXT
 			}
 		}
 	}
@@ -119,7 +125,13 @@ func (h *browsed) peers(self net.IP) []Peer {
 		if ip == nil || ip.Equal(self) {
 			continue
 		}
-		out = append(out, Peer{Name: strings.TrimSuffix(in, "."+HelloType), Addr: net.JoinHostPort(ip.String(), strconv.Itoa(int(srv.Port)))})
+		p := Peer{Name: strings.TrimSuffix(in, "."+HelloType), Addr: net.JoinHostPort(ip.String(), strconv.Itoa(int(srv.Port)))}
+		for _, kv := range h.txt[strings.ToLower(in)] {
+			if k, ok := strings.CutPrefix(kv, "k="); ok {
+				p.Key = k
+			}
+		}
+		out = append(out, p)
 	}
 	slices.SortFunc(out, func(a, b Peer) int { return strings.Compare(a.Name, b.Name) })
 	return out

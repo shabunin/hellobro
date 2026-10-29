@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"hellobro/keyfeed"
 	"hellobro/kobo"
 	"hellobro/share"
@@ -114,10 +116,58 @@ func (a *bro) redrawLaunchers() {
 	}
 }
 
-// typeInto connects t to the device p, to type into it.
+// typeInto connects t to the device p, to type into it: the device whose
+// key it says it has, if it says (an older hellobro doesn't).
 func (a *bro) typeInto(t *termSession, p share.Peer) {
-	a.termNote(t, "the first time, "+p.Name+" asks whether this one may type there: tap Allow on it")
-	a.termConnect(t, sshHost{name: p.Name, user: share.KeysUser, addr: p.Addr, cmd: share.KeysUser})
+	mine := ""
+	if s, err := clientKey(); err == nil {
+		mine = ", if it shows this one's key, " + shortKey(ssh.FingerprintSHA256(s.PublicKey()))
+	}
+	a.termNote(t, "the first time, "+p.Name+" asks whether this one may type there: tap allow on it"+mine)
+	a.termConnect(t, sshHost{name: p.Name, user: share.KeysUser, addr: p.Addr, cmd: share.KeysUser, key: p.Key})
+}
+
+// shortKey is the end of a key's fingerprint, enough to tell two apart
+// by eye: "…3fQx9kLm".
+func shortKey(fp string) string {
+	if len(fp) > 8 {
+		return "…" + fp[len(fp)-8:]
+	}
+	return fp
+}
+
+// peerNote says on p's tile who it is: a device typed into before (by
+// its key), a new one, or one with the name of another typed into, but
+// not its key.
+func (a *bro) peerNote(p share.Peer) string {
+	known := a.mem.Devices
+	switch {
+	case p.Key == "":
+		return "nearby: type into it (an older hellobro)"
+	case known[p.Key] == p.Name:
+		return "nearby: type into it"
+	case known[p.Key] != "":
+		return "nearby: typed into before, as " + known[p.Key]
+	}
+	for _, n := range known {
+		if n == p.Name {
+			return "NOT the " + p.Name + " typed into before: another key, " + shortKey(p.Key)
+		}
+	}
+	return "nearby, new: key " + shortKey(p.Key)
+}
+
+// rememberDevice keeps the device typed into, by its key.
+func (a *bro) rememberDevice(key, name string) {
+	if a.mem.Devices[key] == name {
+		return
+	}
+	if a.mem.Devices == nil {
+		a.mem.Devices = map[string]string{}
+	}
+	a.mem.Devices[key] = name
+	a.mem.save()
+	log.Printf("keys: %s is %s", name, key)
 }
 
 // typing says t is typing into another device.
@@ -165,7 +215,7 @@ func grabFor(w, grab, typing window) (window, window) {
 // them, so it's asked carefully: no is what Enter says, the keys wait a
 // moment (a tap doesn't), an address told no isn't asked again for a
 // while, and this device's own (a program in Alpine) is never asked.
-func (a *bro) askKeys(who, addr string) bool {
+func (a *bro) askKeys(who, addr, key string) bool {
 	if ownAddress(addr) {
 		log.Printf("keys: %s (%s) asked to type here: no, it's this device", who, addr)
 		return false
@@ -185,7 +235,7 @@ func (a *bro) askKeys(who, addr string) bool {
 			n.refused[addr] = time.Now()
 			answer <- false
 		}
-		a.choose(who+" wants to type here", "It's at "+addr+" on the network. Allowed, it may type here from now on, as a keyboard can: any key, a shell too (Settings, Sharing: forget it).",
+		a.choose(who+" wants to type here", "It's at "+addr+" on the network, its key "+shortKey(key)+" (it shows its own as it asks: the same?). Allowed, it may type here from now on, as a keyboard can: any key, a shell too (Settings, Sharing: forget it).",
 			askOpt{"allow", "", func() { answer <- true }}, askOpt{"no", "n", no})
 		q = a.asking
 		q.sel, q.keysAt = 1, time.Now().Add(askKeysCalm)

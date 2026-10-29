@@ -32,6 +32,7 @@ type sshHost struct {
 	name, user, addr string   // addr is host:port
 	via              *sshHost // the jump host it's reached through, or nil
 	cmd              string   // run instead of a login shell, e.g. tmux new -A -s kobo
+	key              string   // the host key it must have (a nearby hellobro's, as it says), not known_hosts'
 }
 
 func (h sshHost) String() string {
@@ -205,6 +206,20 @@ func clientKey() (ssh.Signer, error) {
 
 func authorizedKey(s ssh.Signer) string {
 	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(s.PublicKey()))) + " hellobro@kobo"
+}
+
+// hostKeys checks h's host key: the one it must have, if it says, or as
+// known_hosts has it.
+func hostKeys(h sshHost, note func(string)) ssh.HostKeyCallback {
+	if h.key == "" {
+		return tofuHostKeys(note)
+	}
+	return func(_ string, _ net.Addr, key ssh.PublicKey) error {
+		if fp := ssh.FingerprintSHA256(key); fp != h.key {
+			return fmt.Errorf("its key is %s, not the %s it said: not the device it says it is", fp, h.key)
+		}
+		return nil
+	}
 }
 
 // tofuHostKeys accepts and remembers a host's key the first time, and
@@ -404,7 +419,7 @@ func dialClient(h sshHost, o dialOpts) (*ssh.Client, string, error) {
 				return password(fmt.Sprintf("%s's password: ", h))
 			}), 3),
 		},
-		HostKeyCallback: tofuHostKeys(o.note),
+		HostKeyCallback: hostKeys(h, o.note),
 		Timeout:         10 * time.Second,
 		ClientVersion:   sshClientVersion,
 	}

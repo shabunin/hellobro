@@ -27,6 +27,7 @@ import (
 	"github.com/charmbracelet/x/vt"
 
 	"hellobro/kobo"
+	"hellobro/share"
 )
 
 const (
@@ -980,6 +981,9 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	cols, rows := t.size.X, t.size.Y
 	t.back, t.state = back, termConnected
 	defer a.grabTyping() // typing into another device, maybe
+	if h := t.target; h.user == share.KeysUser && h.key != "" {
+		a.rememberDevice(h.key, h.name)
+	}
 	t.emu = vt.NewSafeEmulator(cols, rows)
 	t.mu.Lock()
 	t.gfx = kittyGfx{cell: a.face(t).cell()}

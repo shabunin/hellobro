@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"testing"
+
+	"golang.org/x/crypto/ssh"
 
 	"hellobro/share"
 )
@@ -39,5 +42,38 @@ func TestOwnAddress(t *testing.T) {
 		if got := ownAddress(ip); got != want {
 			t.Errorf("%s: %v, want %v", ip, got, want)
 		}
+	}
+}
+
+// A nearby device is known by its key: its name alone is anyone's.
+func TestPeerNote(t *testing.T) {
+	a := &bro{}
+	a.mem.Devices = map[string]string{"SHA256:elipsa-key": "Kobo Elipsa"}
+	for _, c := range []struct {
+		p    share.Peer
+		want string
+	}{
+		{share.Peer{Name: "Kobo Elipsa", Key: "SHA256:elipsa-key"}, "nearby: type into it"},
+		{share.Peer{Name: "Desk", Key: "SHA256:elipsa-key"}, "nearby: typed into before, as Kobo Elipsa"},
+		{share.Peer{Name: "Kobo Elipsa", Key: "SHA256:another-key"}, "NOT the Kobo Elipsa typed into before: another key, …ther-key"},
+		{share.Peer{Name: "Libra", Key: "SHA256:libra-key-1"}, "nearby, new: key …ra-key-1"},
+		{share.Peer{Name: "Old"}, "nearby: type into it (an older hellobro)"},
+	} {
+		if got := a.peerNote(c.p); got != c.want {
+			t.Errorf("%v: %q, want %q", c.p, got, c.want)
+		}
+	}
+}
+
+// A device's key, as it said it is, is the one it must have.
+func TestHostKeyPinned(t *testing.T) {
+	_, priv, _ := ed25519.GenerateKey(nil)
+	s, _ := ssh.NewSignerFromKey(priv)
+	fp := ssh.FingerprintSHA256(s.PublicKey())
+	if err := hostKeys(sshHost{key: fp}, nil)("x", nil, s.PublicKey()); err != nil {
+		t.Errorf("its own key: %v", err)
+	}
+	if err := hostKeys(sshHost{key: "SHA256:another"}, nil)("x", nil, s.PublicKey()); err == nil {
+		t.Errorf("another key taken")
 	}
 }

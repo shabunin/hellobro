@@ -94,7 +94,7 @@ func (a *bro) shareApply() {
 		_, port, _ := net.SplitHostPort(shareAddr)
 		p, _ := strconv.Atoi(port)
 		s.stopMDNS = share.Advertise(share.Advert{Host: mdnsHost, Instance: a.deviceName(), Port: p, Iface: shareIf,
-			TXT: []string{"u=root", "path=" + shareRoot}})
+			TXT: []string{"u=root", "path=" + shareRoot, "k=" + s.srv.HostKey()}})
 	case !mdns && s.stopMDNS != nil:
 		s.stopMDNS()
 		s.stopMDNS = nil

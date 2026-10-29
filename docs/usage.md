@@ -946,6 +946,16 @@ there lists it, to forget. Each one says it's there over mDNS
 (`_hellobro._tcp`); the launcher looks again each time it's drawn,
 every 20 s at most.
 
+A device is known by its key, not its name or address: each says its
+server's key in its mDNS answer, and the window logs in only to the one
+that has it. Typed into once, it's remembered by that key (in
+`hellobro.json`), and its tile says so; a new one says its key's end
+("nearby, new: key …3fQx9kLm"), and one with the name of a device
+typed into before but another key says **NOT the Kobo Libra typed into
+before**. The first time, this window says the end of this device's
+key, and the other's question shows the same: if they match, it's this
+one asking.
+
 A computer types into hellobro the same way: `ssh -t -p 2022
 hellobro-keys@kobo.local`, in kitty, foot or another terminal that
 speaks kitty's keyboard protocol for Super and the releases (any other

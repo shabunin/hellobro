@@ -77,7 +77,7 @@ func (a *bro) launchGroups(t *termSession) []launchGroup {
 	}
 	a.nearbyLook()
 	for i, p := range v.nearby.peers {
-		terms = append(terms, launchTile{p.Name, "nearby: type into it", "nearby", num(len(v.hosts) + i + 3), func() { a.typeInto(t, p) }})
+		terms = append(terms, launchTile{p.Name, a.peerNote(p), "nearby", num(len(v.hosts) + i + 3), func() { a.typeInto(t, p) }})
 	}
 	terms = append(terms, launchTile{"SSH key", "copy this Kobo's", "key", 0, a.copyKoboKey})
 
