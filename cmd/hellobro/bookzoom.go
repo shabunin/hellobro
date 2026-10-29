@@ -2,8 +2,8 @@ package main
 
 // A PDF's zoom, each PDF its own (kept with its place), and its
 // gestures: two fingers pinched apart or together zoom in or out round
-// the point between them (the zoom shows while they move; the page is
-// drawn again when they lift); a finger dragged on a page bigger than
+// the point between them (while they move, a frame shows what will fill
+// the window, and the zoom; the page is drawn again when they lift); a finger dragged on a page bigger than
 // the window moves it, anywhere. Taps, keys and swipes still go a
 // screenful at a time, from where it is. + and - and the style panel
 // zoom too, a step at a time, round the middle.
@@ -35,6 +35,7 @@ type pinch struct {
 	z     int         // the zoom now
 	at    image.Point // round here
 	shown time.Time
+	drawn image.Rectangle // what it drew over the page: the frame, the zoom
 }
 
 // canZoom is whether w's page zooms: a PDF's, one page at a time.
@@ -205,7 +206,7 @@ func (a *bro) pairMove() {
 	p.z = z // where it ends: the label only now and then
 	if time.Since(p.shown) >= 150*time.Millisecond {
 		p.shown = time.Now()
-		p.w.drawPinch(a, z)
+		p.w.drawPinch(a, p)
 	}
 }
 
@@ -221,18 +222,72 @@ func (a *bro) pinchEnd() {
 	p.w.setZoom(a, p.z, p.at)
 }
 
-// drawPinch shows the zoom a pinch is at, in the page's middle.
-func (w *bookWin) drawPinch(a *bro, z int) {
+// drawPinch shows where a pinch is: a frame round what the window
+// will show, zoomed so, and the zoom in its middle; what it drew
+// before, the page again.
+func (w *bookWin) drawPinch(a *bro, p *pinch) {
 	if !a.shows(w) {
 		return
 	}
+	c, old := a.C, p.drawn
+	w.pageUnder(a, old)
+	zone := w.pinchZone(p.z, p.at).Intersect(w.area)
+	if zone.Dx() > 12 && zone.Dy() > 12 && zone != w.area {
+		c.Frame(zone, 5, kobo.Black)
+		c.Frame(zone.Inset(5), 3, kobo.White)
+	}
 	m := w.area.Min.Add(w.area.Max).Div(2)
+	if !zone.Empty() {
+		m = zone.Min.Add(zone.Max).Div(2)
+	}
 	r := image.Rect(m.X-150, m.Y-45, m.X+150, m.Y+45)
-	c := a.C
+	r = r.Add(image.Pt(max(0, w.area.Min.X-r.Min.X)+min(0, w.area.Max.X-r.Max.X), max(0, w.area.Min.Y-r.Min.Y)+min(0, w.area.Max.Y-r.Max.Y)))
 	c.Fill(r, kobo.White)
 	c.Frame(r, 3, kobo.Black)
-	c.Text(a.F.Body, r, fmt.Sprintf("zoom %d%%", z), kobo.Black, kobo.AlignCenter)
-	a.Mark(r, false)
+	c.Text(a.F.Body, r, fmt.Sprintf("zoom %d%%", p.z), kobo.Black, kobo.AlignCenter)
+	p.drawn = r.Union(zone)
+	a.Mark(old.Union(p.drawn), false)
+}
+
+// pinchZone is where on the screen what the window would show zoomed
+// to z round p is now: as setZoom will place it.
+func (w *bookWin) pinchZone(z int, p image.Point) image.Rectangle {
+	s, err := w.pdfPage(w.spine, w.laid)
+	if err != nil || w.zoom <= 0 {
+		return image.Rectangle{}
+	}
+	b, v, sz := s.img.Bounds(), w.view, w.area.Size()
+	k := float64(z) / float64(w.zoom) // the page that much bigger
+	q := image.Pt(b.Dx()/2, b.Dy()/2) // p's point on the page now
+	if p.In(v.dst) {
+		q = p.Sub(v.dst.Min).Add(v.sp).Sub(b.Min)
+	}
+	scale := func(q image.Point, k float64) image.Point {
+		return image.Pt(int(float64(q.X)*k), int(float64(q.Y)*k))
+	}
+	big := scale(b.Size(), k)
+	o := scale(q, k).Sub(p.Sub(w.area.Min)) // the window's top left on the page zoomed
+	o.X = max(0, min(o.X, big.X-sz.X))
+	o.Y = max(0, min(o.Y, big.Y-sz.Y))
+	at := scale(o, 1/k)
+	r := image.Rectangle{at, at.Add(scale(sz, 1/k))}
+	return r.Add(b.Min).Sub(v.sp).Add(v.dst.Min)
+}
+
+// pageUnder draws the page shown again in r, white off it.
+func (w *bookWin) pageUnder(a *bro, r image.Rectangle) {
+	r = r.Intersect(w.area)
+	if r.Empty() {
+		return
+	}
+	a.C.Fill(r, kobo.White)
+	s, err := w.pdfPage(w.spine, w.laid)
+	if err != nil {
+		return
+	}
+	v := w.view
+	in := r.Intersect(v.dst)
+	kobo.CopyGray(a.C.Gray, in, s.img, in.Min.Sub(v.dst.Min).Add(v.sp))
 }
 
 func dist(p, q image.Point) float64 {

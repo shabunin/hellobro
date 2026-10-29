@@ -598,8 +598,9 @@ whole, meeting in the middle as a book's do, turned two at a time, the
 next two drawn while you read. A cut works on either. A page
 bigger than the screen is read in screenfuls, across then down, a
 little of each showing again on the next. Two fingers pinched apart or
-together on a page zoom it in or out round the point between them: the
-zoom shows while they move, and the page is drawn again when they lift.
+together on a page zoom it in or out round the point between them:
+while they move, a frame on the page shows what will fill the screen,
+with the zoom in it, and the page is drawn again when they lift.
 Zoomed bigger than the screen, a finger dragged on the page moves it,
 anywhere (it moves in black and white, then is drawn whole when the
 finger lifts); a tap, a key or a swipe goes on a screenful from there.
@@ -618,11 +619,13 @@ To cut a part of a PDF's page out, draw a rectangle across it with the
 pen, or hold a finger still on the page a moment, then move it (as to
 select in a terminal). Or take the select tool, the rectangle with
 dots at its corners in the strip under the page (PDFs only; black
-while it's in hand): tap one corner, then the opposite one, without
-dragging. Each corner then has a dot: tap one (it fills in black) and tap
-where it should be, the corner across staying where it is; a finger
-dragged on the page draws a rectangle at once too. Tap the tool again,
-or Esc, to put it down. Under the rectangle:
+while it's in hand): drag a finger across the page, and the rectangle
+follows it at once; or tap one corner, then the opposite one. Each
+corner then has a dot. Drag a dot to move that corner, a side to move
+that side, or the inside to move the whole rectangle; a drag anywhere
+else draws a new one. Or tap a dot (it fills in black) and tap where
+it should be, the corner across staying where it is. Tap the tool
+again, or Esc, to put it down. Under the rectangle:
 
 - **copy**: its words (whole ones, line by line) into the clipboard,
   which the terminals paste (Ctrl+Shift+V), and its picture, which a

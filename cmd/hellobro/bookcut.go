@@ -2,9 +2,12 @@ package main
 
 // Cutting a part of a PDF's page out: the pen drawn across the page, or
 // a finger held still a moment then moved (as in the terminals), makes a
-// rectangle. So does the select tool (its button under the page), by
-// taps alone: one corner, then the other; a tap on a corner's dot picks
-// it, the next tap puts it there. By the rectangle are its buttons: copy it (its text into the
+// rectangle. So does the select tool (its button under the page): a
+// finger dragged across at once, or taps, one corner, then the other.
+// With it the rectangle changes by fingers too: a corner's dot dragged
+// moves that corner, a side dragged that side, the inside the whole of
+// it; or a dot tapped picks it, and the next tap puts it there. By the
+// rectangle are its buttons: copy it (its text into the
 // clipboard, which the terminals paste; and its picture, which a
 // notebook pastes: notepic.go), save it (a picture at 300 dpi and its
 // text, in Clips/ on the Kobo's storage, and as Clips/latest.png and
@@ -32,17 +35,30 @@ const (
 	cutDPI     = 300  // a cut saved: as sharp as a print
 	cutMaxPx   = 3000 // but no bigger, along its longer side
 	cutMin     = 24   // px: a rectangle smaller isn't one
+	edgeHit    = 40   // px from a side a drag moves it
+)
+
+// What of the cut a drag with the select tool moves (bookCut.resize):
+// sides, two of them a corner; or all of it.
+const (
+	cutL = 1 << iota
+	cutT
+	cutR
+	cutB
+	cutAll
 )
 
 // bookCut is a gesture cutting a part out, while it's on.
 type bookCut struct {
 	w        *bookWin
 	g        *kobo.Gesture
-	v        pdfView     // the page it's on
-	pan      bool        // a finger moving the page (bookzoom.go), not a cut
-	panFrom  image.Point // where the page was, its point at the window's top left
-	early    float64     // how far the finger got in its first moment
-	on       bool        // cutting: the gesture is ours
+	v        pdfView         // the page it's on
+	pan      bool            // a finger moving the page (bookzoom.go), not a cut
+	resize   int             // the select tool's drag changing the cut: what of it (cutL...)
+	orig     image.Rectangle // the cut, as it was
+	panFrom  image.Point     // where the page was, its point at the window's top left
+	early    float64         // how far the finger got in its first moment
+	on       bool            // cutting: the gesture is ours
 	from, to image.Point
 	shown    image.Rectangle // the frame on the screen now
 	drawn    time.Time
@@ -58,8 +74,68 @@ func (a *bro) cutStart(p image.Point, g *kobo.Gesture) bool {
 	if !on {
 		return false
 	}
-	a.bk.cut = &bookCut{w: w, v: v, g: g, from: p, to: p}
+	s := &bookCut{w: w, v: v, g: g, from: p, to: p}
+	if w.selecting && !w.cut.Empty() {
+		if s.resize = w.cutHit(p); s.resize != 0 {
+			s.v, s.orig = w.view, w.cut
+		}
+	}
+	a.bk.cut = s
 	return true
+}
+
+// cutHit is what of the cut a drag from p moves: a corner, a side, the
+// whole (from inside), or nothing (0).
+func (w *bookWin) cutHit(p image.Point) int {
+	for i, c := range w.corners() {
+		if d := p.Sub(c); d.X*d.X+d.Y*d.Y <= cornerHit*cornerHit {
+			return [4]int{cutL | cutT, cutT | cutR, cutR | cutB, cutB | cutL}[i]
+		}
+	}
+	r := w.cut
+	near := func(a, b int) bool { return max(a-b, b-a) <= edgeHit }
+	switch {
+	case !p.In(r.Inset(-edgeHit)):
+		return 0
+	case near(p.X, r.Min.X):
+		return cutL
+	case near(p.X, r.Max.X):
+		return cutR
+	case near(p.Y, r.Min.Y):
+		return cutT
+	case near(p.Y, r.Max.Y):
+		return cutB
+	case p.In(r):
+		return cutAll
+	}
+	return 0
+}
+
+// rect is the rectangle the gesture makes now, on its page.
+func (s *bookCut) rect() image.Rectangle {
+	in := s.w.view.dst
+	if s.resize == 0 {
+		return image.Rectangle{s.from, s.to}.Canon().Intersect(in)
+	}
+	d, r := s.to.Sub(s.from), s.orig
+	if s.resize == cutAll { // moved whole, kept on the page
+		d.X = max(in.Min.X-r.Min.X, min(in.Max.X-r.Max.X, d.X))
+		d.Y = max(in.Min.Y-r.Min.Y, min(in.Max.Y-r.Max.Y, d.Y))
+		return r.Add(d)
+	}
+	if s.resize&cutL != 0 {
+		r.Min.X += d.X
+	}
+	if s.resize&cutT != 0 {
+		r.Min.Y += d.Y
+	}
+	if s.resize&cutR != 0 {
+		r.Max.X += d.X
+	}
+	if s.resize&cutB != 0 {
+		r.Max.Y += d.Y
+	}
+	return r.Canon().Intersect(in)
 }
 
 // cutMove follows it: the pen cuts as soon as it moves, a finger once
@@ -95,19 +171,23 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 			return
 		}
 		s.on, g.Owner = true, ownSelect
-		if !w.cut.Empty() {
-			w.cut = image.Rectangle{}
+		if !w.cut.Empty() || w.corner != nil {
+			w.cut, w.corner, w.grab = image.Rectangle{}, nil, 0
 			w.draw(a)
 		}
 		w.view = s.v
-		log.Print("pdf: cutting")
+		if s.resize != 0 {
+			log.Printf("pdf: the cut dragged (%d)", s.resize)
+		} else {
+			log.Print("pdf: cutting")
+		}
 	}
 	s.to = p
 	if time.Since(s.drawn) < 150*time.Millisecond {
 		return
 	}
 	s.drawn = time.Now()
-	r := image.Rectangle{s.from, s.to}.Canon().Intersect(w.view.dst)
+	r := s.rect()
 	if sh, err := w.pdfPage(w.view.spine, w.laid); err == nil && !s.shown.Empty() { // the page back under the old frame
 		old := s.shown.Intersect(w.view.dst)
 		kobo.CopyGray(a.C.Gray, old, sh.img, old.Min.Sub(w.view.dst.Min).Add(w.view.sp))
@@ -132,9 +212,11 @@ func (a *bro) cutLift(g *kobo.Gesture) bool {
 		return false
 	}
 	w := s.w
-	if r := (image.Rectangle{s.from, s.to}).Canon().Intersect(w.view.dst); r.Dx() >= cutMin && r.Dy() >= cutMin {
+	if r := s.rect(); r.Dx() >= cutMin && r.Dy() >= cutMin {
 		w.dropCut()
 		w.cut = r
+	} else if s.resize != 0 { // too small: as it was
+		w.cut = s.orig
 	}
 	w.draw(a)
 	return true
