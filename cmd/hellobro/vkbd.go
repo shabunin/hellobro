@@ -127,9 +127,12 @@ func vkLayout(page image.Rectangle) ([]vkey, image.Rectangle) {
 	return keys, image.Rect(page.Min.X+sw, page.Min.Y, page.Max.X-sw, top)
 }
 
-// vkPlace lays it out on page, if it shows, and says what's left.
+// vkPlace lays it out on page, if it shows, and says what's left. The
+// keys held let go: a rotate forgets the fingers, and their lifts never
+// come, so a key would go on repeating.
 func (a *bro) vkPlace(page image.Rectangle) image.Rectangle {
 	v := &a.vk
+	a.vkRelease()
 	v.gen++
 	v.keys = nil
 	if !v.on {
@@ -287,6 +290,17 @@ func (a *bro) vkLift(g *kobo.Gesture) bool {
 	return true
 }
 
+// vkRelease lets go the keys held and the modifiers.
+func (a *bro) vkRelease() {
+	for g, h := range a.vk.held {
+		if h.sent {
+			a.Key(kobo.KeyMsg{Code: h.k.code, Value: 0})
+		}
+		delete(a.vk.held, g)
+	}
+	a.vkLetGo()
+}
+
 // vkLetGo lets the modifiers go.
 func (a *bro) vkLetGo() {
 	for code, on := range a.vk.latched {
@@ -348,13 +362,6 @@ func (a *bro) vkApply() {
 	v := &a.vk
 	if on := a.vkWanted(); on != v.on {
 		log.Printf("on-screen keyboard: %v", on)
-		for g, h := range v.held {
-			if h.sent {
-				a.Key(kobo.KeyMsg{Code: h.k.code, Value: 0})
-			}
-			delete(v.held, g)
-		}
-		a.vkLetGo()
 		v.on = on
 		a.Layout(a.lay)
 		if !a.overlay() && !a.Calibrating() {

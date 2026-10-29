@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // testEPUB writes an EPUB of files (and the container and package
@@ -198,5 +199,23 @@ func TestImageTooBig(t *testing.T) {
 	}
 	if m, err := b.Image("OPS/small.png"); err != nil || m.Bounds().Dx() != 2 {
 		t.Errorf("small: %v", err)
+	}
+}
+
+func TestStripComments(t *testing.T) {
+	for in, want := range map[string]string{
+		"p{a:b}":                "p{a:b}",
+		"/*x*/p{/* y */a:b}/*z": " p{ a:b}",
+		"a/**/b/*/c*/d":         "a b d",
+	} {
+		if got := stripComments(in); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+	many := strings.Repeat("/* a comment */p{a:b}", 200000) // 4 MB: was minutes
+	start := time.Now()
+	stripComments(many)
+	if d := time.Since(start); d > 2*time.Second {
+		t.Errorf("%v for 200000 comments", d)
 	}
 }

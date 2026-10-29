@@ -966,9 +966,9 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		case code == 108 || ch == "j":
 			w.sel++
 		case code == 104: // PgUp
-			w.sel -= max(1, len(w.rows)-1)
+			w.sel -= max(1, w.listN)
 		case code == 109:
-			w.sel += max(1, len(w.rows)-1)
+			w.sel += max(1, w.listN)
 		case code == kobo.KeyEnter:
 			w.listOpen(a, w.sel)
 			return true

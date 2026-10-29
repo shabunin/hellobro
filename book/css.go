@@ -14,20 +14,29 @@ type decl struct{ prop, val string }
 // sheet is a stylesheet's rules, by selector: "p", ".c", "p.c".
 type sheet struct{ rules map[string][]decl }
 
-func parseCSS(src string) *sheet {
-	s := &sheet{rules: map[string][]decl{}}
+// stripComments is src without its comments, each a space: in one pass
+// (a sheet of many, cut out one by one, was copied whole for each).
+func stripComments(src string) string {
+	var b strings.Builder
 	for {
 		i := strings.Index(src, "/*")
 		if i < 0 {
-			break
+			b.WriteString(src)
+			return b.String()
 		}
+		b.WriteString(src[:i])
 		j := strings.Index(src[i+2:], "*/")
-		if j < 0 {
-			src = src[:i]
-			break
+		if j < 0 { // never closed: the rest is the comment
+			return b.String()
 		}
-		src = src[:i] + " " + src[i+2+j+2:]
+		b.WriteByte(' ')
+		src = src[i+2+j+2:]
 	}
+}
+
+func parseCSS(src string) *sheet {
+	s := &sheet{rules: map[string][]decl{}}
+	src = stripComments(src)
 	for {
 		src = strings.TrimSpace(src)
 		if src == "" {
