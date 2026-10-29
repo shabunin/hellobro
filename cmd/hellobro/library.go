@@ -233,3 +233,51 @@ func (a *bro) drawLibRow(r image.Rectangle, it libItem, lit bool, open func(), b
 	c.Text(f, text, it.name, ink, kobo.AlignLeft)
 	return append(rows, bookRow{r, open})
 }
+
+// drawNameEdit draws a name being typed in r, after prompt, with ok and
+// cancel: their rows, and the box's (a tap on it does nothing).
+func (a *bro) drawNameEdit(r image.Rectangle, prompt, text string, ok, cancel func()) []bookRow {
+	c := a.C
+	bw := r.Dy() + 64
+	okR := image.Rect(r.Max.X-2*bw-8, r.Min.Y, r.Max.X-bw-8, r.Max.Y).Inset(6)
+	no := image.Rect(r.Max.X-bw, r.Min.Y, r.Max.X, r.Max.Y).Inset(6)
+	box := image.Rect(r.Min.X, r.Min.Y+4, okR.Min.X-12, r.Max.Y-4)
+	c.Fill(box, kobo.White)
+	c.Frame(box, 3, kobo.Black)
+	t := box.Inset(12)
+	pw := kobo.TextWidth(a.F.Small, prompt)
+	c.Text(a.F.Small, image.Rect(t.Min.X, t.Min.Y, t.Min.X+pw, t.Max.Y), prompt, kobo.Mid, kobo.AlignLeft)
+	t.Min.X += pw
+	c.Text(a.F.Body, t, text, kobo.Black, kobo.AlignLeft)
+	cx := min(t.Max.X-3, t.Min.X+kobo.TextWidth(a.F.Body, text)+2) // the caret
+	c.Fill(image.Rect(cx, t.Min.Y+4, cx+3, t.Max.Y-4), kobo.Black)
+	var rows []bookRow
+	for _, b := range []struct {
+		r     image.Rectangle
+		label string
+		do    func()
+	}{{okR, "ok", ok}, {no, "cancel", cancel}} {
+		c.Frame(b.r, 2, kobo.Black)
+		c.Text(a.F.Panel, b.r, b.label, kobo.Black, kobo.AlignCenter)
+		rows = append(rows, bookRow{b.r, b.do})
+	}
+	return append(rows, bookRow{box, func() {}})
+}
+
+// nameKey types a key into a name: Enter is done with it, Esc done
+// without it (ok false).
+func nameKey(text *string, code uint16, ch string) (done, ok bool) {
+	switch {
+	case code == kobo.KeyEnter:
+		return true, true
+	case code == kobo.KeyEsc:
+		return true, false
+	case code == kobo.KeyBackspace:
+		if r := []rune(*text); len(r) > 0 {
+			*text = string(r[:len(r)-1])
+		}
+	case ch != "" && ch != "\t" && ch != "\n":
+		*text += ch
+	}
+	return false, false
+}

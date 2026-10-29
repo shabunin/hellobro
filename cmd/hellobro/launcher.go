@@ -16,7 +16,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -136,11 +135,7 @@ func (a *bro) lastBooks(n int) []libEntry {
 		if pl.Read == 0 {
 			continue
 		}
-		name := pl.Title
-		if name == "" {
-			name = strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-		}
-		es = append(es, libEntry{key: p, name: name, note: fmt.Sprintf("%d%% read", pl.Pct), at: pl.Read})
+		es = append(es, libEntry{key: p, name: placeName(p, pl), note: fmt.Sprintf("%d%% read", pl.Pct), at: pl.Read})
 	}
 	slices.SortFunc(es, func(x, y libEntry) int { return int(y.at - x.at) })
 	var out []libEntry

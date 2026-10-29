@@ -199,35 +199,11 @@ func (w *notesWin) draw(a *bro) {
 
 // drawEdit draws the name being typed in r, with ok and cancel.
 func (w *notesWin) drawEdit(a *bro, r image.Rectangle) {
-	c := a.C
-	e := w.edit
-	bw := r.Dy() + 64
-	ok := image.Rect(r.Max.X-2*bw-8, r.Min.Y, r.Max.X-bw-8, r.Max.Y).Inset(6)
-	no := image.Rect(r.Max.X-bw, r.Min.Y, r.Max.X, r.Max.Y).Inset(6)
-	box := image.Rect(r.Min.X, r.Min.Y+4, ok.Min.X-12, r.Max.Y-4)
-	c.Fill(box, kobo.White)
-	c.Frame(box, 3, kobo.Black)
 	prompt := "name: "
-	if e.key == "" {
+	if w.edit.key == "" {
 		prompt = "new folder: "
 	}
-	t := box.Inset(12)
-	pw := kobo.TextWidth(a.F.Small, prompt)
-	c.Text(a.F.Small, image.Rect(t.Min.X, t.Min.Y, t.Min.X+pw, t.Max.Y), prompt, kobo.Mid, kobo.AlignLeft)
-	t.Min.X += pw
-	c.Text(a.F.Body, t, e.text, kobo.Black, kobo.AlignLeft)
-	cx := min(t.Max.X-3, t.Min.X+kobo.TextWidth(a.F.Body, e.text)+2) // the caret
-	c.Fill(image.Rect(cx, t.Min.Y+4, cx+3, t.Max.Y-4), kobo.Black)
-	for _, b := range []struct {
-		r     image.Rectangle
-		label string
-		do    func()
-	}{{ok, "ok", func() { w.endEdit(a, true) }}, {no, "cancel", func() { w.endEdit(a, false) }}} {
-		c.Frame(b.r, 2, kobo.Black)
-		c.Text(a.F.Panel, b.r, b.label, kobo.Black, kobo.AlignCenter)
-		w.rows = append(w.rows, bookRow{b.r, b.do})
-	}
-	w.rows = append(w.rows, bookRow{box, func() {}})
+	w.rows = append(w.rows, a.drawNameEdit(r, prompt, w.edit.text, func() { w.endEdit(a, true) }, func() { w.endEdit(a, false) })...)
 }
 
 // open opens the folder, or the notebook in this window (or focuses
@@ -563,18 +539,9 @@ func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 	}
 	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
 	if e := w.edit; e != nil {
-		switch {
-		case code == kobo.KeyEnter:
-			w.endEdit(a, true)
-		case code == kobo.KeyEsc:
-			w.endEdit(a, false)
-		case code == kobo.KeyBackspace:
-			if r := []rune(e.text); len(r) > 0 {
-				e.text = string(r[:len(r)-1])
-			}
-			w.draw(a)
-		case ch != "" && ch != "\t" && ch != "\n":
-			e.text += ch
+		if done, ok := nameKey(&e.text, code, ch); done {
+			w.endEdit(a, ok)
+		} else {
 			w.draw(a)
 		}
 		return true

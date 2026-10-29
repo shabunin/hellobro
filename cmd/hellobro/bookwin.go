@@ -108,6 +108,7 @@ func (a *bro) setBookStyle(st bookStyle) {
 // bookPlace is where a book was left.
 type bookPlace struct {
 	Title string `json:"title,omitempty"`
+	Name  string `json:"name,omitempty"` // given on the shelf (bookrename.go)
 	Spine int    `json:"spine"`
 	Block int    `json:"block"`
 	Off   int    `json:"off"`
@@ -194,16 +195,20 @@ type bookWin struct {
 	listN      int // the rows the list has room for
 	rows       []bookRow
 	shelf      []shelfBook
-	looking    bool   // the shelf is being looked for
-	shelfTab   int    // its tab: libRecent, libAll, libFolders
-	shelfDir   string // the folder it shows, under booksRoot
-	back       string // the book it was opened from, to go back to
+	looking    bool      // the shelf is being looked for
+	shelfTab   int       // its tab: libRecent, libAll, libFolders
+	shelfDir   string    // the folder it shows, under booksRoot
+	back       string    // the book it was opened from, to go back to
+	named      string    // the name it was given, if it was (bookrename.go)
+	edit       *noteEdit // a shelf's book's name being typed: key its path
 }
 
 func (w *bookWin) Title() string {
 	switch {
 	case w.path == "":
 		return "Books"
+	case w.named != "":
+		return w.named
 	case w.b != nil && w.b.Title != "":
 		t, _, _ := strings.Cut(w.b.Title, " / ") // Gutenberg's: "Alice… / Illustrated by…"
 		return t
@@ -226,7 +231,7 @@ func (a *bro) newBookWin(path string) *bookWin {
 		a.findBooks(w)
 		return w
 	}
-	w.opening = true
+	w.opening, w.named = true, a.mem.Books[path].Name
 	go func() { // a big book, or a damaged PDF MuPDF reads whole, takes a while: the screen doesn't wait
 		t := time.Now()
 		o := openBookFile(path)
@@ -768,7 +773,16 @@ func (w *bookWin) drawShelf(a *bro) {
 	for k := 0; k < n && w.top+k < len(items); k++ {
 		i := w.top + k
 		r := image.Rect(area.Min.X, area.Min.Y+k*rowH, area.Max.X, area.Min.Y+(k+1)*rowH)
-		w.rows = append(w.rows, a.drawLibRow(r, items[i], i == w.sel, func() { w.listOpen(a, i) })...)
+		it := items[i]
+		if e := w.edit; e != nil && e.key == it.key && !it.dir {
+			w.rows = append(w.rows, a.drawNameEdit(r, "name: ", e.text, func() { w.endRename(a, true) }, func() { w.endRename(a, false) })...)
+			continue
+		}
+		var btns []libTab
+		if !it.dir {
+			btns = []libTab{{"rename", false, func() { w.startRename(a, it.key, it.name) }}}
+		}
+		w.rows = append(w.rows, a.drawLibRow(r, it, i == w.sel, func() { w.listOpen(a, i) }, btns...)...)
 	}
 }
 
@@ -806,10 +820,7 @@ func (a *bro) findBooks(w *bookWin) {
 			if (strings.HasSuffix(strings.ToLower(d.Name()), ".epub") || isPDF(d.Name())) && len(found) < bookShelfMax {
 				b := shelfBook{path: p, name: shelfName(d.Name())}
 				if pl, ok := known[p]; ok {
-					b.pct, b.read = pl.Pct, pl.Read
-					if pl.Title != "" {
-						b.name = pl.Title
-					}
+					b.pct, b.read, b.name = pl.Pct, pl.Read, placeName(p, pl)
 				}
 				found = append(found, b)
 			}
@@ -911,7 +922,7 @@ func (w *bookWin) save(a *bro) {
 	if len(w.pages) == 0 { // its chapter's being laid out: as far as it was
 		pct = a.mem.Books[w.path].Pct
 	}
-	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: pct, Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode, Zoom: w.zoom}
+	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Name: w.named, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: pct, Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode, Zoom: w.zoom}
 	a.mem.save()
 	w.savedAt = time.Now()
 }
@@ -936,6 +947,14 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
 	if w.styling {
 		return w.styleKey(a, code, ch)
+	}
+	if e := w.edit; e != nil {
+		if done, ok := nameKey(&e.text, code, ch); done {
+			w.endRename(a, ok)
+		} else {
+			w.draw(a)
+		}
+		return true
 	}
 	if w.list && w.listPages {
 		by := map[uint16]int{103: -w.listCols, 108: w.listCols, 105: -1, 106: 1, 104: -w.listN, 109: w.listN}
@@ -980,6 +999,11 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 			return true
 		case code == kobo.KeyEsc && w.path == "" && w.back != "":
 			w.fromShelf(a)
+			return true
+		case code == 60 && w.path == "": // F2: rename
+			if items := w.shelfItems(); w.sel < len(items) && !items[w.sel].dir {
+				w.startRename(a, items[w.sel].key, items[w.sel].name)
+			}
 			return true
 		case code == kobo.KeyEsc && w.b != nil, ch == "t" && w.b != nil:
 			w.list = false
@@ -1110,6 +1134,11 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 }
 
 func (w *bookWin) closing(a *bro) {
+	if w.edit != nil {
+		w.edit = nil
+		a.vk.ask = false
+		a.vkApply()
+	}
 	w.gone = true
 	w.save(a)
 	if w.pdf != nil {

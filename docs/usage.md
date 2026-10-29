@@ -584,6 +584,10 @@ and for PDFs, drawn by MuPDF (below).
   next tab, Backspace up a folder; the tab and the folder are kept.
   Beside a book read is how far in you are.
 - Tap a book, or pick it with ↑ ↓ and Enter. It opens where you left it.
+- **rename** on a book's row (or F2) types its name in the row, as in
+  All Notebooks: Enter or **ok** keeps it. Its file is renamed beside
+  it (a `.kepub.epub` stays one), and the name shows from then on, over
+  the book's own title; its place and bookmarks go with it.
 - The book's lists and panels (its contents, bookmarks, pages and
   style) all have the same header: **‹ All Books** at the top left, the
   shelf, and **back to the book** at the top right. The shelf opened
