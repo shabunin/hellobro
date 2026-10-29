@@ -1035,14 +1035,14 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 		lost, how := back.ended()
 		a.Do(func() { a.termEnded(t, gen, err, lost, how) })
 	}()
-	go func() { // emulator (keys, mouse, replies to queries) → remote
+	q := sendTo(back)
+	go func() { // emulator (keys, mouse, replies to queries) → remote, by way of q: never waiting on it
+		defer q.close()
 		buf := make([]byte, 4096)
 		for {
 			n, err := emu.Read(buf)
 			if n > 0 {
-				if _, werr := back.Write(buf[:n]); werr != nil {
-					return
-				}
+				q.put(buf[:n])
 			}
 			if err != nil {
 				return
