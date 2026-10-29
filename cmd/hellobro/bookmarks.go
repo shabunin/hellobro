@@ -208,11 +208,13 @@ func (w *bookWin) drawFoot(a *bro) {
 	out, fit, in := w.zoomButtons()
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
 	last := mark.Union(sel).Union(in)
-	name := w.chapterName()
+	name, ink := w.chapterName(), uint8(kobo.Mid)
 	if w.pdf != nil {
 		name = w.pdfFootName()
+	} else if w.from != nil {
+		name, ink = "‹ back", kobo.Black
 	}
-	c.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, toc.Min.X-12, foot.Max.Y), name, kobo.Mid, kobo.AlignLeft)
+	c.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, toc.Min.X-12, foot.Max.Y), name, ink, kobo.AlignLeft)
 	c.Text(a.F.Small, image.Rect(last.Max.X+12, foot.Min.Y, foot.Max.X, foot.Max.Y), fmt.Sprintf("%d%%", w.pct()), kobo.Mid, kobo.AlignRight)
 	// ☰: three lines
 	m := toc.Min.Add(toc.Max).Div(2)
@@ -308,6 +310,8 @@ func (w *bookWin) footTap(a *bro, p image.Point) bool {
 		w.openStyle(a)
 	case p.In(mark):
 		w.toggleMark(a)
+	case w.from != nil && p.X < toc.Min.X: // "‹ back", after a link
+		w.goBack(a)
 	default:
 		return false
 	}

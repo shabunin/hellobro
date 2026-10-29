@@ -200,6 +200,8 @@ type bookWin struct {
 	shelfDir   string    // the folder it shows, under booksRoot
 	back       string    // the book it was opened from, to go back to
 	named      string    // the name it was given, if it was (bookrename.go)
+	note       *bookNote // a link's target over the page (booknote.go)
+	from       *bookFrom // where a link was followed from
 	edit       *noteEdit // a shelf's book's name being typed: key its path
 }
 
@@ -343,6 +345,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	w.rows = nil
 	w.pageShown = false
 	w.dropCut()
+	w.note = nil
 	if p.Outer.Empty() {
 		return
 	}
@@ -538,6 +541,7 @@ func (w *bookWin) drawPage(a *bro) {
 	w.pics = pics // only these pages' are kept
 	w.drawPageMark(a)
 	w.drawFoot(a)
+	w.drawNote(a)
 }
 
 // drawLaid draws page n of the chapter with its top left at at; the
@@ -864,6 +868,7 @@ func (w *bookWin) goTo(spine int, pos book.Pos) {
 		w.ch, w.pics, w.pages = nil, nil, nil
 	}
 	w.dropCut()
+	w.note = nil
 	w.spine, w.at, w.panned = spine, pos, false
 	w.laid = bookLaid{}
 }
@@ -873,6 +878,7 @@ func (w *bookWin) turn(a *bro, d int) {
 	if w.b == nil || len(w.pages) == 0 || w.laying != nil { // the next pages aren't laid out yet
 		return
 	}
+	w.note = nil
 	two, step := w.laid.two, 1 // two side by side: a PDF's chapters, its pages, go two at a time too
 	if two && (d == 1 || d == -1) {
 		d *= 2
@@ -1025,6 +1031,18 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.draw(a)
 		return true
 	}
+	if n := w.note; n != nil { // Enter goes there, Esc closes it, another key too and goes on
+		w.note = nil
+		switch {
+		case code == kobo.KeyEnter && n.page != nil:
+			w.goThere(a, n.link)
+			return true
+		case code == kobo.KeyEsc:
+			w.draw(a)
+			return true
+		}
+		w.draw(a)
+	}
 	switch {
 	case code == kobo.KeyEsc && (!w.cut.Empty() || w.corner != nil):
 		w.dropCut()
@@ -1109,6 +1127,10 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 		}
 		return
 	}
+	if w.note != nil {
+		w.noteTap(a, p)
+		return
+	}
 	if !w.cut.Empty() { // a part cut out: its buttons, or away with it
 		for _, r := range w.cutRows {
 			if p.In(r.r) {
@@ -1120,9 +1142,12 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 		w.draw(a)
 		return
 	}
+	link := w.linkAt(p)
 	switch {
 	case p.In(w.markCorner()) && w.b != nil:
 		w.toggleMark(a)
+	case link != "":
+		w.followLink(a, link)
 	case p.Y < body.Min.Y+body.Dy()/8:
 		w.openContents(a)
 	case p.Y >= w.area.Max.Y && w.b != nil && w.footTap(a, p):

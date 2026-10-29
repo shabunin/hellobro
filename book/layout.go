@@ -46,7 +46,9 @@ type Item struct {
 	W, H  int    // a picture's, a rule's
 	Text  string // text: what; a picture: its Src
 	Style Style
-	Px    int // text: its size
+	Px    int    // text: its size
+	Link  string // text: the link it's in (Span's)
+	Note  bool   // the link is a note's: it says so, or it's raised
 }
 
 // Pos is a place in a chapter: a block, a byte in its text.
@@ -81,7 +83,9 @@ type frag struct {
 	px    int
 	off   int // in the block's text
 	space bool
-	br    bool // a line break
+	br    bool   // a line break
+	link  string // Span's
+	note  bool
 	w     fixed.Int26_6
 	soft  []int // where the book has soft hyphens in it (byte offsets)
 }
@@ -233,7 +237,7 @@ func (l *layout) frags(b *Block) []frag {
 		px := l.sizeOf(sp)
 		face := l.faces.Face(sp.Style&^(Sup|Sub), px)
 		add := func(text string, at int, space, br bool) {
-			f := frag{text: text, style: sp.Style, px: px, off: at, space: space, br: br}
+			f := frag{text: text, style: sp.Style, px: px, off: at, space: space, br: br, link: sp.Link, note: sp.Note || sp.Link != "" && sp.Style&Sup != 0}
 			if strings.Contains(text, "\u00ad") { // soft hyphens: not shown, but where it breaks
 				var t strings.Builder
 				for _, r := range text {
@@ -448,7 +452,7 @@ func (l *layout) setLine(line []frag, b *Block, bi, left, width int, align Align
 	items := l.page.Items
 	for _, f := range line {
 		if f.space {
-			if n := len(items); extra == 0 && n > len(l.page.Items) && items[n-1].Style == f.style&^(Sup|Sub) && items[n-1].W == x.Round() {
+			if n := len(items); extra == 0 && n > len(l.page.Items) && items[n-1].Style == f.style&^(Sup|Sub) && items[n-1].W == x.Round() && items[n-1].Link == f.link {
 				items[n-1].Text += f.text // with the words around it, when it isn't stretched
 				items[n-1].W = (x + f.w).Round()
 			}
@@ -466,11 +470,12 @@ func (l *layout) setLine(line []frag, b *Block, bi, left, width int, align Align
 		}
 		// one item for a run in one style, up to a stretched space
 		if n := len(items); n > len(l.page.Items) && extra == 0 && items[n-1].Kind == ItemText && items[n-1].Y == y &&
-			items[n-1].Style == f.style&^(Sup|Sub) && items[n-1].Px == f.px && items[n-1].W == x.Round() {
+			items[n-1].Style == f.style&^(Sup|Sub) && items[n-1].Px == f.px && items[n-1].W == x.Round() && items[n-1].Link == f.link {
 			items[n-1].Text += f.text
 			items[n-1].W = (x + f.w).Round()
 		} else {
-			items = append(items, Item{Kind: ItemText, X: x.Round(), Y: y, Text: f.text, Style: f.style &^ (Sup | Sub), Px: f.px, W: (x + f.w).Round()})
+			items = append(items, Item{Kind: ItemText, X: x.Round(), Y: y, Text: f.text, Style: f.style &^ (Sup | Sub), Px: f.px, W: (x + f.w).Round(),
+				Link: f.link, Note: f.note})
 		}
 		x += f.w
 	}

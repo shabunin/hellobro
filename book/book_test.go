@@ -219,3 +219,50 @@ func TestStripComments(t *testing.T) {
 		t.Errorf("%v for 200000 comments", d)
 	}
 }
+
+// TestNote: a link's spans say where to, and whether it's a note's; the
+// note is its id's blocks, up to the next id.
+func TestNote(t *testing.T) {
+	b, err := Open(testEPUB(t, map[string]string{
+		"OPS/text/one.xhtml": `<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+<p>See<a epub:type="noteref" href="../notes.xhtml#n1">1</a> and <a href="two%20b.xhtml#t">there</a>, <a href="http://x.org/">not</a>.</p></body></html>`,
+		"OPS/text/two b.xhtml": `<html><body><p id="t">b</p></body></html>`,
+		"OPS/notes.xhtml": `<html><body><aside id="n1"><p>First note.</p><p>More of it.</p></aside>
+<aside id="n2"><p>Second.</p></aside></body></html>`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	ch, err := b.Chapter(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, sp := range ch.Blocks[0].Spans {
+		got = append(got, fmt.Sprintf("%s|%s|%v", sp.Text, sp.Link, sp.Note))
+	}
+	want := []string{"See||false", "1|OPS/notes.xhtml#n1|true", " and ||false", "there|OPS/text/two b.xhtml#t|false", ", not.||false"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("spans:\n%q\nwant\n%q", got, want)
+	}
+	links := map[string]string{}
+	for _, it := range Layout(ch, Settings{W: 600, H: 800, Px: 20}, goFaces{}, nil)[0].Items {
+		if it.Link != "" {
+			links[it.Text] = fmt.Sprint(it.Link, " ", it.Note)
+		}
+	}
+	if len(links) != 2 || links["1"] != "OPS/notes.xhtml#n1 true" || links["there"] != "OPS/text/two b.xhtml#t false" {
+		t.Errorf("laid out: %q", links)
+	}
+	bs, err := b.Note("OPS/notes.xhtml#n1")
+	if err != nil || len(bs) != 2 || bs[1].Spans[0].Text != "More of it." {
+		t.Errorf("note: %v %v", bs, err)
+	}
+	if _, err := b.Note("OPS/notes.xhtml#n9"); err == nil {
+		t.Errorf("no such id")
+	}
+	if b.SpineOf("OPS/text/two b.xhtml") != 1 || b.SpineOf("OPS/notes.xhtml") != -1 {
+		t.Errorf("spine")
+	}
+}

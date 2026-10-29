@@ -599,6 +599,11 @@ and for PDFs, drawn by MuPDF (below).
 - Under the page are three buttons: **☰** the contents, **Aa** the
   style panel, and a ribbon for a bookmark (a PDF's has the select
   tool too, below).
+- A link in an EPUB, tapped (a note's number, say), shows what it
+  points at in a box at the foot of the page: a tap elsewhere (or Esc)
+  closes it, **go there** (or Enter) goes to it. Then **‹ back** is
+  under the page, where the chapter's name was: a tap on it comes back.
+  A link to a whole chapter goes there at once.
 - **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
   (tap one), the size, the lines' spacing, the margins (± each),
   justified and hyphenation (on / off), **Pages** (this book's own,

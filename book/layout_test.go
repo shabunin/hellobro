@@ -41,7 +41,7 @@ func (g goFaces) Face(s Style, px int) font.Face {
 }
 
 func para(text string) Block {
-	return Block{Spans: []Span{{text, 0, 1}}, First: 1.5}
+	return Block{Spans: []Span{{Text: text, Scale: 1}}, First: 1.5}
 }
 
 func lorem(n int) string {
@@ -58,7 +58,7 @@ func TestLayoutLines(t *testing.T) {
 	for i := range 12 {
 		ch.Blocks = append(ch.Blocks, para(fmt.Sprint(i)+" "+lorem(80+i*7)))
 	}
-	ch.Blocks = append(ch.Blocks, Block{Spans: []Span{{"averyveryveryveryveryveryveryveryverylongwordthatwontfitonanyline", 0, 1}}})
+	ch.Blocks = append(ch.Blocks, Block{Spans: []Span{{Text: "averyveryveryveryveryveryveryveryverylongwordthatwontfitonanyline", Scale: 1}}})
 	s := Settings{W: 600, H: 800, Px: 30}
 	pages := Layout(ch, s, goFaces{}, nil)
 	if len(pages) < 4 {
@@ -105,10 +105,10 @@ func TestLayoutLines(t *testing.T) {
 
 func TestLayoutStyles(t *testing.T) {
 	ch := &Chapter{Blocks: []Block{
-		{Head: 2, Align: Center, Spans: []Span{{"Down the ", Bold, 1.4}, {"Rabbit", Bold | Italic, 1.4}}},
-		{Spans: []Span{{"one", 0, 1}, {"\n", 0, 1}, {"two x", 0, 1}, {"2", Sup, 1}}},
+		{Head: 2, Align: Center, Spans: []Span{{Text: "Down the ", Style: Bold, Scale: 1.4}, {Text: "Rabbit", Style: Bold | Italic, Scale: 1.4}}},
+		{Spans: []Span{{Text: "one", Scale: 1}, {Text: "\n", Scale: 1}, {Text: "two x", Scale: 1}, {Text: "2", Style: Sup, Scale: 1}}},
 		{Kind: Rule},
-		{Pre: true, Align: Left, Spans: []Span{{"a := 1\n\tb", Mono, 1}}},
+		{Pre: true, Align: Left, Spans: []Span{{Text: "a := 1\n\tb", Style: Mono, Scale: 1}}},
 	}}
 	s := Settings{W: 600, H: 800, Px: 30}
 	p := Layout(ch, s, goFaces{}, nil)[0]

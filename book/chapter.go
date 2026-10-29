@@ -6,6 +6,8 @@ package book
 
 import (
 	"encoding/xml"
+	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -26,6 +28,8 @@ type Span struct {
 	Text  string
 	Style Style
 	Scale float32 // its size, of the body text's
+	Link  string  // a link in the book: "file#id", the file a path in it
+	Note  bool    // the link says it's a note's (epub:type noteref)
 }
 
 type Kind uint8
@@ -83,6 +87,8 @@ type cstyle struct {
 	indent float32
 	first  float32
 	pre    bool
+	link   string // in an <a href> to the book's own
+	note   bool
 }
 
 type frame struct {
@@ -105,10 +111,12 @@ var blockTags = map[string]bool{
 var headScale = [7]float32{1, 1.6, 1.4, 1.2, 1.1, 1, 0.9}
 
 // Chapter reads the i-th spine item.
-func (b *Book) Chapter(i int) (*Chapter, error) {
+func (b *Book) Chapter(i int) (*Chapter, error) { return b.chapter(b.Spine[i]) }
+
+// chapter reads the XHTML file name, in the spine or not.
+func (b *Book) chapter(name string) (*Chapter, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	name := b.Spine[i]
 	data, err := b.read(name)
 	if err != nil {
 		return nil, err
@@ -117,6 +125,43 @@ func (b *Book) Chapter(i int) (*Chapter, error) {
 	p.parse(data)
 	return p.ch, nil
 }
+
+// noteMax is how much of a note is shown: its blocks, its text.
+const noteMax, noteText = 8, 2000
+
+// Note is what a link (Span's) points at: the blocks from its id up to
+// the next block an id starts in, a few at most. A note's often
+// one paragraph with its number's id in it, or an aside's paragraphs.
+func (b *Book) Note(link string) ([]Block, error) {
+	file, id, _ := strings.Cut(link, "#")
+	ch, err := b.chapter(file)
+	if err != nil {
+		return nil, err
+	}
+	i, ok := ch.IDs[id]
+	if !ok || i >= len(ch.Blocks) {
+		return nil, fmt.Errorf("%s: no %q in it", file, id)
+	}
+	starts := map[int]bool{}
+	for _, k := range ch.IDs {
+		starts[k] = true
+	}
+	end, n := i+1, 0
+	for _, sp := range ch.Blocks[i].Spans {
+		n += len(sp.Text)
+	}
+	for ; end < len(ch.Blocks) && end-i < noteMax && n < noteText && !starts[end]; end++ {
+		for _, sp := range ch.Blocks[end].Spans {
+			n += len(sp.Text)
+		}
+	}
+	bs := slices.Clone(ch.Blocks[i:end])
+	bs[0].Above = 0
+	return bs, nil
+}
+
+// SpineOf is where file is in the spine; -1 if it's not.
+func (b *Book) SpineOf(file string) int { return slices.Index(b.Spine, file) }
 
 type parser struct {
 	b      *Book
@@ -200,6 +245,12 @@ func (p *parser) start(t xml.StartElement) {
 		st.style |= Sup
 	case "sub":
 		st.style |= Sub
+	case "a":
+		if href := attr(t, "href"); href != "" && !strings.Contains(href, ":") { // the book's own, not a URL
+			file, frag := resolve(p.name, href)
+			st.link = file + "#" + frag
+			st.note = strings.Contains(attr(t, "type"), "noteref") || attr(t, "role") == "doc-noteref"
+		}
 	case "small":
 		st.scale *= 0.85
 	case "big":
@@ -489,11 +540,11 @@ func (p *parser) span(s string, st *cstyle) {
 		p.cur.Align, p.cur.Pre, p.cur.Indent, p.cur.First = bst.align, bst.pre, bst.indent, bst.first
 	}
 	sp := p.cur.Spans
-	if n := len(sp); n > 0 && s != "\n" && sp[n-1].Text != "\n" && sp[n-1].Style == st.style && sp[n-1].Scale == st.scale {
+	if n := len(sp); n > 0 && s != "\n" && sp[n-1].Text != "\n" && sp[n-1].Style == st.style && sp[n-1].Scale == st.scale && sp[n-1].Link == st.link {
 		sp[n-1].Text += s
 		return
 	}
-	p.cur.Spans = append(sp, Span{s, st.style, st.scale})
+	p.cur.Spans = append(sp, Span{Text: s, Style: st.style, Scale: st.scale, Link: st.link, Note: st.note})
 }
 
 // flush ends the block being built, if it has anything to show.
