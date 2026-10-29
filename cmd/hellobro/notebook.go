@@ -924,7 +924,7 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		if ok {
 			a.exRun(w.exCmds(a), e.text, func(text string) { w.exOpen(a, text) })
 		}
-		if a.shows(w) {
+		if a.shows(w) && !a.overlay() { // :help's menu stays
 			w.draw(a)
 		}
 		return true

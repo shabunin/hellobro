@@ -979,7 +979,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		if ok {
 			a.exRun(w.exCmds(a), e.text, func(text string) { w.exOpen(a, text) })
 		}
-		if !w.gone {
+		if !w.gone && !a.overlay() { // :help's menu stays
 			w.draw(a)
 		}
 		return true
