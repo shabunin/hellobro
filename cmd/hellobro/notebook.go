@@ -314,6 +314,7 @@ type noteWin struct {
 	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
 	slotSize   image.Point // the page size the slots are for
 	exporting  bool        // a PDF of it being written (noteexport.go)
+	clearAsked time.Time   // "clear" tapped once: again soon, and it clears
 	overview   bool        // the pages shown small (notepages.go)
 	ovSel      int         // the page chosen there
 	ovFirst    int         // the first shown
@@ -438,18 +439,18 @@ func (w *noteWin) layBar(a *bro) {
 	if w.shown() == 2 {
 		clear = "clear pages"
 	}
-	tools := []noteBtn{{id: "pen", label: a.penLabel()}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper", label: w.nb.paper}, {id: "export"}}
+	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "clear", label: clear}, {id: "paste"}, {id: "paper"}, {id: "export"}}
 	drops := []string{"paper", "export", "redo", "paste", "clear"}
 	if w.overview {
 		tools = []noteBtn{{id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
 		drops = []string{"undo", "copy page", "new before"}
 	}
 	pages := []noteBtn{{id: "prev"}, {id: "next"}}
-	width := func(b noteBtn) int { return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8) }
-	for i := range tools {
-		if tools[i].label == "" {
-			tools[i].label = tools[i].id
+	width := func(b noteBtn) int {
+		if b.label == "" { // a picture
+			return w.bar.Dy() + 8
 		}
+		return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8)
 	}
 	const gap = 10
 	counter := kobo.TextWidth(a.F.Small, "999 / 999")
@@ -520,9 +521,20 @@ func (w *noteWin) drawBar(a *bro) {
 		case off:
 			ink = kobo.Mid
 		}
+		label := b.label
+		if b.id == "clear" && w.clearAsking() {
+			bg, ink, label = kobo.Black, kobo.White, "tap again"
+		}
 		c.Fill(b.r, bg)
 		c.Frame(b.r, 2, kobo.Black)
-		c.Text(a.F.Small, b.r, b.label, ink, kobo.AlignCenter)
+		if icon := noteIcon(b.id, w.nb.paper); icon != nil {
+			drawIcon(c, icon, b.r, ink, bg)
+		} else {
+			c.Text(a.F.Small, b.r, label, ink, kobo.AlignCenter)
+		}
+		if b.id == "pen" { // what it writes, under it
+			w.drawPenSample(a, b.r, ink, bg)
+		}
 		if b.id == "prev" || b.id == "next" { // the font has no arrows: a triangle
 			m, h := b.r.Min.Add(b.r.Max).Div(2), b.r.Dy()/4
 			for dy := -h; dy <= h; dy++ {
@@ -712,6 +724,28 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 	w.show(a)
 }
 
+const noteClearAsk = 4 * time.Second // how long "clear" waits for its second tap
+
+// clearAsking is whether "clear" was tapped once, and waits.
+func (w *noteWin) clearAsking() bool { return time.Since(w.clearAsked) < noteClearAsk }
+
+// clearUnask puts "clear" back as it was, if it was asking.
+func (w *noteWin) clearUnask(a *bro) {
+	if w.clearAsked.IsZero() {
+		return
+	}
+	w.clearAsked = time.Time{}
+	w.showBar(a)
+}
+
+// showBar draws the bar again, if the window shows.
+func (w *noteWin) showBar(a *bro) {
+	if a.shows(w) {
+		w.drawBar(a)
+		a.Mark(w.bar, true)
+	}
+}
+
 func (w *noteWin) tap(a *bro, p image.Point) {
 	if kobo.Hit(p, w.counterRect()) {
 		w.overviewOn(a, !w.overview)
@@ -720,6 +754,9 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 	for _, b := range w.btns {
 		if !kobo.Hit(p, b.r) {
 			continue
+		}
+		if b.id != "clear" {
+			w.clearUnask(a)
 		}
 		switch b.id {
 		case "pen", "eraser", "select":
@@ -733,6 +770,20 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		case "undo", "redo":
 			w.doUndo(a, b.id == "undo")
 		case "clear":
+			if !w.clearAsking() { // it asks first
+				asked := time.Now()
+				w.clearAsked = asked
+				w.showBar(a)
+				time.AfterFunc(noteClearAsk, func() {
+					a.Do(func() {
+						if w.clearAsked == asked {
+							w.clearUnask(a)
+						}
+					})
+				})
+				break
+			}
+			w.clearUnask(a)
 			var ops []noteOp
 			for n := w.cur; n < w.cur+w.shown(); n++ {
 				if pg := w.strokes(n); len(pg) > 0 {
@@ -861,6 +912,9 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 			return true
 		}
 		w.closePenMenu(a)
+	}
+	if p.In(w.paperArea()) {
+		w.clearUnask(a)
 	}
 	if w.overview { // the pages, small: a tap or a swipe
 		if !p.In(w.paperArea()) || !ev.Pen && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {

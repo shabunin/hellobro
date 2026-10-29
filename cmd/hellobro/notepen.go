@@ -44,14 +44,18 @@ func (a *bro) penInk() string {
 	return "black"
 }
 
-// penLabel is the pen's button: what it writes, if not the plain pen.
-func (a *bro) penLabel() string {
-	ink, width := a.penInk(), a.penWidth()
-	word := map[string]string{"black": "pen", "gray": "gray", "marker": "marker"}[ink]
-	if width != "medium" {
-		word = width + " " + word
+// drawPenSample draws a line as the pen writes now, at the foot of its
+// button r: its width and its gray.
+func (w *noteWin) drawPenSample(a *bro, r image.Rectangle, ink, bg uint8) {
+	half := map[string]float64{"fine": 0.5, "medium": 0.9, "bold": 1.5}[a.penWidth()]
+	g := ink
+	switch a.penInk() {
+	case "gray":
+		g = noteGray
+	case "marker":
+		g, half = noteMarker, 2.2
 	}
-	return word
+	drawIcon(a.C, []iconPart{iconLine(half, 4, 23, 20, 23)}, r, g, bg)
 }
 
 // newStroke is a stroke as the pen writes it now.

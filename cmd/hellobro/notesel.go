@@ -147,7 +147,7 @@ func (w *noteWin) selButtons(a *bro) []noteBtn {
 	var bs []noteBtn
 	x := 0
 	for _, id := range []string{"copy", "cut", "duplicate", "turn", "delete"} {
-		b := noteBtn{id: id, label: id, r: image.Rect(x, 0, x+kobo.TextWidth(a.F.Small, id)+32, h)}
+		b := noteBtn{id: id, r: image.Rect(x, 0, x+h+16, h)}
 		bs = append(bs, b)
 		x = b.r.Max.X + 8
 	}
@@ -255,7 +255,7 @@ func (w *noteWin) drawSel(a *bro, clip image.Rectangle) {
 			if b.r.Overlaps(clip) {
 				c.Fill(b.r, kobo.White)
 				c.Frame(b.r, 2, kobo.Black)
-				c.Text(a.F.Small, b.r, b.label, kobo.Black, kobo.AlignCenter)
+				drawIcon(c, noteIcon(b.id, ""), b.r, kobo.Black, kobo.White)
 			}
 		}
 	}

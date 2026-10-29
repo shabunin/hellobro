@@ -631,17 +631,24 @@ say. "Notebook" in the switcher (Meta+D) opens a new one; the ones
 you have are listed there by name (the date and time each was made);
 the launcher has them too, the last three written.
 
+Its buttons are pictures (below by their names): the pen, an eraser,
+a dotted rectangle (select), arrows round (undo, redo), a clipboard
+(paste), a page as the paper is (squares, lines, plain), a tray with
+an arrow out (export). Under the pen, a line as it writes: its width,
+its gray. **clear page** is words, and asks: tap it again within a few
+seconds to clear (it says "tap again"); anything else, and it doesn't.
+
 - The pen writes; a heavier hand, a thicker line. **eraser** (or E)
   takes off each stroke the pen goes over; **pen** (or P) is back to
   writing. Holding a button on the pen erases too.
 - Tap **pen** while it's in hand for its choices, under it: **fine**,
   **medium**, **bold**; **black**, **gray**, or **marker** (a
   highlighter: wide, light gray, under the ink, yellow in Xournal++).
-  The button says which (`bold gray`, `marker`); the choice is kept.
+  The line under the button shows which; the choice is kept.
   Touch the page to put them away. A notebook from Xournal++ shows its
   colors as the grays they are, its highlighters as markers.
 - **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), **clear
-  page** (undone like the rest), and the paper: squares, lines or
+  page** (twice; undone like the rest), and the paper: squares, lines or
   plain, for the whole notebook.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
   last page, if it has something on it, a new page. Once a pen has
@@ -651,10 +658,11 @@ the launcher has them too, the last three written.
   small, a screenful at a time (the arrows, PgUp, PgDn or a finger
   swiped across for more), and a **+ new page** tile after the last.
   Tap a page to choose it (or the arrow keys), again to open it (or
-  Enter, or **open**). The strip has then: **new before**, **new
-  after**, **copy page** (a copy after it), **delete** (or Delete; the
-  only page is cleared instead), **earlier** and **later** (moving
-  it), and **undo**: each is undone like a stroke. The counter again,
+  Enter, or **open**, corners as a frame). The strip has then: **new
+  before** and **new after** (a + by a page), **copy page** (a copy
+  after it; two pages), **delete** (a bin, or Delete; the only page is
+  cleared instead), **earlier** and **later** (arrows: moving it), and
+  **undo**: each is undone like a stroke. The counter again,
   or O, goes back to the page.
 - Till then fingers write: a stylus without a battery (or a Kobo Stylus
   with a flat one) is a finger to the screen. A pen seen once is
@@ -677,9 +685,10 @@ the launcher has them too, the last three written.
   - drag the dot over it round to turn it: freely, snapping to quarter
     turns near them; pictures only by quarter turns (Xournal++ has no
     other way to keep them);
-  - the buttons under it: **copy** (Ctrl+C), **cut** (Ctrl+X),
-    **duplicate** (Ctrl+D: a copy down and right, taken), **turn** (a
-    quarter, clockwise), **delete** (Delete or Backspace).
+  - the buttons under it: **copy** (two pages; Ctrl+C), **cut**
+    (scissors; Ctrl+X), **duplicate** (two pages and a +; Ctrl+D: a
+    copy down and right, taken), **turn** (an arrow round: a quarter,
+    clockwise), **delete** (a bin; Delete or Backspace).
 
   What's done stays on the page; undo puts each back. A tap where
   nothing is lets go; another, with nothing taken, puts a cross where
