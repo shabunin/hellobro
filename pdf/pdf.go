@@ -7,6 +7,7 @@ package pdf
 import (
 	"errors"
 	"image"
+	"math"
 	"strings"
 	"unicode"
 )
@@ -26,6 +27,37 @@ type Rect struct{ X0, Y0, X1, Y1 float64 }
 
 // Size is a page's size in points (1/72 inch).
 type Size struct{ W, H float64 }
+
+// What's drawn at most: a page's part fit to a window can be any size (a
+// thin strip of ink fit to its width; a page a metre long), and the
+// Kobo's memory isn't.
+const (
+	MaxPixels = 24 << 20 // 24 MB of gray
+	MaxSide   = 16000    // px, along either side
+)
+
+// CapZoom is zoom, made smaller if a part of a page w × h points drawn
+// at it would be more than MaxPixels or MaxSide; 0 if it can't be drawn
+// at all (no size, a zoom that's no number).
+func CapZoom(w, h, zoom float64) float64 {
+	if !(w > 0 && h > 0 && zoom > 0) || math.IsInf(w, 0) || math.IsInf(h, 0) || math.IsInf(zoom, 0) {
+		return 0
+	}
+	return min(zoom, MaxSide/w, MaxSide/h, math.Sqrt(MaxPixels/(w*h)))
+}
+
+// errSize is Render's for what it won't draw.
+var errSize = errors.New("the page can't be drawn that size")
+
+// checkDraw says whether clip, of a page drawn zoom times, can be drawn.
+func checkDraw(zoom float64, clip image.Rectangle) error {
+	switch {
+	case !(zoom > 0) || math.IsInf(zoom, 0), clip.Empty(),
+		clip.Dx() > MaxSide, clip.Dy() > MaxSide, clip.Dx()*clip.Dy() > MaxPixels:
+		return errSize
+	}
+	return nil
+}
 
 // Scaled is the size of the page drawn zoom times its size in points.
 func (s Size) Scaled(zoom float64) image.Point {

@@ -13,6 +13,7 @@ package main
 // bookcut.go's.
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"log"
@@ -109,10 +110,13 @@ func pdfDraw(d *pdf.Doc, spine int, laid bookLaid) (pdfShown, error) {
 	if err != nil {
 		return pdfShown{}, err
 	}
+	if pdf.CapZoom(size.W, size.H, 1) == 0 {
+		return pdfShown{}, errors.New("the page has no size")
+	}
 	// where its ink is, in points
 	x0, y0, x1, y1 := 0.0, 0.0, size.W, size.H
-	if !laid.st.pdfNoTrim && size.W > 0 {
-		z := pdfInkPx / size.W
+	if !laid.st.pdfNoTrim {
+		z := pdf.CapZoom(size.W, size.H, min(pdfInkPx/size.W, 4*pdfInkPx/size.H)) // a long page: no longer than 4 widths' worth
 		m, err := d.Render(spine, z, image.Rectangle{Max: size.Scaled(z)})
 		if err != nil {
 			return pdfShown{}, err
@@ -123,11 +127,15 @@ func pdfDraw(d *pdf.Doc, spine int, laid bookLaid) (pdfShown, error) {
 			x1, y1 = min(size.W, (float64(ink.Max.X)+pad)/z), min(size.H, (float64(ink.Max.Y)+pad)/z)
 		}
 	}
-	z := float64(laid.w) / (x1 - x0)
+	z, whole := float64(laid.w)/(x1-x0), float64(laid.w)/size.W
 	if !laid.st.pdfWidth {
-		z = min(z, float64(laid.h)/(y1-y0))
+		z, whole = min(z, float64(laid.h)/(y1-y0)), min(whole, float64(laid.h)/size.H)
 	}
-	z *= float64(laid.st.pdfZoom) / 100
+	z = min(z, 3*whole) // trimming takes the margins off: a thin strip of ink isn't blown up to the window
+	z = pdf.CapZoom(x1-x0, y1-y0, z*float64(laid.st.pdfZoom)/100)
+	if z == 0 {
+		return pdfShown{}, errors.New("no room to draw the page")
+	}
 	clip := image.Rect(int(x0*z), int(y0*z), int(x1*z+0.5), int(y1*z+0.5))
 	img, err := d.Render(spine, z, clip)
 	return pdfShown{spine, laid, img, z}, err
@@ -187,8 +195,12 @@ func (w *bookWin) layoutPDF(a *bro, laid bookLaid) {
 		log.Printf("pdf: page %d: %v", w.spine+1, err)
 		return
 	}
-	w.err = ""
 	b := s.img.Bounds()
+	if b.Empty() {
+		w.err = "the page drew empty"
+		return
+	}
+	w.err = ""
 	w.pages, w.tiles = nil, nil
 	for _, y := range pdfSteps(b.Dy(), laid.h) {
 		for _, x := range pdfSteps(b.Dx(), laid.w) {
@@ -305,7 +317,7 @@ func (w *bookWin) drawAhead(a *bro) {
 			if w.ahead == ah {
 				w.ahead = nil
 			}
-			if ah.err != nil || w.pdf != d {
+			if ah.err != nil || w.pdf != d || ah.laid != w.laid { // drawn for a zoom or a size gone: it'd push out the page shown
 				return
 			}
 			log.Printf("pdf: page %d drawn ahead in %v", next+1, time.Since(t).Round(time.Millisecond))

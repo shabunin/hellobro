@@ -131,7 +131,7 @@ func renderPDFPage(doc *pdf.Doc, i, width int) (*image.Gray, error) {
 	if err != nil {
 		return nil, err
 	}
-	zoom := float64(width) / sz.W
+	zoom := pdf.CapZoom(sz.W, sz.H, min(float64(width)/sz.W, 4*float64(width)/sz.H)) // a long page: no longer than 4 widths
 	return doc.Render(i, zoom, image.Rectangle{Max: sz.Scaled(zoom)})
 }
 

@@ -276,10 +276,10 @@ func (d *Doc) Size(i int) (Size, error) {
 // (in the drawn page's pixels, its top left at 0,0), which is the image's
 // bounds.
 func (d *Doc) Render(i int, zoom float64, clip image.Rectangle) (*image.Gray, error) {
-	m := image.NewGray(clip)
-	if clip.Empty() {
-		return m, nil
+	if err := checkDraw(zoom, clip); err != nil {
+		return nil, err
 	}
+	m := image.NewGray(clip)
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.d == nil {

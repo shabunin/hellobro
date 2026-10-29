@@ -366,7 +366,7 @@ func (w *bookWin) cutCopy(a *bro) {
 		a.Notify("can't read it: " + err.Error())
 		return
 	}
-	z := cutCopyDPI / 72.0
+	z := pdf.CapZoom(r.X1-r.X0, r.Y1-r.Y0, min(cutCopyDPI/72.0, cutMaxPx/max(r.X1-r.X0, r.Y1-r.Y0)))
 	m, err := w.pdf.Render(w.view.spine, z, image.Rect(int(r.X0*z), int(r.Y0*z), int(r.X1*z+0.5), int(r.Y1*z+0.5)))
 	if err == nil {
 		err = copyPicture(m)
@@ -405,7 +405,7 @@ func (w *bookWin) cutSave(a *bro) {
 }
 
 func saveCut(d *pdf.Doc, spine int, r pdf.Rect, dir, name string) error {
-	z := min(cutDPI/72.0, cutMaxPx/max(r.X1-r.X0, r.Y1-r.Y0))
+	z := pdf.CapZoom(r.X1-r.X0, r.Y1-r.Y0, min(cutDPI/72.0, cutMaxPx/max(r.X1-r.X0, r.Y1-r.Y0)))
 	m, err := d.Render(spine, z, image.Rect(int(r.X0*z), int(r.Y0*z), int(r.X1*z+0.5), int(r.Y1*z+0.5)))
 	if err != nil {
 		return err
