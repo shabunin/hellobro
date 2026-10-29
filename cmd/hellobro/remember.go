@@ -35,7 +35,6 @@ type remembered struct {
 	PDFWidth    bool                 `json:"pdf-fit-width,omitempty"` // PDFs' pages as wide as the screen, not whole (bookpdf.go)
 	PDFZoom     int                  `json:"pdf-zoom,omitempty"`      // % of the fit
 	PDFNoTrim   bool                 `json:"pdf-no-trim,omitempty"`   // their white margins kept
-	BookPages   string               `json:"book-pages,omitempty"`    // one, two side by side, or auto: two in a wide window
 	Pen         bool                 `json:"pen,omitempty"`           // a pen has written in a notebook: fingers turn its pages (notebook.go)
 	NoteWidth   string               `json:"note-width,omitempty"`    // the notebooks' pen: fine, medium, bold (notepen.go)
 	NoteInk     string               `json:"note-ink,omitempty"`      // black, gray, marker

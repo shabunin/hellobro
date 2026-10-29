@@ -48,13 +48,14 @@ type bookStyle struct {
 	px, leading     int
 	margin          int
 	ragged, noHyphs bool
-	pdfWidth        bool   // PDFs (bookpdf.go): fit their pages' width, not the whole page
-	pdfNoTrim       bool   // and keep their white margins
-	pdfZoom         int    // and zoom them, % of the fit (pdfZooms)
-	pages           string // one, two side by side, or auto: two in a window wider than tall
+	pdfWidth        bool // PDFs (bookpdf.go): fit their pages' width, not the whole page
+	pdfNoTrim       bool // and keep their white margins
+	pdfZoom         int  // and zoom them, % of the fit (pdfZooms)
 }
 
-// bookPageModes are the ways the pages show, and their switches' words.
+// bookPageModes are the ways a book's pages show (each book its own,
+// kept with its place): one, two side by side, or two if the window is
+// wider than tall; and their switches' words.
 var (
 	bookPageModes = []string{"one", "two", "auto"}
 	bookPageWords = map[string]string{"one": "one page", "two": "two side by side", "auto": "two if wide"}
@@ -73,10 +74,7 @@ const bookGutter = 48 // px between two pages side by side
 
 func (a *bro) bookStyle() bookStyle {
 	m := &a.mem
-	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim, pdfZoom: m.PDFZoom, pages: m.BookPages}
-	if !slices.Contains(bookPageModes, st.pages) {
-		st.pages = "one"
-	}
+	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim, pdfZoom: m.PDFZoom}
 	if !slices.Contains(pdfZooms, st.pdfZoom) {
 		st.pdfZoom = 100
 	}
@@ -96,7 +94,7 @@ func (a *bro) setBookStyle(st bookStyle) {
 		a.bk.faces = nil
 	}
 	m.BookFont, m.BookPx, m.BookLeading, m.BookMargin, m.BookRagged, m.BookNoHyph = st.font, st.px, st.leading, st.margin, st.ragged, st.noHyphs
-	m.PDFWidth, m.PDFNoTrim, m.PDFZoom, m.BookPages = st.pdfWidth, st.pdfNoTrim, st.pdfZoom, st.pages
+	m.PDFWidth, m.PDFNoTrim, m.PDFZoom = st.pdfWidth, st.pdfNoTrim, st.pdfZoom
 	a.mem.save()
 	for _, win := range a.windows() {
 		if w, ok := win.(*bookWin); ok && w.b != nil {
@@ -118,6 +116,7 @@ type bookPlace struct {
 	Read  int64  `json:"read"` // when, Unix seconds
 
 	Marks []bookMark `json:"marks,omitempty"` // bookmarks.go
+	Pages string     `json:"pages,omitempty"` // how its pages show: bookPageModes; "" one
 }
 
 // bookState is what the readers share: the fonts, the size.
@@ -166,6 +165,7 @@ type bookWin struct {
 	pages     []book.Page
 	page      int
 	laid      bookLaid // what the pages are laid out for
+	pageMode  string   // its pages: one, two, auto (bookPageModes)
 
 	p       kobo.Panel
 	area    image.Rectangle // the text's, in the body
@@ -231,7 +231,24 @@ func (a *bro) newBookWin(path string) *bookWin {
 	if pl, ok := a.mem.Books[path]; ok {
 		w.marks = slices.DeleteFunc(slices.Clone(pl.Marks), func(m bookMark) bool { return m.Spine >= len(b.Spine) })
 	}
+	w.loadPageMode(a)
 	return w
+}
+
+// loadPageMode takes the book's way of showing its pages, as kept.
+func (w *bookWin) loadPageMode(a *bro) {
+	w.pageMode = "one"
+	if pl, ok := a.mem.Books[w.path]; ok && slices.Contains(bookPageModes, pl.Pages) {
+		w.pageMode = pl.Pages
+	}
+}
+
+// setPageMode shows the book's pages as mode says, and keeps it.
+func (w *bookWin) setPageMode(a *bro, mode string) {
+	w.pageMode = mode
+	w.laid = bookLaid{} // laid out again
+	w.save(a)
+	w.draw(a)
 }
 
 // faces are the reader's fonts, as chosen.
@@ -314,7 +331,7 @@ func (w *bookWin) layout(a *bro) {
 	}
 	faces := a.bookFaces()
 	laid := bookLaid{w: w.area.Dx(), h: w.area.Dy(), st: a.bookStyle()}
-	if laid.st.pages == "two" || laid.st.pages == "auto" && w.area.Dx() > w.area.Dy() {
+	if mode := w.pageMode; mode == "two" || mode == "auto" && w.area.Dx() > w.area.Dy() {
 		laid.two, laid.w = true, (w.area.Dx()-bookGutter)/2
 		laid.st.pdfWidth, laid.st.pdfZoom = false, 100 // a PDF's pages whole, each
 	}
@@ -675,7 +692,7 @@ func (w *bookWin) save(a *bro) {
 	if a.mem.Books == nil {
 		a.mem.Books = map[string]bookPlace{}
 	}
-	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: w.pct(), Read: time.Now().Unix(), Marks: w.marks}
+	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: w.pct(), Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode}
 	a.mem.save()
 	w.savedAt = time.Now()
 }

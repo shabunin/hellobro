@@ -1,9 +1,10 @@
 # Two pages side by side (bookwin.go, bookpdf.go): the first book, a PDF,
 # fullscreen; s, its style panel: Pages (the fourth row) to "two side by
 # side"; back to it: two pages; → the next two; a part of the right one
-# cut with the pen. Esc, Esc: the shelf; the second book, an EPUB: two
-# pages too (the setting's the readers'); → on; s: its panel, Pages to
-# "two if wide"; back.
+# cut with the pen. Esc, Esc: the shelf; the second book, an EPUB: one
+# page (the setting is each book's); → on; s: its panel, Pages to "two
+# side by side"; back. Esc: the shelf, the PDF again (now second, the
+# EPUB read last): still two.
 # HELLOBRO_BOOKS: a directory with a PDF first by name, then an EPUB.
 # app: hellobro
 import os, sys
@@ -26,7 +27,9 @@ key(108); time.sleep(1); key(ENTER); time.sleep(8) # the EPUB
 key(RIGHT); time.sleep(4)
 key(31); time.sleep(3)                             # its panel
 key(103); time.sleep(1); key(103); time.sleep(1)   # up, round to Pages
-key(ENTER); time.sleep(4)                          # two if wide
+key(ENTER); time.sleep(4)                          # two side by side
 key(1); time.sleep(5)
+key(1); time.sleep(5)                              # the shelf
+key(108); time.sleep(1); key(ENTER); time.sleep(8) # the PDF: two, as it was
 fullscreen(); time.sleep(3)
 exit_app()

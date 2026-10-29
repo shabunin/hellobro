@@ -2,9 +2,9 @@ package main
 
 // The reader's style panel, in the book's window over its page: the
 // fonts, each shown in itself; the size, the lines' spacing, the
-// margins, justified or not, hyphens or not, the pages (one, two side
-// by side, or two if the window's wide); and a paragraph set as the
-// books will be. s or a tap under the page opens it, Esc or Done goes
+// margins, justified or not, hyphens or not; the pages, this book's
+// (one, two side by side, or two if the window's wide); and a paragraph
+// set as the books will be. s or a tap under the page opens it, Esc or Done goes
 // back to the page. It's the reader's own: the app's Settings don't
 // have it.
 
@@ -119,7 +119,8 @@ func (w *bookWin) styleStep(a *bro, i, d int) {
 	case styleHyph:
 		st.noHyphs = !st.noHyphs
 	case stylePages:
-		st.pages = nextPages(st.pages, d)
+		w.setPageMode(a, nextPages(w.pageMode, d))
+		return
 	case styleDone:
 		w.closeStyle(a)
 		return
@@ -165,7 +166,7 @@ func (st bookStyle) values() [styleN]string {
 		fmt.Sprintf("%d%%", bookMargins[st.margin]),
 		onOff[!st.ragged],
 		onOff[!st.noHyphs],
-		bookPageWords[st.pages],
+		"", // the book's own: drawStyle
 		"",
 	}
 }
@@ -235,7 +236,7 @@ func (w *bookWin) drawStyle(a *bro) {
 		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X, r.Max.Y), styleLabels[k], kobo.Black, kobo.AlignLeft)
 		right := r.Max.X
 		if k == stylePages {
-			box(image.Rect(right-260, r.Min.Y, right, r.Max.Y), vals[k], func() { w.styleStep(a, i, 0) })
+			box(image.Rect(right-260, r.Min.Y, right, r.Max.Y), bookPageWords[w.pageMode], func() { w.styleStep(a, i, 0) })
 			continue
 		}
 		if k == styleJustify || k == styleHyph {

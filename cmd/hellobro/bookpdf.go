@@ -93,6 +93,7 @@ func (a *bro) openPDF(w *bookWin) {
 		}
 	}
 	w.pdf, w.b = d, b
+	w.loadPageMode(a)
 	if pl, ok := a.mem.Books[w.path]; ok && pl.Spine < n {
 		w.spine, w.at = pl.Spine, book.Pos{Block: pl.Block, Off: pl.Off}
 	}
@@ -367,7 +368,8 @@ func (w *bookWin) pdfStyleStep(a *bro, i, d int) {
 	case pdfStyleTrim:
 		st.pdfNoTrim = !st.pdfNoTrim
 	case pdfStylePages:
-		st.pages = nextPages(st.pages, d)
+		w.setPageMode(a, nextPages(w.pageMode, d))
+		return
 	case pdfStyleDone:
 		w.closeStyle(a)
 		return
@@ -408,7 +410,7 @@ func (w *bookWin) drawPDFStyle(a *bro) {
 		case pdfStyleTrim:
 			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), onOff[!st.pdfNoTrim], 0)
 		case pdfStylePages:
-			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), bookPageWords[st.pages], 0)
+			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), bookPageWords[w.pageMode], 0)
 		case pdfStyleDone:
 			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), "back to the book", 0)
 		}

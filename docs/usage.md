@@ -559,9 +559,10 @@ and for PDFs, drawn by MuPDF (below).
   tool too, below).
 - **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
   (tap one), the size, the lines' spacing, the margins (± each),
-  justified and hyphenation (on / off), **Pages** (one page, two side
-  by side, or two if wide: two when the window is wider than tall, a
-  landscape screen), and a paragraph set as the books will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
+  justified and hyphenation (on / off), **Pages** (this book's own,
+  kept with its place: one page, two side by side, or two if wide: two
+  when the window is wider than tall, a landscape screen), and a
+  paragraph set as the books will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
   switch; Esc, s or "back to the book" leaves it. Every book takes it;
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
@@ -591,7 +592,7 @@ same. Their pages are drawn gray by MuPDF, linked into hellobro (package
 whole page. **s** or **Aa** has their own panel: **Fit** the whole page
 or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and
 **-** on the page too), **Trim white margins** on or off, and **Pages**
-as for EPUBs (the setting is the readers'): two side by side are each
+as for EPUBs (each PDF its own): two side by side are each
 whole, meeting in the middle as a book's do, turned two at a time, the
 next two drawn while you read. A cut works on either. A page
 bigger than the screen is read in screenfuls, across then down, a
