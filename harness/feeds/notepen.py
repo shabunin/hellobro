@@ -36,7 +36,7 @@ def choose(*words):
 start(); time.sleep(3)
 gui("notebook"); time.sleep(3)
 fullscreen(); time.sleep(4)
-pen = (44, 32)                                     # the strip's first button
+pen = buttons(0, 40)[1]                            # the strip's second button (the first: ‹ All Notebooks)
 stroke(wave(H // 4, W // 5, W * 4 // 5), pen=True, pressure=lambda t: 2000); time.sleep(2)
 choose("bold", "gray")
 stroke(wave(H // 2, W // 5, W * 4 // 5), pen=True, pressure=lambda t: 2000); time.sleep(3)
