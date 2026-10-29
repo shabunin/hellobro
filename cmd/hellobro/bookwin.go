@@ -150,16 +150,20 @@ type bookWin struct {
 	savedAt time.Time
 	pics    map[string]*image.Gray // the page's pictures, scaled
 
-	marks   []bookMark
-	list    bool // the contents (or the shelf) show
-	listMks bool // the list is the bookmarks, not the contents
-	styling bool // the style panel shows (bookstyle.go)
-	sel     int
-	top     int
-	listN   int // the rows the list has room for
-	rows    []bookRow
-	shelf   []shelfBook
-	looking bool // the shelf is being looked for
+	marks      []bookMark
+	list       bool              // the contents (or the shelf) show
+	listMks    bool              // the list is the bookmarks, not the contents
+	listPages  bool              // a PDF's pages, small (bookpages.go)
+	listCols   int               // how many across, then
+	thumbs     *pdfThumbs        // the pages drawn small
+	thumbTiles []image.Rectangle // where they show
+	styling    bool              // the style panel shows (bookstyle.go)
+	sel        int
+	top        int
+	listN      int // the rows the list has room for
+	rows       []bookRow
+	shelf      []shelfBook
+	looking    bool // the shelf is being looked for
 }
 
 func (w *bookWin) Title() string {
@@ -431,6 +435,10 @@ func (w *bookWin) listOpen(a *bro, i int) {
 		}
 		return
 	}
+	if w.listPages {
+		w.openThumb(a, i)
+		return
+	}
 	if w.listMks {
 		if i < len(w.marks) {
 			w.goToMark(a, i)
@@ -462,6 +470,10 @@ func (w *bookWin) drawList(a *bro) {
 	if w.b != nil {
 		w.drawTabs(a, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH))
 		area.Min.Y += rowH + 12
+	}
+	if w.listPages {
+		w.drawThumbs(a, area)
+		return
 	}
 	n := max(1, area.Dy()/rowH)
 	w.listN = n
@@ -641,6 +653,28 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 	if w.styling {
 		return w.styleKey(a, code, ch)
 	}
+	if w.list && w.listPages {
+		by := map[uint16]int{103: -w.listCols, 108: w.listCols, 105: -1, 106: 1, 104: -w.listN, 109: w.listN}
+		switch {
+		case by[code] != 0:
+			w.sel += by[code]
+		case code == kobo.KeyEnter:
+			w.listOpen(a, w.sel)
+			return true
+		case code == kobo.KeyEsc, ch == "t", ch == "o":
+			w.list = false
+		case code == kobo.KeyTab:
+			w.showList(a, false)
+			return true
+		case ch == "b":
+			w.showList(a, true)
+			return true
+		default:
+			return false
+		}
+		w.draw(a)
+		return true
+	}
 	if w.list {
 		switch {
 		case code == 103 || ch == "k": // up
@@ -656,6 +690,9 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 			return true
 		case code == kobo.KeyEsc && w.b != nil, ch == "t" && w.b != nil:
 			w.list = false
+		case code == kobo.KeyTab && w.b != nil && w.listMks && w.pdf != nil, ch == "o" && w.pdf != nil:
+			w.showPages(a)
+			return true
 		case code == kobo.KeyTab && w.b != nil:
 			w.showList(a, !w.listMks)
 			return true
@@ -708,6 +745,8 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.openStyle(a)
 	case ch == "b" && w.b != nil:
 		w.toggleMark(a)
+	case ch == "o" && w.pdf != nil:
+		w.showPages(a)
 	case code == kobo.KeyEsc:
 		w.save(a)
 		a.replaceWin(w, a.newBookWin(""))

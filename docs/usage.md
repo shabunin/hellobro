@@ -593,6 +593,13 @@ little of each showing again on the next. The next page is drawn while
 you read this one, so turning to it is at once. PDFs locked with a
 password don't open (an empty one does).
 
+A PDF's contents have a third tab, **Pages** (or **o** on a page, Tab
+from the bookmarks): its pages small, a screenful at a time, the one
+being read marked "reading". They fill in one by one (MuPDF draws them
+aside, those showing first, then the next screenful's). Tap one to read
+it, or move the frame with the arrows and Enter; a finger swiped up or
+down, or PgUp and PgDn, goes a screenful.
+
 To cut a part of a PDF's page out, draw a rectangle across it with the
 pen, or hold a finger still on the page a moment, then move it (as to
 select in a terminal). Or take the select tool, the rectangle with

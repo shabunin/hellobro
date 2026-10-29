@@ -271,7 +271,7 @@ func (w *bookWin) footTap(a *bro, p image.Point) bool {
 // showList shows the book's contents, or its bookmarks: the place shown
 // picked in either.
 func (w *bookWin) showList(a *bro, marks bool) {
-	w.list, w.listMks, w.sel = true, marks, 0
+	w.list, w.listMks, w.listPages, w.sel = true, marks, false, 0
 	if marks {
 		for i, m := range w.marks {
 			if m.Spine < w.spine || m.Spine == w.spine && !w.at.Before(m.pos()) {
@@ -289,7 +289,8 @@ func (w *bookWin) showList(a *bro, marks bool) {
 	w.draw(a)
 }
 
-// drawTabs draws the list's tabs in r: the contents, the bookmarks;
+// drawTabs draws the list's tabs in r: the contents, the bookmarks, a
+// PDF's pages (bookpages.go);
 // and at their right the way back to the page, for a finger.
 func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
 	c := a.C
@@ -304,17 +305,31 @@ func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
 	button(back, "back to the book", func() { w.list = false; w.draw(a) })
 	r.Min.X, r.Max.X = shelf.Max.X+16, back.Min.X-16
 	c.Fill(image.Rect(r.Min.X, r.Max.Y-2, r.Max.X, r.Max.Y), kobo.Light)
-	half := r.Dx() / 2
-	for k, name := range []string{"Contents", fmt.Sprintf("Bookmarks (%d)", len(w.marks))} {
-		t := image.Rect(r.Min.X+k*half, r.Min.Y, r.Min.X+(k+1)*half, r.Max.Y)
+	names := []string{"Contents", fmt.Sprintf("Bookmarks (%d)", len(w.marks))}
+	if w.pdf != nil {
+		names = append(names, "Pages")
+	}
+	on := 0
+	switch {
+	case w.listPages:
+		on = 2
+	case w.listMks:
+		on = 1
+	}
+	each := r.Dx() / len(names)
+	for k, name := range names {
+		t := image.Rect(r.Min.X+k*each, r.Min.Y, r.Min.X+(k+1)*each, r.Max.Y)
 		ink := uint8(kobo.Mid)
-		if marks := k == 1; marks == w.listMks {
+		if k == on {
 			ink = kobo.Black
 			c.Fill(image.Rect(t.Min.X, t.Max.Y-5, t.Max.X, t.Max.Y), kobo.Black)
 		}
 		c.Text(a.F.Body, t, name, ink, kobo.AlignCenter)
-		marks := k == 1
-		w.rows = append(w.rows, bookRow{t, func() { w.showList(a, marks) }})
+		show := func() { w.showList(a, k == 1) }
+		if k == 2 {
+			show = func() { w.showPages(a) }
+		}
+		w.rows = append(w.rows, bookRow{t, show})
 	}
 }
 
@@ -336,6 +351,9 @@ func (w *bookWin) swipe(a *bro, from, to image.Point) {
 			return
 		}
 		n := max(1, w.listN-1)
+		if w.listPages { // a screenful of pages
+			n = w.listN
+		}
 		if d.Y > 0 { // the finger down: back
 			n = -n
 		}
