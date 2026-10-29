@@ -488,8 +488,8 @@ func (a *bro) drawConnect(t *termSession) {
 	add(run(func() { a.replaceWin(t, a.newBookWin("")) }), "Books: the EPUBs and PDFs on this Kobo, to read (tap here)")
 	guiLine := len(lines)
 	add(nil, "", "Settings, in a window:   "+strings.Join(guiNames(), "   "))
-	notes := append([]string{"new"}, noteNames()...)
-	notes = notes[:min(len(notes), 4)] // the last three written
+	notes := append([]string{"all", "new"}, noteNames()...)
+	notes = notes[:min(len(notes), 5)] // the last three written
 	noteLine := len(lines)
 	add(nil, "Notebooks, to write in with the pen:   "+strings.Join(notes, "   "))
 	add(nil, "", keys, "Esc: close this window.")
@@ -528,10 +528,14 @@ func (a *bro) drawConnect(t *termSession) {
 		x := r.Min.X + kobo.TextWidth(a.F.Body, "Notebooks, to write in with the pen:   ")
 		for i, n := range notes {
 			w := kobo.TextWidth(a.F.Body, n)
-			if i == 0 {
-				n = ""
+			do := func() { a.launchNotebook(t, n) }
+			switch i {
+			case 0:
+				do = func() { a.replaceWin(t, a.newNotesWin("")) }
+			case 1:
+				do = func() { a.launchNotebook(t, "") }
 			}
-			pn.picks = append(pn.picks, launchPick{image.Rect(x-8, r.Min.Y, x+w+8, r.Max.Y), func() { a.launchNotebook(t, n) }})
+			pn.picks = append(pn.picks, launchPick{image.Rect(x-8, r.Min.Y, x+w+8, r.Max.Y), do})
 			x += w + kobo.TextWidth(a.F.Body, "   ")
 		}
 	}

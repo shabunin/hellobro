@@ -247,3 +247,46 @@ func TestNotebookMoves(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestNoteEntries(t *testing.T) {
+	root, old := t.TempDir(), t.TempDir()
+	defer func(r string, o func() string) { shareRoot, oldNotesDir = r, o }(shareRoot, oldNotesDir)
+	shareRoot, oldNotesDir = root, func() string { return old }
+	nd := filepath.Join(root, "Notebooks")
+	for _, d := range []string{"Work/2026", "Empty", ".trash"} {
+		os.MkdirAll(filepath.Join(nd, d), 0o755)
+	}
+	for _, f := range []string{"plan.xopp", "Work/ideas.xopp", "Work/2026/q4.xopp", ".trash/gone.xopp", "plan.pdf"} {
+		os.WriteFile(filepath.Join(nd, f), []byte("x"), 0o644)
+	}
+	os.WriteFile(filepath.Join(old, "sums.hbnote"), []byte("x"), 0o644)
+	es, dirs := noteEntries()
+	var keys []string
+	for _, e := range es {
+		keys = append(keys, e.key)
+	}
+	slices.Sort(keys)
+	if want := []string{"Work/2026/q4", "Work/ideas", "plan", "sums"}; !slices.Equal(keys, want) {
+		t.Errorf("notebooks %q, want %q", keys, want)
+	}
+	slices.Sort(dirs)
+	if want := []string{"Empty", "Work", "Work/2026"}; !slices.Equal(dirs, want) {
+		t.Errorf("folders %q, want %q", dirs, want)
+	}
+	// one in a folder is written there
+	nb := &notebook{name: "New/first", paper: "plain", pages: [][]*noteStroke{nil}}
+	if err := nb.save(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(nd, "New", "first.xopp")); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestNoteNameOK(t *testing.T) {
+	for name, ok := range map[string]bool{"plan": true, "2026-10-29 14.05": true, "a b (2)": true, "": false, "a/b": false, `a\b`: false, ".hidden": false, "what?": false} {
+		if err := noteNameOK(name); (err == nil) != ok {
+			t.Errorf("%q: %v", name, err)
+		}
+	}
+}

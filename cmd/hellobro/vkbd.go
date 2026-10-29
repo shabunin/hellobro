@@ -54,6 +54,7 @@ type vkbdState struct {
 	latched map[uint16]bool // modifiers down till the next key
 	next    time.Time       // the held key's next repeat
 	since   time.Time       // the keyboard went (or we started): auto waits from it
+	ask     bool            // a name's being typed (notelist.go): it shows if there's no keyboard
 }
 
 // vkItem is a key in a row, w units wide; code 0 is a gap.
@@ -326,6 +327,9 @@ func (a *bro) vkTick() {
 
 // vkWanted says whether it should show now.
 func (a *bro) vkWanted() bool {
+	if a.vk.ask && a.Keyboard == "" {
+		return true
+	}
 	switch a.setting("vkbd") {
 	case "on":
 		return true

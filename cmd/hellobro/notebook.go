@@ -26,13 +26,16 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/xml"
 	"fmt"
 	"image"
 	"io"
+	"io/fs"
 	"log"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -50,6 +53,7 @@ const (
 	noteSwipe            = 120 // px across a finger goes, to turn the page
 	noteExt              = ".xopp"
 	noteOldExt           = ".hbnote"
+	noteDepth            = 4 // folders in folders, at most
 	notePapers           = "squares lines plain"
 
 	ownInk  = 7 // the pen writing or erasing in a notebook
@@ -182,7 +186,7 @@ func loadNotebook(name string) (*notebook, error) {
 // save writes nb, a new file over the old one: a crash halfway leaves
 // the old one whole. The .hbnote it was goes, once it's written.
 func (nb *notebook) save() error {
-	if err := os.MkdirAll(notesDir(), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(notePath(nb.name)), 0o755); err != nil {
 		return err
 	}
 	b, err := nb.xopp()
@@ -205,33 +209,58 @@ func (nb *notebook) save() error {
 	return nil
 }
 
-// noteNames are the notebooks there are, the last written first.
+// noteNames are the notebooks there are, the last written first: a
+// name is its path under Notebooks/, its folders and all ("Work/plan").
 func noteNames() []string {
-	type named struct {
-		name string
-		at   time.Time
-	}
-	var ns []named
-	for _, d := range []struct{ dir, ext string }{{notesDir(), noteExt}, {oldNotesDir(), noteOldExt}} {
-		es, _ := os.ReadDir(d.dir)
-		for _, e := range es {
-			n, ok := strings.CutSuffix(e.Name(), d.ext)
-			if !ok || e.IsDir() || slices.ContainsFunc(ns, func(o named) bool { return o.name == n }) {
-				continue
-			}
-			var at time.Time
-			if fi, err := e.Info(); err == nil {
-				at = fi.ModTime()
-			}
-			ns = append(ns, named{n, at})
-		}
-	}
-	slices.SortFunc(ns, func(a, b named) int { return b.at.Compare(a.at) })
+	es, _ := noteEntries()
+	slices.SortStableFunc(es, func(a, b libEntry) int { return cmp.Compare(b.at, a.at) })
 	var names []string
-	for _, n := range ns {
-		names = append(names, n.name)
+	for _, e := range es {
+		names = append(names, e.key)
 	}
 	return names
+}
+
+// noteEntries are the notebooks there are, in Notebooks/ and its folders
+// (not the dot ones), and the .hbnote ones they were, for the list of
+// them (notelist.go); and the folders.
+func noteEntries() ([]libEntry, []string) {
+	var es []libEntry
+	var dirs []string
+	entry := func(name string, d fs.DirEntry) libEntry {
+		e := libEntry{key: name, rel: name + noteExt, name: path.Base(name)}
+		if fi, err := d.Info(); err == nil {
+			e.at, e.note = fi.ModTime().Unix(), fi.ModTime().Format("2 Jan 15:04")
+		}
+		return e
+	}
+	root := notesDir()
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || p == root {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, p)
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") || strings.Count(rel, "/") >= noteDepth {
+				return filepath.SkipDir
+			}
+			dirs = append(dirs, rel)
+			return nil
+		}
+		if name, ok := strings.CutSuffix(rel, noteExt); ok {
+			es = append(es, entry(name, d))
+		}
+		return nil
+	})
+	old, _ := os.ReadDir(oldNotesDir())
+	for _, d := range old {
+		name, ok := strings.CutSuffix(d.Name(), noteOldExt)
+		if ok && !d.IsDir() && !slices.ContainsFunc(es, func(e libEntry) bool { return e.key == name }) {
+			es = append(es, entry(name, d))
+		}
+	}
+	return es, dirs
 }
 
 // newNoteName names a new notebook for when it's made.
@@ -435,10 +464,11 @@ func (w *noteWin) counter() string {
 // layBar lays the tools along the strip, as many as fit: what's left
 // out goes from the least needed.
 func (w *noteWin) layBar(a *bro) {
-	tools := []noteBtn{{id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}}
+	all := noteBtn{id: "all", label: "‹ All Notebooks"} // at the left always, as the books' All Books (notelist.go)
+	tools := []noteBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}}
 	drops := []string{"paper", "export", "redo", "paste"}
 	if w.overview {
-		tools = []noteBtn{{id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
+		tools = []noteBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
 		drops = []string{"undo", "copy page", "new before"}
 	}
 	pages := []noteBtn{{id: "prev"}, {id: "next"}}
@@ -507,7 +537,7 @@ func (w *noteWin) drawBar(a *bro) {
 		on := b.id == "pen" && !w.erasing && !w.selecting || b.id == "eraser" && w.erasing || b.id == "select" && w.selecting
 		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 ||
 			b.id == "prev" && w.cur == 0 || b.id == "next" && w.turnTo(1) < 0
-		if w.overview && b.id != "undo" {
+		if w.overview && b.id != "undo" && b.id != "all" {
 			off = w.ovOff(b.id)
 		}
 		bg, ink := uint8(kobo.White), uint8(kobo.Black)
@@ -755,6 +785,8 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 			w.clearUnask(a)
 		}
 		switch b.id {
+		case "all":
+			a.notesFrom(w)
 		case "pen", "eraser", "select":
 			if b.id == "pen" && !w.erasing && !w.selecting { // in hand: its choices
 				w.penMenu = !w.penMenu

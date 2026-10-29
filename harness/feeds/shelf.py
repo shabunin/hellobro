@@ -13,8 +13,8 @@ from feedlib import *
 
 PAD = 16
 TOP = 40                                               # the header's middle, fullscreen
-ALL, BACK = (PAD + min(230, (W - 2 * PAD) // 5) // 2, TOP), (W - PAD - min(260, (W - 2 * PAD) // 4) // 2, TOP)
-L, R = PAD + min(230, (W - 2 * PAD) // 5) + 16, W - PAD - min(260, (W - 2 * PAD) // 4) - 16
+ALL, BACK = (PAD + min(230, (W - 2 * PAD) // 5) // 2, TOP), (W - PAD - min(300, (W - 2 * PAD) // 4) // 2, TOP)
+L, R = PAD + min(230, (W - 2 * PAD) // 5) + 16, W - PAD - min(300, (W - 2 * PAD) // 4) - 16
 def tab(k, n=3): return (L + (2 * k + 1) * (R - L) // (2 * n), TOP)
 
 start()

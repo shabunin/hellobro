@@ -135,7 +135,7 @@ func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown expor
 	if err := os.MkdirAll(clips, 0o755); err != nil {
 		return "", err
 	}
-	pngName := fmt.Sprintf("%s p%d.png", name, shown.n+1)
+	pngName := fmt.Sprintf("%s p%d.png", filepath.Base(name), shown.n+1) // a notebook in a folder: its own name
 	for _, f := range []string{pngName, "latest.png"} {
 		if err := writeAtomic(filepath.Join(clips, f), b.Bytes()); err != nil {
 			return "", err

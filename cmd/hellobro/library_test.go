@@ -31,12 +31,12 @@ func TestLibView(t *testing.T) {
 	}{
 		{libRecent, "", []string{"Alice", "Zed", "art", "Dune", "Odes"}},
 		{libAll, "", []string{"Alice", "art", "Dune", "Odes", "Zed"}},
-		{libFolders, "", []string{"[Fiction 2 → Fiction]", "[Poems 1 → Poems]", "art", "Zed"}},
+		{libFolders, "", []string{"[Empty empty → Empty]", "[Fiction 2 → Fiction]", "[Poems 1 → Poems]", "art", "Zed"}},
 		{libFolders, "Fiction", []string{"[‹ all folders Fiction → ]", "[SF 1 → Fiction/SF]", "Alice"}},
-		{libFolders, "Fiction/SF", []string{"[‹ Fiction Fiction/SF → Fiction]", "Dune"}},
+		{libFolders, "Fiction/SF", []string{"[‹ Fiction Fiction/SF → Fiction]", "[Old empty → Fiction/SF/Old]", "Dune"}},
 		{libFolders, "Gone", []string{"[‹ all folders Gone → ]"}},
 	} {
-		if got := show(libView(es, c.tab, c.dir)); !slices.Equal(got, c.want) {
+		if got := show(libView(es, []string{"Empty", "Fiction", "Fiction/SF/Old"}, c.tab, c.dir)); !slices.Equal(got, c.want) {
 			t.Errorf("tab %d %q: %q, want %q", c.tab, c.dir, got, c.want)
 		}
 	}

@@ -107,6 +107,8 @@ func winWord(w wm.Window) string {
 		return "book:" + w.path
 	case *noteWin:
 		return "note:" + w.nb.name
+	case *notesWin:
+		return "notes"
 	case *termSession:
 		if w.fontPx != 0 {
 			return strconv.Itoa(w.fontPx) + "px/" + termWord(w)
@@ -176,6 +178,9 @@ func (a *bro) wmRestore(s wm.Saved) (ok bool) {
 			notes = append(notes, w)
 			n++
 			return w
+		case "notes":
+			n++
+			return a.newNotesWin("")
 		case "launcher":
 		case "alpine", "sh":
 			starts = append(starts, func() { a.termStartShell(t, kind == "alpine") })

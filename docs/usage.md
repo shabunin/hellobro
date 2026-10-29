@@ -662,8 +662,30 @@ soft hyphens.
 
 A notebook is pages to write on with the pen: sums worked out by hand,
 say. "Notebook" in the switcher (Meta+D) opens a new one; the ones
-you have are listed there by name (the date and time each was made);
-the launcher has them too, the last three written.
+you have are listed there by name (the date and time each was made,
+till it's renamed); the launcher has them too, the last three written,
+after **all** and **new**.
+
+- **All Notebooks** (the launcher's **all**, **Notebooks** in the
+  switcher, or **‹ All Notebooks** at the left of a notebook's bar)
+  has the books' header and tabs ([Books](#books)): **Recent** (the
+  last written first), **All** (by name) and **Folders** (a folder at a
+  time, its folders first; the top row goes up). Opened from a
+  notebook, **back to the notebook** is at the top right, where the
+  books have "back to the book" (or Esc).
+- **+ new notebook** (or n) makes one in the folder shown and opens
+  it; **+ new folder** makes a folder there. The folders are folders
+  in `Notebooks/`, four deep at most.
+- **rename** on a row (or F2) types its name in the row: Enter or
+  **ok** keeps it, Esc or **cancel** doesn't. Without a keyboard, the
+  one on the screen shows for it. A notebook's PDF export is renamed
+  with it; a folder's notebooks go with it, open ones too.
+- **×** (or Delete) asks **delete?**: tap it again within 4 s. A
+  notebook goes to `Notebooks/.trash` (its window closes first), to
+  be fished out over USB or sftp; a folder goes only if it's empty.
+- Tap a notebook, or Enter, to open it in the list's place; one open
+  in another window is focused there. ↑ ↓ (or j k) pick, Tab goes to
+  the next tab, Backspace up a folder, a swipe up or down pages.
 
 Its buttons are pictures (below by their names): the pen, an eraser,
 a dotted rectangle (select), arrows round (undo, redo), a clipboard

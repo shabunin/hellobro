@@ -60,8 +60,11 @@ func (a *bro) drawLibHeader(r image.Rectangle, all string, here bool, toAll func
 		c.Text(a.F.Panel, h.all, "‹ "+all, kobo.Black, kobo.AlignCenter)
 	}
 	h.rows = append(h.rows, bookRow{h.all, toAll})
-	h.back = image.Rect(r.Max.X-min(260, r.Dx()/4), r.Min.Y, r.Max.X, r.Max.Y-6)
+	h.back = image.Rect(r.Max.X-min(300, r.Dx()/4), r.Min.Y, r.Max.X, r.Max.Y-6)
 	if back != "" {
+		if kobo.TextWidth(a.F.Panel, back)+24 > h.back.Dx() { // a narrow window
+			back = "back"
+		}
 		c.Frame(h.back, 2, kobo.Black)
 		c.Text(a.F.Panel, h.back, back, kobo.Black, kobo.AlignCenter)
 		h.rows = append(h.rows, bookRow{h.back, toBack})
@@ -115,8 +118,9 @@ type libEntry struct {
 
 // libView is what a tab shows of es: Recent, the last first then the
 // rest by name; All, by name; Folders, those in dir ("" the root), its
-// folders first, each with how many there are in it, all told.
-func libView(es []libEntry, tab int, dir string) []libItem {
+// folders first, each with how many there are in it, all told. dirs are
+// folders there are besides those es are in: empty ones.
+func libView(es []libEntry, dirs []string, tab int, dir string) []libItem {
 	byName := func(x, y libEntry) int {
 		return cmp.Or(strings.Compare(strings.ToLower(x.name), strings.ToLower(y.name)), strings.Compare(x.rel, y.rel))
 	}
@@ -149,6 +153,12 @@ func libView(es []libEntry, tab int, dir string) []libItem {
 		pre = dir + "/"
 	}
 	count := map[string]int{}
+	for _, d := range dirs {
+		if rest, ok := strings.CutPrefix(d, pre); ok && rest != "" {
+			sub, _, _ := strings.Cut(rest, "/")
+			count[sub] += 0
+		}
+	}
 	var here []libEntry
 	for _, e := range es {
 		rest, ok := strings.CutPrefix(e.rel, pre)
@@ -167,7 +177,11 @@ func libView(es []libEntry, tab int, dir string) []libItem {
 	}
 	slices.SortFunc(subs, func(x, y string) int { return strings.Compare(strings.ToLower(x), strings.ToLower(y)) })
 	for _, s := range subs {
-		items = append(items, libItem{name: s, note: fmt.Sprint(count[s]), key: pre + s, dir: true})
+		note := fmt.Sprint(count[s])
+		if count[s] == 0 {
+			note = "empty"
+		}
+		items = append(items, libItem{name: s, note: note, key: pre + s, dir: true})
 	}
 	slices.SortFunc(here, byName)
 	for _, e := range here {

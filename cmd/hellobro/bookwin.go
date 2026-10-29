@@ -484,7 +484,7 @@ func (w *bookWin) shelfItems() []libItem {
 		}
 		es = append(es, e)
 	}
-	return libView(es, w.shelfTab, w.shelfDir)
+	return libView(es, nil, w.shelfTab, w.shelfDir)
 }
 
 // shelfGo shows the shelf's tab, in folder dir; the choice at the top.
