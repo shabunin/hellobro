@@ -79,6 +79,9 @@ func copyPicture(m image.Image) error {
 // two), under what's on it, or on the next page if there's no room; or
 // at the select tool's mark. It comes in taken by the select tool.
 func (w *noteWin) paste(a *bro) {
+	if w.pasteInk(a) { // a notebook's, copied after (notesel.go)
+		return
+	}
 	data, err := os.ReadFile(kobo.AppFile(clipPic))
 	if err != nil {
 		a.Notify("nothing to paste: copy a part of a PDF's page first")

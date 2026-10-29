@@ -653,16 +653,31 @@ the launcher has them too, the last three written.
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
   writing on the second makes it a page. **clear pages** clears both.
-- **select** (or S) takes what's written, and pictures, to move them;
-  the pen and fingers both work with it. Tap a stroke or a picture to
-  take it (the ink over a picture first), or draw a rectangle round
-  some to take all that's wholly inside; a dashed frame goes round
-  what's taken. Drag inside the frame to move it, onto the page beside
-  it too where two show; it stays on the page. Delete (or Backspace)
-  takes it off the page; undo puts a move or a delete back. A tap
-  where nothing is lets go; another, with nothing taken, puts a cross
-  where the next paste goes (tap the cross to take it away). **pen**
-  or **eraser** puts the tool down.
+- **select** (or S) takes what's written, and pictures, to change
+  them; the pen and fingers both work with it. Tap a stroke or a
+  picture to take it (the ink over a picture first), or draw a
+  rectangle round some to take all that's wholly inside. A dashed frame
+  goes round what's taken, with a dot at each corner and one over it:
+  - drag inside the frame to move it, onto the page beside it too where
+    two show;
+  - drag a corner's dot to make it bigger or smaller (the corner across
+    stays put, the shape kept, lines as much thicker);
+  - drag the dot over it round to turn it: freely, snapping to quarter
+    turns near them; pictures only by quarter turns (Xournal++ has no
+    other way to keep them);
+  - the buttons under it: **copy** (Ctrl+C), **cut** (Ctrl+X),
+    **duplicate** (Ctrl+D: a copy down and right, taken), **turn** (a
+    quarter, clockwise), **delete** (Delete or Backspace).
+
+  What's done stays on the page; undo puts each back. A tap where
+  nothing is lets go; another, with nothing taken, puts a cross where
+  the next paste goes (tap the cross to take it away). **pen** or
+  **eraser** puts the tool down.
+- What's copied from a notebook is kept as `clipboard.xopp` next to
+  hellobro: paste it (Ctrl+V, **paste**) on another page or in another
+  notebook, where it was on its page, or at the cross. It comes in
+  taken, to be dragged where it should go. Whichever was copied last,
+  ink or a PDF's picture, is what pastes.
 - **paste** (or Ctrl+V) puts the picture last copied from a PDF on the
   page: at the cross, if there's one, else on the page shown (the left
   one of two) under what's written on it, shrunk to the margins if need

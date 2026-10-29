@@ -717,6 +717,9 @@ const (
 	keyE = 18
 	keyP = 25
 	keyS = 31
+	keyC = 46
+	keyX = 45
+	keyD = 32
 	keyY = 21
 	keyV = 47
 )
@@ -739,6 +742,8 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		w.paste(a)
 	case len(w.sel) > 0 && (code == keyDelete || code == kobo.KeyBackspace):
 		w.deleteSel(a)
+	case len(w.sel) > 0 && m.ctrl && (code == keyC || code == keyX || code == keyD):
+		w.selAct(a, map[uint16]string{keyC: "copy", keyX: "cut", keyD: "duplicate"}[code])
 	case value == 1 && !m.ctrl && (code == keyE || code == keyP || code == keyS):
 		w.setTool(a, map[uint16]string{keyE: "eraser", keyP: "pen", keyS: "select"}[code])
 	default:
@@ -789,6 +794,9 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 			return true
 		}
 		w.closePenMenu(a)
+	}
+	if w.selecting && p.In(w.selArea(a)) { // what's taken: its dots and buttons, by the edges too
+		return a.noteSelTouch(w, -1, p, g)
 	}
 	slot := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return p.In(r) })
 	if slot < 0 {
