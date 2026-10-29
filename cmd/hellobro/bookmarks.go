@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"fmt"
 	"image"
+	"log"
 	"slices"
 	"strings"
 	"time"
@@ -156,25 +157,34 @@ func (w *bookWin) deleteMark(a *bro, i int) {
 const footButton = 100 // a button's width
 
 // footButtons are the strip's buttons: the contents, the style, a
-// bookmark, side by side in its middle.
-func (w *bookWin) footButtons() (toc, style, mark image.Rectangle) {
+// bookmark, and in a PDF the select tool (bookcut.go), side by side in
+// its middle.
+func (w *bookWin) footButtons() (toc, style, mark, sel image.Rectangle) {
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y)
-	cx := (foot.Min.X + foot.Max.X) / 2
-	style = image.Rect(cx-footButton/2, foot.Min.Y, cx+footButton/2, foot.Max.Y)
-	return style.Sub(image.Pt(footButton, 0)), style, style.Add(image.Pt(footButton, 0))
+	n := 3
+	if w.pdf != nil {
+		n = 4
+	}
+	x := (foot.Min.X+foot.Max.X)/2 - n*footButton/2
+	bs := make([]image.Rectangle, 4)
+	for i := range n {
+		bs[i] = image.Rect(x+i*footButton, foot.Min.Y, x+(i+1)*footButton, foot.Max.Y)
+	}
+	return bs[0], bs[1], bs[2], bs[3]
 }
 
 // drawFoot draws the strip: the chapter, the buttons, how far in.
 func (w *bookWin) drawFoot(a *bro) {
 	c := a.C
-	toc, style, mark := w.footButtons()
+	toc, style, mark, sel := w.footButtons()
 	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
+	last := mark.Union(sel)
 	name := w.chapterName()
 	if w.pdf != nil {
 		name = w.pdfFootName()
 	}
 	c.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, toc.Min.X-12, foot.Max.Y), name, kobo.Mid, kobo.AlignLeft)
-	c.Text(a.F.Small, image.Rect(mark.Max.X+12, foot.Min.Y, foot.Max.X, foot.Max.Y), fmt.Sprintf("%d%%", w.pct()), kobo.Mid, kobo.AlignRight)
+	c.Text(a.F.Small, image.Rect(last.Max.X+12, foot.Min.Y, foot.Max.X, foot.Max.Y), fmt.Sprintf("%d%%", w.pct()), kobo.Mid, kobo.AlignRight)
 	// ☰: three lines
 	m := toc.Min.Add(toc.Max).Div(2)
 	for k := -1; k <= 1; k++ {
@@ -183,6 +193,19 @@ func (w *bookWin) drawFoot(a *bro) {
 	c.Text(a.F.Body, style, "Aa", kobo.Dark, kobo.AlignCenter)
 	m = mark.Min.Add(mark.Max).Div(2)
 	ribbon(c, image.Rect(m.X-10, m.Y-14, m.X+10, m.Y+14), len(w.pageMarks()) > 0, kobo.Dark)
+	if !sel.Empty() { // the select tool: a rectangle with its corners' dots, black while it's in hand
+		ink := uint8(kobo.Dark)
+		if w.selecting {
+			c.Fill(sel.Inset(8), kobo.Black)
+			ink = kobo.White
+		}
+		m = sel.Min.Add(sel.Max).Div(2)
+		r := image.Rect(m.X-18, m.Y-12, m.X+18, m.Y+12)
+		c.Frame(r, 2, ink)
+		for _, p := range []image.Point{r.Min, {r.Max.X - 1, r.Min.Y}, r.Max.Sub(image.Pt(1, 1)), {r.Min.X, r.Max.Y - 1}} {
+			c.Disc(p, 4, ink, sel)
+		}
+	}
 }
 
 // drawPageMark hangs a ribbon in the top margin at the right, if the
@@ -224,8 +247,13 @@ func ribbon(c kobo.Canvas, r image.Rectangle, filled bool, g uint8) {
 // footTap does what a tap at p on the strip under the page asks, if
 // it's on a button.
 func (w *bookWin) footTap(a *bro, p image.Point) bool {
-	toc, style, mark := w.footButtons()
+	toc, style, mark, sel := w.footButtons()
 	switch {
+	case p.In(sel):
+		w.selecting = !w.selecting
+		w.dropCut()
+		log.Printf("pdf: select tool %v", w.selecting)
+		w.draw(a)
 	case p.In(toc):
 		w.openContents(a)
 	case p.In(style):

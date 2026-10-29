@@ -124,22 +124,25 @@ type shelfBook struct {
 }
 
 type bookWin struct {
-	path    string // "": the shelf
-	b       *book.Book
-	pdf     *pdf.Doc // a PDF's: b is made of it, a chapter a page (bookpdf.go)
-	shown   []pdfShown
-	ahead   *pdfAhead     // a page being drawn ahead
-	tiles   []image.Point // where each screenful starts in the page drawn
-	view    pdfView
-	cut     image.Rectangle // a part cut out, on the screen (bookcut.go)
-	cutRows []bookRow       // its buttons
-	err     string
-	spine   int
-	at      book.Pos // the page shown starts here
-	ch      *book.Chapter
-	pages   []book.Page
-	page    int
-	laid    bookLaid // what the pages are laid out for
+	path      string // "": the shelf
+	b         *book.Book
+	pdf       *pdf.Doc // a PDF's: b is made of it, a chapter a page (bookpdf.go)
+	shown     []pdfShown
+	ahead     *pdfAhead     // a page being drawn ahead
+	tiles     []image.Point // where each screenful starts in the page drawn
+	view      pdfView
+	cut       image.Rectangle // a part cut out, on the screen (bookcut.go)
+	cutRows   []bookRow       // its buttons
+	selecting bool            // the select tool: taps place the cut's corners
+	corner    *image.Point    // the first corner, placed
+	grab      int             // a corner of the cut picked, to be moved: 1–4; 0 none
+	err       string
+	spine     int
+	at        book.Pos // the page shown starts here
+	ch        *book.Chapter
+	pages     []book.Page
+	page      int
+	laid      bookLaid // what the pages are laid out for
 
 	p       kobo.Panel
 	area    image.Rectangle // the text's, in the body
@@ -235,7 +238,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	p.Name = w.Title()
 	w.p = p
 	w.rows = nil
-	w.cut = image.Rectangle{}
+	w.dropCut()
 	if p.Outer.Empty() {
 		return
 	}
@@ -568,7 +571,7 @@ func (w *bookWin) goTo(spine int, pos book.Pos) {
 	if spine != w.spine {
 		w.ch, w.pics = nil, nil
 	}
-	w.cut = image.Rectangle{}
+	w.dropCut()
 	w.spine, w.at = spine, pos
 	w.laid = bookLaid{}
 }
@@ -592,7 +595,7 @@ func (w *bookWin) turn(a *bro, d int) {
 	default:
 		w.page = n
 		w.at = w.pages[n].Start
-		w.cut = image.Rectangle{}
+		w.dropCut()
 	}
 	w.turns++
 	w.draw(a)
@@ -669,8 +672,11 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		return true
 	}
 	switch {
-	case code == kobo.KeyEsc && !w.cut.Empty():
-		w.cut = image.Rectangle{}
+	case code == kobo.KeyEsc && (!w.cut.Empty() || w.corner != nil):
+		w.dropCut()
+		w.draw(a)
+	case code == kobo.KeyEsc && w.selecting: // nothing cut: the tool put down
+		w.selecting = false
 		w.draw(a)
 	case (ch == "+" || ch == "=") && w.pdf != nil:
 		a.pdfZoomStep(1)
@@ -736,6 +742,12 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 		}
 		return
 	}
+	if w.selecting && w.pdf != nil {
+		if !(p.Y >= w.area.Max.Y && w.footTap(a, p)) {
+			w.selectTap(a, p)
+		}
+		return
+	}
 	if !w.cut.Empty() { // a part cut out: its buttons, or away with it
 		for _, r := range w.cutRows {
 			if p.In(r.r) {
@@ -743,7 +755,7 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 				return
 			}
 		}
-		w.cut = image.Rectangle{}
+		w.dropCut()
 		w.draw(a)
 		return
 	}

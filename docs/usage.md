@@ -27,7 +27,8 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
   - **Sharing** with a computer over SFTP and SSH (how to reach the
     Kobo, pairing, who's connected and sending what);
   - **Settings**, hellobro's own, in groups: Light; Sleep; Keyboard
-    (the Bluetooth window when it's gone); At start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
+    (the Bluetooth window when it's gone); Touch (touch marks, how
+    workspaces turn by touch); At start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
     CPU profiles); Terminal (notifications, the status bar); Alpine;
     Keys;
   - **Battery**: the charge, the current it gives (mA, W), the gauge's
@@ -86,10 +87,12 @@ say) it says which (`grab` too, while the keys are grabbed), and what plays, and
 A swipe up or down along the right edge of the screen opens the menu:
 rotate the screen, touch calibration, the on-screen keyboard, sleep,
 lock, the switcher, and quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
-it. A swipe in from the right edge, at any height, goes to the next
-workspace, in from the left edge to the one before, as pages turn; so
-do two fingers swiped left or right anywhere, where the screen tells
-two fingers apart. Settings, Touch marks shows where touches
+it. Two fingers swiped left anywhere go to the next workspace, swiped
+right to the one before, as pages turn (where the screen tells two
+fingers apart). Settings, **Workspaces by touch**, one finger as well:
+a swipe in from the right edge, at any height, to the next, in from
+the left edge to the one before; it's off at first, since a book's or
+a notebook's swipe near an edge took it. Settings, Touch marks shows where touches
 land: a ring where a finger (or the pen) came down, a dot where it
 lifted after moving, each for 3 s; the log has each touch then, to the
 millisecond.
@@ -591,7 +594,13 @@ password don't open (an empty one does).
 
 To cut a part of a PDF's page out, draw a rectangle across it with the
 pen, or hold a finger still on the page a moment, then move it (as to
-select in a terminal). Under it:
+select in a terminal). Or take the select tool, the rectangle with
+dots at its corners in the strip under the page (PDFs only; black
+while it's in hand): tap one corner, then the opposite one, without
+dragging. Each corner then has a dot: tap one (it fills in black) and tap
+where it should be, the corner across staying where it is; a finger
+dragged on the page draws a rectangle at once too. Tap the tool again,
+or Esc, to put it down. Under the rectangle:
 
 - **copy**: its words (whole ones, line by line) into the clipboard,
   which the terminals paste (Ctrl+Shift+V), and its picture, which a

@@ -313,10 +313,10 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	}
 }
 
-// edgeSwipe takes a swipe from an edge, once it's gone far enough: in
-// from the right, the next workspace, in from the left the one before
-// (as pages turn); up or down along the right edge, the menu. (Up or
-// down the left edge is the light's: kobo's.)
+// edgeSwipe takes a swipe from an edge, once it's gone far enough: up
+// or down along the right edge, the menu (up or down the left edge is
+// the light's: kobo's); if the settings say so, in from the right the
+// next workspace, in from the left the one before (as pages turn).
 func (a *bro) edgeSwipe(p image.Point, g *kobo.Gesture) bool {
 	if g.Owner != 0 {
 		return false
@@ -328,7 +328,7 @@ func (a *bro) edgeSwipe(p image.Point, g *kobo.Gesture) bool {
 		g.Owner, a.edge = ownMenu, nil
 		log.Print("menu swipe")
 		a.menu()
-	case kobo.Abs(dx) > menuSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) && (dx < 0) == right: // inward
+	case kobo.Abs(dx) > menuSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) && (dx < 0) == right && a.setting("edge-swipe") == "edge": // inward
 		g.Owner, a.edge = ownEdge, nil
 		if a.tv.sel != nil && a.tv.sel.g == g {
 			a.tv.sel = nil

@@ -2,7 +2,9 @@ package main
 
 // Cutting a part of a PDF's page out: the pen drawn across the page, or
 // a finger held still a moment then moved (as in the terminals), makes a
-// rectangle, and by it its buttons: copy it (its text into the
+// rectangle. So does the select tool (its button under the page), by
+// taps alone: one corner, then the other; a tap on a corner's dot picks
+// it, the next tap puts it there. By the rectangle are its buttons: copy it (its text into the
 // clipboard, which the terminals paste; and its picture, which a
 // notebook pastes: notepic.go), save it (a picture at 300 dpi and its
 // text, in Clips/ on the Kobo's storage, and as Clips/latest.png and
@@ -63,8 +65,8 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 		case g.Owner != 0:
 			a.bk.cut = nil
 			return
-		case g.Pen && g.Moved > selStill:
-		case g.Pen:
+		case (g.Pen || w.selecting) && g.Moved > selStill: // the select tool's finger draws at once, as the pen
+		case g.Pen || w.selecting:
 			return
 		case time.Since(g.At) < selHold:
 			s.early = g.Moved
@@ -107,23 +109,99 @@ func (a *bro) cutLift(g *kobo.Gesture) bool {
 	}
 	w := s.w
 	if r := (image.Rectangle{s.from, s.to}).Canon().Intersect(w.view.dst); r.Dx() >= cutMin && r.Dy() >= cutMin {
+		w.dropCut()
 		w.cut = r
 	}
 	w.draw(a)
 	return true
 }
 
+const cornerHit = 56 // px from a corner's dot a tap picks it
+
+// dropCut takes the cut away, and what the select tool had placed.
+func (w *bookWin) dropCut() { w.cut, w.corner, w.grab = image.Rectangle{}, nil, 0 }
+
+// corners are the cut's, clockwise from the top left.
+func (w *bookWin) corners() [4]image.Point {
+	r := w.cut
+	return [4]image.Point{r.Min, {r.Max.X - 1, r.Min.Y}, r.Max.Sub(image.Pt(1, 1)), {r.Min.X, r.Max.Y - 1}}
+}
+
+// selectTap is a tap on the page with the select tool: the cut's
+// buttons; a picked corner put there; a corner's dot picked; else a
+// corner placed, the first or the second (and the cut is made).
+func (w *bookWin) selectTap(a *bro, p image.Point) {
+	for _, r := range w.cutRows {
+		if p.In(r.r) {
+			r.do()
+			return
+		}
+	}
+	in := w.view.dst
+	p = image.Pt(max(in.Min.X, min(in.Max.X-1, p.X)), max(in.Min.Y, min(in.Max.Y-1, p.Y)))
+	if !w.cut.Empty() {
+		cs := w.corners()
+		if w.grab > 0 { // the far corner stays, this one goes to p
+			r := image.Rectangle{cs[(w.grab+1)%4], p}.Canon()
+			r.Max = r.Max.Add(image.Pt(1, 1))
+			w.grab = 0
+			if r.Dx() >= cutMin && r.Dy() >= cutMin {
+				w.cut = r
+			}
+			w.draw(a)
+			return
+		}
+		for i, c := range cs {
+			if d := p.Sub(c); d.X*d.X+d.Y*d.Y <= cornerHit*cornerHit {
+				w.grab = i + 1
+				w.draw(a)
+				return
+			}
+		}
+		w.dropCut() // elsewhere: another cut, from here
+	}
+	if w.corner == nil {
+		w.corner = &p
+		w.draw(a)
+		return
+	}
+	r := image.Rectangle{*w.corner, p}.Canon()
+	r.Max = r.Max.Add(image.Pt(1, 1))
+	w.corner = nil
+	if r.Dx() >= cutMin && r.Dy() >= cutMin {
+		w.cut = r
+		log.Print("pdf: cut by taps")
+	}
+	w.draw(a)
+}
+
+// drawCorner draws a corner's dot: a ring, filled if it's picked.
+func drawCorner(c kobo.Canvas, p image.Point, picked bool, clip image.Rectangle) {
+	c.Disc(p, 17, kobo.White, clip)
+	c.Disc(p, 14, kobo.Black, clip)
+	if !picked {
+		c.Disc(p, 9, kobo.White, clip)
+	}
+}
+
 // drawCut draws the rectangle cut out, if there's one, and its buttons:
 // under it, or over it if there's no room under it.
 func (w *bookWin) drawCut(a *bro) {
 	w.cutRows = nil
-	r := w.cut
+	r, c := w.cut, a.C
+	if w.selecting && w.corner != nil {
+		drawCorner(c, *w.corner, true, w.view.dst)
+	}
 	if r.Empty() {
 		return
 	}
-	c := a.C
 	c.Frame(r.Inset(-3), 3, kobo.White)
 	c.Frame(r, 3, kobo.Black)
+	if w.selecting {
+		for i, p := range w.corners() {
+			drawCorner(c, p, w.grab == i+1, w.p.Body)
+		}
+	}
 	const h, gap = 64, 10
 	labels := []string{"copy", "save", "×"}
 	widths := []int{140, 140, 64}
@@ -136,7 +214,7 @@ func (w *bookWin) drawCut(a *bro) {
 		y = max(w.area.Min.Y, r.Min.Y-gap-h)
 	}
 	x := max(w.area.Min.X, min(r.Max.X, w.area.Max.X)-total)
-	do := []func(){func() { w.cutCopy(a) }, func() { w.cutSave(a) }, func() { w.cut = image.Rectangle{}; w.draw(a) }}
+	do := []func(){func() { w.cutCopy(a) }, func() { w.cutSave(a) }, func() { w.dropCut(); w.draw(a) }}
 	for i, label := range labels {
 		b := image.Rect(x, y, x+widths[i], y+h)
 		x += widths[i] + gap
