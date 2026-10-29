@@ -80,3 +80,33 @@ func TestBookOpened(t *testing.T) {
 		t.Errorf("closed, it took the book")
 	}
 }
+
+// A chapter laid out aside is taken only if it's still the one wanted;
+// then the page is found: its last, or the contents' anchor.
+func TestLaidOut(t *testing.T) {
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
+	a.wm.wins = map[*wm.Node]window{}
+	w := &bookWin{b: &book.Book{Spine: make([]string, 3)}, spine: 1, at: book.Pos{Block: 1 << 30}}
+	want := bookLayingOut{spine: 1, laid: bookLaid{w: 100, h: 100}}
+	w.laying = &want
+	ch := &book.Chapter{Blocks: make([]book.Block, 3), IDs: map[string]int{"x": 1}}
+	pages := []book.Page{{}, {Start: book.Pos{Block: 1}}, {Start: book.Pos{Block: 2}}}
+	w.laidOut(a, bookLayingOut{spine: 0, laid: want.laid}, ch, pages, nil) // an older one's
+	if w.pages != nil || w.laying == nil {
+		t.Fatalf("took pages not wanted")
+	}
+	w.turn(a, 1)
+	if w.spine != 1 {
+		t.Errorf("turned while laying out")
+	}
+	w.laidOut(a, want, ch, pages, nil)
+	if w.laying != nil || w.page != 2 || w.at != pages[2].Start {
+		t.Errorf("its last page: page %d at %v", w.page, w.at)
+	}
+	w.frag, w.at = "x", book.Pos{}
+	w.findPage()
+	if w.page != 1 || w.frag != "" {
+		t.Errorf("the anchor: page %d", w.page)
+	}
+}

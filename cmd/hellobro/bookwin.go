@@ -159,8 +159,12 @@ type bookWin struct {
 	corner    *image.Point    // the first corner, placed
 	grab      int             // a corner of the cut picked, to be moved: 1–4; 0 none
 	err       string
-	opening   bool // the book's being opened (newBookWin)
-	gone      bool // the window's closed
+	opening   bool           // the book's being opened (newBookWin)
+	laying    *bookLayingOut // an EPUB's chapter being laid out, aside
+	pagesFor  bookLayingOut  // what the pages are laid out for
+	pageShown bool           // the page is what the window shows: it stays while the next is laid out
+	frag      string         // the anchor the contents went to, found once its chapter's laid out
+	gone      bool           // the window's closed
 	spine     int
 	at        book.Pos // the page shown starts here
 	ch        *book.Chapter
@@ -332,6 +336,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	p.Name = w.Title()
 	w.p = p
 	w.rows = nil
+	w.pageShown = false
 	w.dropCut()
 	if p.Outer.Empty() {
 		return
@@ -394,26 +399,80 @@ func (w *bookWin) layout(a *bro) {
 		w.layoutPDF(a, laid)
 		return
 	}
-	if w.ch == nil {
-		ch, err := w.b.Chapter(w.spine)
-		if err != nil {
-			w.err = err.Error()
-			w.ch = &book.Chapter{}
-		} else {
-			w.ch, w.err = ch, ""
-		}
+	want := bookLayingOut{spine: w.spine, laid: laid}
+	if w.ch != nil && w.pagesFor == want { // laid out: gone to a place in it, its page
+		w.laid = laid
+		w.findPage()
+		return
 	}
-	t := time.Now()
-	w.pages = book.Layout(w.ch, laid.st.settings(image.Pt(laid.w, laid.h), w.b.Lang), faces, func(src string) image.Point {
-		p, _ := w.b.ImageSize(src)
-		return p
-	})
-	w.laid = laid
+	if w.laying != nil && *w.laying == want { // on its way
+		return
+	}
+	// An EPUB's chapter is laid out aside: a long one takes the Kobo
+	// most of a second, and the keys and the other windows don't wait.
+	w.laying = &want
+	b, ch := w.b, w.ch
+	if w.pagesFor.spine != w.spine {
+		ch = nil
+	}
+	st, faces := laid.st.settings(image.Pt(laid.w, laid.h), b.Lang), faces.clone()
+	go func() {
+		t := time.Now()
+		var err error
+		if ch == nil {
+			if ch, err = b.Chapter(want.spine); err != nil {
+				ch = &book.Chapter{}
+			}
+		}
+		pages := book.Layout(ch, st, faces, func(src string) image.Point {
+			p, _ := b.ImageSize(src)
+			return p
+		})
+		log.Printf("book: chapter %d: %d pages in %v", want.spine, len(pages), time.Since(t).Round(time.Millisecond))
+		a.Do(func() { w.laidOut(a, want, ch, pages, err) })
+	}()
+}
+
+// bookLayingOut is what a chapter's pages are laid out for.
+type bookLayingOut struct {
+	spine int
+	laid  bookLaid
+}
+
+// laidOut takes the pages laid out aside, if they're still the ones
+// wanted, and shows them.
+func (w *bookWin) laidOut(a *bro, want bookLayingOut, ch *book.Chapter, pages []book.Page, err error) {
+	if w.gone || w.laying == nil || *w.laying != want { // closed, or other pages are wanted now
+		return
+	}
+	w.laying = nil
+	w.err = ""
+	if err != nil {
+		w.err = err.Error()
+	}
+	w.ch, w.pages, w.pagesFor, w.laid = ch, pages, want, want.laid
+	w.findPage()
+	if w.page < len(w.pages) && w.at.Block >= len(ch.Blocks) { // its last page: from where it starts
+		w.at = w.pages[w.page].Start
+	}
+	if a.shows(w) {
+		w.draw(a)
+	}
+}
+
+// findPage finds the page w.at is on, in the pages laid out (or the
+// anchor the contents went to).
+func (w *bookWin) findPage() {
+	if w.frag != "" {
+		if bi, ok := w.ch.IDs[w.frag]; ok {
+			w.at = book.Pos{Block: bi}
+		}
+		w.frag = ""
+	}
 	w.page = book.PageAt(w.pages, w.at)
-	if laid.two { // a spread starts on an even page
+	if w.laid.two { // a spread starts on an even page
 		w.page -= w.page % 2
 	}
-	log.Printf("book: chapter %d: %d pages in %v", w.spine, len(w.pages), time.Since(t).Round(time.Millisecond))
 }
 
 func (w *bookWin) draw(a *bro) {
@@ -421,21 +480,34 @@ func (w *bookWin) draw(a *bro) {
 	if p.Outer.Empty() {
 		return
 	}
+	reading := !w.styling && !w.list && w.b != nil
+	if reading {
+		w.layout(a)
+		if w.laying != nil && w.pageShown { // the page shown stays till the next is laid out
+			return
+		}
+	}
+	w.pageShown = false
 	a.DrawPanel(p, w.status())
 	body := p.Body
 	a.C.Fill(body, kobo.White)
+	note := func(s string, ink uint8) {
+		a.C.Text(a.F.Body, image.Rect(w.area.Min.X, w.area.Min.Y, w.area.Max.X, w.area.Min.Y+40), s, ink, kobo.AlignLeft)
+	}
 	switch {
 	case w.styling:
 		w.drawStyle(a)
 	case w.list:
 		w.drawList(a)
-	case w.opening:
-		a.C.Text(a.F.Body, image.Rect(w.area.Min.X, w.area.Min.Y, w.area.Max.X, w.area.Min.Y+40), "opening "+filepath.Base(w.path)+"…", kobo.Mid, kobo.AlignLeft)
+	case w.opening, reading && w.laying != nil && w.pagesFor == bookLayingOut{}:
+		note("opening "+filepath.Base(w.path)+"…", kobo.Mid)
+	case reading && w.laying != nil:
+		note("laying out…", kobo.Mid)
 	case w.err != "" && w.b == nil:
-		a.C.Text(a.F.Body, image.Rect(w.area.Min.X, w.area.Min.Y, w.area.Max.X, w.area.Min.Y+40), "can't read it: "+w.err, kobo.Dark, kobo.AlignLeft)
+		note("can't read it: "+w.err, kobo.Dark)
 	default:
-		w.layout(a)
 		w.drawPage(a)
+		w.pageShown = true
 	}
 	if w.turns >= bookFlashEvery {
 		w.turns = 0
@@ -602,13 +674,7 @@ func (w *bookWin) listOpen(a *bro, i int) {
 	e := w.b.TOC[i]
 	w.list = false
 	w.goTo(e.Spine, book.Pos{})
-	if e.Frag != "" {
-		w.layout(a)
-		if bi, ok := w.ch.IDs[e.Frag]; ok {
-			w.at = book.Pos{Block: bi}
-			w.page = book.PageAt(w.pages, w.at)
-		}
-	}
+	w.frag = e.Frag
 	w.draw(a)
 }
 
@@ -784,7 +850,7 @@ func (a *bro) bookExit() {
 // goTo shows chapter spine at pos.
 func (w *bookWin) goTo(spine int, pos book.Pos) {
 	if spine != w.spine {
-		w.ch, w.pics = nil, nil
+		w.ch, w.pics, w.pages = nil, nil, nil
 	}
 	w.dropCut()
 	w.spine, w.at, w.panned = spine, pos, false
@@ -793,7 +859,7 @@ func (w *bookWin) goTo(spine int, pos book.Pos) {
 
 // turn goes d pages on (back if negative), across chapters.
 func (w *bookWin) turn(a *bro, d int) {
-	if w.b == nil || len(w.pages) == 0 {
+	if w.b == nil || len(w.pages) == 0 || w.laying != nil { // the next pages aren't laid out yet
 		return
 	}
 	two, step := w.laid.two, 1 // two side by side: a PDF's chapters, its pages, go two at a time too
@@ -841,7 +907,11 @@ func (w *bookWin) save(a *bro) {
 	if a.mem.Books == nil {
 		a.mem.Books = map[string]bookPlace{}
 	}
-	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: w.pct(), Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode, Zoom: w.zoom}
+	pct := w.pct()
+	if len(w.pages) == 0 { // its chapter's being laid out: as far as it was
+		pct = a.mem.Books[w.path].Pct
+	}
+	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: pct, Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode, Zoom: w.zoom}
 	a.mem.save()
 	w.savedAt = time.Now()
 }

@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 
 	_ "golang.org/x/image/webp"
 )
@@ -29,6 +30,7 @@ type Book struct {
 	z             *zip.ReadCloser
 	files         map[string]*zip.File
 	css           map[string]*sheet // stylesheets read so far
+	mu            sync.Mutex        // Chapter's: the stylesheets read, from more than one goroutine
 }
 
 // TOCEntry is a line of the contents: where it goes, how deep it is.

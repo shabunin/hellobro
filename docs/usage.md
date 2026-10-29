@@ -627,7 +627,10 @@ PDFs are on the same shelf and read the same way: a page at a time,
 the contents are their outline (if they have one), bookmarks are the
 same. A book is opened aside: the window says **opening…** meanwhile
 (a damaged PDF, read whole, can take seconds), and the rest of
-hellobro goes on; closed before it's open, it's let go. Their pages are drawn gray by MuPDF, linked into hellobro (package
+hellobro goes on; closed before it's open, it's let go. An EPUB's
+chapter is laid out aside too: turned into, the page shown stays till
+the next is ready (turns meanwhile wait for it), and a window resized
+or a font changed says **laying out…** for that moment. Their pages are drawn gray by MuPDF, linked into hellobro (package
 `pdf`), with their white margins trimmed, as big as the screen takes the
 whole page. **s** or **Aa** has their own panel: **Fit** the whole page
 or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and

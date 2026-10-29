@@ -106,6 +106,8 @@ var headScale = [7]float32{1, 1.6, 1.4, 1.2, 1.1, 1, 0.9}
 
 // Chapter reads the i-th spine item.
 func (b *Book) Chapter(i int) (*Chapter, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	name := b.Spine[i]
 	data, err := b.read(name)
 	if err != nil {

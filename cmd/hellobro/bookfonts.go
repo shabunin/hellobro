@@ -156,6 +156,12 @@ func parseFont(data []byte) (*opentype.Font, error) {
 	return opentype.Parse(data)
 }
 
+// clone is f for another goroutine: the fonts are shared (a parsed
+// font is read only), the faces its own (each has its buffers).
+func (f *bookFaces) clone() *bookFaces {
+	return &bookFaces{fam: f.fam, fonts: f.fonts, faces: map[[2]int]font.Face{}}
+}
+
 // Face is the font for style s, px pixels.
 func (f *bookFaces) Face(s book.Style, px int) font.Face {
 	i := int(s & (book.Bold | book.Italic))
