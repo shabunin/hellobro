@@ -76,7 +76,8 @@ func copyPicture(m image.Image) error {
 }
 
 // paste puts the clipboard's picture on the page shown (the left one of
-// two), under what's on it, or on the next page if there's no room.
+// two), under what's on it, or on the next page if there's no room; or
+// at the select tool's mark. It comes in taken by the select tool.
 func (w *noteWin) paste(a *bro) {
 	data, err := os.ReadFile(kobo.AppFile(clipPic))
 	if err != nil {
@@ -89,13 +90,14 @@ func (w *noteWin) paste(a *bro) {
 		a.Notify("can't paste it: " + err.Error())
 		return
 	}
-	page, box := w.pastePlace(p.gray.Bounds().Size())
+	page, box := w.pasteWhere(p.gray.Bounds().Size()) // notesel.go
 	for len(w.nb.pages) <= page {
 		w.nb.pages = append(w.nb.pages, nil)
 	}
 	op := noteOp{page: page, add: []*noteStroke{picStroke(p, box)}}
 	w.nb.apply(op, false)
 	w.edited(op)
+	w.pasted(page, op.add[0])
 	if page >= w.cur+w.shown() {
 		w.cur = page
 	}

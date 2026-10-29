@@ -647,11 +647,23 @@ the launcher has them too, the last three written.
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
   writing on the second makes it a page. **clear pages** clears both.
+- **select** (or S) takes what's written, and pictures, to move them;
+  the pen and fingers both work with it. Tap a stroke or a picture to
+  take it (the ink over a picture first), or draw a rectangle round
+  some to take all that's wholly inside; a dashed frame goes round
+  what's taken. Drag inside the frame to move it, onto the page beside
+  it too where two show; it stays on the page. Delete (or Backspace)
+  takes it off the page; undo puts a move or a delete back. A tap
+  where nothing is lets go; another, with nothing taken, puts a cross
+  where the next paste goes (tap the cross to take it away). **pen**
+  or **eraser** puts the tool down.
 - **paste** (or Ctrl+V) puts the picture last copied from a PDF on the
-  page (the left one of two), under what's written on it, shrunk to the
-  margins if need be; if there's no room left there, on the next page.
-  It's under the ink: write over it. The eraser leaves it; undo and
-  clear page take it away.
+  page: at the cross, if there's one, else on the page shown (the left
+  one of two) under what's written on it, shrunk to the margins if need
+  be, or on the next page if there's no room left there. It comes in
+  taken by the select tool: drag it where it should go, then **pen** to
+  write. It's under the ink: write over it. The eraser leaves it; undo
+  and clear page take it away.
 - It's kept a few seconds after the last stroke and on closing, as
   `Notebooks/NAME.xopp` on the Kobo's storage: over USB, or file
   sharing (`sftp kobo.local`). A notebook's window comes back with the
