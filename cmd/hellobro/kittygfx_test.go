@@ -381,3 +381,37 @@ func TestGfxQueries(t *testing.T) {
 		}
 	}
 }
+
+// TestGfxLimits: sizes that wrap a 32-bit int are refused; an image sent
+// again takes its placements with it; images are capped in number too.
+func TestGfxLimits(t *testing.T) {
+	for _, c := range []struct {
+		w, h int
+		ok   bool
+	}{{1, 1, true}, {4096, 3072, true}, {65536, 65536, false}, {kgMaxPixels, 2, false}, {0, 5, false}, {5, -1, false}} {
+		if kgSizeOK(c.w, c.h) != c.ok {
+			t.Errorf("%d × %d: %v", c.w, c.h, !c.ok)
+		}
+	}
+	ts, read := gfxTerm(t, 20, 6)
+	data := pngB64(t, 25, 30, color.Black)
+	ts.write([]byte("\x1b_Ga=T,f=100,i=7;" + data + "\x1b\\"))
+	read()
+	if len(ts.gfx.places) != 1 {
+		t.Fatalf("%d placements", len(ts.gfx.places))
+	}
+	ts.write([]byte("\x1b_Ga=t,f=100,i=7;" + data + "\x1b\\")) // again, not placed
+	read()
+	if len(ts.gfx.places) != 0 || ts.gfx.bytes != len(ts.gfx.images[7].gray.Pix) {
+		t.Errorf("sent again: %d placements, %d bytes", len(ts.gfx.places), ts.gfx.bytes)
+	}
+	for i := range kgMaxImages + 50 {
+		ts.write([]byte(fmt.Sprintf("\x1b_Ga=t,f=24,s=1,v=1,I=%d,q=2;AAAA\x1b\\", i+1)))
+	}
+	if n := len(ts.gfx.images); n > kgMaxImages {
+		t.Errorf("%d images kept", n)
+	}
+	if n := len(ts.gfx.numbers); n > kgMaxImages {
+		t.Errorf("%d numbers kept", n)
+	}
+}

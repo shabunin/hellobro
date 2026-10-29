@@ -13,8 +13,8 @@ package main
 // The subset: images sent directly (t=d; files and shared memory are
 // refused: the paths would be a jail's or another host's), as RGB, RGBA
 // or PNG, zlib'd or not, in chunks; placed with a size in cells or their
-// own; queried; deleted all, by id or by number. No animation, no z
-// order, no Unicode placeholders.
+// own, or by Unicode placeholders (kgholder.go); queried; deleted all,
+// by id or by number. No animation, no z order.
 
 import (
 	"bytes"
@@ -39,6 +39,7 @@ const (
 	kgMaxPixels = 12 << 20 // an image's, decoded
 	kgMaxSide   = 2048     // kept no bigger: the screen is smaller
 	kgMaxBytes  = 32 << 20 // the images a terminal keeps, all told
+	kgMaxImages = 256      // and how many: a 1×1 one costs more than its byte
 	kgMaxPlaces = 512
 	kgMaxCells  = 255 // a placement's rows and columns: they're a byte each in the rune
 	kgRune0     = 0xF0000
@@ -437,7 +438,7 @@ func kgDecode(c *kgCmd) (gray *image.Gray, w, h int, err error) {
 	if c.f != 100 && bpp == 0 {
 		return nil, 0, 0, fmt.Errorf("EINVAL:format %d not supported", c.f)
 	}
-	if bpp != 0 && (c.s <= 0 || c.v <= 0 || c.s*c.v > kgMaxPixels) {
+	if bpp != 0 && !kgSizeOK(c.s, c.v) {
 		return nil, 0, 0, fmt.Errorf("EINVAL:bad size")
 	}
 	if c.o == 'z' {
@@ -462,7 +463,7 @@ func kgDecode(c *kgCmd) (gray *image.Gray, w, h int, err error) {
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("EBADPNG:%v", err)
 		}
-		if cfg.Width*cfg.Height > kgMaxPixels || cfg.Width <= 0 || cfg.Height <= 0 {
+		if !kgSizeOK(cfg.Width, cfg.Height) {
 			return nil, 0, 0, fmt.Errorf("EFBIG:image too big")
 		}
 		if m, err = png.Decode(bytes.NewReader(raw)); err != nil {
@@ -483,6 +484,10 @@ func kgDecode(c *kgCmd) (gray *image.Gray, w, h int, err error) {
 	}
 	return gray, b.Dx(), b.Dy(), nil
 }
+
+// kgSizeOK says whether a w × h image may be decoded: divided, not
+// multiplied, as an int is 32 bits on the Kobo (65536 × 65536 is 0).
+func kgSizeOK(w, h int) bool { return w > 0 && h > 0 && w <= kgMaxPixels/h }
 
 // kgRaw is RGB or RGBA pixels as an image.
 func kgRaw(raw []byte, w, h, bpp int) image.Image {
@@ -552,14 +557,14 @@ func (g *kittyGfx) add(c *kgCmd, gray *image.Gray, w, h int) *kgImage {
 			c.i = id // the answer says it
 		}
 	}
-	if old := g.images[id]; old != nil {
-		g.bytes -= len(old.gray.Pix) // its placements keep what they show
+	if old := g.images[id]; old != nil { // sent again: the old one goes, and where it was placed
+		g.free(old)
 	}
 	g.seq++
 	img := &kgImage{id: id, gray: gray, w: w, h: h, seq: g.seq}
 	g.images[id] = img
 	g.bytes += len(gray.Pix)
-	for g.bytes > kgMaxBytes && len(g.images) > 1 {
+	for (g.bytes > kgMaxBytes || len(g.images) > kgMaxImages) && len(g.images) > 1 {
 		var oldest *kgImage
 		for _, m := range g.images {
 			if m != img && (oldest == nil || m.seq < oldest.seq) {
@@ -574,6 +579,11 @@ func (g *kittyGfx) add(c *kgCmd, gray *image.Gray, w, h int) *kgImage {
 func (g *kittyGfx) free(img *kgImage) {
 	g.bytes -= len(img.gray.Pix)
 	delete(g.images, img.id)
+	for n, id := range g.numbers {
+		if id == img.id {
+			delete(g.numbers, n)
+		}
+	}
 	for k, pl := range g.places {
 		if pl.img == img {
 			delete(g.places, k)
