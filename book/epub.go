@@ -268,11 +268,22 @@ func (b *Book) readNCX(name string) {
 	add(n.Points, 0)
 }
 
+// MaxPicture is the most pixels a picture is decoded with: a bigger one
+// (a camera's, or a header that says so) would be hundreds of MB.
+const MaxPicture = 16 << 20
+
 // Image is the picture at src (a path in the zip, as a Block has it).
 func (b *Book) Image(src string) (image.Image, error) {
 	f := b.files[src]
 	if f == nil {
 		return nil, fmt.Errorf("%s: not in the book", src)
+	}
+	size, err := b.ImageSize(src)
+	if err != nil {
+		return nil, err
+	}
+	if size.X <= 0 || size.Y <= 0 || size.X > MaxPicture/size.Y {
+		return nil, fmt.Errorf("%s: %d × %d, too big a picture", src, size.X, size.Y)
 	}
 	r, err := f.Open()
 	if err != nil {

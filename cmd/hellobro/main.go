@@ -201,6 +201,7 @@ func (a *bro) Tick() {
 
 func (a *bro) Exit() {
 	a.noteExit()
+	a.bookExit()
 	a.wmKeep(true)
 	a.ipcExit()
 	a.termCloseAll()

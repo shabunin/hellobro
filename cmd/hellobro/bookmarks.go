@@ -34,8 +34,12 @@ func (m bookMark) pos() book.Pos { return book.Pos{Block: m.Block, Off: m.Off} }
 func (w *bookWin) pageSpan() (from, to book.Pos) {
 	from = w.pages[w.page].Start
 	to = book.Pos{Block: 1 << 30}
-	if w.page+1 < len(w.pages) {
-		to = w.pages[w.page+1].Start
+	next := w.page + 1
+	if w.laid.two && w.pdf == nil { // two side by side: the right one's too
+		next++
+	}
+	if next < len(w.pages) {
+		to = w.pages[next].Start
 	}
 	return from, to
 }

@@ -41,3 +41,11 @@ func TestLibView(t *testing.T) {
 		}
 	}
 }
+
+func TestShelfName(t *testing.T) {
+	for in, want := range map[string]string{"Dune.epub": "Dune", "Dune.EPUB": "Dune", "a.kepub.epub": "a", "Paper.PDF": "Paper", "notes.txt": "notes.txt"} {
+		if got := shelfName(in); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+}

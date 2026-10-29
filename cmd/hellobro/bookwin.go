@@ -12,6 +12,7 @@ import (
 	"image"
 	"io/fs"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -677,7 +678,7 @@ func booksRoot() string {
 func (a *bro) findBooks(w *bookWin) {
 	root := booksRoot()
 	w.looking = true
-	known := a.mem.Books
+	known := maps.Clone(a.mem.Books) // the walk's own: a book's place is written meanwhile
 	go func() {
 		var found []shelfBook
 		filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -691,7 +692,7 @@ func (a *bro) findBooks(w *bookWin) {
 				return nil
 			}
 			if (strings.HasSuffix(strings.ToLower(d.Name()), ".epub") || isPDF(d.Name())) && len(found) < bookShelfMax {
-				b := shelfBook{path: p, name: strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(d.Name(), ".epub"), ".kepub"), ".pdf")}
+				b := shelfBook{path: p, name: shelfName(d.Name())}
 				if pl, ok := known[p]; ok {
 					b.pct, b.read = pl.Pct, pl.Read
 					if pl.Title != "" {
@@ -702,12 +703,6 @@ func (a *bro) findBooks(w *bookWin) {
 			}
 			return nil
 		})
-		slices.SortFunc(found, func(x, y shelfBook) int {
-			if x.read != y.read {
-				return int(y.read - x.read)
-			}
-			return strings.Compare(strings.ToLower(x.name), strings.ToLower(y.name))
-		})
 		a.Do(func() {
 			w.shelf, w.looking = found, false
 			if a.shows(w) {
@@ -715,6 +710,27 @@ func (a *bro) findBooks(w *bookWin) {
 			}
 		})
 	}()
+}
+
+// shelfName is a book's name from its file's: ".epub", ".kepub.epub"
+// and ".pdf" off, however they're written.
+func shelfName(file string) string {
+	for _, ext := range []string{".epub", ".kepub", ".pdf"} {
+		if strings.HasSuffix(strings.ToLower(file), ext) {
+			file = file[:len(file)-len(ext)]
+		}
+	}
+	return file
+}
+
+// bookExit keeps where each book open is, for quitting and sleep: while
+// reading, a place is only kept every 20 s.
+func (a *bro) bookExit() {
+	for _, w := range a.windows() {
+		if b, ok := w.(*bookWin); ok {
+			b.save(a)
+		}
+	}
 }
 
 // --- turning pages ---
@@ -886,8 +902,14 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.turn(a, -1)
 	case code == 102: // Home: the chapter's start
 		w.turn(a, -w.page)
-	case code == 107:
-		w.turn(a, len(w.pages)-1-w.page)
+	case code == 107: // End: the chapter's last page, of two side by side the last two
+		last := len(w.pages) - 1
+		if w.laid.two {
+			last -= last % 2
+		}
+		if last != w.page {
+			w.turn(a, last-w.page) // of two, an even step: turn doubles only one
+		}
 	case ch == "+" || ch == "=":
 		a.restyle(min(bookPxMax, a.bookPx()+bookPxStep), a.bookFaces().fam.name)
 	case ch == "-":

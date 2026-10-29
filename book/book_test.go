@@ -2,7 +2,12 @@ package book
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"hash/crc32"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,5 +170,33 @@ func TestDump(t *testing.T) {
 				t.Logf("%d.%d %.160s", i, j, s)
 			}
 		}
+	}
+}
+
+// TestImageTooBig: a picture whose header says it's huge isn't decoded;
+// a small one is.
+func TestImageTooBig(t *testing.T) {
+	ihdr := func(w, h uint32) string { // a PNG's start: enough for its size
+		var b bytes.Buffer
+		b.WriteString("\x89PNG\r\n\x1a\n")
+		data := binary.BigEndian.AppendUint32(binary.BigEndian.AppendUint32([]byte("IHDR"), w), h)
+		data = append(data, 8, 0, 0, 0, 0)
+		binary.Write(&b, binary.BigEndian, uint32(len(data)-4))
+		b.Write(data)
+		binary.Write(&b, binary.BigEndian, crc32.ChecksumIEEE(data))
+		return b.String()
+	}
+	var small bytes.Buffer
+	png.Encode(&small, image.NewGray(image.Rect(0, 0, 2, 2)))
+	b, err := Open(testEPUB(t, map[string]string{"OPS/huge.png": ihdr(20000, 20000), "OPS/small.png": small.String()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	if _, err := b.Image("OPS/huge.png"); err == nil || !strings.Contains(err.Error(), "too big") {
+		t.Errorf("huge: %v", err)
+	}
+	if m, err := b.Image("OPS/small.png"); err != nil || m.Bounds().Dx() != 2 {
+		t.Errorf("small: %v", err)
 	}
 }

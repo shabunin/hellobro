@@ -67,6 +67,8 @@ func (a *bro) sleepWhenIdle() {
 
 func (a *bro) Sleep() func() {
 	a.slp.asleep = true
+	a.noteExit() // what's written, and where each book is, kept: it may not wake
+	a.bookExit()
 	a.picker = nil   // the sleep screen goes over it; waking draws the page
 	a.pausePlayers() // the Bluetooth audio goes with the radio: on again after, where it was
 	a.unmountAll(true)
