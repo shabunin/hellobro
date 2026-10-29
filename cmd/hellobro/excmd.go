@@ -22,10 +22,12 @@ import (
 type exLine struct{ text string }
 
 // exCmd is a ":" command: its names (the first the one shown, then the
-// short ones), what it takes, as the line hints it, and what it does.
+// short ones), what it takes, as the line hints it, what it's for (in
+// :help), and what it does (nil: it's :help).
 type exCmd struct {
 	names string
 	arg   string
+	help  string
 	run   func(arg string) error
 }
 
@@ -90,10 +92,14 @@ func exHint(cmds []exCmd, text string) string {
 	return strings.Join(hs, " · ")
 }
 
-// exRun runs the line typed; what went wrong is noted.
-func (a *bro) exRun(cmds []exCmd, line string) {
+// exRun runs the line typed; what went wrong is noted. again opens the
+// line again with text in it, for :help's commands that take something.
+func (a *bro) exRun(cmds []exCmd, line string, again func(text string)) {
 	c, arg, err := exFind(cmds, line)
-	if err == nil && c != nil {
+	switch {
+	case err == nil && c != nil && c.run == nil:
+		a.exHelp(cmds, again)
+	case err == nil && c != nil:
 		err = c.run(arg)
 	}
 	if err != nil {
@@ -101,12 +107,30 @@ func (a *bro) exRun(cmds []exCmd, line string) {
 	}
 }
 
-// exHelp notes the commands there are.
-func exHelp(a *bro, cmds []exCmd) func(string) error {
-	return func(string) error {
-		a.Notify(":N a page, :N% that far in · " + exHint(cmds, ""))
-		return nil
+// exHelp shows the commands in a menu: typing narrows it, and the one
+// picked runs, or, if it takes something, is typed on the line to go on.
+func (a *bro) exHelp(cmds []exCmd, again func(text string)) {
+	es := []pickEntry{{title: ":N   :N%", detail: "a page; that far in"}}
+	for _, c := range cmds {
+		if c.run == nil {
+			continue
+		}
+		ns := strings.Fields(c.names)
+		title, detail := ":"+ns[0], c.help
+		if c.arg != "" {
+			title += " " + c.arg
+		}
+		if len(ns) > 1 {
+			detail += "   (:" + strings.Join(ns[1:], " :") + ")"
+		}
+		do := func() { again(ns[0] + " ") }
+		if c.arg == "" {
+			do = func() { a.exRun(cmds, ns[0], again) }
+		}
+		es = append(es, pickEntry{title: title, detail: detail, do: do})
 	}
+	es[0].do = func() { again("") }
+	a.openMenu(":help", "type to narrow · Enter: it, or it on the line · Esc closes", es, nil)
 }
 
 // exStrip is where the line goes in body: along its foot.

@@ -32,7 +32,7 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 	}
 	var cmds []exCmd
 	cmds = []exCmd{
-		{"page p", "N", func(arg string) error {
+		{"page p", "N", "go to page N", func(arg string) error {
 			n, pct, err := exNumber(arg)
 			if pct {
 				n = max(1, n*len(w.nb.pages)/100)
@@ -43,16 +43,16 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 			w.openPage(a, n-1)
 			return nil
 		}},
-		{"new", "", page("new after")},
-		{"copy", "", page("copy page")},
-		{"delete", "", page("delete")},
-		{"clear", "", page("clear")},
-		{"pen", "", tool("pen")},
-		{"eraser", "", tool("eraser")},
-		{"select", "", tool("select")},
-		{"undo u", "", func(string) error { w.doUndo(a, true); return nil }},
-		{"redo", "", func(string) error { w.doUndo(a, false); return nil }},
-		{"paper", strings.ReplaceAll(notePapers, " ", "|"), func(arg string) error {
+		{"new", "", "a new page after this one", page("new after")},
+		{"copy", "", "a copy of this page after it", page("copy page")},
+		{"delete", "", "this page gone (Ctrl+Z brings it back)", page("delete")},
+		{"clear", "", "this page cleared", page("clear")},
+		{"pen", "", "the pen", tool("pen")},
+		{"eraser", "", "the eraser", tool("eraser")},
+		{"select", "", "the select tool", tool("select")},
+		{"undo u", "", "undo", func(string) error { w.doUndo(a, true); return nil }},
+		{"redo", "", "redo", func(string) error { w.doUndo(a, false); return nil }},
+		{"paper", strings.ReplaceAll(notePapers, " ", "|"), "the paper", func(arg string) error {
 			if !strings.Contains(" "+notePapers+" ", " "+arg+" ") || arg == "" {
 				return errors.New("paper: " + strings.ReplaceAll(notePapers, " ", ", "))
 			}
@@ -61,23 +61,23 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 			w.place(a, w.p) // its button says another word
 			return nil
 		}},
-		{"pages o", "", func(string) error { w.overviewOn(a, !w.overview); return nil }},
-		{"export", "", func(string) error { w.export(a); return nil }},
-		{"write w", "", func(string) error {
+		{"pages o", "", "the pages' view, on or off", func(string) error { w.overviewOn(a, !w.overview); return nil }},
+		{"export", "", "the PDF export", func(string) error { w.export(a); return nil }},
+		{"write w", "", "write it now", func(string) error {
 			if !w.keep(a) {
 				return errors.New("it can't be written now: it's kept as soon as it can be")
 			}
 			a.Notify(w.nb.name + " written")
 			return nil
 		}},
-		{"edit e open", "name", func(arg string) error { return w.exOpen(a, arg) }},
-		{"rename", "name", func(arg string) error {
+		{"edit e open", "name", "another notebook here (a new one if none is so named)", func(arg string) error { return w.exEdit(a, arg) }},
+		{"rename", "name", "the notebook's name", func(arg string) error {
 			if err := noteNameOK(arg); err != nil {
 				return err
 			}
 			return renameNotebook(a, w.nb.name, path.Join(path.Dir(w.nb.name), arg))
 		}},
-		{"move mv", "folder", func(arg string) error {
+		{"move mv", "folder", "to a folder (/ the top)", func(arg string) error {
 			dir := strings.Trim(arg, "/")
 			for _, d := range strings.Split(dir, "/") {
 				if err := noteNameOK(d); err != nil && dir != "" {
@@ -89,15 +89,25 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 			}
 			return renameNotebook(a, w.nb.name, path.Join(dir, path.Base(w.nb.name)))
 		}},
-		{"list ls all", "", func(string) error { a.notesFrom(w); return nil }},
-		{"quit q close wq x", "", func(string) error { a.closeWin(w); return nil }},
+		{"list ls all", "", "All Notebooks", func(string) error { a.notesFrom(w); return nil }},
+		{"quit q close wq x", "", "close the window", func(string) error { a.closeWin(w); return nil }},
 	}
-	return append(cmds, exCmd{"help h", "", exHelp(a, cmds)})
+	return append(cmds, exCmd{"help h", "", "this list", nil})
 }
 
-// exOpen opens the notebook named so in this window: its name as it's
+// exOpen opens the ":" line, text typed on it already.
+func (w *noteWin) exOpen(a *bro, text string) {
+	if !a.shows(w) {
+		return
+	}
+	w.ex = &exLine{text: text}
+	a.exAsk(true)
+	a.drawEx(a.exStrip(w.p.Body), w.ex, w.exCmds(a))
+}
+
+// exEdit opens the notebook named so in this window: its name as it's
 // listed, or the one name begins; none so named, a new one, beside this.
-func (w *noteWin) exOpen(a *bro, name string) error {
+func (w *noteWin) exEdit(a *bro, name string) error {
 	if name == "" {
 		return errors.New(":e which notebook?")
 	}

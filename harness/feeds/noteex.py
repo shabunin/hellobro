@@ -1,6 +1,6 @@
 # A notebook's ":" commands: written in; :new a page after it, written
-# in; :paper lines; :1 back to the first; :rename plan; :mv Work; :ls
-# the list (Work: plan); back, :q closes it.
+# in; :paper lines; :1 back to the first; :help, "paper" Enter, plain;
+# :rename plan; :mv Work; :ls the list (Work: plan); back, :q closes it.
 # app: hellobro
 import os, sys, math
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,6 +19,9 @@ ex("new")
 stroke(wave(H // 2), pen=True); time.sleep(3)
 ex("paper lines")
 ex("1")
+ex("help", 4)                                          # the commands, in a menu
+keys("paper"); time.sleep(2); key(ENTER); time.sleep(3)  # :paper on the line
+keys("plain"); time.sleep(1); key(ENTER); time.sleep(4)
 ex("rename plan")
 ex("mv Work")
 ex("ls", 5)

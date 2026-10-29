@@ -9,8 +9,8 @@ func TestExFind(t *testing.T) {
 	run := func(name string) func(string) error {
 		return func(arg string) error { ran, got = name, arg; return nil }
 	}
-	cmds := []exCmd{{"page p", "N", run("page")}, {"paper", "x", run("paper")}, {"find / f", "word", run("find")},
-		{"font", "name", run("font")}, {"export", "", run("export")}, {"quit q", "", run("quit")}}
+	cmds := []exCmd{{"page p", "N", "", run("page")}, {"paper", "x", "", run("paper")}, {"find / f", "word", "", run("find")},
+		{"font", "name", "", run("font")}, {"export", "", "", run("export")}, {"quit q", "", "", run("quit")}}
 	for _, c := range []struct{ line, ran, arg string }{
 		{"12", "page", "12"}, {"40%", "page", "40%"}, {"p 3", "page", "3"}, {"/rabbit hole", "find", "rabbit hole"},
 		{"f fox", "find", "fox"}, {"fo Go", "font", "Go"}, {"ex", "export", ""}, {"q", "quit", ""}, {"paper lines", "paper", "lines"},

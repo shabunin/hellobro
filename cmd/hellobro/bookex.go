@@ -23,8 +23,8 @@ type bookFind struct {
 func (w *bookWin) exCmds(a *bro) []exCmd {
 	var cmds []exCmd
 	cmds = []exCmd{
-		{"page p", "N or N%", func(arg string) error { return w.exPage(a, arg) }},
-		{"chapter ch", "N", func(arg string) error {
+		{"page p", "N or N%", "go to page N (an EPUB's: of this chapter); N% that far into the book", func(arg string) error { return w.exPage(a, arg) }},
+		{"chapter ch", "N", "go to chapter N", func(arg string) error {
 			n, _, err := exNumber(arg)
 			if err != nil || n < 1 || n > len(w.b.Spine) {
 				return fmt.Errorf("a chapter from 1 to %d", len(w.b.Spine))
@@ -34,19 +34,19 @@ func (w *bookWin) exCmds(a *bro) []exCmd {
 			w.draw(a)
 			return nil
 		}},
-		{"find / f", "word", func(arg string) error { return w.exFind(a, arg) }},
-		{"contents toc", "", func(string) error { w.openContents(a); return nil }},
-		{"bookmarks marks", "", func(string) error { w.showList(a, true); return nil }},
-		{"mark m", "", func(string) error { w.toggleMark(a); return nil }},
-		{"back", "", func(string) error {
+		{"find / f", "word", "the next page with the word on it; :/ alone, the next again", func(arg string) error { return w.exFind(a, arg) }},
+		{"contents toc", "", "the contents", func(string) error { w.openContents(a); return nil }},
+		{"bookmarks marks", "", "the bookmarks", func(string) error { w.showList(a, true); return nil }},
+		{"mark m", "", "a bookmark on this page, or not", func(string) error { w.toggleMark(a); return nil }},
+		{"back", "", "back from a link followed", func(string) error {
 			if w.from == nil {
 				return errors.New("no link followed to go back from")
 			}
 			w.goBack(a)
 			return nil
 		}},
-		{"style s", "", func(string) error { w.openStyle(a); return nil }},
-		{"size", "px", func(arg string) error {
+		{"style s", "", "the style panel", func(string) error { w.openStyle(a); return nil }},
+		{"size", "px", "the text's size", func(arg string) error {
 			n, _, err := exNumber(arg)
 			if err != nil || n < bookPxMin || n > bookPxMax {
 				return fmt.Errorf("a size from %d to %d", bookPxMin, bookPxMax)
@@ -54,7 +54,7 @@ func (w *bookWin) exCmds(a *bro) []exCmd {
 			a.restyle(n, a.bookFaces().fam.name)
 			return nil
 		}},
-		{"font", "name", func(arg string) error {
+		{"font", "name", "the font, the one that matches best", func(arg string) error {
 			best, score := "", -1
 			for _, f := range a.bk.fams {
 				if s := fuzzy(arg, f.name); s > score {
@@ -67,7 +67,7 @@ func (w *bookWin) exCmds(a *bro) []exCmd {
 			a.restyle(a.bookPx(), best)
 			return nil
 		}},
-		{"zoom z", "%", func(arg string) error {
+		{"zoom z", "%", "a PDF's zoom", func(arg string) error {
 			n, _, err := exNumber(strings.TrimSuffix(arg, "%"))
 			if w.pdf == nil || err != nil || n < pdfZoomMin || n > pdfZoomMax {
 				return fmt.Errorf("a PDF's zoom, from %d to %d", pdfZoomMin, pdfZoomMax)
@@ -75,18 +75,28 @@ func (w *bookWin) exCmds(a *bro) []exCmd {
 			w.setZoom(a, n, w.area.Min.Add(w.area.Max).Div(2))
 			return nil
 		}},
-		{"pages", "", func(string) error {
+		{"pages", "", "a PDF's pages, small", func(string) error {
 			if w.pdf == nil {
 				return errors.New(":pages is a PDF's")
 			}
 			w.showPages(a)
 			return nil
 		}},
-		{"rename", "name", func(arg string) error { return renameBook(a, w.path, arg) }},
-		{"shelf books", "", func(string) error { w.toShelf(a); return nil }},
-		{"quit q close", "", func(string) error { a.closeWin(w); return nil }},
+		{"rename", "name", "the book's name, its file's too", func(arg string) error { return renameBook(a, w.path, arg) }},
+		{"shelf books", "", "All Books", func(string) error { w.toShelf(a); return nil }},
+		{"quit q close", "", "close the window", func(string) error { a.closeWin(w); return nil }},
 	}
-	return append(cmds, exCmd{"help h", "", exHelp(a, cmds)})
+	return append(cmds, exCmd{"help h", "", "this list", nil})
+}
+
+// exOpen opens the ":" line, text typed on it already.
+func (w *bookWin) exOpen(a *bro, text string) {
+	if w.gone {
+		return
+	}
+	w.ex, w.note = &exLine{text: text}, nil
+	a.exAsk(true)
+	w.draw(a)
 }
 
 // exPage goes to page N: a PDF's, or of the chapter shown in an EPUB;

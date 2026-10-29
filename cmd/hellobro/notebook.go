@@ -922,7 +922,7 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		w.ex = nil
 		a.exAsk(false)
 		if ok {
-			a.exRun(w.exCmds(a), e.text)
+			a.exRun(w.exCmds(a), e.text, func(text string) { w.exOpen(a, text) })
 		}
 		if a.shows(w) {
 			w.draw(a)
@@ -930,9 +930,7 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		return true
 	}
 	if ch == ":" && !m.ctrl {
-		w.ex = &exLine{}
-		a.exAsk(true)
-		a.drawEx(a.exStrip(w.p.Body), w.ex, w.exCmds(a))
+		w.exOpen(a, "")
 		return true
 	}
 	if !m.ctrl && code == keyO {

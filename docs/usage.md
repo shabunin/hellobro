@@ -713,7 +713,9 @@ As in vim: **:** opens a line at the window's foot (and the on-screen
 keyboard, if there's no other). A command and Enter runs it; Esc,
 Backspace on nothing, or a tap leaves it. A name can be cut short while
 it's the only one so begun (`:ex` is export); the line shows what what's
-typed could be. `:help` notes them all.
+typed could be. `:help` (`:h`) shows them all in a menu, each with what
+it does: typing narrows it, Enter runs the one lit, or puts it on the
+line if it takes something (`:size `, then the size).
 
 | Command | |
 |---|---|

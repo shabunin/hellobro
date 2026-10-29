@@ -977,7 +977,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.ex = nil
 		a.exAsk(false)
 		if ok {
-			a.exRun(w.exCmds(a), e.text)
+			a.exRun(w.exCmds(a), e.text, func(text string) { w.exOpen(a, text) })
 		}
 		if !w.gone {
 			w.draw(a)
@@ -985,9 +985,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		return true
 	}
 	if ch == ":" && w.b != nil && !w.styling {
-		w.ex, w.note = &exLine{}, nil
-		a.exAsk(true)
-		w.draw(a)
+		w.exOpen(a, "")
 		return true
 	}
 	if w.list && w.listPages {
