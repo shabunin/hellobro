@@ -23,15 +23,6 @@ var guiTitles = map[string]string{
 // guiName is the window key's name, "" if there's none.
 func guiName(key string) string { return guiTitles[key] }
 
-// guiNames are their names, in the launcher's order.
-func guiNames() []string {
-	var ns []string
-	for _, k := range guiKeys {
-		ns = append(ns, guiName(k))
-	}
-	return ns
-}
-
 func (g *guiWin) Title() string    { return guiName(g.key) }
 func (g *guiWin) Class() string    { return "hellobro" }
 func (g *guiWin) Instance() string { return g.key }

@@ -140,9 +140,6 @@ func (a *bro) sharePair() {
 	a.drawSettings()
 }
 
-// shareBusy says whether a computer is connected.
-func (a *bro) shareBusy() bool { return len(a.share.conns) > 0 }
-
 func (a *bro) shareEvent(e share.Event) {
 	s := &a.share
 	c := e.Conn

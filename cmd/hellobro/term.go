@@ -204,16 +204,6 @@ func (a *bro) onScreen(t *termSession) bool {
 // showing says whether t's cells or launcher are up.
 func (a *bro) showing(t *termSession) bool { return a.onScreen(t) }
 
-// termLive says whether any session is connected, or about to be.
-func (a *bro) termLive() bool {
-	for _, t := range a.terms() {
-		if t.state != termIdle {
-			return true
-		}
-	}
-	return false
-}
-
 // --- the window ---
 
 func (t *termSession) Class() string { return "terminal" }
@@ -872,8 +862,7 @@ func (a *bro) dialPrompts(t *termSession, gen int, h sshHost) dialOpts {
 
 // hostMenu is what can be done with saved host i: connect, mount its
 // files (or unmount them), edit its line, forget it.
-func (a *bro) hostMenu(t *termSession, i int) {
-	h := a.tv.hosts[i]
+func (a *bro) hostMenu(t *termSession, h sshHost) {
 	opts := []askOpt{{"connect", "c", func() { a.termConnect(t, h) }}}
 	if m := a.mounted(h); m != nil {
 		opts = append(opts, askOpt{"unmount its files", "u", func() { a.unmountHost(h) }})
@@ -1270,7 +1259,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 				a.termStartShell(t, i == 0)
 				return true
 			case i-2 < len(v.hosts):
-				a.hostMenu(t, i-2)
+				a.hostMenu(t, v.hosts[i-2])
 			case i-2-len(v.hosts) < len(v.nearby.peers):
 				a.typeInto(t, v.nearby.peers[i-2-len(v.hosts)])
 				return true

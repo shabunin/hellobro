@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"hellobro/kobo"
 )
@@ -36,8 +37,10 @@ type launchGroup struct {
 	tiles []launchTile
 }
 
-// launchTileMin is a tile's least width; the rows take as many as fit.
-const launchTileMin = 290
+const (
+	launchTileMin   = 290             // a tile's least width; the rows take as many as fit
+	launchRecentFor = 5 * time.Second // the books and notebooks last opened are looked for again after that
+)
 
 // launchMenu says whether t's launcher shows its tiles: it's waiting
 // for a choice, not logging in or editing a host's line.
@@ -70,7 +73,7 @@ func (a *bro) launchGroups(t *termSession) []launchGroup {
 		if m := a.mounted(h); m != nil && m.cmd != nil {
 			note = "mounted, " + mountMode(m.rw)
 		}
-		terms = append(terms, launchTile{h.name, note, "host", num(i + 3), func() { a.hostMenu(t, i) }})
+		terms = append(terms, launchTile{h.name, note, "host", num(i + 3), func() { a.hostMenu(t, h) }})
 	}
 	a.nearbyLook()
 	for i, p := range v.nearby.peers {
@@ -83,17 +86,22 @@ func (a *bro) launchGroups(t *termSession) []launchGroup {
 		{"Notebooks", "all, in folders", "notebooks", 0, func() { a.replaceWin(t, a.newNotesWin("")) }},
 		{"New notebook", "to write in", "new", 0, func() { a.launchNotebook(t, "") }},
 	}
-	for _, b := range a.lastBooks(2) {
-		read = append(read, launchTile{b.name, b.note, "reading", 0, func() { a.replaceWin(t, a.newBookWin(b.key)) }})
-	}
-	names := noteNames()
-	for _, n := range names[:min(2, len(names))] {
-		note := "notebook"
-		if d := path.Dir(n); d != "." {
-			note = "in " + d
+	m := &t.pane.menu
+	if m.recent == nil || time.Since(m.recentAt) > launchRecentFor { // the card's looked at, not at every key
+		m.recent, m.recentAt = []launchTile{}, time.Now()
+		for _, b := range a.lastBooks(2) {
+			m.recent = append(m.recent, launchTile{b.name, b.note, "reading", 0, func() { a.replaceWin(t, a.newBookWin(b.key)) }})
 		}
-		read = append(read, launchTile{path.Base(n), note, "notebook", 0, func() { a.launchNotebook(t, n) }})
+		names := noteNames()
+		for _, n := range names[:min(2, len(names))] {
+			note := "notebook"
+			if d := path.Dir(n); d != "." {
+				note = "in " + d
+			}
+			m.recent = append(m.recent, launchTile{path.Base(n), note, "notebook", 0, func() { a.launchNotebook(t, n) }})
+		}
 	}
+	read = append(read, m.recent...)
 
 	var set []launchTile
 	for _, k := range guiKeys {
@@ -210,10 +218,12 @@ type menuPlaced struct {
 	rects    []image.Rectangle
 	area     image.Rectangle // the tiles' part of the panel
 	h        int             // how high the tiles are, all told
-	lit      int             // the tile lit (Enter opens it), -1 none
+	lit      int             // the tile lit (Enter opens it): the first, new; -1 none, scrolled
 	drawnLit int             // the one drawn lit
 	top      int             // how far down the tiles are scrolled
 	asked    bool            // the ssh> line asked for the keyboard on the screen
+	recent   []launchTile    // the books and notebooks last opened, as looked for
+	recentAt time.Time
 }
 
 // drawMenu draws t's launcher as tiles; only what changed, if it's
@@ -229,9 +239,13 @@ func (a *bro) drawMenu(t *termSession) {
 	// ssh> line, the keys.
 	small := a.F.Small.Metrics().Height.Ceil() + 6
 	fieldH := a.libRowH()
-	bottomH := len(t.notes)*small + 8 + fieldH + 8 + small
-	area := image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Max.Y-bottomH-12)
-	bottom := image.Rect(in.Min.X, area.Max.Y+12, in.Max.X, in.Max.Y)
+	notes := t.notes
+	if len(notes)*small > in.Dy()/3 { // a small window: the notes are in the log
+		notes = nil
+	}
+	bottomH := len(notes)*small + 8 + fieldH + 8 + small
+	area := image.Rect(in.Min.X, in.Min.Y, in.Max.X, max(in.Min.Y, in.Max.Y-bottomH-12))
+	bottom := image.Rect(in.Min.X, area.Max.Y+12, in.Max.X, max(area.Max.Y+12, in.Max.Y))
 
 	var ns []int
 	var tiles []launchTile
@@ -255,7 +269,8 @@ func (a *bro) drawMenu(t *termSession) {
 		compact = true
 		heads, rects, h = menuLayout(area.Dx(), ns, launchTileMin, max(72, bodyH+28), headH, 12)
 	}
-	if h > area.Dy() { // it scrolls: room for "more"
+	more := h > area.Dy() && area.Dy() > 4*small // it scrolls: room for "more", if there's room
+	if more {
 		area.Min.Y += small
 		area.Max.Y -= small
 	}
@@ -277,7 +292,7 @@ func (a *bro) drawMenu(t *termSession) {
 		}
 	}
 	var sig strings.Builder
-	fmt.Fprint(&sig, body, compact, m.top)
+	fmt.Fprint(&sig, body, area, compact, m.top, flat)
 	for _, g := range gs {
 		fmt.Fprint(&sig, "|", g.name)
 		for _, tl := range g.tiles {
@@ -297,10 +312,10 @@ func (a *bro) drawMenu(t *termSession) {
 				c.Fill(image.Rect(hr.Min.X, hr.Max.Y-4, hr.Max.X, hr.Max.Y-2), kobo.Light)
 			}
 		}
-		if m.top > 0 {
+		if more && m.top > 0 {
 			c.Text(a.F.Small, image.Rect(area.Min.X, area.Min.Y-small, area.Max.X, area.Min.Y), "↑ more: swipe down", kobo.Mid, kobo.AlignRight)
 		}
-		if h-m.top > area.Dy() {
+		if more && h-m.top > area.Dy() {
 			c.Text(a.F.Small, image.Rect(area.Min.X, area.Max.Y, area.Max.X, area.Max.Y+small), "↓ more: swipe up", kobo.Mid, kobo.AlignRight)
 		}
 	} else {
@@ -324,7 +339,7 @@ func (a *bro) drawMenu(t *termSession) {
 	m.sig, m.tiles, m.rects, m.area, m.h, m.drawnLit = sig.String(), tiles, flat, area, h, m.lit
 
 	y := bottom.Min.Y
-	for _, n := range t.notes {
+	for _, n := range notes {
 		c.Text(a.F.Small, image.Rect(bottom.Min.X, y, bottom.Max.X, y+small), n, kobo.Black, kobo.AlignLeft)
 		y += small
 	}
@@ -432,7 +447,7 @@ func (a *bro) menuSwipe(t *termSession, from, to image.Point) bool {
 	if m.h <= m.area.Dy() {
 		return true
 	}
-	step := m.area.Dy() * 3 / 4
+	step := max(m.area.Dy()*3/4, 1)
 	if d.Y > 0 {
 		step = -step
 	}

@@ -260,11 +260,6 @@ func (a *bro) target() (player, bool) {
 	return player{}, false
 }
 
-// musicPlaying says whether a player plays.
-func (a *bro) musicPlaying() bool {
-	return slices.ContainsFunc(a.media.players, func(p player) bool { return p.status == "Playing" })
-}
-
 // nowPlaying is the header's line: what the keys' player plays.
 func (a *bro) nowPlaying() string {
 	p, ok := a.target()

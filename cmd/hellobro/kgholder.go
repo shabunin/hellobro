@@ -17,8 +17,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-const kgHolderRune = 0x10EEEE
-
 // kgHolder is a placeholder cell: which image, which placement (or 0),
 // and where in it.
 type kgHolder struct {
