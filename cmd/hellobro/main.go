@@ -37,6 +37,7 @@ type bro struct {
 	tv     termView
 	edge   *kobo.Gesture    // a contact along the right edge, which may become a menu swipe
 	pair   [2]*kobo.Gesture // two fingers together: may become a workspace swipe
+	pinch  *pinch           // or a PDF zoomed (bookzoom.go)
 	media  mediaState
 	stat   statBar  // the terminal tabs' status bar
 	picker *picker  // the switcher, while it's up
@@ -309,7 +310,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	case a.bk.cut != nil && a.bk.cut.g == g:
 		a.cutMove(p, g)
 	case g.Owner == ownPair:
-		a.pairSwipe()
+		a.pairMove()
 	}
 }
 
@@ -412,6 +413,9 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		a.edge = nil
 	}
 	if a.pair[0] == g || a.pair[1] == g {
+		if a.pinch != nil {
+			a.pinchEnd()
+		}
 		a.pair = [2]*kobo.Gesture{}
 	}
 	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge || g.Owner == ownKey {

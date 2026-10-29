@@ -50,7 +50,7 @@ type bookStyle struct {
 	ragged, noHyphs bool
 	pdfWidth        bool // PDFs (bookpdf.go): fit their pages' width, not the whole page
 	pdfNoTrim       bool // and keep their white margins
-	pdfZoom         int  // and zoom them, % of the fit (pdfZooms)
+	pdfZoom         int  // and zoom them, % of the fit: each PDF's own (bookzoom.go)
 }
 
 // bookPageModes are the ways a book's pages show (each book its own,
@@ -74,10 +74,7 @@ const bookGutter = 48 // px between two pages side by side
 
 func (a *bro) bookStyle() bookStyle {
 	m := &a.mem
-	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim, pdfZoom: m.PDFZoom}
-	if !slices.Contains(pdfZooms, st.pdfZoom) {
-		st.pdfZoom = 100
-	}
+	st := bookStyle{font: a.bookFaces().fam.name, px: a.bookPx(), leading: m.BookLeading, margin: m.BookMargin, ragged: m.BookRagged, noHyphs: m.BookNoHyph, pdfWidth: m.PDFWidth, pdfNoTrim: m.PDFNoTrim, pdfZoom: pdfZoomMin}
 	if st.leading < bookLeadingMin || st.leading > bookLeadingMax {
 		st.leading = bookLeadingDefault
 	}
@@ -94,7 +91,7 @@ func (a *bro) setBookStyle(st bookStyle) {
 		a.bk.faces = nil
 	}
 	m.BookFont, m.BookPx, m.BookLeading, m.BookMargin, m.BookRagged, m.BookNoHyph = st.font, st.px, st.leading, st.margin, st.ragged, st.noHyphs
-	m.PDFWidth, m.PDFNoTrim, m.PDFZoom = st.pdfWidth, st.pdfNoTrim, st.pdfZoom
+	m.PDFWidth, m.PDFNoTrim = st.pdfWidth, st.pdfNoTrim
 	a.mem.save()
 	for _, win := range a.windows() {
 		if w, ok := win.(*bookWin); ok && w.b != nil {
@@ -117,6 +114,7 @@ type bookPlace struct {
 
 	Marks []bookMark `json:"marks,omitempty"` // bookmarks.go
 	Pages string     `json:"pages,omitempty"` // how its pages show: bookPageModes; "" one
+	Zoom  int        `json:"zoom,omitempty"`  // a PDF's, % of the fit (bookzoom.go)
 }
 
 // bookState is what the readers share: the fonts, the size.
@@ -166,6 +164,8 @@ type bookWin struct {
 	page      int
 	laid      bookLaid // what the pages are laid out for
 	pageMode  string   // its pages: one, two, auto (bookPageModes)
+	zoom      int      // a PDF's, % of the fit (bookzoom.go)
+	panned    bool     // its page moved by a finger: shown from w.at, not a screenful's start
 
 	p       kobo.Panel
 	area    image.Rectangle // the text's, in the body
@@ -334,6 +334,8 @@ func (w *bookWin) layout(a *bro) {
 	if mode := w.pageMode; mode == "two" || mode == "auto" && w.area.Dx() > w.area.Dy() {
 		laid.two, laid.w = true, (w.area.Dx()-bookGutter)/2
 		laid.st.pdfWidth, laid.st.pdfZoom = false, 100 // a PDF's pages whole, each
+	} else if w.pdf != nil {
+		laid.st.pdfZoom = w.zoom
 	}
 	if w.ch != nil && laid == w.laid {
 		return
@@ -639,7 +641,7 @@ func (w *bookWin) goTo(spine int, pos book.Pos) {
 		w.ch, w.pics = nil, nil
 	}
 	w.dropCut()
-	w.spine, w.at = spine, pos
+	w.spine, w.at, w.panned = spine, pos, false
 	w.laid = bookLaid{}
 }
 
@@ -656,6 +658,7 @@ func (w *bookWin) turn(a *bro, d int) {
 		step = 2
 	}
 	switch n := w.page + d; {
+	case w.panned && (d == 1 || d == -1) && w.panStep(d): // moved by a finger: a screenful on from there
 	case n >= len(w.pages):
 		if w.spine+step >= len(w.b.Spine) {
 			return
@@ -670,13 +673,13 @@ func (w *bookWin) turn(a *bro, d int) {
 		if two {
 			n -= n % 2
 		}
-		w.page = n
+		w.page, w.panned = n, false
 		w.at = w.pages[n].Start
 		w.dropCut()
 	}
 	w.turns++
 	w.draw(a)
-	if w.ch != nil && w.page < len(w.pages) {
+	if w.ch != nil && w.page < len(w.pages) && !w.panned {
 		w.at = w.pages[w.page].Start
 	}
 	if time.Since(w.savedAt) > bookSaveEvery {
@@ -692,7 +695,7 @@ func (w *bookWin) save(a *bro) {
 	if a.mem.Books == nil {
 		a.mem.Books = map[string]bookPlace{}
 	}
-	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: w.pct(), Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode}
+	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: w.pct(), Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode, Zoom: w.zoom}
 	a.mem.save()
 	w.savedAt = time.Now()
 }
@@ -781,9 +784,9 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.selecting = false
 		w.draw(a)
 	case (ch == "+" || ch == "=") && w.pdf != nil:
-		a.pdfZoomStep(1)
+		w.zoomStep(a, 1)
 	case ch == "-" && w.pdf != nil:
-		a.pdfZoomStep(-1)
+		w.zoomStep(a, -1)
 	case code == kobo.KeySpace || code == 106 || code == 109 || code == 108 || ch == "j" || ch == "l" || ch == "n":
 		w.turn(a, 1)
 	case code == 105 || code == 104 || code == 103 || code == kobo.KeyBackspace || ch == "k" || ch == "h" || ch == "p":

@@ -32,7 +32,7 @@ const (
 	pdfKept    = 3   // pages kept drawn: the one shown, the one before, the one ahead
 )
 
-// pdfZooms are the zooms there are, % of the fit.
+// pdfZooms are the zoom's steps, % of the fit (a pinch goes between).
 var pdfZooms = []int{100, 125, 150, 175, 200, 250, 300, 400}
 
 // pdfShown is a page drawn for a layout.
@@ -94,8 +94,10 @@ func (a *bro) openPDF(w *bookWin) {
 	}
 	w.pdf, w.b = d, b
 	w.loadPageMode(a)
+	w.loadZoom(a)
 	if pl, ok := a.mem.Books[w.path]; ok && pl.Spine < n {
 		w.spine, w.at = pl.Spine, book.Pos{Block: pl.Block, Off: pl.Off}
+		w.panned = w.zoom > pdfZoomMin // zoomed: just where it was, maybe moved by a finger
 	}
 	log.Printf("pdf: %s: %d pages, %d in the outline", filepath.Base(w.path), n, len(b.TOC))
 }
@@ -230,7 +232,11 @@ func (w *bookWin) drawPDF(a *bro) {
 				w.drawPDFIn(a, w.spine+1, image.Rect(area.Max.X-w.laid.w, area.Min.Y, area.Max.X, area.Max.Y), image.Point{}, -1)
 			}
 		default:
-			w.drawPDFIn(a, w.spine, area, w.tiles[w.page], 0)
+			tile := w.tiles[w.page]
+			if s, err := w.pdfPage(w.spine, w.laid); err == nil && w.panned {
+				tile = w.panTile(s.img.Bounds())
+			}
+			w.drawPDFIn(a, w.spine, area, tile, 0)
 		}
 	}
 	if (!w.cut.Empty() || w.corner != nil) && slices.ContainsFunc(w.views, func(v pdfView) bool { return v.spine == w.view.spine }) {
@@ -336,15 +342,6 @@ func (w *bookWin) pdfFootName() string {
 
 // --- its style panel: the fit, the trimming ---
 
-// pdfZoomStep zooms PDFs a step in (d 1) or out (-1).
-func (a *bro) pdfZoomStep(d int) {
-	st := a.bookStyle()
-	i := max(0, slices.Index(pdfZooms, st.pdfZoom))
-	st.pdfZoom = pdfZooms[max(0, min(len(pdfZooms)-1, i+d))]
-	a.setBookStyle(st)
-	a.Notify(fmt.Sprintf("zoom %d%%", st.pdfZoom))
-}
-
 const (
 	pdfStyleFit = iota
 	pdfStyleZoom
@@ -362,7 +359,7 @@ func (w *bookWin) pdfStyleStep(a *bro, i, d int) {
 		st.pdfWidth = !st.pdfWidth
 	case pdfStyleZoom:
 		if d != 0 {
-			a.pdfZoomStep(d)
+			w.zoomStep(a, d)
 		}
 		return
 	case pdfStyleTrim:
@@ -403,7 +400,7 @@ func (w *bookWin) drawPDFStyle(a *bro) {
 		case pdfStyleZoom:
 			box(image.Rect(r.Max.X-boxW, r.Min.Y, r.Max.X, r.Max.Y), "+", 1)
 			vr := image.Rect(r.Max.X-boxW-160, r.Min.Y, r.Max.X-boxW, r.Max.Y)
-			c.Text(a.F.Body, vr, fmt.Sprintf("%d%%", st.pdfZoom), kobo.Black, kobo.AlignCenter)
+			c.Text(a.F.Body, vr, fmt.Sprintf("%d%%", w.zoom), kobo.Black, kobo.AlignCenter)
 			box(image.Rect(vr.Min.X-boxW, r.Min.Y, vr.Min.X, r.Max.Y), "−", -1)
 		case pdfStyleFit:
 			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), fit[st.pdfWidth], 0)
@@ -433,9 +430,9 @@ func (w *bookWin) pdfStyleKey(a *bro, code uint16, ch string) bool {
 	case code == kobo.KeyEnter || code == kobo.KeySpace:
 		w.pdfStyleStep(a, w.sel, 0)
 	case ch == "+" || ch == "=":
-		a.pdfZoomStep(1)
+		w.zoomStep(a, 1)
 	case ch == "-":
-		a.pdfZoomStep(-1)
+		w.zoomStep(a, -1)
 	case code == kobo.KeyEsc || ch == "s" || ch == "q":
 		w.closeStyle(a)
 	default:

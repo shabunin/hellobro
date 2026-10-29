@@ -591,12 +591,19 @@ same. Their pages are drawn gray by MuPDF, linked into hellobro (package
 `pdf`), with their white margins trimmed, as big as the screen takes the
 whole page. **s** or **Aa** has their own panel: **Fit** the whole page
 or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and
-**-** on the page too), **Trim white margins** on or off, and **Pages**
+**-** on the page too; each PDF its own, kept with its place), **Trim
+white margins** on or off, and **Pages**
 as for EPUBs (each PDF its own): two side by side are each
 whole, meeting in the middle as a book's do, turned two at a time, the
 next two drawn while you read. A cut works on either. A page
 bigger than the screen is read in screenfuls, across then down, a
-little of each showing again on the next. The next page is drawn while
+little of each showing again on the next. Two fingers pinched apart or
+together on a page zoom it in or out round the point between them: the
+zoom shows while they move, and the page is drawn again when they lift.
+Zoomed bigger than the screen, a finger dragged on the page moves it,
+anywhere (it moves in black and white, then is drawn whole when the
+finger lifts); a tap, a key or a swipe goes on a screenful from there.
+The next page is drawn while
 you read this one, so turning to it is at once. PDFs locked with a
 password don't open (an empty one does).
 

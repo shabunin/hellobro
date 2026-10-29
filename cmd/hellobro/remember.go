@@ -33,7 +33,6 @@ type remembered struct {
 	BookRagged  bool                 `json:"book-ragged,omitempty"`  // no justified text
 	BookNoHyph  bool                 `json:"book-no-hyphens,omitempty"`
 	PDFWidth    bool                 `json:"pdf-fit-width,omitempty"` // PDFs' pages as wide as the screen, not whole (bookpdf.go)
-	PDFZoom     int                  `json:"pdf-zoom,omitempty"`      // % of the fit
 	PDFNoTrim   bool                 `json:"pdf-no-trim,omitempty"`   // their white margins kept
 	Pen         bool                 `json:"pen,omitempty"`           // a pen has written in a notebook: fingers turn its pages (notebook.go)
 	NoteWidth   string               `json:"note-width,omitempty"`    // the notebooks' pen: fine, medium, bold (notepen.go)

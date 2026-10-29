@@ -38,9 +38,11 @@ const (
 type bookCut struct {
 	w        *bookWin
 	g        *kobo.Gesture
-	v        pdfView // the page it's on
-	early    float64 // how far the finger got in its first moment
-	on       bool    // cutting: the gesture is ours
+	v        pdfView     // the page it's on
+	pan      bool        // a finger moving the page (bookzoom.go), not a cut
+	panFrom  image.Point // where the page was, its point at the window's top left
+	early    float64     // how far the finger got in its first moment
+	on       bool        // cutting: the gesture is ours
 	from, to image.Point
 	shown    image.Rectangle // the frame on the screen now
 	drawn    time.Time
@@ -67,8 +69,20 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 	s, w := a.bk.cut, a.bk.cut.w
 	if !s.on {
 		switch {
+		case s.pan: // ours (ownPan)
+			s.to = p
+			if time.Since(s.drawn) >= 150*time.Millisecond {
+				s.drawn = time.Now()
+				w.panTo(a, s.panFrom.Sub(p.Sub(s.from)), false)
+			}
+			return
 		case g.Owner != 0:
 			a.bk.cut = nil
+			return
+		case !g.Pen && !w.selecting && g.Moved > selStill && time.Since(g.At) < selHold && w.canPan(): // moving from the start: the page moves
+			s.pan, s.panFrom, s.to, g.Owner = true, s.v.sp, p, ownPan
+			w.dropCut()
+			log.Print("pdf: panning")
 			return
 		case (g.Pen || w.selecting) && g.Moved > selStill: // the select tool's finger draws at once, as the pen
 		case g.Pen || w.selecting:
@@ -110,6 +124,10 @@ func (a *bro) cutLift(g *kobo.Gesture) bool {
 		return false
 	}
 	a.bk.cut = nil
+	if s.pan {
+		s.w.panTo(a, s.panFrom.Sub(s.to.Sub(s.from)), true)
+		return true
+	}
 	if !s.on {
 		return false
 	}
