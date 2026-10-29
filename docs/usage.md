@@ -16,11 +16,12 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
   helix, htop, Claude Code…, mouse taps and scrolling), a shell on the
   Kobo itself (`/bin/sh`, as root, in a PTY), or Alpine Linux in a jail
   ([The Alpine shell](#the-alpine-shell)). A new one is a **launcher**
-  till it runs something: **1** Alpine, **2** the Kobo's sh, **3** and
-  on the saved hosts, or `user@host` typed in ([Terminal](#terminal)).
+  till it runs something: tiles for everything hellobro has
+  ([The launcher](#the-launcher)); **1** Alpine, **2** the Kobo's sh,
+  **3** and on the saved hosts, or `user@host` typed in ([Terminal](#terminal)).
   A saved host's files can be mounted too ([Host files](#host-files)).
 - **a settings' window**, one of each, opened from a launcher's
-  "Settings, in a window" row or the switcher:
+  Settings tiles or the switcher:
   - **Wi-Fi** and **Bluetooth**, without going back to Nickel: on and
     off, networks (join, with a password; leave; forget; one by name),
     and devices (scan, pair, connect, disconnect, forget);
@@ -361,15 +362,43 @@ was open already, goes back to its place). A keyboard back within the
 Bluetooth comes back on with the keyboard. Settings, **The keyboard
 gone**: after 15 s, 30 s or 1 min, or nothing comes up.
 
+## The launcher
+
+A new window (Meta+Enter, a window's **+**, or the first one) is a
+launcher: what hellobro has, as tiles to tap, in groups.
+
+- **Terminals**: **Alpine** (1), the **Kobo shell** (2), each saved
+  host (3 and on: its menu), the nearby hellobros to type into
+  ([Typing into another device](#typing-into-another-device)), and
+  **SSH key**, which copies this Kobo's public key.
+- **Read and write**: **Books** (All Books), **Notebooks** (All
+  Notebooks), **New notebook**, then the last two books read (how far
+  in) and the last two notebooks written, to go on with.
+- **Settings**: Wi-Fi, Bluetooth, Sharing, Settings, Battery, What
+  uses it, each in its window, and **Keys** (a command's keys).
+- **This Kobo**: **Rotate** the screen, the on-screen **Keyboard**
+  (show / hide), the **Light** on or off, **Sleep**, **Lock**, **Touch**
+  (calibrate), and **Nickel** (quit, back to it; it asks first).
+
+A tile opens in the launcher's place; Rotate, Light and the like leave
+it there. The numbers (1–9) still pick the terminals; the arrows light
+a tile (Alpine is lit at first) and Enter opens it. The tiles are as
+big as the window has room for; in a small one only their names show,
+and a swipe up or down scrolls them. At the bottom is the **ssh>** line
+for a host not saved ([Terminal](#terminal)): typing goes there, and a
+tap on it brings the on-screen keyboard if no keyboard is connected.
+How the last session ended is noted above it.
+
 ## Terminal
 
-- A launcher (Meta+Enter, or a window's +) asks what to run: **1**
-  Alpine, **2** the Kobo's sh (Enter alone: Alpine), **3** and on a
-  saved host, or a host typed in. Esc closes it.
+- A launcher (Meta+Enter, or a window's +) asks what to run
+  ([The launcher](#the-launcher)): **1** Alpine, **2** the Kobo's sh
+  (Enter alone: the tile lit, Alpine at first), **3** and on a saved
+  host, or a host typed in. Esc closes it.
 - Type `user@host[:port] [command]` and Enter; the prompt also takes
   `ssh -p PORT [-J user@jumphost] user@host [command]`. A host typed
-  there is saved once it connects (in `hellobro.json`), and listed under
-  the prompt.
+  there is saved once it connects (in `hellobro.json`), and gets its
+  tile.
 - A tap on a saved host, or its number, opens its menu: **connect**
   (Enter), **mount its files** ([Host files](#host-files)), **edit**,
   **forget**. Edit puts its line in the prompt, to change and save with
@@ -546,7 +575,7 @@ hellobro has a reader of its own for EPUBs, set in the Kobo's fonts
 italics), with the book's pictures, headings, italics and centred text;
 and for PDFs, drawn by MuPDF (below).
 
-- Open the shelf, **All Books**, from a new window ("Books… (tap here)")
+- Open the shelf, **All Books**, from a new window (the **Books** tile)
   or the switcher (**Books**). It has the EPUBs and PDFs anywhere on
   the Kobo but its dot folders, in three tabs: **Recent** (the last read
   first, then the rest by name), **All** (by name) and **Folders** (a
@@ -663,10 +692,10 @@ soft hyphens.
 A notebook is pages to write on with the pen: sums worked out by hand,
 say. "Notebook" in the switcher (Meta+D) opens a new one; the ones
 you have are listed there by name (the date and time each was made,
-till it's renamed); the launcher has them too, the last three written,
-after **all** and **new**.
+till it's renamed); the launcher has **Notebooks**, **New notebook**
+and the last two written.
 
-- **All Notebooks** (the launcher's **all**, **Notebooks** in the
+- **All Notebooks** (the launcher's **Notebooks**, **Notebooks** in the
   switcher, or **‹ All Notebooks** at the left of a notebook's bar)
   has the books' header and tabs ([Books](#books)): **Recent** (the
   last written first), **All** (by name) and **Folders** (a folder at a
@@ -883,8 +912,8 @@ even with a computer connected.
 ## Typing into another device
 
 Another e-reader running hellobro, on the same Wi-Fi with sharing on,
-is listed in the launcher under the saved hosts: `4   Kobo Libra
-nearby: type into it`. Picked (its number, or a tap), this keyboard
+is a tile in the launcher after the saved hosts: **Kobo Libra**,
+"nearby: type into it", numbered after them. Picked (its number, or a tap), this keyboard
 types there: a window logs in to it as `hellobro-keys`, and what's typed
 in it goes to a keyboard made there (uinput), which that hellobro takes
 for any other. While the window is in focus every key goes there,

@@ -14,7 +14,7 @@ import (
 
 // iconPart is a piece of an icon, in grid units.
 type iconPart struct {
-	kind byte      // 'l' a line through pts; 'o' a ring and 'd' a dot (x, y, r); 'f' a box (x0, y0, x1, y1) of ink, 'w' of the button's paper
+	kind byte      // 'l' a line through pts; 'o' a ring and 'd' a dot (x, y, r), 'b' one of the paper; 'f' a box (x0, y0, x1, y1) of ink, 'w' of the paper
 	pts  []float64 // its points
 	w    float64   // a line's half width; 0: thin
 }
@@ -142,8 +142,12 @@ func drawIcon(c kobo.Canvas, parts []iconPart, r image.Rectangle, ink, bg uint8)
 			o, rad, w := at(p.pts[0], p.pts[1]), px(p.pts[2]), max(1, px(p.w))
 			c.Disc(o, rad+w, ink, r)
 			c.Disc(o, max(0, rad-w), bg, r)
-		case 'd':
-			c.Disc(at(p.pts[0], p.pts[1]), px(p.pts[2]), ink, r)
+		case 'd', 'b':
+			g := ink
+			if p.kind == 'b' {
+				g = bg
+			}
+			c.Disc(at(p.pts[0], p.pts[1]), px(p.pts[2]), g, r)
 		case 'f', 'w':
 			g := ink
 			if p.kind == 'w' {

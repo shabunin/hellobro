@@ -29,6 +29,10 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   `hellobro-msg notify TEXT` puts up a note. One slim bar at the top
   lists each workspace's windows. The windows
   come back as they were left.
+- **A launcher for fingers**: a new window shows every app as a tile
+  (terminals and hosts, books and notebooks, the settings' windows,
+  rotate, keyboard, light, sleep, lock), to tap; numbers and arrows work
+  too.
 - **SSH**: an xterm-256color terminal, as many as you like, mouse,
   reconnects by itself. tmux, htop, helix, Claude Code all work.
 - **On-screen keyboard**: a laptop's rows under the windows and the
@@ -117,7 +121,7 @@ make dist            # a release's files, in dist/
 
 | | |
 | --- | --- |
-| Meta+Enter | a new window: 1 Alpine, 2 the Kobo's sh, 3… a saved host |
+| Meta+Enter | a new window: the launcher, tiles for all the apps (1 Alpine, 2 the Kobo's sh, 3… a saved host) |
 | Meta+D, Meta+Space | go to: windows, workspaces, hosts, settings, commands |
 | Meta+arrows (or H J K L), with Shift | focus the window there, move it there |
 | Meta+1…0, with Shift | go to a workspace, send the window there |

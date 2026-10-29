@@ -15,7 +15,6 @@ import (
 	"image/color"
 	"io"
 	"log"
-	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -137,6 +136,7 @@ type termPane struct {
 	shownConnect []string    // the connect screen's rows as drawn, nil: draw it all
 	shownStatus  string
 	picks        []launchPick    // the launcher's choices, as drawn, for taps
+	menu         menuPlaced      // the launcher's tiles (launcher.go)
 	cursorY      int             // the row the cursor was drawn on
 	alt          bool            // the alternate screen was drawn
 	selShown     bool            // a selection was drawn
@@ -285,6 +285,7 @@ func (a *bro) termGeometry() {
 func (a *bro) paneGeometry(t *termSession) {
 	f, pn := a.face(t), &t.pane
 	pn.shown, pn.shownConnect, pn.picks, pn.grid = nil, nil, nil, image.Rectangle{}
+	pn.menu.sig = ""
 	if pn.p.Body.Empty() {
 		return
 	}
@@ -369,7 +370,7 @@ func (a *bro) drawPane(t *termSession) {
 	if pn.p.Outer.Empty() {
 		return
 	}
-	pn.shownConnect = nil
+	pn.shownConnect, pn.menu.sig = nil, ""
 	a.DrawPanel(a.termPanel(t), "")
 	a.drawTermTitle(t)
 	switch {
@@ -407,62 +408,24 @@ type launchPick struct {
 // guiKeys are the settings' windows, as the launcher offers them.
 var guiKeys = []string{"wifi", "bluetooth", "sharing", "settings", "battery", "usage"}
 
-// drawConnect draws the launcher: what can run here (Alpine, the Kobo's
-// sh, the saved hosts, by number), the ssh> line for a host not saved,
-// the settings' windows, and how the last thing ended. While SSH logs
-// in, its questions are asked here.
+// drawConnect draws the launcher: its tiles (launcher.go), or, while
+// SSH logs in or a saved host's line is edited, what that asks, and how
+// the last thing ended.
 func (a *bro) drawConnect(t *termSession) {
-	v, pn := &a.tv, &t.pane
-	keys := a.keyHints("launcher", "another window", "palette", "the switcher", "kill", "close it")
+	pn := &t.pane
+	if launchMenu(t) {
+		pn.shownConnect = nil
+		a.drawMenu(t)
+		return
+	}
+	if pn.menu.sig != "" { // the tiles were drawn: all of it again
+		pn.menu.sig, pn.shownConnect = "", nil
+	}
+	pn.picks = nil
 	var lines []string
-	type pick struct {
-		line int
-		do   func()
-	}
-	var picks []pick
-	add := func(do func(), l ...string) {
-		if do != nil {
-			picks = append(picks, pick{len(lines), do})
-		}
-		lines = append(lines, l...)
-	}
-	idle := t.state == termIdle && t.edit == nil && t.prompt == nil
-	run := func(do func()) func() {
-		if !idle {
-			return nil
-		}
-		return do
-	}
-	add(nil, "What runs here? Press its number, or tap it.")
-	alpine := "   1   Alpine Linux " + alpineVersion + ", in a jail on this Kobo"
-	if _, err := os.Stat(alpineImg); err != nil {
-		alpine += " (set up the first time: a disk image, 3 MB from the net)"
-	}
-	add(run(func() { a.termStartShell(t, true) }), alpine)
-	add(run(func() { a.termStartShell(t, false) }), "   2   the Kobo's own /bin/sh, as "+whoami())
-	for i, h := range v.hosts {
-		if i+3 > 9 {
-			break
-		}
-		line := fmt.Sprintf("   %d   %s   %s", i+3, h.name, h)
-		if h.cmd != "" {
-			line += "   ▸ " + h.cmd
-		}
-		if m := a.mounted(h); m != nil && m.cmd != nil {
-			line += "   · mounted, " + mountMode(m.rw)
-		}
-		add(run(func() { a.hostMenu(t, i) }), line)
-	}
-	a.nearbyLook()
-	for i, p := range v.nearby.peers {
-		if n := len(v.hosts) + i + 3; n <= 9 {
-			add(run(func() { a.typeInto(t, p) }), fmt.Sprintf("   %d   %s   nearby: type into it", n, p.Name))
-		}
-	}
-	add(nil, "", "Or a host not saved: user@host[:port] [command] and Enter (saved once it connects).")
 	switch {
 	case t.prompt != nil && t.prompt.yesno:
-		add(nil, t.prompt.question, "(Enter: yes, Esc: no)")
+		lines = append(lines, t.prompt.question, "(Enter: yes, Esc: no)")
 	case t.prompt != nil:
 		shown, help := t.prompt.answer, "(Enter to send, Esc to cancel)"
 		if !t.prompt.echo {
@@ -471,74 +434,21 @@ func (a *bro) drawConnect(t *termSession) {
 			}
 			help = "(Enter to send, Tab to show/hide, Esc to cancel)"
 		}
-		if v.mods.caps {
+		if a.tv.mods.caps {
 			help += "   CAPS LOCK is on"
 		}
-		add(nil, t.prompt.question+shown+"█", help)
+		lines = append(lines, t.prompt.question+shown+"█", help)
 	case t.state == termIdle && t.edit != nil:
-		add(nil, "edit> "+t.input+"█", "(name  user@host[:port]  [via user@jump]  [command]; Enter to save, Esc to leave it)")
-	case t.state == termIdle:
-		add(nil, "ssh> "+t.input+"█")
+		lines = append(lines, "A saved host's line:", "edit> "+t.input+"█", "(name  user@host[:port]  [via user@jump]  [command]; Enter to save, Esc to leave it)")
 	case t.state == termWaiting:
-		add(nil, "ssh> "+t.input, "(Esc: stop reconnecting)")
+		lines = append(lines, "ssh> "+t.input, "(Esc: stop reconnecting)")
 	default:
-		add(nil, "ssh> "+t.input)
-	}
-	add(nil, "")
-	add(run(func() { a.replaceWin(t, a.newBookWin("")) }), "Books: the EPUBs and PDFs on this Kobo, to read (tap here)")
-	guiLine := len(lines)
-	add(nil, "", "Settings, in a window:   "+strings.Join(guiNames(), "   "))
-	notes := append([]string{"all", "new"}, noteNames()...)
-	notes = notes[:min(len(notes), 5)] // the last three written
-	noteLine := len(lines)
-	add(nil, "Notebooks, to write in with the pen:   "+strings.Join(notes, "   "))
-	add(nil, "", keys, "Esc: close this window.")
-	add(nil, "", "This Kobo's key, for ~/.ssh/authorized_keys (also in id_ed25519.pub next to hellobro):")
-	if s, err := clientKey(); err == nil {
-		key := authorizedKey(s)
-		for len(key) > 0 {
-			n := min(len(key), 64)
-			add(nil, "   "+key[:n])
-			key = key[n:]
-		}
-	} else {
-		add(nil, "   "+err.Error())
+		lines = append(lines, "ssh> "+t.input)
 	}
 	if len(t.notes) > 0 {
-		add(nil, "")
-		add(nil, t.notes...)
+		lines = append(append(lines, ""), t.notes...)
 	}
-	rows := a.DrawTextRows(a.termPanel(t), a.F.Body, lines, &pn.shownConnect)
-	pn.picks = nil
-	for _, p := range picks {
-		if r := rows[p.line]; !r.Empty() {
-			pn.picks = append(pn.picks, launchPick{r, p.do})
-		}
-	}
-	// the settings' windows, a word each
-	if r := rows[guiLine+1]; !r.Empty() && idle {
-		x := r.Min.X + kobo.TextWidth(a.F.Body, "Settings, in a window:   ")
-		for i, key := range guiKeys {
-			w := kobo.TextWidth(a.F.Body, guiName(key))
-			pn.picks = append(pn.picks, launchPick{image.Rect(x-8, r.Min.Y, x+w+8, r.Max.Y), func() { a.replaceWin(t, &guiWin{key: guiKeys[i]}) }})
-			x += w + kobo.TextWidth(a.F.Body, "   ")
-		}
-	}
-	if r := rows[noteLine]; !r.Empty() && idle {
-		x := r.Min.X + kobo.TextWidth(a.F.Body, "Notebooks, to write in with the pen:   ")
-		for i, n := range notes {
-			w := kobo.TextWidth(a.F.Body, n)
-			do := func() { a.launchNotebook(t, n) }
-			switch i {
-			case 0:
-				do = func() { a.replaceWin(t, a.newNotesWin("")) }
-			case 1:
-				do = func() { a.launchNotebook(t, "") }
-			}
-			pn.picks = append(pn.picks, launchPick{image.Rect(x-8, r.Min.Y, x+w+8, r.Max.Y), do})
-			x += w + kobo.TextWidth(a.F.Body, "   ")
-		}
-	}
+	a.DrawTextRows(a.termPanel(t), a.F.Body, lines, &pn.shownConnect)
 }
 
 // updateTerm redraws what changed on t's connect screen, if it's on
@@ -547,7 +457,7 @@ func (a *bro) drawConnect(t *termSession) {
 func (a *bro) updateTerm(t *termSession) {
 	switch {
 	case !a.onScreen(t):
-	case t.connected() || t.pane.shownConnect == nil:
+	case t.connected() || t.pane.shownConnect == nil && t.pane.menu.sig == "":
 		a.drawPane(t)
 	default:
 		a.drawTermStatus()
@@ -1179,6 +1089,7 @@ func (a *bro) termEnded(t *termSession, gen int, err error, lost bool, how strin
 
 // termClose drops the session's connection, or cancels one in progress.
 func (a *bro) termClose(t *termSession) {
+	a.launchUnask(t)
 	if t.prompt != nil {
 		close(t.prompt.reply)
 		t.prompt = nil
@@ -1330,10 +1241,14 @@ func (a *bro) termKey(code uint16, value int32) bool {
 				break
 			}
 			a.hostSave(t, h, line)
+		case t.edit == nil && t.input == "" && a.menuKey(t, code):
+			return true
 		case code == kobo.KeyEsc:
+			a.launchUnask(t)
 			a.closeWin(t)
 			return true
 		case code == kobo.KeyEnter:
+			a.launchUnask(t)
 			in := strings.TrimSpace(t.input)
 			if in == "" {
 				a.termStartShell(t, true)
@@ -1349,6 +1264,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 				t.input = string(r[:len(r)-1])
 			}
 		case printable && t.input == "" && t.edit == nil && ch >= "1" && ch <= "9":
+			a.launchUnask(t)
 			switch i := int(ch[0] - '1'); {
 			case i < 2:
 				a.termStartShell(t, i == 0)
@@ -1541,6 +1457,9 @@ func (a *bro) termTap(p image.Point) {
 // termSwipe turns a vertical swipe into mouse wheel steps, one per row moved.
 func (a *bro) termSwipe(from, to image.Point) bool {
 	t := a.term()
+	if t != nil && !t.connected() {
+		return a.menuSwipe(t, from, to)
+	}
 	x, y, ok := a.termCell(from)
 	if t == nil || !t.connected() || !ok {
 		return false
