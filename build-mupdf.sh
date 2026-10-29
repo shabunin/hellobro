@@ -7,6 +7,11 @@
 # no JavaScript, HTML/EPUB, XPS, SVG or barcodes; of the fonts, the PDF
 # base 14 and Charis SIL (Latin, Cyrillic, Greek), not the CJK, Noto or
 # emoji ones. Builds in the hellobro-cross image (tools/Containerfile).
+# FreeType is built without GCC's vectorizer: GCC 14 at -O2 for ARM
+# makes its Type 1 parser call every embedded Type 1 font broken
+# ("FT_New_Memory_Face: broken file"), and LaTeX's PDFs come out in a
+# stand-in font, their maths in pieces. The variable from the
+# environment goes before MuPDF's own FreeType flags (+= in Makelists).
 #
 # usage: ./build-mupdf.sh [path/to/mupdf-source]
 set -eu
@@ -24,7 +29,9 @@ src=$(cd "$src" && pwd)
 out=$here/third_party/mupdf
 mkdir -p "$out"
 
-podman run --rm --security-opt label=disable -v "$src":/src -w /src hellobro-cross sh -euc '
+podman run --rm --security-opt label=disable -v "$src":/src -w /src \
+	-e FREETYPE_BUILD_CFLAGS="-fno-tree-vectorize -fno-tree-slp-vectorize" hellobro-cross sh -euc '
+	rm -rf /src/build/release/thirdparty/freetype # make doesn'"'"'t know the flags changed
 	make -j"$(nproc)" build=release OS=Linux libs \
 		CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ AR=arm-linux-gnueabihf-ar LD=arm-linux-gnueabihf-ld \
 		HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no HAVE_LIBCRYPTO=no USE_SYSTEM_LIBS=no \
