@@ -613,6 +613,7 @@ func (a *bro) menu() {
 		{"sleep", "Sleep", "", "sleep"},
 		{"lock", "Lock", "the screen", "lock"},
 		{"palette", "Go to…", "the switcher", "switcher"},
+		{"workspaces", "Workspaces", "all, to add one", "workspaces"},
 		{"quit", "Quit", "back to Nickel", "quit"},
 	} {
 		if c := commandByID(t.id); c != nil {

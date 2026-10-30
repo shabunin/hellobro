@@ -583,6 +583,9 @@ func appIcon(id string) []iconPart {
 		return []iconPart{iconShut(0.8, 3, 3, 21, 3, 21, 21, 3, 21), iconLine(1.4, 6.5, 12.5, 10.5, 16.5, 17.5, 7.5)}
 	case "unticked":
 		return []iconPart{iconShut(0.8, 3, 3, 21, 3, 21, 21, 3, 21)}
+	case "workspaces": // four screens, one with windows
+		return []iconPart{iconShut(0.7, 2, 3, 11, 3, 11, 11, 2, 11), iconShut(0.7, 13, 3, 22, 3, 22, 11, 13, 11),
+			iconShut(0.7, 2, 13, 11, 13, 11, 21, 2, 21), iconShut(0.7, 13, 13, 22, 13, 22, 21, 13, 21), box(4, 5, 9, 9)}
 	case "switcher": // a list, one picked
 		return []iconPart{iconShut(0.8, 3, 4, 21, 4, 21, 20, 3, 20), box(5, 7, 19, 11), iconLine(0.5, 6, 14, 18, 14), iconLine(0.5, 6, 17, 18, 17)}
 	case "quit":

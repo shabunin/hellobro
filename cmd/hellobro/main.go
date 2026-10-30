@@ -173,6 +173,8 @@ func (a *bro) Tap(p image.Point) {
 		a.pickerTap(p)
 	case p.In(a.stat.r):
 		a.mediaKey(kobo.KeyPlayPause)
+	case !a.lay.Full && p.Y < a.lay.Page.Min.Y: // the bar, not a workspace's name in it
+		a.openWorkspaces()
 	default:
 		a.wmTap(p)
 	}

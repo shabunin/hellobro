@@ -69,6 +69,13 @@ one goes once you leave it), Meta+Shift+1…0 send the window in focus to
 one, and a tap on one goes there. An empty workspace lists the keys (as
 they are, keys.conf's too), and a tap on it opens a window.
 
+A tap on the bar away from the workspaces (or Meta+O, or the menu's
+**Workspaces**) shows them all as tiles, each a small drawing of its
+windows as they're laid out, the one shown framed. Tap one to go there;
+the last tile, **+**, makes a new workspace (the first free number) and
+opens a launcher on it. Typing narrows them, and the arrows and Enter
+pick one.
+
 Meta+Shift+Minus puts the window away (i3's scratchpad), Meta+Minus
 brings it back, floating, and puts it away again.
 
@@ -90,7 +97,7 @@ say) it says which (`grab` too, while the keys are grabbed), and what plays, and
 A swipe up or down along the right edge of the screen opens the menu,
 tiles big enough for a finger, each an icon, a word and its keys: rotate
 the screen, touch calibration, the on-screen keyboard, the light,
-airplane mode, sleep, lock, the switcher (Go to…), and quit, back to
+airplane mode, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
 Nickel. Tap one, or its number, or the arrows (the one they're on has
 a ring) and Enter (or type to narrow); Esc or a tap outside closes it. **Airplane** turns Wi-Fi and
 Bluetooth off, keeping which were on; tapped again (its tile is dark
@@ -253,6 +260,7 @@ say which; keys.conf still says meta for the Mod key either way.
 | Meta+Shift+arrows, Meta+Shift+H/J/K/L | move the window there |
 | Meta+Tab, Meta+Shift+Tab | the next, the previous window |
 | Meta+1…0, Meta+Shift+1…0 | go to a workspace, send the window there |
+| Meta+O | the workspaces as tiles, and a new one |
 | Meta+B, Meta+V | split: the next window beside, below |
 | Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
 | Meta+F | fullscreen (or its strip's fullscreen; a swipe in from the top edge leaves it) |

@@ -24,9 +24,10 @@ var pickRowH = 58 // sizes.go: taller for fingers
 
 type pickEntry struct {
 	kind, title, detail string
-	icon                string // appIcon's, for a menu of tiles
-	on                  bool   // a tile for what's on now: dark
-	stay                bool   // picked, the menu stays (a tick)
+	icon                string                  // appIcon's, for a menu of tiles
+	on                  bool                    // a tile for what's on now: dark
+	stay                bool                    // picked, the menu stays (a tick)
+	paint               func(r image.Rectangle) // draws its tile, for one that isn't an icon's
 	current             bool
 	do                  func()
 	score               int
@@ -40,7 +41,17 @@ type picker struct {
 	sel, top    int
 	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
 	rows        []image.Rectangle
-	tiles       int // a menu of tiles, this many across (0: rows)
+	tiles       int  // a menu of tiles, this many across (0: rows)
+	tileH       int  // their height (0: pickTileH's)
+	wide        bool // the screen's width, tiles as it is: the workspaces'
+}
+
+// tileHeight is a tile's height in p.
+func (p *picker) tileHeight() int {
+	if p.tileH > 0 {
+		return p.tileH
+	}
+	return pickTileH()
 }
 
 func (a *bro) openPicker() {
@@ -117,11 +128,23 @@ func (a *bro) showPicker(p *picker) {
 		n++
 	}
 	h := 136 + min(max(1, n), pickRowsMax)*pickRowH + 16
-	if p.tiles > 0 {
-		p.tiles = max(2, min(3, w/340))
-		h = 136 + (n+p.tiles-1)/p.tiles*(pickTileH()+12) + 16
-	}
 	top := b.Min.Y + max(40, b.Dy()/8)
+	if p.wide { // tiles the screen's shape, a header over each
+		w, top = b.Dx()-48, max(b.Min.Y, a.lay.Page.Min.Y)+16 // under the bar
+		p.tiles = 3
+		if b.Dx() > b.Dy() {
+			p.tiles = 4
+		}
+		tw := (w - 40 - (p.tiles-1)*12) / p.tiles
+		ar := a.wm.area
+		p.tileH = wsHeadH + tw*ar.Dy()/max(1, ar.Dx())
+	}
+	if p.tiles > 0 {
+		if !p.wide {
+			p.tiles = max(2, min(3, w/340))
+		}
+		h = 136 + (n+p.tiles-1)/p.tiles*(p.tileHeight()+12) + 16
+	}
 	h = min(h, b.Max.Y-40-top)
 	p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
 	a.picker = p
@@ -258,7 +281,7 @@ func (a *bro) drawPicker() {
 	p, c := a.picker, a.C
 	rows := (p.box.Dy() - 152) / pickRowH
 	if p.tiles > 0 {
-		rows = (p.box.Dy() - 152) / (pickTileH() + 12) * p.tiles
+		rows = (p.box.Dy() - 152) / (p.tileHeight() + 12) * p.tiles
 	}
 	step := max(1, p.tiles) // tiles scroll by rows of them
 	rows = max(step, rows-rows%step)
@@ -298,14 +321,18 @@ func (a *bro) drawPicker() {
 		tw := (in.Dx() - (p.tiles-1)*12) / p.tiles
 		for n := p.top; n < min(len(p.shown), p.top+rows); n++ {
 			e, i := p.shown[n], n-p.top
-			x, ty := in.Min.X+i%p.tiles*(tw+12), y+i/p.tiles*(pickTileH()+12)
-			r := image.Rect(x, ty, x+tw, ty+pickTileH())
+			x, ty := in.Min.X+i%p.tiles*(tw+12), y+i/p.tiles*(p.tileHeight()+12)
+			r := image.Rect(x, ty, x+tw, ty+p.tileHeight())
 			p.rows = append(p.rows, r)
 			num := 0
 			if p.query == "" && n < 9 {
 				num = n + 1
 			}
-			a.drawTile(r, launchTile{name: e.title, note: e.detail, icon: e.icon, num: num}, e.on, false)
+			if e.paint != nil {
+				e.paint(r)
+			} else {
+				a.drawTile(r, launchTile{name: e.title, note: e.detail, icon: e.icon, num: num}, e.on, false)
+			}
 			if n == p.sel { // the keys' choice: ringed, as dark is on
 				a.C.Frame(r.Inset(-6), 4, kobo.Black)
 			}

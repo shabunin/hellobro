@@ -55,6 +55,7 @@ func wmCommand(line, title string, repeat bool, keys ...string) *command {
 func makeCommands() []*command {
 	cs := []*command{
 		{id: "launcher", title: "A new window", keys: []string{"meta+enter"}, run: (*bro).openLauncher},
+		{id: "workspaces", title: "Workspaces: all of them, small, to go to one or add one", keys: []string{"meta+o"}, run: (*bro).openWorkspaces},
 		{id: "palette", title: "Go to…", keys: []string{"meta+d", "meta+space"}, run: (*bro).openPicker, hidden: true},
 		wmCommand("kill", "Close the window in focus", false, "meta+shift+q"),
 	}
