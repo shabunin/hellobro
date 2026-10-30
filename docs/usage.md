@@ -109,10 +109,10 @@ the screen, touch calibration, the on-screen keyboard, the light,
 Wi-Fi, Bluetooth, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
 Nickel. Tap one, or its number, or the arrows (the one they're on has
 a ring) and Enter (or type to narrow); Esc or a tap outside closes it.
-**Wi-Fi** and **Bluetooth** turn that radio on or off where they are,
-the menu staying up: a tile is dark while its radio is on, and says
-how it is (the network joined, on, off, or "a moment…" while it
-changes).
+**Light**, **Wi-Fi** and **Bluetooth** turn it on or off where they
+are, the menu staying up: a tile is dark while it's on, and says how
+it is (the light's level, the network joined, on, off, or "a moment…"
+while a radio changes).
 
 **Airplane mode** (`airplane` in keys.conf and the switcher) turns
 Wi-Fi and Bluetooth off, keeping which were on; again, it turns those

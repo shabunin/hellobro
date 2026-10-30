@@ -617,6 +617,7 @@ func (a *bro) menu() {
 
 func (a *bro) menuEntries() []pickEntry {
 	r := &a.rs
+	l, lit := a.Light()
 	var entries []pickEntry
 	for _, t := range []struct{ id, title, note, icon string }{
 		{"rotate", "Rotate", "the screen", "rotate"},
@@ -636,10 +637,15 @@ func (a *bro) menuEntries() []pickEntry {
 			continue
 		}
 		e := pickEntry{kind: "command", title: t.title, detail: t.note, icon: t.icon, do: func() { c.run(a) }}
-		switch t.id {
-		case "wifi": // how it is, not its keys; tapped, the menu stays to show it going
+		switch {
+		case t.id == "light.toggle" && lit: // how it is, not its keys; tapped, the menu stays to show it
+			e.on, e.stay, e.detail = l > 0, true, "off"
+			if l > 0 {
+				e.detail = strconv.Itoa(l) + "%"
+			}
+		case t.id == "wifi":
 			e.on, e.stay, e.do = r.ws.On, true, func() { a.radioFlip(panelWiFi) }
-		case "bluetooth":
+		case t.id == "bluetooth":
 			e.on, e.stay, e.do = r.bs.Powered, true, func() { a.radioFlip(panelBT) }
 		default:
 			if k := a.keyLabels(c.id); k != "" {
