@@ -41,6 +41,11 @@ def tap(x, y, slot=0):
     tid[0] += 1
     frame(slot, ID=tid[0], TOOL=0, **at(x, y), P=30); time.sleep(0.05)
     frame(slot, ID=-1); time.sleep(0.9)
+def hold(x, y, secs=1.2, slot=0):
+    """A finger put down at x, y and kept there still for secs."""
+    tid[0] += 1
+    frame(slot, ID=tid[0], TOOL=0, **at(x, y), P=30); time.sleep(secs)
+    frame(slot, ID=-1); time.sleep(0.9)
 def stroke(pts, slot=0, pen=False, pressure=None):
     tid[0] += 1
     if pen:   # approach: hover first

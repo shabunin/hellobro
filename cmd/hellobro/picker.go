@@ -28,6 +28,7 @@ type pickEntry struct {
 	icon                string                  // appIcon's, for a menu of tiles
 	on                  bool                    // a tile for what's on now: dark
 	stay                bool                    // picked, the menu stays (a tick)
+	hold                func()                  // a finger held on its tile: its settings, say
 	paint               func(r image.Rectangle) // draws its tile, for one that isn't an icon's
 	changed             func() bool             // its tile would be drawn otherwise now (paint's)
 	current             bool
@@ -52,6 +53,8 @@ type picker struct {
 	refresh     func()             // before the tiles are asked whether they changed
 	entries     func() []pickEntry // all anew, when what they show may have changed (againPicker)
 	lookedAt    time.Time          // the tiles last asked whether they changed
+	held        *kobo.Gesture      // a finger down on a tile with a hold, at heldN
+	heldN       int
 }
 
 // chrome is the height of p's title, line and margins: what isn't rows.
@@ -505,6 +508,43 @@ func (a *bro) pickerTap(pt image.Point) {
 	}
 }
 
+// pickHold is how long a finger stays on a tile for its hold: less
+// than a tap may last, so the gesture is told it's no tap.
+const pickHold = 600 * time.Millisecond
+
+// pickerDown notes a finger put down on an entry that has a hold.
+func (a *bro) pickerDown(pt image.Point, g *kobo.Gesture) {
+	p := a.picker
+	if p == nil {
+		return
+	}
+	p.held = nil
+	for i, r := range p.rows {
+		if n := p.top + i; pt.In(r) && n < len(p.shown) && p.shown[n].hold != nil {
+			p.held, p.heldN = g, n
+		}
+	}
+}
+
+// pickerHeld runs the hold of the entry a finger's stayed on, still.
+func (a *bro) pickerHeld() {
+	p := a.picker
+	if p == nil || p.held == nil {
+		return
+	}
+	g := p.held
+	switch {
+	case g.Dur != 0 || g.Moved >= 30: // lifted, or it's a swipe
+		p.held = nil
+	case time.Since(g.At) >= pickHold:
+		p.held = nil
+		g.Ignored = "held on a tile" // no tap when it lifts
+		e := p.shown[p.heldN]
+		a.unpick()
+		e.hold()
+	}
+}
+
 // pickerTick draws again the tiles that changed under it, a few seconds
 // apart at most: the workspaces' terminals as their output comes.
 // againPicker makes the menu's entries anew, if it can, and draws it
@@ -528,6 +568,7 @@ func (a *bro) againPicker() {
 }
 
 func (a *bro) pickerTick() {
+	a.pickerHeld()
 	p := a.picker
 	if p == nil || p.tiles == 0 || time.Since(p.lookedAt) < 3*time.Second || a.Blitting() {
 		return

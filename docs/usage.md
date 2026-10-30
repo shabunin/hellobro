@@ -106,13 +106,14 @@ The bar; remembered in `bar`); a full-screen window has none either.
 A swipe up or down along the right edge of the screen opens the menu,
 tiles big enough for a finger, each an icon, a word and its keys: rotate
 the screen, touch calibration, the on-screen keyboard, the light,
-Wi-Fi, Bluetooth, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
+Wi-Fi, Bluetooth, Settings, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
 Nickel. Tap one, or its number, or the arrows (the one they're on has
 a ring) and Enter (or type to narrow); Esc or a tap outside closes it.
 **Light**, **Wi-Fi** and **Bluetooth** turn it on or off where they
 are, the menu staying up: a tile is dark while it's on, and says how
 it is (the light's level, the network joined, on, off, or "a moment…"
-while a radio changes).
+while a radio changes). A finger held on Wi-Fi or Bluetooth opens its
+window instead: the networks, the devices.
 
 **Airplane mode** (`airplane` in keys.conf and the switcher) turns
 Wi-Fi and Bluetooth off, keeping which were on; again, it turns those

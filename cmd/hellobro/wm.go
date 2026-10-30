@@ -626,6 +626,7 @@ func (a *bro) menuEntries() []pickEntry {
 		{"light.toggle", "Light", "on / off", "light"},
 		{"wifi", "Wi-Fi", radioNote(!r.read, r.wBusy != "", r.ws.On, r.ws.SSID), "wifi"},
 		{"bluetooth", "Bluetooth", radioNote(!r.read, r.bBusy != "", r.bs.Powered, ""), "bluetooth"},
+		{"settings", "Settings", "the rest", "settings"},
 		{"sleep", "Sleep", "", "sleep"},
 		{"lock", "Lock", "the screen", "lock"},
 		{"palette", "Go to…", "the switcher", "switcher"},
@@ -645,8 +646,10 @@ func (a *bro) menuEntries() []pickEntry {
 			}
 		case t.id == "wifi":
 			e.on, e.stay, e.do = r.ws.On, true, func() { a.radioFlip(panelWiFi) }
+			e.hold = func() { a.openGUI("wifi") } // held: its window, the networks
 		case t.id == "bluetooth":
 			e.on, e.stay, e.do = r.bs.Powered, true, func() { a.radioFlip(panelBT) }
+			e.hold = func() { a.openGUI("bluetooth") }
 		default:
 			if k := a.keyLabels(c.id); k != "" {
 				e.detail = k
