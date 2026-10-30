@@ -95,8 +95,12 @@ func (w *noteWin) slotOf(n int) (image.Rectangle, bool) {
 	return image.Rectangle{}, false
 }
 
-// paperArea is the window under the tools' strip.
+// paperArea is the window less the tools' strip: under it, or right of
+// it down the side.
 func (w *noteWin) paperArea() image.Rectangle {
+	if w.side {
+		return image.Rect(w.bar.Max.X, w.p.Body.Min.Y, w.p.Body.Max.X, w.p.Body.Max.Y)
+	}
 	return image.Rect(w.p.Body.Min.X, w.bar.Max.Y, w.p.Body.Max.X, w.p.Body.Max.Y)
 }
 

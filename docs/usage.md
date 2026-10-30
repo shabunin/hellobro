@@ -105,9 +105,11 @@ taller bar, status bar and title strips, bigger window buttons, and
 taller rows in menus, Settings, Wi-Fi and Bluetooth, the books' and
 notebooks' lists, and the strips over a notebook's page and under a
 book's; **compact** fits more on the screen, for a keyboard. It
-changes at once (also in the switcher: "setting: sizes"). Where a
-window is too narrow for all of a notebook's tools, the least needed
-go, then All Notebooks is its arrow alone. `HELLOBRO_TOUCH=big` or
+changes at once (also in the switcher: "setting: sizes"). A
+notebook in a window too narrow for all its tools along the top (and
+taller than wide) has them down its left side instead, all of them,
+the page arrows and counter at the foot; the pen's choices open beside
+the pen. Narrow and short, the least needed go. `HELLOBRO_TOUCH=big` or
 `small` in `launch.sh`'s environment overrides it.
 
 Meta and the arrows (or h j k l, as vim has them) move the focus

@@ -105,21 +105,31 @@ func colorGray(c string, marker bool) uint8 {
 	return min(lum, 0xA0)
 }
 
-// layPenMenu lays the pen's choices under its button.
+// layPenMenu lays the pen's choices under its button, or right of it
+// down the side; a row too long for the window goes on under.
 func (w *noteWin) layPenMenu(a *bro) {
 	w.penOpts = nil
 	i := slices.IndexFunc(w.btns, func(b noteBtn) bool { return b.id == "pen" })
 	if i < 0 {
 		return
 	}
-	x, y := w.btns[i].r.Min.X+8, w.bar.Max.Y+10
-	h := w.bar.Dy() - 8
+	pen := w.btns[i].r
+	x0, y, h := pen.Min.X+8, w.bar.Max.Y+10, pen.Dy()
+	if w.side {
+		x0, y = w.bar.Max.X+10, pen.Min.Y
+	}
+	end := w.paperArea().Max.X - 8
+	x := x0
 	for gi, group := range [][]string{noteWidths, noteInks} {
 		if gi > 0 {
 			x += 24
 		}
 		for _, o := range group {
-			r := image.Rect(x, y, x+max(kobo.TextWidth(a.F.Small, o)+36, h+8), y+h)
+			wd := max(kobo.TextWidth(a.F.Small, o)+36, h+8)
+			if x+wd > end && x > x0 {
+				x, y = x0, y+h+8
+			}
+			r := image.Rect(x, y, x+wd, y+h)
 			w.penOpts = append(w.penOpts, noteBtn{id: o, label: o, r: r})
 			x = r.Max.X + 8
 		}

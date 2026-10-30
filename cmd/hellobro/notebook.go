@@ -394,6 +394,7 @@ type noteWin struct {
 
 	p     kobo.Panel
 	bar   image.Rectangle // the tools' strip
+	side  bool            // it stands along the left: a narrow window (layBar)
 	ex    *exLine         // a ":" command being typed (noteex.go)
 	btns  []noteBtn
 	slots []image.Rectangle // the pages on screen, left to right: cur, cur+1
@@ -458,7 +459,7 @@ func noteSlots(area image.Rectangle, size image.Point) ([]image.Rectangle, float
 }
 
 func (w *noteWin) place(a *bro, p kobo.Panel) {
-	w.p, w.btns, w.bar, w.slots = p, nil, image.Rectangle{}, nil
+	w.p, w.btns, w.bar, w.slots, w.side = p, nil, image.Rectangle{}, nil, false
 	if p.Outer.Empty() {
 		return
 	}
@@ -468,8 +469,13 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 	}
 	b := p.Body.Inset(kobo.Pad / 2)
 	w.bar = image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+h)
+	if tools, _ := barTools(false); w.barNeed(a, tools) > w.barRoom(a) && b.Dy() > b.Dx() { // not all on top: down the side (the pens' tools say, so it stays put for the overview's)
+		w.side = true
+		cw := max(h+8, kobo.TextWidth(a.F.Small, "99 / 99")+20)
+		w.bar = image.Rect(b.Min.X, b.Min.Y, b.Min.X+cw, b.Max.Y)
+	}
 	w.slotSize = w.pageSize(w.cur)
-	w.slots, w.scale = noteSlots(image.Rect(b.Min.X, w.bar.Max.Y+kobo.Pad/2, b.Max.X, b.Max.Y), w.slotSize)
+	w.slots, w.scale = noteSlots(w.paperArea().Inset(kobo.Pad/2), w.slotSize)
 	w.layBar(a)
 }
 
@@ -507,62 +513,127 @@ func (w *noteWin) counter() string {
 	return fmt.Sprintf("%d / %d", w.cur+1, all)
 }
 
-// layBar lays the tools along the strip, as many as fit: what's left
-// out goes from the least needed.
-func (w *noteWin) layBar(a *bro) {
+// barTools are the tools on the strip (the overview's, or the pen's
+// and the rest), All Notebooks first, and those that go first where
+// there's no room for all.
+func barTools(overview bool) (tools []noteBtn, drops []string) {
 	all := noteBtn{id: "all", label: "‹ All Notebooks"} // at the left always, as the books' All Books (notelist.go)
-	tools := []noteBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}}
-	drops := []string{"paper", "export", "redo", "paste"}
-	if w.overview {
-		tools = []noteBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}}
-		drops = []string{"undo", "copy page", "new before"}
+	if overview {
+		return []noteBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}},
+			[]string{"undo", "copy page", "new before"}
 	}
-	pages := []noteBtn{{id: "prev"}, {id: "next"}}
-	width := func(b noteBtn) int {
-		if b.label == "" { // a picture
-			return w.bar.Dy() + 8
-		}
-		return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8)
+	return []noteBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}},
+		[]string{"paper", "export", "redo", "paste"}
+}
+
+const noteBarGap = 10 // between the strip's buttons
+
+// barWidth is b's width on the strip along the top.
+func (w *noteWin) barWidth(a *bro, b noteBtn) int {
+	if b.label == "" { // a picture
+		return w.bar.Dy() + 8
 	}
-	const gap = 10
-	counter := kobo.TextWidth(a.F.Small, "999 / 999")
+	return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8)
+}
+
+// barNeed is how wide tools are along the top.
+func (w *noteWin) barNeed(a *bro, tools []noteBtn) int {
+	n := 0
+	for _, t := range tools {
+		n += w.barWidth(a, t) + noteBarGap
+	}
+	return n
+}
+
+// barCounter is how wide the page counter is.
+func (w *noteWin) barCounter(a *bro) int {
 	if w.shown() == 2 {
-		counter = kobo.TextWidth(a.F.Small, "999–999 / 999")
+		return kobo.TextWidth(a.F.Small, "999–999 / 999")
 	}
-	room := w.bar.Dx() - width(pages[0]) - width(pages[1]) - counter - 4*gap
-	need := func() int {
-		n := 0
-		for _, t := range tools {
-			n += width(t) + gap
-		}
-		return n
+	return kobo.TextWidth(a.F.Small, "999 / 999")
+}
+
+// barRoom is the room along the top for the tools: the page arrows and
+// counter are at its end.
+func (w *noteWin) barRoom(a *bro) int {
+	return w.bar.Dx() - 2*(w.bar.Dy()+8) - w.barCounter(a) - 4*noteBarGap
+}
+
+// layBar lays the tools along the strip, as many as fit: what's left
+// out goes from the least needed. Down the side, the page arrows and
+// counter are at its foot.
+func (w *noteWin) layBar(a *bro) {
+	tools, drops := barTools(w.overview)
+	pages := []noteBtn{{id: "prev"}, {id: "next"}}
+	if w.side {
+		w.laySide(a, tools, drops, pages)
+		w.layPenMenu(a)
+		return
 	}
+	room := w.barRoom(a)
 	for _, drop := range drops {
-		if need() <= room {
+		if w.barNeed(a, tools) <= room {
 			break
 		}
 		tools = slices.DeleteFunc(tools, func(t noteBtn) bool { return t.id == drop })
 	}
-	if need() > room { // narrower still: All Notebooks its arrow alone, then the last tools go (and it, last)
+	if w.barNeed(a, tools) > room { // narrower still: All Notebooks its arrow alone, then the last tools go (and it, last)
 		tools[0].label = "‹"
 	}
-	for len(tools) > 0 && need() > room {
+	for len(tools) > 0 && w.barNeed(a, tools) > room {
 		tools = tools[:len(tools)-1]
 	}
 	x := w.bar.Min.X
 	for _, t := range tools {
-		t.r = image.Rect(x, w.bar.Min.Y+4, x+width(t), w.bar.Max.Y-4)
+		t.r = image.Rect(x, w.bar.Min.Y+4, x+w.barWidth(a, t), w.bar.Max.Y-4)
 		w.btns = append(w.btns, t)
-		x = t.r.Max.X + gap
+		x = t.r.Max.X + noteBarGap
 	}
 	x = w.bar.Max.X
 	for _, t := range []noteBtn{pages[1], pages[0]} {
-		t.r = image.Rect(x-width(t), w.bar.Min.Y+4, x, w.bar.Max.Y-4)
+		t.r = image.Rect(x-w.barWidth(a, t), w.bar.Min.Y+4, x, w.bar.Max.Y-4)
 		w.btns = append(w.btns, t)
-		x = t.r.Min.X - counter - 2*gap
+		x = t.r.Min.X - w.barCounter(a) - 2*noteBarGap
 	}
 	w.layPenMenu(a)
 }
+
+// laySide lays the tools down the strip along the left, one under
+// another, and at its foot the page before, the counter and the next.
+// A short window still leaves some out, as along the top.
+func (w *noteWin) laySide(a *bro, tools []noteBtn, drops []string, pages []noteBtn) {
+	bh := noteSideH(w.bar.Dx())
+	room := w.bar.Dy() - 3*(bh+noteBarGap)
+	tools[0].label = "‹"
+	if w.overview {
+		tools[slices.IndexFunc(tools, func(t noteBtn) bool { return t.id == "clear" })].label = "clear"
+	}
+	for _, drop := range drops {
+		if len(tools)*(bh+noteBarGap) <= room {
+			break
+		}
+		tools = slices.DeleteFunc(tools, func(t noteBtn) bool { return t.id == drop })
+	}
+	for len(tools) > 0 && len(tools)*(bh+noteBarGap) > room {
+		tools = tools[:len(tools)-1]
+	}
+	in := w.bar.Inset(4)
+	y := in.Min.Y
+	for _, t := range tools {
+		t.r = image.Rect(in.Min.X, y, in.Max.X, y+bh)
+		w.btns = append(w.btns, t)
+		y = t.r.Max.Y + noteBarGap
+	}
+	y = in.Max.Y
+	for _, t := range []noteBtn{pages[1], pages[0]} { // the next at the foot; the counter between (counterRect)
+		t.r = image.Rect(in.Min.X, y-bh, in.Max.X, y)
+		w.btns = append(w.btns, t)
+		y = t.r.Min.Y - bh - 2*noteBarGap
+	}
+}
+
+// noteSideH is a button's height down a strip cw wide: about square.
+func noteSideH(cw int) int { return min(cw-8, 76) }
 
 func (w *noteWin) panel(a *bro) kobo.Panel { return a.winPanel(w.p, a.focusedWin() == window(w)) }
 
@@ -611,9 +682,12 @@ func (w *noteWin) drawBar(a *bro) {
 		}
 		c.Fill(b.r, bg)
 		c.Frame(b.r, 2, kobo.Black)
-		if icon := noteIcon(b.id, w.nb.paper); icon != nil {
+		switch icon := noteIcon(b.id, w.nb.paper); {
+		case icon != nil:
 			drawIcon(c, icon, b.r, ink, bg)
-		} else {
+		case label == "‹": // All Notebooks, its arrow alone: big enough to see
+			c.Text(a.F.Panel, b.r, label, ink, kobo.AlignCenter)
+		default:
 			c.Text(a.F.Small, b.r, label, ink, kobo.AlignCenter)
 		}
 		if b.id == "pen" { // what it writes, under it
@@ -648,7 +722,11 @@ func (w *noteWin) counterRect() image.Rectangle {
 	if n < 2 {
 		return image.Rectangle{}
 	}
-	return image.Rect(w.btns[n-1].r.Max.X+6, w.bar.Min.Y+4, w.btns[n-2].r.Min.X-6, w.bar.Max.Y-4)
+	prev, next := w.btns[n-1].r, w.btns[n-2].r
+	if w.side {
+		return image.Rect(prev.Min.X, prev.Max.Y+6, prev.Max.X, next.Min.Y-6)
+	}
+	return image.Rect(prev.Max.X+6, w.bar.Min.Y+4, next.Min.X-6, w.bar.Max.Y-4)
 }
 
 // drawPages draws the pages where they're in clip: the paper, then the
@@ -659,7 +737,7 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 		return
 	}
 	c := a.C
-	area := image.Rect(w.p.Body.Min.X, w.bar.Max.Y, w.p.Body.Max.X, w.p.Body.Max.Y).Intersect(clip)
+	area := w.paperArea().Intersect(clip)
 	c.Fill(area, kobo.White)
 	for i, pg := range w.slots {
 		if cl := clip.Intersect(pg); !cl.Empty() {

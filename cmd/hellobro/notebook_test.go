@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"image"
 	"os"
 	"path/filepath"
@@ -365,21 +366,49 @@ func TestFingerTurns(t *testing.T) {
 }
 
 // The notebook's strip fits its window, however narrow, with fingers'
-// sizes too: what doesn't fit goes, never overlapping or past its end.
+// sizes too: along the top, or down the side where the top hasn't room
+// for all the tools (then all of them show). Nothing overlaps or goes
+// past its end; the pages and the pen's choices are beside it.
 func TestNoteBarFits(t *testing.T) {
 	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
-	for _, h := range []int{56, 76} {
-		for wd := 300; wd <= 1400; wd += 25 {
-			for _, ov := range []bool{false, true} {
-				w := &noteWin{nb: &notebook{pages: [][]*noteStroke{nil}}, overview: ov, bar: image.Rect(0, 0, wd, h)}
-				w.layBar(a)
-				for i, b := range w.btns {
-					if !b.r.In(w.bar) {
-						t.Errorf("%dx%d (overview %v): %s at %v, past the strip", wd, h, ov, b.id, b.r)
+	defer kobo.SetBig(false)
+	for _, big := range []bool{false, true} {
+		kobo.SetBig(big)
+		for _, ht := range []int{500, 1700} {
+			for wd := 300; wd <= 1400; wd += 25 {
+				for _, ov := range []bool{false, true} {
+					w := &noteWin{nb: &notebook{pages: [][]*noteStroke{nil}}, overview: ov, penMenu: true}
+					body := image.Rect(0, 0, wd, ht)
+					w.place(a, kobo.Panel{Outer: body, Body: body})
+					at := fmt.Sprintf("%dx%d (big %v, overview %v, side %v)", wd, ht, big, ov, w.side)
+					if want := ht == 1700 && wd <= 600; ht == 1700 && (wd <= 600 || wd == 1400) && w.side != want {
+						t.Errorf("%s: down the side %v, want %v", at, w.side, want)
 					}
-					for _, c := range w.btns[i+1:] {
-						if b.r.Overlaps(c.r) {
-							t.Errorf("%dx%d (overview %v): %s and %s overlap", wd, h, ov, b.id, c.id)
+					tools, _ := barTools(ov)
+					if w.side && ht > 1000 && len(w.btns) != len(tools)+2 {
+						t.Errorf("%s: %d buttons down the side, want all %d", at, len(w.btns), len(tools)+2)
+					}
+					for i, b := range w.btns {
+						if !b.r.In(w.bar) {
+							t.Errorf("%s: %s at %v, past the strip %v", at, b.id, b.r, w.bar)
+						}
+						for _, c := range w.btns[i+1:] {
+							if b.r.Overlaps(c.r) {
+								t.Errorf("%s: %s and %s overlap", at, b.id, c.id)
+							}
+						}
+					}
+					if r := w.counterRect(); len(w.btns) >= 2 && (r.Dx() < 20 || r.Dy() < 20) {
+						t.Errorf("%s: the counter is %v", at, r)
+					}
+					for _, s := range w.slots {
+						if !s.In(w.paperArea()) || s.Overlaps(w.bar) {
+							t.Errorf("%s: a page at %v, not beside the strip %v", at, s, w.bar)
+						}
+					}
+					for _, o := range w.penOpts {
+						if o.r.Max.X > w.paperArea().Max.X || o.r.Overlaps(w.bar) {
+							t.Errorf("%s: the pen's %s at %v, out of %v", at, o.id, o.r, w.paperArea())
 						}
 					}
 				}
