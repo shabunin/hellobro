@@ -17,7 +17,7 @@ import (
 	"hellobro/kobo"
 )
 
-var statH = 34 // HELLOBRO_TOUCH=big: taller
+var statH = 34 // sizes.go: taller for fingers
 
 const (
 	statEvery  = 5 * time.Second

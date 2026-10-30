@@ -18,6 +18,8 @@
 #      FAKE_RADIO (default 1: stand-in Wi-Fi and Bluetooth; empty: the real ones),
 #      APP_EXTRA (a directory copied into the app's, over what's there:
 #      settings, relay.conf, keys, keys.conf, hellobro.json),
+#      HELLOBRO_TOUCH (small unless set: the feeds tap where things are compact;
+#      big, or empty for the settings' Sizes),
 #      HELLOBRO_MSG (the ipc feed's hellobro-msg: a PC build of hellobro by that name)
 #      READ_KITTY, READ_DOCS (the readkitty feed's: a PC build named read-kitty;
 #      a directory with test.pdf, test.epub and pic.jpg),
@@ -56,7 +58,7 @@ fi
 TABS=$TABS python3 -I "$H/feeds/$FEED.py" "$OUT/input" "$ROTA" &
 FEEDPID=$!
 FAKE_SNAP_AREA=${FAKE_SNAP_AREA:-40000} FAKE_SCREEN_DIR=$OUT/screen FAKE_GYRO=$ROTA HELLOBRO_FBINK=$H/fakefbink.py \
-	HELLOBRO_INPUT_DIR=$OUT/input HELLOBRO_DEVICES=$H/devices INTERFACE=$IFACE HELLOBRO_MUSIC_DIR=${MUSIC:-$H/music} HELLOBRO_FAKE_PCM=$OUT/pcm.raw HELLOBRO_FAKE_RADIO=${FAKE_RADIO-1} HELLOBRO_FAKE_SLEEP=1 \
+	HELLOBRO_INPUT_DIR=$OUT/input HELLOBRO_DEVICES=$H/devices INTERFACE=$IFACE HELLOBRO_MUSIC_DIR=${MUSIC:-$H/music} HELLOBRO_FAKE_PCM=$OUT/pcm.raw HELLOBRO_FAKE_RADIO=${FAKE_RADIO-1} HELLOBRO_FAKE_SLEEP=1 HELLOBRO_TOUCH=${HELLOBRO_TOUCH-small} \
 	HELLOBRO_NTX_IO=$OUT/ntx_io HELLOBRO_GPIO=$OUT/gpio HELLOBRO_BATTERY=$OUT/battery HELLOBRO_NICKEL_CONF=$H/nickel.conf HELLOBRO_HOSTS=$OUT/hosts \
 	HELLOBRO_IPC_DIR=$OUT/ipc HELLOBRO_SHARE_ADDR=127.0.0.1:${SHARE_PORT:-2022} HELLOBRO_SHARE_ROOT=$OUT/onboard HELLOBRO_NO_MDNS=1 HELLOBRO_FAKE_PAIR_CODE=246810 \
 	env $MPRIS_ENV timeout "${TIMEOUT:-170}" qemu-arm "$OUT/app/$NAME" > "$OUT/stdout.txt" 2>&1 || { echo "app exit: $?"; kill $FEEDPID 2>/dev/null; }

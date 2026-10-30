@@ -99,15 +99,12 @@ func main() {
 		alpineInit(os.Args[2])
 		return
 	}
-	updateTrial()                                  // before anything that might hang
-	if kobo.EnvOr("HELLOBRO_TOUCH", "") == "big" { // a small sharp screen, fingers on it
-		kobo.Big()
-		pickRowH, statH = 92, 56
-	}
+	updateTrial() // before anything that might hang
 	a := &bro{media: mediaState{kick: make(chan struct{}, 1)}}
 	a.vk = vkbdState{held: map[*kobo.Gesture]vkHeld{}, latched: map[uint16]bool{}, since: time.Now()}
 	a.loadStatBar()
 	a.set = loadSettings()
+	a.applySizes() // before anything is laid out
 	a.vk.on = a.setting("vkbd") == "on"
 	a.mem = loadRemembered(kobo.AppFile(""))
 	a.tv.hosts = a.mem.hosts()

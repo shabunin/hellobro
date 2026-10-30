@@ -63,13 +63,16 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
 ```
 
 - Snapshots: `OUT/screen/snap-NNNN-b-after.png`. Look at them, don't guess.
+- The harness runs compact (`HELLOBRO_TOUCH=small`), as the feeds tap
+  where things are then; `HELLOBRO_TOUCH=` (empty) for the settings'
+  Sizes, which are for fingers by default (feed `sizes`).
 - Log: `OUT/stdout.txt`. App files: `OUT/app`.
 - `APP_EXTRA=dir` copies files into the app's dir first (settings,
   relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
 - Feeds drive the window manager with Meta (`mod()` in feedlib) and
   open settings' windows through the switcher (`gui()`). hellobro has
-  no header: `exit_app()` quits through its menu (`menu()`, a swipe
-  along the right edge), and `bar` is
+  no header: `exit_app()` quits with Meta+Shift+E (its menu, `menu()`,
+  is a swipe along the right edge, not full screen), and `bar` is
   the feed of the bar, the menu, an empty workspace's keys and `notify`. A
   few feeds still say Ctrl+Alt+1–4 (`tab()`): that's a workspace laid
   out as the tab was. The saved host is 3 in the launcher (1 Alpine, 2

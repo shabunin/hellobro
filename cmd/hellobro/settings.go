@@ -17,11 +17,11 @@ import (
 )
 
 const (
-	panelSet  = 3 // the settings panel, after Wi-Fi, Bluetooth and Sharing
-	setRowH   = 50
-	setRowMin = 40
-	setTxt    = "settings"
+	panelSet = 3 // the settings panel, after Wi-Fi, Bluetooth and Sharing
+	setTxt   = "settings"
 )
+
+var setRowH, setRowMin = 50, 40 // sizes.go: taller for fingers
 
 // setting is one line of the panel: its values as saved, and as shown.
 // A label with a %s gets the key of command cmd there.
@@ -64,6 +64,9 @@ var settingList = []setting{
 	{key: "edge-swipe", label: "Workspaces by touch",
 		values: []string{"two", "edge"},
 		shown:  []string{"two fingers swiped across", "two fingers, or one swiped in from a side"}},
+	{key: "touch-size", label: "Sizes", title: "Sizes: for fingers or compact",
+		values: []string{"fingers", "compact"},
+		shown:  []string{"for fingers: taller strips, rows and buttons", "compact: more on the screen"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
 		values: []string{"frozen", "closed"},
 		shown:  []string{"frozen: back to it at once", "closed, as KOReader does (from the next start)"}},
@@ -294,6 +297,9 @@ func (a *bro) stepSetting(i, d int) {
 			a.SetTouchMarks(a.setting(st.key) == "on")
 		case "vkbd":
 			a.vkApply()
+		case "touch-size":
+			a.applySizes()
+			a.Relayout()
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))

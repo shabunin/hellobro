@@ -666,6 +666,13 @@ func (a *App) relayout() {
 	a.drawAll(true)
 }
 
+// Relayout lays the screen out and draws it again, as a rotation does:
+// for the frame's new sizes (SetBig).
+func (a *App) Relayout() {
+	a.WaitBlit()
+	a.relayout()
+}
+
 // Rotate turns the screen a quarter, as the header's button does.
 func (a *App) Rotate() { a.rotate() }
 

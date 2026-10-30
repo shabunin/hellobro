@@ -530,15 +530,24 @@ func (w *noteWin) layBar(a *bro) {
 		counter = kobo.TextWidth(a.F.Small, "999–999 / 999")
 	}
 	room := w.bar.Dx() - width(pages[0]) - width(pages[1]) - counter - 4*gap
-	for _, drop := range drops {
-		need := 0
+	need := func() int {
+		n := 0
 		for _, t := range tools {
-			need += width(t) + gap
+			n += width(t) + gap
 		}
-		if need <= room {
+		return n
+	}
+	for _, drop := range drops {
+		if need() <= room {
 			break
 		}
 		tools = slices.DeleteFunc(tools, func(t noteBtn) bool { return t.id == drop })
+	}
+	if need() > room { // narrower still: All Notebooks its arrow alone, then the last tools go (and it, last)
+		tools[0].label = "‹"
+	}
+	for len(tools) > 0 && need() > room {
+		tools = tools[:len(tools)-1]
 	}
 	x := w.bar.Min.X
 	for _, t := range tools {

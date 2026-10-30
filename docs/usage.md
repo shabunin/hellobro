@@ -100,9 +100,15 @@ land: a ring where a finger (or the pen) came down, a dot where it
 lifted after moving, each for 3 s; the log has each touch then, to the
 millisecond.
 
-On a small sharp screen used by touch, `HELLOBRO_TOUCH=big` (in
-`launch.sh`'s environment) makes the frame for fingers: a taller bar,
-status bar, title strips and tabs, bigger window buttons and menu rows.
+Settings, Touch, **Sizes**: **for fingers** (the default) has a
+taller bar, status bar and title strips, bigger window buttons, and
+taller rows in menus, Settings, Wi-Fi and Bluetooth, the books' and
+notebooks' lists, and the strips over a notebook's page and under a
+book's; **compact** fits more on the screen, for a keyboard. It
+changes at once (also in the switcher: "setting: sizes"). Where a
+window is too narrow for all of a notebook's tools, the least needed
+go, then All Notebooks is its arrow alone. `HELLOBRO_TOUCH=big` or
+`small` in `launch.sh`'s environment overrides it.
 
 Meta and the arrows (or h j k l, as vim has them) move the focus
 between the windows; with Shift, the window itself moves. Meta+A

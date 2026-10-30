@@ -330,13 +330,15 @@ var (
 	big    bool
 )
 
-// Big makes the frame for fingers on a small sharp screen: a taller bar,
-// title strips (tabs too) and their buttons. Before anything is laid out.
-func Big() {
-	big = true
-	barH, titleH = 72, 76
+// SetBig makes the frame for fingers (or back): a taller bar, title
+// strips (tabs too) and their buttons. Then Relayout, if it's laid out.
+func SetBig(on bool) {
+	big = on
+	barH, titleH, barTabPad, winIconPad = 46, 48, 14, 12
+	if on {
+		barH, titleH, barTabPad, winIconPad = 72, 76, 24, 20
+	}
 	FoldH = titleH + 2*border
-	barTabPad, winIconPad = 24, 20
 }
 
 // IsBig says the frame is Big's.

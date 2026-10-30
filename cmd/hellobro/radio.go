@@ -26,8 +26,9 @@ const (
 	panelBT
 )
 
+var radioRowH = 56 // sizes.go: taller for fingers
+
 const (
-	radioRowH    = 56
 	radioPoll    = 3 * time.Second
 	discoverTime = 40 * time.Second
 )

@@ -43,7 +43,9 @@ type libHead struct {
 }
 
 // libRowH is a list's row: room for a finger.
-func (a *bro) libRowH() int { return max(64, kobo.TextWidth(a.F.Body, "M")*2+10) }
+func (a *bro) libRowH() int { return max(libRowMin, kobo.TextWidth(a.F.Body, "M")*2+10) }
+
+var libRowMin = 64 // sizes.go: taller for fingers
 
 // drawLibHeader draws the header in r: all ("All Books"), lit if here;
 // back ("back to the book"), if there's somewhere to go back to; the

@@ -357,7 +357,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	if w.pdf != nil { // its own margins are enough
 		mx, my = 8, 8
 	}
-	foot := max(64, kobo.TextWidth(a.F.Small, "M")*2+8) // the strip under the page: room for its buttons
+	foot := max(footMin, kobo.TextWidth(a.F.Small, "M")*2+8) // the strip under the page: room for its buttons
 	w.area = image.Rect(body.Min.X+mx, body.Min.Y+my, body.Max.X-mx, body.Max.Y-foot)
 }
 

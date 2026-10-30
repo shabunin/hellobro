@@ -20,7 +20,7 @@ import (
 
 const pickRowsMax = 10
 
-var pickRowH = 58 // HELLOBRO_TOUCH=big: taller, for fingers
+var pickRowH = 58 // sizes.go: taller for fingers
 
 type pickEntry struct {
 	kind, title, detail string

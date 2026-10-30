@@ -158,10 +158,13 @@ func (w *bookWin) deleteMark(a *bro, i int) {
 
 // --- the strip under the page ---
 
+// The strip under a book's page: how tall at least, a button's width
+// (sizes.go: bigger for fingers).
+var footMin, footButton = 64, 100
+
 const (
-	footButton = 100 // a button's width
-	zoomButton = 84  // a PDF's zoom buttons': − 100% +
-	zoomGap    = 24  // between them and the rest
+	zoomButton = 84 // a PDF's zoom buttons': − 100% +
+	zoomGap    = 24 // between them and the rest
 )
 
 // footButtons are the strip's buttons: the contents, the style, a

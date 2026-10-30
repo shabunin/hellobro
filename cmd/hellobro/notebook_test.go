@@ -363,3 +363,27 @@ func TestFingerTurns(t *testing.T) {
 		}
 	}
 }
+
+// The notebook's strip fits its window, however narrow, with fingers'
+// sizes too: what doesn't fit goes, never overlapping or past its end.
+func TestNoteBarFits(t *testing.T) {
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	for _, h := range []int{56, 76} {
+		for wd := 300; wd <= 1400; wd += 25 {
+			for _, ov := range []bool{false, true} {
+				w := &noteWin{nb: &notebook{pages: [][]*noteStroke{nil}}, overview: ov, bar: image.Rect(0, 0, wd, h)}
+				w.layBar(a)
+				for i, b := range w.btns {
+					if !b.r.In(w.bar) {
+						t.Errorf("%dx%d (overview %v): %s at %v, past the strip", wd, h, ov, b.id, b.r)
+					}
+					for _, c := range w.btns[i+1:] {
+						if b.r.Overlaps(c.r) {
+							t.Errorf("%dx%d (overview %v): %s and %s overlap", wd, h, ov, b.id, c.id)
+						}
+					}
+				}
+			}
+		}
+	}
+}
