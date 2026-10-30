@@ -775,7 +775,7 @@ and the last two written.
   the next tab, Backspace up a folder, a swipe up or down pages.
 
 Its buttons are pictures (below by their names): the pen, an eraser,
-a dotted rectangle (select), arrows round (undo, redo), a clipboard
+a dotted rectangle (select), a T (text), arrows round (undo, redo), a clipboard
 (paste), a page as the paper is (squares, lines, plain), a tray with
 an arrow out (export). Under the pen, a line as it writes: its width,
 its gray.
@@ -789,6 +789,14 @@ its gray.
   The line under the button shows which; the choice is kept.
   Touch the page to put them away. A notebook from Xournal++ shows its
   colors as the grays they are, its highlighters as markers.
+- **text** (or T, or `:text`) types on the page from a keyboard (or
+  the one on the screen): tap the page and type there, or tap a text to
+  go on in it. Enter starts a new line; the arrows, Home and End move
+  the cursor; Esc, another tool, a tap off the page or a turned page
+  leaves it. A text is undone as one; emptied, it's gone. The select
+  tool takes it with a tap (moves it, sizes it, copies, deletes it);
+  the eraser leaves it, as in Xournal++, where it's a text as its own
+  are (14 pt; theirs show here too, at their size) and can be edited.
 - **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), and the paper: squares, lines or
   plain, for the whole notebook.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
@@ -888,7 +896,7 @@ The same line as a book's ([":" commands in a book](#-commands-in-a-book)).
 |---|---|
 | `:3`, `:p 3` | page 3 |
 | `:new`, `:copy`, `:delete`, `:clear` | a page after this one, a copy of it, this one gone, cleared (all undone with Ctrl+Z) |
-| `:pen`, `:eraser`, `:select`, `:u`, `:redo` | the tools; undo, redo |
+| `:pen`, `:eraser`, `:select`, `:text`, `:u`, `:redo` | the tools; undo, redo |
 | `:paper lines` | squares, lines or plain |
 | `:o` | the pages' view, on or off |
 | `:w`, `:export` | written now; the PDF export |

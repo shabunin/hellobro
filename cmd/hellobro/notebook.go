@@ -69,11 +69,16 @@ type noteStroke struct {
 	box    image.Rectangle // in page units, with the pen's width
 	attrs  []xml.Attr      // from its file: the tool, its color… (nil: ours, black)
 	pic    *notePic        // a picture in box, not a stroke (notepic.go)
+	txt    *noteText       // a text from box's top left, not a stroke (notetext.go)
 	gray   uint8           // its ink: black, or a gray (notepen.go)
 	marker bool            // a highlighter's: under the ink
 }
 
 func (s *noteStroke) bound() {
+	if s.txt != nil {
+		s.box = s.txt.box(s.box.Min)
+		return
+	}
 	if s.pic != nil {
 		return
 	}
@@ -356,7 +361,7 @@ func segDist(p, a, b image.Point) float64 {
 
 // hits says whether the eraser at p (page units) takes s.
 func (s *noteStroke) hits(p image.Point) bool {
-	if s.pic != nil || !p.In(s.box.Inset(-noteEraser)) { // a picture, as in Xournal++: the eraser leaves it
+	if s.pic != nil || s.txt != nil || !p.In(s.box.Inset(-noteEraser)) { // a picture or a text, as in Xournal++: the eraser leaves it
 		return false
 	}
 	pt := func(i int) image.Point { return image.Pt(int(s.pts[i].x), int(s.pts[i].y)) }
@@ -376,6 +381,8 @@ type noteWin struct {
 	cur        int // the page shown, the left one of two
 	erasing    bool
 	selecting  bool          // the select tool in hand (notesel.go)
+	texting    bool          // the text tool (notetext.go)
+	typing     *noteTyping   // a text being typed
 	sel        []*noteStroke // what it's taken, on selPage
 	selPage    int
 	mark       *noteMark // where the next paste goes
@@ -522,7 +529,7 @@ func barTools(overview bool) (tools []noteBtn, drops []string) {
 		return []noteBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}},
 			[]string{"undo", "copy page", "new before"}
 	}
-	return []noteBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}},
+	return []noteBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}},
 		[]string{"paper", "export", "redo", "paste"}
 }
 
@@ -663,7 +670,7 @@ func (w *noteWin) drawBar(a *bro) {
 	c := a.C
 	c.Fill(w.bar, kobo.White)
 	for _, b := range w.btns {
-		on := b.id == "pen" && !w.erasing && !w.selecting || b.id == "eraser" && w.erasing || b.id == "select" && w.selecting
+		on := b.id == "pen" && !w.erasing && !w.selecting && !w.texting || b.id == "eraser" && w.erasing || b.id == "select" && w.selecting || b.id == "text" && w.texting
 		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 ||
 			b.id == "prev" && w.cur == 0 || b.id == "next" && w.turnTo(1) < 0
 		if w.overview && b.id != "undo" && b.id != "all" {
@@ -788,6 +795,14 @@ func (w *noteWin) drawStroke(a *bro, s *noteStroke, at, clip image.Rectangle) {
 		w.drawPic(a, s, at, clip)
 		return
 	}
+	if s.txt != nil {
+		pos := -1
+		if k := w.typing; k != nil && k.s == s {
+			pos = k.pos
+		}
+		drawNoteText(a.C, s, at.Min, w.scale, pos, clip)
+		return
+	}
 	prev := w.toScreen(s.pts[0], at)
 	a.C.Disc(prev, w.radius(s.pts[0]), s.gray, clip)
 	for _, p := range s.pts[1:] {
@@ -844,6 +859,7 @@ func (w *noteWin) turnTo(by int) int {
 }
 
 func (w *noteWin) turn(a *bro, by int) {
+	w.endTyping(a)
 	if w.overview {
 		w.ovTurn(a, by)
 		return
@@ -860,6 +876,7 @@ func (w *noteWin) turn(a *bro, by int) {
 }
 
 func (w *noteWin) doUndo(a *bro, undo bool) {
+	w.endTyping(a)
 	from, to := &w.undo, &w.redo
 	if !undo {
 		from, to = to, from
@@ -912,6 +929,7 @@ func (w *noteWin) showBar(a *bro) {
 }
 
 func (w *noteWin) tap(a *bro, p image.Point) {
+	w.endTyping(a)
 	if w.ex != nil { // a tap leaves the line
 		w.ex = nil
 		a.exAsk(false)
@@ -932,8 +950,8 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		switch b.id {
 		case "all":
 			a.notesFrom(w)
-		case "pen", "eraser", "select":
-			if b.id == "pen" && !w.erasing && !w.selecting { // in hand: its choices
+		case "pen", "eraser", "select", "text":
+			if b.id == "pen" && !w.erasing && !w.selecting && !w.texting { // in hand: its choices
 				w.penMenu = !w.penMenu
 				w.show(a)
 				break
@@ -1000,6 +1018,9 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 	}
 	m := a.tv.mods
 	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
+	if w.typing != nil && w.typeKey(a, code, ch) {
+		return true
+	}
 	if e := w.ex; e != nil {
 		done, ok := exKey(e, code, ch)
 		if !done {
@@ -1044,8 +1065,8 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		w.deleteSel(a)
 	case len(w.sel) > 0 && m.ctrl && (code == keyC || code == keyX || code == keyD):
 		w.selAct(a, map[uint16]string{keyC: "copy", keyX: "cut", keyD: "duplicate"}[code])
-	case value == 1 && !m.ctrl && (code == keyE || code == keyP || code == keyS):
-		w.setTool(a, map[uint16]string{keyE: "eraser", keyP: "pen", keyS: "select"}[code])
+	case value == 1 && !m.ctrl && (code == keyE || code == keyP || code == keyS || code == keyT):
+		w.setTool(a, map[uint16]string{keyE: "eraser", keyP: "pen", keyS: "select", keyT: "text"}[code])
 	default:
 		return false
 	}
@@ -1053,6 +1074,7 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 }
 
 func (w *noteWin) closing(a *bro) {
+	w.endTyping(a)
 	if w.ex != nil {
 		w.ex = nil
 		a.exAsk(false)
@@ -1165,6 +1187,10 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	}
 	if w.selecting {
 		return a.noteSelTouch(w, slot, p, g)
+	}
+	if w.texting { // a tap types there (noteLift); a finger swiped turns the page
+		g.Owner = ownLeaf
+		return true
 	}
 	if !ev.Pen && a.fingerTurns() {
 		g.Owner = ownLeaf
@@ -1293,7 +1319,9 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		if w, ok := a.windowAt(g.Start).(*noteWin); ok {
 			a.noteFocus(w)
 			dx, dy := g.Last.X-g.Start.X, g.Last.Y-g.Start.Y
-			if kobo.Abs(dx) > noteSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) {
+			if i := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return g.Start.In(r) }); w.texting && i >= 0 && kobo.Abs(dx) < noteSwipe && kobo.Abs(dy) < noteSwipe {
+				w.textAt(a, w.cur+i, w.toPage(g.Start, w.slots[i]))
+			} else if kobo.Abs(dx) > noteSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) {
 				by := 1 // leftward: the next, as pages turn
 				if dx > 0 {
 					by = -1

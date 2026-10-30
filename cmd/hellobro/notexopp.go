@@ -6,9 +6,10 @@ package main
 // first, as the pen pressed. Xournal++ (Linux, Mac, Windows) opens them,
 // to go on writing on a computer, add text, make a PDF.
 //
-// What we don't draw (text, a PDF under the page) is kept as it came and
+// What we don't draw (a PDF under the page) is kept as it came and
 // written back; only all the layers become one. Pictures (images) are
-// drawn, under the ink, and highlighters' strokes (notepen.go).
+// drawn, under the ink, highlighters' strokes (notepen.go) and texts,
+// over it (notetext.go).
 
 import (
 	"bufio"
@@ -40,7 +41,13 @@ type xoppStroke struct {
 type xoppLayer struct {
 	Images  []xoppImage  `xml:"image"` // first: under the ink (notepic.go)
 	Strokes []xoppStroke `xml:"stroke"`
+	Texts   []xoppTextEl `xml:"text"` // over it (notetext.go)
 	Rest    []xoppAny    `xml:",any"`
+}
+
+type xoppTextEl struct {
+	Attrs []xml.Attr `xml:",any,attr"`
+	Data  string     `xml:",chardata"`
 }
 
 type xoppPage struct {
@@ -129,6 +136,9 @@ func parseXopp(name string, r io.Reader) (*notebook, error) {
 					continue
 				}
 				strokes = append(strokes, s)
+			}
+			for _, xt := range l.Texts {
+				strokes = append(strokes, xoppToText(xt))
 			}
 			pg.extra = append(pg.extra, l.Rest...)
 		}
@@ -230,6 +240,10 @@ func (nb *notebook) xoppText() []byte {
 		for _, s := range strokes {
 			if s.pic != nil {
 				layer.Images = append(layer.Images, s.xoppImage())
+				continue
+			}
+			if s.txt != nil {
+				layer.Texts = append(layer.Texts, s.xoppText())
 				continue
 			}
 			layer.Strokes = append(layer.Strokes, s.xopp())

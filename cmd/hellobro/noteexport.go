@@ -68,6 +68,7 @@ func (w *noteWin) exportPage(n int) exportPage {
 
 // export writes the notebook as a PDF, and the page shown as a PNG.
 func (w *noteWin) export(a *bro) {
+	w.endTyping(a)
 	if w.exporting {
 		return
 	}
@@ -211,6 +212,8 @@ func renderNotePage(pg exportPage, paper string, doc *pdf.Doc, dpi float64) (*im
 		for _, s := range pg.strokes {
 			switch {
 			case strokeLayer(s) != l:
+			case s.txt != nil:
+				drawNoteText(c, s, image.Point{}, k, -1, m.Bounds())
 			case s.pic != nil:
 				r := image.Rect(int(float64(s.box.Min.X)*k), int(float64(s.box.Min.Y)*k), int(float64(s.box.Max.X)*k), int(float64(s.box.Max.Y)*k))
 				xdraw.ApproxBiLinear.Scale(m, r, s.pic.gray, s.pic.gray.Bounds(), xdraw.Src, nil)

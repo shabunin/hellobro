@@ -72,7 +72,8 @@ func TestNotebookXopp(t *testing.T) {
 	}
 }
 
-// What Xournal++ wrote, with what we don't draw: it comes back as it was.
+// What Xournal++ wrote, with what we don't draw: it comes back as it was
+// (its text, read and written again).
 func TestNotebookXoppKept(t *testing.T) {
 	in := `<?xml version="1.0" standalone="no"?>
 <xournal creator="Xournal++ 1.2.3" fileversion="4"><title>t</title><preview>AAAA</preview>
@@ -92,7 +93,7 @@ func TestNotebookXoppKept(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if nb.paper != "squares" || len(nb.pages) != 2 || len(nb.pages[0]) != 3 || len(nb.meta[0].extra) != 1 { // the text kept
+		if nb.paper != "squares" || len(nb.pages) != 2 || len(nb.pages[0]) != 4 || len(nb.meta[0].extra) != 0 { // the text read (notetext.go)
 			t.Fatalf("paper %q, %d pages, %d strokes, %d kept", nb.paper, len(nb.pages), len(nb.pages[0]), len(nb.meta[0].extra))
 		}
 		if p := nb.pages[0][0].pts[2]; p != (notePt{158, 189, 32}) {

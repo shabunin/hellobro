@@ -77,6 +77,8 @@ func noteIcon(id, paper string) []iconPart {
 	case "select":
 		return []iconPart{iconShut(0.5, 5, 6, 19, 6, 19, 18, 5, 18), {kind: 'd', pts: []float64{5, 6, 2}}, {kind: 'd', pts: []float64{19, 6, 2}},
 			{kind: 'd', pts: []float64{19, 18, 2}}, {kind: 'd', pts: []float64{5, 18, 2}}}
+	case "text": // a T
+		return []iconPart{iconLine(1, 5, 5, 19, 5), iconLine(1, 12, 5, 12, 20), iconLine(0.7, 9, 20, 15, 20)}
 	case "undo":
 		return iconUndo
 	case "redo":

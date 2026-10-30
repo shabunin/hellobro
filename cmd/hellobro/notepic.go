@@ -90,6 +90,7 @@ func copyPicture(m image.Image) error {
 // two), under what's on it, or on the next page if there's no room; or
 // at the select tool's mark. It comes in taken by the select tool.
 func (w *noteWin) paste(a *bro) {
+	w.endTyping(a)
 	if w.pasteInk(a) { // a notebook's, copied after (notesel.go)
 		return
 	}

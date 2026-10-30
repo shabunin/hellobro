@@ -50,6 +50,7 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 		{"pen", "", "the pen", tool("pen")},
 		{"eraser", "", "the eraser", tool("eraser")},
 		{"select", "", "the select tool", tool("select")},
+		{"text", "", "the text tool: tap the page, type (Esc: done)", tool("text")},
 		{"undo u", "", "undo", func(string) error { w.doUndo(a, true); return nil }},
 		{"redo", "", "redo", func(string) error { w.doUndo(a, false); return nil }},
 		{"paper", strings.ReplaceAll(notePapers, " ", "|"), "the paper", func(arg string) error {
@@ -97,6 +98,7 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 
 // exOpen opens the ":" line, text typed on it already.
 func (w *noteWin) exOpen(a *bro, text string) {
+	w.endTyping(a)
 	if !a.shows(w) {
 		return
 	}

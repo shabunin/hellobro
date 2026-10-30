@@ -75,7 +75,8 @@ type noteMark struct {
 // setTool takes the pen, the eraser or the select tool; what was taken
 // and the paste mark go with the select tool.
 func (w *noteWin) setTool(a *bro, id string) {
-	w.erasing, w.selecting = id == "eraser", id == "select"
+	w.endTyping(a)
+	w.erasing, w.selecting, w.texting = id == "eraser", id == "select", id == "text"
 	if !w.selecting && (len(w.sel) > 0 || w.mark != nil) {
 		w.sel, w.mark = nil, nil
 		w.show(a)
@@ -348,7 +349,7 @@ func (w *noteWin) angleTo(d *noteDrag, p image.Point) float64 {
 	angle := func(q image.Point) float64 { return math.Atan2(float64(q.Y-c.Y), float64(q.X-c.X)) }
 	th := angle(p) - angle(d.from)
 	q := math.Round(th/(math.Pi/2)) * math.Pi / 2
-	if slices.ContainsFunc(w.sel, func(s *noteStroke) bool { return s.pic != nil }) || math.Abs(th-q) < 6*math.Pi/180 {
+	if slices.ContainsFunc(w.sel, func(s *noteStroke) bool { return s.pic != nil || s.txt != nil }) || math.Abs(th-q) < 6*math.Pi/180 {
 		th = q
 	}
 	return th
@@ -483,7 +484,7 @@ func (w *noteWin) selectAt(page int, p image.Point) {
 	var hit *noteStroke
 	for _, ink := range []bool{true, false} { // the last written first
 		for _, s := range slices.Backward(w.strokes(page)) {
-			if hit == nil && (ink && s.hits(p) || !ink && s.pic != nil && p.In(s.box)) {
+			if hit == nil && (ink && s.hits(p) || !ink && (s.pic != nil || s.txt != nil) && p.In(s.box)) {
 				hit = s
 			}
 		}
@@ -599,6 +600,14 @@ func (s *noteStroke) moved(d image.Point) *noteStroke {
 // by quarters.
 func (s *noteStroke) transformed(f func(x, y float64) (float64, float64), k float64, quarters int) *noteStroke {
 	clamp := func(v float64) int16 { return int16(max(-1<<15, min(1<<15-1, math.Round(v)))) }
+	if s.txt != nil { // upright still: where its corner goes, its size k times
+		x0, y0 := f(float64(s.box.Min.X), float64(s.box.Min.Y))
+		x1, y1 := f(float64(s.box.Max.X), float64(s.box.Max.Y))
+		box := image.Rect(int(math.Round(x0)), int(math.Round(y0)), int(math.Round(x1)), int(math.Round(y1))).Canon()
+		m := textStroke(&noteText{s: s.txt.s, size: max(1, s.txt.size*k), attrs: s.txt.attrs}, box.Min)
+		m.gray = s.gray
+		return m
+	}
 	if s.pic != nil {
 		x0, y0 := f(float64(s.box.Min.X), float64(s.box.Min.Y))
 		x1, y1 := f(float64(s.box.Max.X), float64(s.box.Max.Y))
