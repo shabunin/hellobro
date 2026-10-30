@@ -238,7 +238,7 @@ func kittyKey(code uint16, value int32, m termMods, f int) (string, bool) {
 	var text string
 	if all && f&kittyText != 0 && ev != 3 && !held {
 		var cps []string
-		for _, r := range ch {
+		for _, r := range kobo.Retype(ch) {
 			cps = append(cps, strconv.Itoa(int(r)))
 		}
 		text = strings.Join(cps, ":")

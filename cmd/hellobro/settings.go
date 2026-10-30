@@ -55,6 +55,9 @@ var settingList = []setting{
 	{key: "vkbd", label: "On-screen keyboard%s", cmd: "keyboard",
 		values: []string{"fields", "none", "auto", "on"},
 		shown:  []string{"for a text field (a name, find, a note's text)", "off", "when no keyboard is connected (after 10 s)", "always"}},
+	{key: "languages", label: "Languages to type in%s", cmd: "language",
+		values: []string{"en", "en ru", "en uk", "en ru uk", "en de"},
+		shown:  []string{"English", "English, Russian", "English, Ukrainian", "English, Russian, Ukrainian", "English, German"}},
 	{key: "touch-marks", group: "Touch", label: "Touch marks",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "a ring where it touched, a dot where it lifted, for 3 s"}},
@@ -302,6 +305,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.applyMod()
 		case "touch-marks":
 			a.SetTouchMarks(a.setting(st.key) == "on")
+		case "languages":
+			a.typeIn(0)
 		case "vkbd":
 			a.vk.said = 0 // the setting's say now
 			a.vkApply()

@@ -370,7 +370,7 @@ func (a *bro) pickerKey(code uint16, value int32) {
 			a.filterPicker()
 		}
 	case printable && !m.ctrl && !m.alt:
-		p.query += ch
+		p.query += kobo.Retype(ch)
 		a.filterPicker()
 	default:
 		return

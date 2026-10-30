@@ -1136,7 +1136,8 @@ func (a *bro) grabbed(code uint16, value int32) bool {
 	return c == nil || c.id != "grab"
 }
 
-// showMode has the bar say the binding mode, or grab.
+// showMode has the bar say the binding mode, or grab, or the language
+// typed in.
 func (a *bro) showMode() {
 	switch {
 	case a.grabbing() && a.term().typing():
@@ -1147,6 +1148,8 @@ func (a *bro) showMode() {
 		a.SetStatus("keys here: " + a.keyLabel("grab") + " gives them to " + a.term().target.name)
 	case a.wm.mode != "":
 		a.SetStatus("mode: " + a.wm.mode)
+	case a.vk.lang > 0: // not the first language
+		a.SetStatus("typing in " + langNames[kobo.Typing()] + " · " + a.keyLabel("language") + ": the next")
 	default:
 		a.SetStatus("")
 	}

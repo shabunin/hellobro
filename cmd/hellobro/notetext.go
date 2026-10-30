@@ -254,6 +254,7 @@ func (w *noteWin) typeKey(a *bro, code uint16, ch string) bool {
 		if ch == "" {
 			return true // a key that types nothing: not the page's while typing
 		}
+		ch = kobo.Retype(ch)
 	}
 	if ch != "" {
 		t.s = t.s[:k.pos] + ch + t.s[k.pos:]

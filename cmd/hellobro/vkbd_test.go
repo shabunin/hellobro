@@ -13,7 +13,7 @@ import (
 func TestVkLayout(t *testing.T) {
 	for _, page := range []image.Rectangle{image.Rect(0, 46, 1404, 1872), image.Rect(0, 46, 1872, 1404)} {
 		keys, rest := vkLayout(page)
-		if len(keys) != 54+6+7 {
+		if len(keys) != 55+6+7 {
 			t.Errorf("%v: %d keys", page, len(keys))
 		}
 		right := 0

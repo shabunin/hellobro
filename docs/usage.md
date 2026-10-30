@@ -172,6 +172,20 @@ the same, showing it or hiding it. Either holds till a text field
 wants it (it shows again) or a keyboard connects. While it shows, a
 keyboard gone doesn't bring up the Bluetooth window.
 
+#### Languages
+
+Settings, **Languages to type in**: English, or English with Russian,
+Ukrainian, both, or German. Ctrl+Alt+Space (keys.conf: `language`), or
+the on-screen keyboard's key left of the space bar (it says `EN`, `RU`…),
+types in the next one, round; a keyboard's keys and the on-screen ones
+alike, with the on-screen letters showing it. The layouts are the usual
+ones (ЙЦУКЕН, Ukrainian's with ґ on the `\` key, QWERTZ) at a US
+keyboard's places, with no dead keys. Only what's typed changes: text in
+a terminal, a name, the find line, a ":" line, a notebook's text, a
+password. The keys' commands stay where they are (Ctrl+C, Meta+D, a
+book's letters), and so do keys.conf's names. Not in English, the bar
+says which; hellobro starts in the first.
+
 A question over the page (a saved host's menu, read-only or
 read-write, restart into a new build) has its answers as buttons: the
 arrows or Tab move between them, Enter picks the one in black, a

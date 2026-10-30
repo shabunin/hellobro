@@ -106,6 +106,7 @@ func main() {
 	a.set = loadSettings()
 	a.applySizes() // before anything is laid out
 	a.vk.on = a.setting("vkbd") == "on"
+	kobo.SetTyping(a.langs()[0])
 	a.mem = loadRemembered(kobo.AppFile(""))
 	a.tv.hosts = a.mem.hosts()
 	radio.StateDir = kobo.AppFile("")

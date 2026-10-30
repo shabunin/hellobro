@@ -279,7 +279,7 @@ func nameKey(text *string, code uint16, ch string) (done, ok bool) {
 			*text = string(r[:len(r)-1])
 		}
 	case ch != "" && ch != "\t" && ch != "\n":
-		*text += ch
+		*text += kobo.Retype(ch)
 	}
 	return false, false
 }

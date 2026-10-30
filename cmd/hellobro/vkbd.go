@@ -15,11 +15,14 @@ package main
 // shows it a while after the last keyboard went and hides it as one
 // comes; or on. Two fingers swiped up from the screen's foot show it
 // whatever the setting, and down onto it hide it, as the menu's
-// Keyboard does: till a field comes, or a keyboard.
+// Keyboard does: till a field comes, or a keyboard. Its key left of the
+// space bar types in the next of the languages set (Settings, Languages
+// to type in), as Ctrl+Alt+Space does, the letters showing it.
 
 import (
 	"image"
 	"log"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -35,6 +38,7 @@ const (
 	vkAutoWait = 10 * time.Second // a keyboard's naps and blips are shorter
 	vkSlop     = 30               // px a finger on a key at an edge may wander before it's a swipe
 	vkFoot     = 100              // px up from the screen's foot where two fingers swiped up show it
+	vkLang     = 0xfff0           // the language's key: no key's code
 )
 
 type vkey struct {
@@ -61,6 +65,7 @@ type vkbdState struct {
 	since   time.Time       // the keyboard went (or we started): auto waits from it
 	ask     bool            // a name's being typed (notelist.go): it shows if there's no keyboard
 	said    int             // shown (1) or hidden (-1) by a swipe or the menu, whatever the setting
+	lang    int             // the language typed in, of the setting's
 }
 
 // vkItem is a key in a row, w units wide; code 0 is a gap.
@@ -92,7 +97,7 @@ var vkRows = [][]vkItem{
 	vkRow([]vkItem{{1.5, 0, ""}}, vkChars(16, 12), []vkItem{{1.5, 43, ""}}),
 	vkRow([]vkItem{{1.75, 0, ""}}, vkChars(30, 11), []vkItem{{2.25, kobo.KeyEnter, "Enter"}}),
 	vkRow([]vkItem{{2.25, 0, ""}}, vkChars(44, 10), []vkItem{{0.75, 0, ""}, {1, keyUp, "↑"}, {1, 0, ""}}),
-	{{2.5, 0, ""}, {9, kobo.KeySpace, " "}, {0.5, 0, ""}, {1, keyLeft, "←"}, {1, keyDown, "↓"}, {1, keyRight, "→"}},
+	{{0.25, 0, ""}, {2, vkLang, ""}, {0.25, 0, ""}, {9, kobo.KeySpace, " "}, {0.5, 0, ""}, {1, keyLeft, "←"}, {1, keyDown, "↓"}, {1, keyRight, "→"}},
 }
 
 // The strips, top to bottom; they stand on the rows.
@@ -189,8 +194,11 @@ func (a *bro) drawVkey(k vkey) {
 		c.Frame(r, 2, kobo.Black)
 	}
 	f, label := a.F.Panel, k.label
-	if label == "" {
+	if k.code == vkLang {
+		label = strings.ToUpper(kobo.Typing())
+	} else if label == "" {
 		label, _ = kobo.KeyChar(k.code, a.vk.latched[kobo.KeyLeftShift], a.tv.mods.caps)
+		label = kobo.Retype(label)
 	} else if utf8.RuneCountInString(label) > 1 { // a word; an arrow's big
 		f = a.F.Small
 	}
@@ -231,6 +239,11 @@ func (a *bro) vkTouch(p image.Point, g *kobo.Gesture) bool {
 func (a *bro) vkPress(g *kobo.Gesture) {
 	v := &a.vk
 	h := v.held[g]
+	if h.k.code == vkLang {
+		delete(v.held, g)
+		a.typeIn(v.lang + 1)
+		return
+	}
 	if kobo.IsModifier(h.k.code) {
 		delete(v.held, g)
 		on := !v.latched[h.k.code]
@@ -387,6 +400,27 @@ func (a *bro) vkToggle() {
 	a.vk.said = map[bool]int{false: 1, true: -1}[a.vk.on]
 	a.vkApply()
 }
+
+// typeIn types in the i'th of the languages set, round; the letters on
+// the screen show it.
+func (a *bro) typeIn(i int) {
+	langs := a.langs()
+	a.vk.lang = i % len(langs)
+	kobo.SetTyping(langs[a.vk.lang])
+	log.Printf("typing in %s", kobo.Typing())
+	a.showMode()
+	if len(langs) == 1 && i > 0 {
+		a.Toast("one language: Settings, Languages to type in", 3*time.Second)
+	} else if i > 0 {
+		a.Toast("typing in "+langNames[kobo.Typing()], 2*time.Second)
+	}
+	a.drawVkbd(func(k vkey) bool { return k.label == "" || k.code == vkLang })
+}
+
+// langs are the languages to type in, set in Settings.
+func (a *bro) langs() []string { return strings.Fields(a.setting("languages")) }
+
+var langNames = map[string]string{"en": "English", "ru": "Russian", "uk": "Ukrainian", "de": "German"}
 
 // vkAsk shows it for a text field being typed in, if there's no other
 // keyboard (and even if it was hidden), or lets it go.

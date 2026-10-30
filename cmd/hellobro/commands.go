@@ -135,6 +135,8 @@ func makeCommands() []*command {
 		&command{id: "music.quieter", title: "Quieter (the player's volume)", repeat: true,
 			run: func(a *bro) { a.mediaKey(kobo.KeyVolumeDown) }},
 		&command{id: "keyboard", title: "On-screen keyboard: show / hide", run: (*bro).vkToggle},
+		&command{id: "language", title: "Keyboard: type in the next language (Settings, Languages)", keys: []string{"ctrl+alt+space"},
+			run: func(a *bro) { a.typeIn(a.vk.lang + 1) }},
 		&command{id: "books", title: "Books: the shelf, to read one", run: (*bro).openShelf},
 		&command{id: "notebooks", title: "Notebooks: all of them, to open, rename, put in folders", run: (*bro).openNotes},
 		&command{id: "statusbar", title: "Status bar: show / hide", keys: []string{"ctrl+shift+b"}, run: (*bro).toggleStat},
