@@ -1,7 +1,7 @@
 # Exporting a notebook (noteexport.go): a new notebook, fullscreen, a
 # circle and a wave; Right, a line on the next page; Ctrl+E: OUT's
 # Notebooks/NAME.pdf (NAME (notebook).pdf beside someone else's),
-# Clips/NAME pN.png and Clips/latest.png.
+# Clips/NAME pN DATE TIME.png and Clips/latest.png; a note on the page.
 # HELLOBRO_BOOKS: a directory, where Clips/ goes.
 # app: hellobro
 import os, sys

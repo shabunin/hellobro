@@ -872,9 +872,10 @@ its gray.
   there (Xournal++'s lecture beside its notes), it's left be, and the
   export is `NAME (notebook).pdf`. All the pages to the last written
   on (of one on a PDF, only the pages written on). The page shown goes
-  to `Clips/NAME pN.png` and `Clips/latest.png` too, as a PDF's cut
-  does, for a program in Alpine to take. It's done aside; a note says
-  when it's written.
+  to `Clips/NAME pN DATE TIME.png` (each export its own, as
+  `2026-10-30 14.05.07`) and `Clips/latest.png` too, as a PDF's cut
+  does, for a program in Alpine to take. It's done aside; a note on the
+  page says when it's written, and the PNG's name.
 - `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
   on a computer to go on writing, add text, or export a PDF. Its texts
   show and are edited here too (the text tool). What hellobro doesn't

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
+	"time"
 
 	"hellobro/kobo"
 	"hellobro/wm"
@@ -144,5 +145,14 @@ func TestNoteMove(t *testing.T) {
 	}
 	if w.back != "Work/plan" {
 		t.Errorf("back to %q", w.back)
+	}
+}
+
+// An exported page's PNG is named for its notebook (in a folder too),
+// the page and when: each export its own, no colons for the card.
+func TestExportPNGName(t *testing.T) {
+	at := time.Date(2026, 10, 30, 14, 5, 7, 0, time.Local)
+	if got, want := exportPNGName("Work/plan", 2, at), "plan p3 2026-10-30 14.05.07.png"; got != want {
+		t.Errorf("%q, want %q", got, want)
 	}
 }

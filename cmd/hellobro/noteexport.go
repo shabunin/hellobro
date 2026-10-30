@@ -3,10 +3,11 @@ package main
 // Exporting a notebook: "export" (or Ctrl+E) writes it as a PDF, NAME.pdf
 // by its .xopp in Notebooks/, a picture of each page (200 dpi, gray: for
 // a computer, a printer, or an LLM to read); of pages on a PDF (from
-// Xournal++), the pages written on. And the page shown as a PNG in Clips/, as NAME pN.png
-// and latest.png, as a PDF's cut is (bookcut.go): for a program in Alpine
-// to take. It's drawn away from the screen's loop, from what the pages
-// were when it was asked; a note says when it's written.
+// Xournal++), the pages written on. And the page shown as a PNG in Clips/,
+// as "NAME pN DATE TIME.png" (each export its own) and latest.png, as a
+// PDF's cut is (bookcut.go): for a program in Alpine to take. It's drawn
+// away from the screen's loop, from what the pages were when it was
+// asked; a note on the page says when it's written, and where.
 
 import (
 	"bytes"
@@ -19,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	xdraw "golang.org/x/image/draw"
 
@@ -84,28 +86,32 @@ func (w *noteWin) export(a *bro) {
 		count = "a page"
 	}
 	a.Notify("exporting " + count + "…")
+	at := time.Now()
 	go func() {
-		msg, err := exportNotebook(name, paper, pdfPath, pages, shown)
+		msg, pngName, err := exportNotebook(name, paper, pdfPath, pages, shown, at)
 		a.Do(func() {
 			w.exporting = false
 			if err != nil {
 				log.Printf("notebook %s: export: %v", name, err)
 				a.Notify("not exported: " + err.Error())
+				a.Toast("not exported: "+err.Error(), 8*time.Second)
 				return
 			}
 			log.Printf("notebook %s: exported, %s", name, count)
 			a.Notify(msg)
+			a.Toast("exported: Clips/"+pngName, 6*time.Second)
 		})
 	}()
 }
 
-// exportNotebook draws pages and writes them; it says where.
-func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown exportPage) (string, error) {
+// exportNotebook draws pages and writes them, the page shown as a PNG
+// named for when it was asked (at); it says where, and the PNG's name.
+func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown exportPage, at time.Time) (string, string, error) {
 	var doc *pdf.Doc
 	if pdfPath != "" {
 		var err error
 		if doc, err = pdf.Open(pdfPath); err != nil {
-			return "", err
+			return "", "", err
 		}
 		defer doc.Close()
 	}
@@ -114,7 +120,7 @@ func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown expor
 	for _, pg := range pages {
 		m, err := renderNotePage(pg, paper, doc, noteExportDPI)
 		if err != nil {
-			return "", fmt.Errorf("page %d: %w", pg.n+1, err)
+			return "", "", fmt.Errorf("page %d: %w", pg.n+1, err)
 		}
 		imgs = append(imgs, pdfImagePage{img: m, w: pg.pt[0], h: pg.pt[1]})
 		if pg.n == shown.n {
@@ -124,27 +130,33 @@ func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown expor
 	if shownImg == nil {
 		var err error
 		if shownImg, err = renderNotePage(shown, paper, doc, noteExportDPI); err != nil {
-			return "", err
+			return "", "", err
 		}
 	}
 	out := exportPath(name)
 	if err := writeAtomic(out, imagesPDF(imgs)); err != nil {
-		return "", err
+		return "", "", err
 	}
 	var b bytes.Buffer
 	png.Encode(&b, shownImg) // into memory: it can't fail
 	clips := filepath.Join(booksRoot(), "Clips")
 	if err := os.MkdirAll(clips, 0o755); err != nil {
-		return "", err
+		return "", "", err
 	}
-	pngName := fmt.Sprintf("%s p%d.png", filepath.Base(name), shown.n+1) // a notebook in a folder: its own name
+	pngName := exportPNGName(name, shown.n, at)
 	for _, f := range []string{pngName, "latest.png"} {
 		if err := writeAtomic(filepath.Join(clips, f), b.Bytes()); err != nil {
-			return "", err
+			return "", "", err
 		}
 	}
 	rel, _ := filepath.Rel(notesDir(), out)
-	return fmt.Sprintf("exported: Notebooks/%s; page %d as Clips/latest.png", filepath.ToSlash(rel), shown.n+1), nil
+	return fmt.Sprintf("exported: Notebooks/%s; page %d as Clips/%s", filepath.ToSlash(rel), shown.n+1, pngName), pngName, nil
+}
+
+// exportPNGName is the page n's PNG, exported at: the notebook's own name
+// (in a folder too), the page and when, as the card takes it (no colons).
+func exportPNGName(name string, n int, at time.Time) string {
+	return fmt.Sprintf("%s p%d %s.png", filepath.Base(name), n+1, at.Format("2006-01-02 15.04.05"))
 }
 
 // exportMark is in the PDFs exports write: what's written over, or
