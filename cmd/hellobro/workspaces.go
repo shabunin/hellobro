@@ -6,12 +6,12 @@ package main
 // left). A tap goes there; Esc or a tap outside closes. A tap on the
 // bar's empty part, the menu's Workspaces or Meta+O puts it up.
 //
-// What's in the windows shows too. A terminal's cells are there whether
-// it shows or not, so it's drawn from them, as it is now, and again
-// while the tiles are up as its output comes. The others don't change
-// while they're out of sight (a book, a notebook): they're kept as they
-// were last on screen, a third of their size, from when their workspace
-// was left. One that never showed since hellobro started is a box.
+// What's in the windows shows too, as it is now, and again every few
+// seconds while the tiles are up. A terminal's cells are there whether
+// it shows or not, so it's drawn from them (placed, it would be resized,
+// and what runs in it). The others are placed where they'd be on their
+// workspace, drawn on a canvas of their own and put back: a book has
+// its pages laid out for that size already.
 
 import (
 	"fmt"
@@ -28,14 +28,12 @@ const wsHeadH = 44 // a workspace tile's header: its name, how many windows
 // openWorkspaces puts the workspaces up, the one shown lit.
 func (a *bro) openWorkspaces() {
 	t := a.wm.tree
-	if !a.overlay() {
-		a.keepThumbs()
-	}
 	for w := range a.wm.thumbs {
 		if a.nodeOf(w) == nil { // closed
 			delete(a.wm.thumbs, w)
 		}
 	}
+	a.drawThumbs()
 	var es []pickEntry
 	sel := 0
 	for _, ws := range t.Workspaces() {
@@ -59,7 +57,21 @@ func (a *bro) openWorkspaces() {
 	}
 	es = append(es, pickEntry{kind: "workspace", title: "New workspace", detail: "+",
 		paint: func(r image.Rectangle) { a.drawNewTile(r) }, do: a.newWorkspace})
-	p := &picker{title: "Workspaces", hint: "tap one to go there, or + for a new one", all: es, tiles: 1, wide: true}
+	p := &picker{title: "Workspaces", hint: "tap one · 1–9 · arrows, Enter · n: a new one · Esc closes",
+		all: es, tiles: 1, wide: true, keysOnly: true, refresh: a.drawThumbs}
+	p.key = func(ch string) {
+		switch {
+		case ch >= "0" && ch <= "9": // as Meta+1…0
+			if ch == "0" {
+				ch = "10"
+			}
+			a.closePicker()
+			a.wmRun("workspace number " + ch)
+		case ch == "n" || ch == "+" || ch == "=":
+			a.closePicker()
+			a.newWorkspace()
+		}
+	}
 	a.showPicker(p)
 	p.sel = sel
 	a.drawPicker()
@@ -194,30 +206,57 @@ type wsThumb struct {
 // thumbScale is how much smaller a window's kept: about a tile's share.
 const thumbScale = 3
 
-// keepThumbs keeps the windows on screen as they're drawn, small. A
-// terminal's are drawn from its cells instead (termThumb).
-func (a *bro) keepThumbs() {
+// drawThumbs draws every window but the terminals (termThumb) small:
+// each placed where it would be on its workspace and drawn on a canvas
+// that isn't the screen's, then put back, the shown ones where they
+// were, the others nowhere. Nothing reaches the panel meanwhile (Mark).
+func (a *bro) drawThumbs() {
 	if a.C.Gray == nil {
 		return
 	}
 	if a.wm.thumbs == nil {
 		a.wm.thumbs = map[window]*wsThumb{}
 	}
-	for _, n := range a.wm.tree.Shown() {
-		w := a.wm.wins[n]
-		if w == nil {
-			continue
+	t := a.wm.tree
+	off := kobo.Blank(a.C.Rect.Size())
+	screen := a.C.Gray
+	a.C.Gray, a.wm.offscreen = off, true
+	defer func() {
+		a.C.Gray, a.wm.offscreen = screen, false
+		t.Render() // the workspace shown's places, as they were
+	}()
+	cur := t.Current()
+	for _, ws := range t.Workspaces() {
+		fs := t.LayOut(ws)
+		for _, n := range t.Find(func(o *wm.Node) bool { return o.Leaf() && o.Visible && wm.WorkspaceOf(o) == ws }) {
+			w := a.wm.wins[n]
+			if w == nil {
+				continue
+			}
+			if tm, ok := w.(*termSession); ok && tm.connected() {
+				continue
+			}
+			p := a.panelFor(n, w, fs)
+			g, gui := w.(*guiWin)
+			if gui && ws != cur {
+				g.shown = true // not coming up for real: no scan, no sample
+			}
+			a.C.Fill(p.Outer, kobo.White) // not what the one before left
+			w.place(a, p)
+			w.draw(a)
+			if ws != cur {
+				w.place(a, kobo.Panel{})
+			}
+			r := p.Body.Intersect(off.Rect)
+			if r.Dx() < thumbScale || r.Dy() < thumbScale {
+				continue
+			}
+			img := image.NewGray(image.Rect(0, 0, r.Dx()/thumbScale, r.Dy()/thumbScale))
+			scaleGray(img, img.Rect, off.SubImage(r).(*image.Gray))
+			h := fnv.New64a()
+			h.Write(img.Pix)
+			a.wm.thumbs[w] = &wsThumb{img: img, sum: h.Sum64()}
 		}
-		if t, ok := w.(*termSession); ok && t.connected() {
-			continue
-		}
-		r := w.panel(a).Body.Intersect(a.C.Rect)
-		if r.Dx() < thumbScale || r.Dy() < thumbScale {
-			continue
-		}
-		img := image.NewGray(image.Rect(0, 0, r.Dx()/thumbScale, r.Dy()/thumbScale))
-		scaleGray(img, img.Rect, a.C.SubImage(r).(*image.Gray))
-		a.wm.thumbs[w] = &wsThumb{img: img}
 	}
 }
 
@@ -233,13 +272,16 @@ func (a *bro) thumbOf(w window) *image.Gray {
 	return nil
 }
 
-// wsSum is what ws's terminals show, summed: another sum, another tile.
+// wsSum is what ws's windows show, summed: another sum, another tile.
 func (a *bro) wsSum(ws *wm.Node) uint64 {
 	h := fnv.New64a()
 	for _, n := range a.wm.tree.Find(func(o *wm.Node) bool { return o.Leaf() && wm.WorkspaceOf(o) == ws }) {
-		if t, ok := a.wm.wins[n].(*termSession); ok && t.connected() {
+		w := a.wm.wins[n]
+		if t, ok := w.(*termSession); ok && t.connected() {
 			_, sum := a.termCells(t, false)
 			fmt.Fprint(h, sum, ";")
+		} else if th := a.wm.thumbs[w]; th != nil {
+			fmt.Fprint(h, th.sum, ";")
 		}
 	}
 	return h.Sum64()

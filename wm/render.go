@@ -29,11 +29,17 @@ func (t *Tree) Render() {
 		w.Rect = image.Rectangle{}
 	}
 	reset(t.scratch)
-	ws := t.Current()
+	t.LayOut(t.Current())
+}
+
+// LayOut places ws's windows as they'd be with ws shown, and says which
+// is fullscreen there (nil: none). For a workspace not shown that lasts
+// till the next Render.
+func (t *Tree) LayOut(ws *Node) (fullscreen *Node) {
 	ws.Rect, ws.Visible = t.content.Rect, true
 	if fs := t.fullscreenOn(ws); fs != nil {
 		t.place(fs, ws.Rect, false)
-		return
+		return fs
 	}
 	t.layout(ws, ws.Rect)
 	for _, f := range ws.Floating {
@@ -42,6 +48,7 @@ func (t *Tree) Render() {
 			t.place(c, f.Rect, true)
 		}
 	}
+	return nil
 }
 
 // place puts n in r, with a title bar if it's a window and bar says so.

@@ -43,10 +43,21 @@ type picker struct {
 	sel, top    int
 	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
 	rows        []image.Rectangle
-	tiles       int       // a menu of tiles, this many across (0: rows)
-	tileH       int       // their height (0: pickTileH's)
-	wide        bool      // the screen's width, tiles as it is: the workspaces'
-	lookedAt    time.Time // the tiles last asked whether they changed
+	tiles       int             // a menu of tiles, this many across (0: rows)
+	tileH       int             // their height (0: pickTileH's)
+	wide        bool            // the whole screen, tiles as it is: the workspaces'
+	keysOnly    bool            // no line to type in: a key typed is key's
+	key         func(ch string) // what a key typed does, keysOnly
+	refresh     func()          // before the tiles are asked whether they changed
+	lookedAt    time.Time       // the tiles last asked whether they changed
+}
+
+// chrome is the height of p's title, line and margins: what isn't rows.
+func (p *picker) chrome() int {
+	if p.keysOnly {
+		return 86
+	}
+	return 152
 }
 
 // tileHeight is a tile's height in p.
@@ -132,20 +143,16 @@ func (a *bro) showPicker(p *picker) {
 	}
 	h := 136 + min(max(1, n), pickRowsMax)*pickRowH + 16
 	top := b.Min.Y + max(40, b.Dy()/8)
-	if p.wide { // tiles the screen's shape, a header over each
-		w, top = b.Dx()-48, max(b.Min.Y, a.lay.Page.Min.Y)+16 // under the bar
-		p.tiles = 3
-		if b.Dx() > b.Dy() {
-			p.tiles = 4
-		}
-		tw := (w - 40 - (p.tiles-1)*12) / p.tiles
-		ar := a.wm.area
-		p.tileH = wsHeadH + tw*ar.Dy()/max(1, ar.Dx())
+	if p.wide { // the whole screen: as many across as makes them biggest
+		p.box = b
+		p.tiles, p.tileH = wideTiles(n, b.Dx()-40, b.Dy()-p.chrome()-16, a.wm.area)
+		a.picker = p
+		a.filterPicker()
+		a.drawPicker()
+		return
 	}
 	if p.tiles > 0 {
-		if !p.wide {
-			p.tiles = max(2, min(3, w/340))
-		}
+		p.tiles = max(2, min(3, w/340))
 		h = 136 + (n+p.tiles-1)/p.tiles*(p.tileHeight()+12) + 16
 	}
 	h = min(h, b.Max.Y-40-top)
@@ -153,6 +160,24 @@ func (a *bro) showPicker(p *picker) {
 	a.picker = p
 	a.filterPicker()
 	a.drawPicker()
+}
+
+// wideTiles is how many tiles across, and how high, n of them fit
+// biggest in w×h: each the shape of area, a header over it.
+func wideTiles(n, w, h int, area image.Rectangle) (cols, tileH int) {
+	best := 0
+	for c := 1; c <= 6; c++ {
+		tw := (w - (c-1)*12) / c
+		th := wsHeadH + tw*area.Dy()/max(1, area.Dx())
+		if rows := (n + c - 1) / c; rows*(th+12) <= h && tw > best {
+			best, cols, tileH = tw, c, th
+		}
+	}
+	if cols == 0 { // too many: the smallest, scrolled
+		cols = 6
+		tileH = wsHeadH + (w-60)/6*area.Dy()/max(1, area.Dx())
+	}
+	return cols, tileH
 }
 
 // closePicker takes the menu down; the page comes back.
@@ -282,9 +307,9 @@ func fuzzy(q, text string) int {
 
 func (a *bro) drawPicker() {
 	p, c := a.picker, a.C
-	rows := (p.box.Dy() - 152) / pickRowH
+	rows := (p.box.Dy() - p.chrome()) / pickRowH
 	if p.tiles > 0 {
-		rows = (p.box.Dy() - 152) / (p.tileHeight() + 12) * p.tiles
+		rows = (p.box.Dy() - p.chrome()) / (p.tileHeight() + 12) * p.tiles
 	}
 	step := max(1, p.tiles) // tiles scroll by rows of them
 	rows = max(step, rows-rows%step)
@@ -299,20 +324,26 @@ func (a *bro) drawPicker() {
 	head := image.Rect(p.box.Min.X+24, p.box.Min.Y+10, p.box.Max.X-24, p.box.Min.Y+60)
 	c.Text(a.F.Panel, head, p.title, kobo.Black, kobo.AlignLeft)
 	keys := "type to narrow · ↑ ↓ Enter · Esc closes"
-	if p.tiles > 0 {
+	switch {
+	case p.keysOnly:
+		keys = p.hint
+	case p.tiles > 0:
 		keys = "tap one, or the arrows and Enter · Esc closes"
 	}
 	c.Text(a.F.Small, head, keys, kobo.Dark, kobo.AlignRight)
-	in := image.Rect(p.box.Min.X+20, head.Max.Y+6, p.box.Max.X-20, head.Max.Y+64)
-	c.Frame(in, 2, kobo.Black)
-	q := "› " + p.query
-	tr := in.Inset(4)
-	tr.Min.X += 12
-	c.Text(a.F.Body, tr, q, kobo.Black, kobo.AlignLeft)
-	cx := tr.Min.X + kobo.TextWidth(a.F.Body, q) + 3
-	c.Fill(image.Rect(cx, in.Min.Y+12, cx+3, in.Max.Y-12), kobo.Black) // the cursor
-	if p.query == "" {
-		c.Text(a.F.Small, tr, p.hint, kobo.Mid, kobo.AlignRight)
+	in := image.Rect(p.box.Min.X+20, head.Max.Y-4, p.box.Max.X-20, head.Max.Y-4)
+	if !p.keysOnly {
+		in = image.Rect(p.box.Min.X+20, head.Max.Y+6, p.box.Max.X-20, head.Max.Y+64)
+		c.Frame(in, 2, kobo.Black)
+		q := "› " + p.query
+		tr := in.Inset(4)
+		tr.Min.X += 12
+		c.Text(a.F.Body, tr, q, kobo.Black, kobo.AlignLeft)
+		cx := tr.Min.X + kobo.TextWidth(a.F.Body, q) + 3
+		c.Fill(image.Rect(cx, in.Min.Y+12, cx+3, in.Max.Y-12), kobo.Black) // the cursor
+		if p.query == "" {
+			c.Text(a.F.Small, tr, p.hint, kobo.Mid, kobo.AlignRight)
+		}
 	}
 
 	p.rows = p.rows[:0]
@@ -391,6 +422,13 @@ func (a *bro) pickerKey(code uint16, value int32) {
 	case code == kobo.KeyEnter:
 		a.pick(p.sel)
 		return
+	case p.keysOnly && printable && code != kobo.KeyTab && !m.ctrl && !m.alt:
+		if p.key != nil {
+			p.key(ch)
+		}
+		return
+	case p.keysOnly && code == kobo.KeyBackspace:
+		return
 	case p.query == "" && p.extra == nil && ch >= "1" && ch <= "9" && !m.ctrl: // a name typed can start with one
 		a.pick(int(ch[0] - '1'))
 		return
@@ -440,10 +478,13 @@ func (a *bro) pickerTap(pt image.Point) {
 // apart at most: the workspaces' terminals as their output comes.
 func (a *bro) pickerTick() {
 	p := a.picker
-	if p == nil || p.tiles == 0 || time.Since(p.lookedAt) < 2*time.Second || a.Blitting() {
+	if p == nil || p.tiles == 0 || time.Since(p.lookedAt) < 3*time.Second || a.Blitting() {
 		return
 	}
 	p.lookedAt = time.Now()
+	if p.refresh != nil {
+		p.refresh()
+	}
 	for i, r := range p.rows {
 		n := p.top + i
 		if n >= len(p.shown) {

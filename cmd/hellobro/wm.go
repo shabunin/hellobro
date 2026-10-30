@@ -71,6 +71,7 @@ type wmState struct {
 	oriented  bool                // the workspaces laid along the screen once
 	tall      bool                // and it was portrait
 	thumbs    map[window]*wsThumb // the windows small, for the workspaces' tiles
+	offscreen bool                // the windows are drawing on a canvas not the screen's: nothing to update
 }
 
 type wmTab struct {
@@ -381,11 +382,7 @@ func (a *bro) wmRunWith(line string, h wm.Host) []wm.Result {
 	if wmMove(line) {
 		a.wmMoved()
 	}
-	was := a.wm.tree.Current()
 	rs := a.wm.tree.Run(line, h)
-	if a.wm.tree.Current() != was && !a.overlay() {
-		a.keepThumbs() // the canvas is still the workspace left
-	}
 	for _, r := range rs {
 		if !r.Success {
 			log.Printf("wm: %q: %s", line, r.Error)
@@ -660,19 +657,7 @@ func (a *bro) wmPlace() bool {
 		fmt.Fprint(&sig, n.ID, n.Rect, n.Layout, floatingNode(n), ";")
 		if w := a.wm.wins[n]; w != nil && !a.sketching() { // sketching: they stay as they were till it's done
 			placed[w] = true
-			r := n.Rect.Inset(wmGap / 2)
-			switch {
-			case n == fs:
-				w.place(a, kobo.Panel{Name: w.Title(), Outer: n.Rect, Body: n.Rect})
-			case n.Parent != nil && (n.Parent.Layout == wm.Tabbed || n.Parent.Layout == wm.Stacked) && n.Parent.Type != wm.FloatingCon:
-				w.place(a, kobo.NewPanel(a.F, w.Title(), a.tabBody(n.Parent, n.Rect), ""))
-			case n.Border == wm.BorderNone:
-				w.place(a, kobo.Panel{Name: w.Title(), Outer: r, Body: r})
-			default:
-				p := kobo.NewPanel(a.F, w.Title(), r, "")
-				p.Floating = floatingNode(n)
-				w.place(a, p)
-			}
+			w.place(a, a.panelFor(n, w, fs))
 		}
 		if n.Layout == wm.Tabbed || n.Layout == wm.Stacked {
 			a.placeTabs(n)
@@ -699,6 +684,23 @@ func (a *bro) wmPlace() bool {
 		return true
 	}
 	return false
+}
+
+// panelFor is where w, n's window, goes as n is laid out; fs, the
+// window fullscreen on its workspace, if one is.
+func (a *bro) panelFor(n *wm.Node, w window, fs *wm.Node) kobo.Panel {
+	r := n.Rect.Inset(wmGap / 2)
+	switch {
+	case n == fs:
+		return kobo.Panel{Name: w.Title(), Outer: n.Rect, Body: n.Rect}
+	case n.Parent != nil && (n.Parent.Layout == wm.Tabbed || n.Parent.Layout == wm.Stacked) && n.Parent.Type != wm.FloatingCon:
+		return kobo.NewPanel(a.F, w.Title(), a.tabBody(n.Parent, n.Rect), "")
+	case n.Border == wm.BorderNone:
+		return kobo.Panel{Name: w.Title(), Outer: r, Body: r}
+	}
+	p := kobo.NewPanel(a.F, w.Title(), r, "")
+	p.Floating = floatingNode(n)
+	return p
 }
 
 // tabBody is where a tabbed or stacked container's child c (at r, under
@@ -862,11 +864,17 @@ func (a *bro) drawFloats(r image.Rectangle) {
 // Mark is the App's, but what a tiled window draws under a floating one
 // has the floating one drawn again over it, before it reaches the panel.
 func (a *bro) Mark(r image.Rectangle, ui bool) {
+	if a.wm.offscreen {
+		return
+	}
 	a.App.Mark(r, ui)
 	a.overFloats(r)
 }
 
 func (a *bro) MarkFlash(r image.Rectangle) {
+	if a.wm.offscreen {
+		return
+	}
 	a.App.MarkFlash(r)
 	a.overFloats(r)
 }

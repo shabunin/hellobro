@@ -31,8 +31,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   i3's IPC, so `i3-msg`, `swaymsg` and i3ipc scripts work, and
   `hellobro-msg notify TEXT` puts up a note. One slim bar at the top
   lists each workspace's windows; a tap on it shows them all as tiles,
-  what's in their windows drawn small (terminals live), with a + for a
-  new one, so fingers alone make and find them. The windows
+  over the whole screen, what's in their windows drawn small and live,
+  with a + for a new one, so fingers alone make and find them. The windows
   come back as they were left.
 - **A launcher for fingers**: a new window shows every app as a tile
   (terminals and hosts, books and notebooks, the settings' windows,

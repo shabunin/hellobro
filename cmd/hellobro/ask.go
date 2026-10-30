@@ -81,9 +81,10 @@ func (a *bro) askTyped(title, text, want, yes string, do func()) {
 // ready says whether the first answer can be taken.
 func (q *askBox) ready() bool { return q.typed == q.want }
 
-// overlay says whether something is up over the page.
+// overlay says whether something is up over the page: never over the
+// windows drawn for the workspaces' tiles (drawThumbs).
 func (a *bro) overlay() bool {
-	return a.picker != nil || a.asking != nil || a.info != nil || a.keyset != nil
+	return !a.wm.offscreen && (a.picker != nil || a.asking != nil || a.info != nil || a.keyset != nil)
 }
 
 func (a *bro) drawAsk() {

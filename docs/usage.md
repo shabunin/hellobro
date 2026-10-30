@@ -70,15 +70,14 @@ one, and a tap on one goes there. An empty workspace lists the keys (as
 they are, keys.conf's too), and a tap on it opens a window.
 
 A tap on the bar away from the workspaces (or Meta+O, or the menu's
-**Workspaces**) shows them all as tiles, each a small drawing of its
-windows as they're laid out, the one shown framed. What's in them shows
-too: a terminal as it is now, its output coming in while the tiles are
-up (every couple of seconds); a book, a notebook or a settings' window as
-it was when its workspace was left (one not on screen since hellobro
-started is an empty box). Tap one to go there;
-the last tile, **+**, makes a new workspace (the first free number) and
-opens a launcher on it. Typing narrows them, and the arrows and Enter
-pick one.
+**Workspaces**) shows them all as tiles over the whole screen, each a
+small drawing of its windows as they're laid out, the one shown framed.
+What's in the windows shows too, as it is now, and again every few
+seconds while they're up: a terminal's output, a book's page, a
+notebook, the battery. Tap one to go there; the last tile, **+**, makes
+a new workspace (the first free number) and opens a launcher on it.
+Keys: 1…9 and 0 go to that workspace, **n** makes a new one, the arrows
+and Enter pick one, Esc closes.
 
 Meta+Shift+Minus puts the window away (i3's scratchpad), Meta+Minus
 brings it back, floating, and puts it away again.
