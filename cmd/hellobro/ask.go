@@ -171,7 +171,7 @@ func (a *bro) askKey(code uint16, value int32) {
 				a.drawAsk()
 			}
 		case printable && !m.ctrl && len(q.typed) < 2*len(q.want):
-			q.typed += kobo.Retype(ch)
+			q.typed += kobo.Type(ch)
 			a.drawAsk()
 		}
 		return

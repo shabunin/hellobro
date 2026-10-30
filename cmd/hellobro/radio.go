@@ -1113,7 +1113,7 @@ func (a *bro) radioKey(code uint16, value int32) bool {
 				a.drawRadioPanel(p.panel)
 			}
 		case printable && !m.ctrl:
-			p.answer += kobo.Retype(ch)
+			p.answer += kobo.Type(ch)
 			a.drawRadioPanel(p.panel)
 		}
 		return true

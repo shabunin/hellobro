@@ -174,13 +174,18 @@ keyboard gone doesn't bring up the Bluetooth window.
 
 #### Languages
 
-Settings, **Languages to type in**: English, or English with Russian,
-Ukrainian, both, or German. Ctrl+Alt+Space (keys.conf: `language`), or
+Settings, **Languages to type in**: a tap (or Enter) puts them up as
+tiles, ticked or not: English, Russian, Ukrainian, German, Greek. A tap
+(or its number) ticks or unticks one, one at least; Esc or a tap outside
+closes it (the switcher has it too: "Languages to type in, ticked").
+Ctrl+Alt+Space (keys.conf: `language`), or
 the on-screen keyboard's key left of the space bar (it says `EN`, `RU`…),
 types in the next one, round; a keyboard's keys and the on-screen ones
 alike, with the on-screen letters showing it. The layouts are the usual
-ones (ЙЦУКЕН, Ukrainian's with ґ on the `\` key, QWERTZ) at a US
-keyboard's places, with no dead keys. Only what's typed changes: text in
+ones (ЙЦУКЕН, Ukrainian's with ґ on the `\` key, QWERTZ, Greek's) at a
+US keyboard's places. Greek's accents are dead keys, as on any Greek
+keyboard: `;` then a vowel is ά, έ, ή…, Shift+`;` then ι or υ is ϊ, ϋ;
+an accent and a space is the accent alone. Only what's typed changes: text in
 a terminal, a name, the find line, a ":" line, a notebook's text, a
 password. The keys' commands stay where they are (Ctrl+C, Meta+D, a
 book's letters), and so do keys.conf's names. Not in English, the bar

@@ -417,11 +417,6 @@ func (a *bro) typeIn(i int) {
 	a.drawVkbd(func(k vkey) bool { return k.label == "" || k.code == vkLang })
 }
 
-// langs are the languages to type in, set in Settings.
-func (a *bro) langs() []string { return strings.Fields(a.setting("languages")) }
-
-var langNames = map[string]string{"en": "English", "ru": "Russian", "uk": "Ukrainian", "de": "German"}
-
 // vkAsk shows it for a text field being typed in, if there's no other
 // keyboard (and even if it was hidden), or lets it go.
 func (a *bro) vkAsk(on bool) {

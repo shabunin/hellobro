@@ -25,6 +25,7 @@ var pickRowH = 58 // sizes.go: taller for fingers
 type pickEntry struct {
 	kind, title, detail string
 	icon                string // appIcon's, for a menu of tiles
+	stay                bool   // picked, the menu stays (a tick)
 	current             bool
 	do                  func()
 	score               int
@@ -143,6 +144,16 @@ func (a *bro) pick(n int) {
 	e := p.shown[n]
 	if e.current {
 		a.closePicker()
+		return
+	}
+	if e.stay {
+		e.do()
+		if a.picker == p { // its entries anew, the same lit
+			top := p.top
+			a.filterPicker()
+			p.sel, p.top = n, top
+			a.drawPicker()
+		}
 		return
 	}
 	a.picker = nil
@@ -370,7 +381,7 @@ func (a *bro) pickerKey(code uint16, value int32) {
 			a.filterPicker()
 		}
 	case printable && !m.ctrl && !m.alt:
-		p.query += kobo.Retype(ch)
+		p.query += kobo.Type(ch)
 		a.filterPicker()
 	default:
 		return

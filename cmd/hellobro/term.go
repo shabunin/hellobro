@@ -1212,7 +1212,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 		case code == kobo.KeyTab:
 			p.reveal = !p.reveal
 		case printable:
-			p.answer += kobo.Retype(ch)
+			p.answer += kobo.Type(ch)
 		}
 		a.updateTerm(t)
 		return true
@@ -1273,7 +1273,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 				return true
 			}
 		case printable && !m.ctrl:
-			t.input += kobo.Retype(ch)
+			t.input += kobo.Type(ch)
 			if t.edit == nil {
 				t.pane.menu.lit, t.pane.menu.top = 0, 0
 			}
@@ -1351,7 +1351,9 @@ func termKeyEvent(code uint16, m termMods) (uv.KeyPressEvent, bool) {
 	plain, _ := kobo.KeyChar(code, false, false)
 	k.Code = []rune(plain)[0]
 	if !m.ctrl {
-		k.Text = kobo.Retype(ch)
+		if k.Text = kobo.Type(ch); k.Text == "" {
+			return k, false // an accent, waiting for its letter
+		}
 	}
 	return k, true
 }

@@ -55,9 +55,8 @@ var settingList = []setting{
 	{key: "vkbd", label: "On-screen keyboard%s", cmd: "keyboard",
 		values: []string{"fields", "none", "auto", "on"},
 		shown:  []string{"for a text field (a name, find, a note's text)", "off", "when no keyboard is connected (after 10 s)", "always"}},
-	{key: "languages", label: "Languages to type in%s", cmd: "language",
-		values: []string{"en", "en ru", "en uk", "en ru uk", "en de"},
-		shown:  []string{"English", "English, Russian", "English, Ukrainian", "English, Russian, Ukrainian", "English, German"}},
+	{key: "languages", label: "Languages to type in%s", cmd: "language", // a tap: ticks to choose them (langs.go)
+		values: langValues(false), shown: langValues(true)},
 	{key: "touch-marks", group: "Touch", label: "Touch marks",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "a ring where it touched, a dot where it lifted, for 3 s"}},
@@ -159,6 +158,9 @@ func settingCommands() []*command {
 	for i, st := range settingList {
 		switch st.key {
 		case "share", "relay", "status-bar", "tabs", "keys":
+			continue
+		case "languages":
+			cs = append(cs, &command{id: "languages", title: "Setting: Languages to type in, ticked", run: (*bro).openLangs})
 			continue
 		case "alpine-remove":
 			cs = append(cs, &command{id: "alpine.remove", title: "Alpine: remove it…", run: (*bro).alpineRemoveAsk})
@@ -271,6 +273,9 @@ func (a *bro) stepSetting(i, d int) {
 		return
 	case "alpine-remove":
 		a.alpineRemoveAsk()
+		return
+	case "languages":
+		a.openLangs()
 		return
 	case "status-bar":
 		a.toggleStat()

@@ -579,6 +579,10 @@ func appIcon(id string) []iconPart {
 		return []iconPart{ring(12, 12, 6, 0.6), iconLine(0.6, 12, 2, 12, 22), iconLine(0.6, 2, 12, 22, 12)}
 	case "airplane": // from above, its nose up
 		return []iconPart{iconLine(1.2, 12, 2.5, 12, 19), iconShut(0.7, 12, 8.5, 21.5, 14, 21.5, 16, 12, 12.5, 2.5, 16, 2.5, 14), iconLine(0.8, 8, 21.5, 12, 18.5, 16, 21.5)}
+	case "ticked":
+		return []iconPart{iconShut(0.8, 3, 3, 21, 3, 21, 21, 3, 21), iconLine(1.4, 6.5, 12.5, 10.5, 16.5, 17.5, 7.5)}
+	case "unticked":
+		return []iconPart{iconShut(0.8, 3, 3, 21, 3, 21, 21, 3, 21)}
 	case "switcher": // a list, one picked
 		return []iconPart{iconShut(0.8, 3, 4, 21, 4, 21, 20, 3, 20), box(5, 7, 19, 11), iconLine(0.5, 6, 14, 18, 14), iconLine(0.5, 6, 17, 18, 17)}
 	case "quit":
