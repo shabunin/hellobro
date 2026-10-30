@@ -43,14 +43,15 @@ type picker struct {
 	sel, top    int
 	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
 	rows        []image.Rectangle
-	tiles       int             // a menu of tiles, this many across (0: rows)
-	tileW       int             // their width (0: the box's, shared)
-	tileH       int             // their height (0: pickTileH's)
-	wide        bool            // the whole screen, tiles as it is: the workspaces'
-	keysOnly    bool            // no line to type in: a key typed is key's
-	key         func(ch string) // what a key typed does, keysOnly
-	refresh     func()          // before the tiles are asked whether they changed
-	lookedAt    time.Time       // the tiles last asked whether they changed
+	tiles       int                // a menu of tiles, this many across (0: rows)
+	tileW       int                // their width (0: the box's, shared)
+	tileH       int                // their height (0: pickTileH's)
+	wide        bool               // the whole screen, tiles as it is: the workspaces'
+	keysOnly    bool               // no line to type in: a key typed is key's
+	key         func(ch string)    // what a key typed does, keysOnly
+	refresh     func()             // before the tiles are asked whether they changed
+	entries     func() []pickEntry // all anew, when what they show may have changed (againPicker)
+	lookedAt    time.Time          // the tiles last asked whether they changed
 }
 
 // chrome is the height of p's title, line and margins: what isn't rows.
@@ -208,6 +209,9 @@ func (a *bro) pick(n int) {
 		e.do()
 		if a.picker == p { // its entries anew, the same lit
 			top := p.top
+			if p.entries != nil {
+				p.all = p.entries()
+			}
 			a.filterPicker()
 			p.sel, p.top = n, top
 			a.drawPicker()
@@ -503,6 +507,26 @@ func (a *bro) pickerTap(pt image.Point) {
 
 // pickerTick draws again the tiles that changed under it, a few seconds
 // apart at most: the workspaces' terminals as their output comes.
+// againPicker makes the menu's entries anew, if it can, and draws it
+// again if any reads otherwise now.
+func (a *bro) againPicker() {
+	p := a.picker
+	if p == nil || p.entries == nil {
+		return
+	}
+	es := p.entries()
+	if slices.EqualFunc(es, p.all, func(x, y pickEntry) bool {
+		return x.title == y.title && x.detail == y.detail && x.on == y.on
+	}) {
+		return
+	}
+	sel, top := p.sel, p.top
+	p.all = es
+	a.filterPicker()
+	p.sel, p.top = min(sel, max(0, len(p.shown)-1)), top
+	a.drawPicker()
+}
+
 func (a *bro) pickerTick() {
 	p := a.picker
 	if p == nil || p.tiles == 0 || time.Since(p.lookedAt) < 3*time.Second || a.Blitting() {

@@ -81,6 +81,7 @@ type radioState struct {
 
 	polledAt time.Time
 	polling  bool
+	read     bool // ws and bs are as read, not yet zero
 	prompt   *radioPrompt
 }
 
@@ -161,7 +162,7 @@ func (a *bro) radioPoll(scan bool) {
 		a.Do(func() {
 			r.polling, r.polledAt = false, time.Now()
 			wKey, bKey := r.selected()
-			r.ws, r.bs, r.devs = ws, bs, devs
+			r.ws, r.bs, r.devs, r.read = ws, bs, devs, true
 			a.SetNetwork(netText(ws))
 			if scan {
 				r.wBusy = ""
@@ -326,6 +327,9 @@ func (a *bro) radioRun(panel int, busy string, do func(progress func(string)) er
 			if err != nil {
 				*note = err.Error()
 				log.Printf("radio: %s: %v", busy, err)
+				if !a.showingRadio() { // nowhere else to say so
+					a.Toast(strings.TrimSuffix(busy, "…")+": "+err.Error(), 5*time.Second)
+				}
 			} else {
 				*note = "done: " + strings.TrimSuffix(busy, "…")
 			}
@@ -437,14 +441,6 @@ func (a *bro) airplaneOver() {
 		a.mem.Airplane = nil
 		a.mem.save()
 	}
-}
-
-// airplaneNote is airplane mode's, for the menu.
-func (a *bro) airplaneNote() string {
-	if a.mem.Airplane != nil {
-		return "on: tap to leave"
-	}
-	return "Wi-Fi, Bluetooth off"
 }
 
 func (a *bro) wifiPower() {
@@ -660,6 +656,7 @@ func (a *bro) drawRadio() {
 }
 
 func (a *bro) drawRadioPanel(i int) {
+	a.againPicker() // the menu's tiles for them
 	win := []string{"wifi", "bluetooth"}[i]
 	if !a.guiShows(win) || a.rv[i].list.Empty() {
 		return

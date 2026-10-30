@@ -601,34 +601,70 @@ func barTitle(s string) string {
 const barTitleMax = 18 // runes of a window's title in the bar
 
 // menu is the app's own menu, a swipe along the right edge away: what
-// the header's buttons were, lock and the switcher.
+// the header's buttons were, lock and the switcher. Its Wi-Fi and
+// Bluetooth tiles turn them on and off where they are, and follow them
+// while it's up.
 func (a *bro) menu() {
 	if a.picker != nil { // another menu: this one in its place
 		a.closePicker()
 	}
+	a.radioStart()
+	p := &picker{title: "hello bro", hint: "type to narrow, or tap", all: a.menuEntries(), tiles: 2,
+		entries: a.menuEntries, refresh: func() { a.radioPoll(false) }}
+	a.showPicker(p)
+	a.radioPoll(false)
+}
+
+func (a *bro) menuEntries() []pickEntry {
+	r := &a.rs
 	var entries []pickEntry
 	for _, t := range []struct{ id, title, note, icon string }{
 		{"rotate", "Rotate", "the screen", "rotate"},
 		{"calibrate", "Touch", "calibrate", "touch"},
 		{"keyboard", "Keyboard", "on the screen", "keyboard"},
 		{"light.toggle", "Light", "on / off", "light"},
-		{"airplane", "Airplane", a.airplaneNote(), "airplane"},
+		{"wifi", "Wi-Fi", radioNote(!r.read, r.wBusy != "", r.ws.On, r.ws.SSID), "wifi"},
+		{"bluetooth", "Bluetooth", radioNote(!r.read, r.bBusy != "", r.bs.Powered, ""), "bluetooth"},
 		{"sleep", "Sleep", "", "sleep"},
 		{"lock", "Lock", "the screen", "lock"},
 		{"palette", "Go to…", "the switcher", "switcher"},
 		{"workspaces", "Workspaces", "all, to add one", "workspaces"},
 		{"quit", "Quit", "back to Nickel", "quit"},
 	} {
-		if c := commandByID(t.id); c != nil {
-			note := t.note // what it is, or its keys; airplane mode's, how it is
-			if k := a.keyLabels(c.id); k != "" && t.id != "airplane" {
-				note = k
-			}
-			entries = append(entries, pickEntry{kind: "command", title: t.title, detail: note, icon: t.icon,
-				on: t.id == "airplane" && a.mem.Airplane != nil, do: func() { c.run(a) }})
+		c := commandByID(t.id)
+		if c == nil {
+			continue
 		}
+		e := pickEntry{kind: "command", title: t.title, detail: t.note, icon: t.icon, do: func() { c.run(a) }}
+		switch t.id {
+		case "wifi": // how it is, not its keys; tapped, the menu stays to show it going
+			e.on, e.stay, e.do = r.ws.On, true, func() { a.radioFlip(panelWiFi) }
+		case "bluetooth":
+			e.on, e.stay, e.do = r.bs.Powered, true, func() { a.radioFlip(panelBT) }
+		default:
+			if k := a.keyLabels(c.id); k != "" {
+				e.detail = k
+			}
+		}
+		entries = append(entries, e)
 	}
-	a.openTiles("hello bro", "type to narrow, or tap", entries)
+	return entries
+}
+
+// radioNote is how a radio is, for its tile: not yet read, busy, on
+// (with the network it's on), or off.
+func radioNote(unread, busy, on bool, network string) string {
+	switch {
+	case busy:
+		return "a moment…"
+	case unread:
+		return "…"
+	case on && network != "":
+		return network
+	case on:
+		return "on"
+	}
+	return "off"
 }
 
 // TabTap goes to the workspace tapped in the bar.

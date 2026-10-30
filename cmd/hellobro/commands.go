@@ -778,6 +778,11 @@ func (a *bro) toggleLight() {
 // the window may not know yet: it's read first). Its window shows it going.
 func (a *bro) radioToggle(panel int) {
 	a.openGUI([]string{"wifi", "bluetooth"}[panel])
+	a.radioFlip(panel)
+}
+
+// radioFlip is radioToggle without the window: the menu's tiles.
+func (a *bro) radioFlip(panel int) {
 	a.radioStart()
 	r := &a.rs
 	wifi, bt := r.wifi, r.bt
@@ -785,7 +790,7 @@ func (a *bro) radioToggle(panel int) {
 		ws := wifi.Status()
 		bs, _ := bt.Status()
 		a.Do(func() {
-			r.ws, r.bs = ws, bs
+			r.ws, r.bs, r.read = ws, bs, true
 			if panel == panelWiFi {
 				a.wifiPower()
 			} else {

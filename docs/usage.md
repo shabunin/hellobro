@@ -106,13 +106,20 @@ The bar; remembered in `bar`); a full-screen window has none either.
 A swipe up or down along the right edge of the screen opens the menu,
 tiles big enough for a finger, each an icon, a word and its keys: rotate
 the screen, touch calibration, the on-screen keyboard, the light,
-airplane mode, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
+Wi-Fi, Bluetooth, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
 Nickel. Tap one, or its number, or the arrows (the one they're on has
-a ring) and Enter (or type to narrow); Esc or a tap outside closes it. **Airplane** turns Wi-Fi and
-Bluetooth off, keeping which were on; tapped again (its tile is dark
-while it's on) it turns those back on, as does turning one on in its window. It
-stays through a restart, and Nickel finds them off when hellobro quits.
-The switcher has it too (`airplane` in keys.conf). Two fingers swiped left anywhere go to the next workspace, swiped
+a ring) and Enter (or type to narrow); Esc or a tap outside closes it.
+**Wi-Fi** and **Bluetooth** turn that radio on or off where they are,
+the menu staying up: a tile is dark while its radio is on, and says
+how it is (the network joined, on, off, or "a moment…" while it
+changes).
+
+**Airplane mode** (`airplane` in keys.conf and the switcher) turns
+Wi-Fi and Bluetooth off, keeping which were on; again, it turns those
+back on, as does turning one on in its window or the menu. It stays
+through a restart, and Nickel finds them off when hellobro quits.
+
+Two fingers swiped left anywhere go to the next workspace, swiped
 right to the one before, as pages turn (where the screen tells two
 fingers apart). Settings, **Workspaces by touch**, one finger as well:
 a swipe in from the right edge, at any height, to the next, in from
