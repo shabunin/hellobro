@@ -15,7 +15,8 @@ package main
 // shows it a while after the last keyboard went and hides it as one
 // comes; or on. Two fingers swiped up from the screen's foot show it
 // whatever the setting, and down onto it hide it, as the menu's
-// Keyboard does: till a field comes, or a keyboard. Its key left of the
+// Keyboard does, and its own Hide key, atop the left strip: till a field
+// comes, or a keyboard. Its key left of the
 // space bar types in the next of the languages set (Settings, Languages
 // to type in), as Ctrl+Alt+Space does, the letters showing it.
 
@@ -39,6 +40,7 @@ const (
 	vkSlop     = 30               // px a finger on a key at an edge may wander before it's a swipe
 	vkFoot     = 100              // px up from the screen's foot where two fingers swiped up show it
 	vkLang     = 0xfff0           // the language's key: no key's code
+	vkHide     = 0xfff1           // and the one that hides it
 )
 
 type vkey struct {
@@ -102,7 +104,7 @@ var vkRows = [][]vkItem{
 
 // The strips, top to bottom; they stand on the rows.
 var (
-	vkLeft  = []vkItem{{1, keyHome, "Home"}, {1, keyPgUp, "PgUp"}, {1, keyPgDn, "PgDn"}, {1, keyEnd, "End"}, {1, kobo.KeyTab, "Tab"}, {1, kobo.KeyLeftShift, "Shift"}}
+	vkLeft  = []vkItem{{1, vkHide, "Hide ▼"}, {1, keyHome, "Home"}, {1, keyPgUp, "PgUp"}, {1, keyPgDn, "PgDn"}, {1, keyEnd, "End"}, {1, kobo.KeyTab, "Tab"}, {1, kobo.KeyLeftShift, "Shift"}}
 	vkRight = []vkItem{{1, kobo.KeyEsc, "Esc"}, {1, keyDelete, "Del"}, {1, kobo.KeyTab, "Tab"}, {1, keyLeftMeta, "Mod"}, {1, keyLeftAlt, "Alt"}, {1, kobo.KeyLeftCtrl, "Ctrl"}, {1, kobo.KeyLeftShift, "Shift"}}
 )
 
@@ -239,9 +241,14 @@ func (a *bro) vkTouch(p image.Point, g *kobo.Gesture) bool {
 func (a *bro) vkPress(g *kobo.Gesture) {
 	v := &a.vk
 	h := v.held[g]
-	if h.k.code == vkLang {
+	switch h.k.code {
+	case vkLang:
 		delete(v.held, g)
 		a.typeIn(v.lang + 1)
+		return
+	case vkHide:
+		delete(v.held, g)
+		a.vkToggle()
 		return
 	}
 	if kobo.IsModifier(h.k.code) {

@@ -144,8 +144,8 @@ the shell.
 
 Without a keyboard, one on the screen: a laptop's rows under the
 windows (numbers, letters, Backspace, Enter, the space bar, the arrows
-in a cross at the right), a strip at the left (Home, PgUp, PgDn, End,
-Tab, Shift) and one at the right (Esc, Del, Tab, Mod, Alt, Ctrl,
+in a cross at the right), a strip at the left (Hide, Home, PgUp, PgDn,
+End, Tab, Shift) and one at the right (Esc, Del, Tab, Mod, Alt, Ctrl,
 Shift). Its keys are a keyboard's: the window manager's keys, the
 terminals', kitty's, all as from a real one. Shift, Ctrl, Alt and Mod
 (Meta, the window keys') hold till the next key is up, shown in black;
@@ -167,8 +167,9 @@ always.
 
 Two fingers swiped up from the screen's very foot (the last 100 px)
 show it whatever the setting, full screen too; two fingers swiped down
-onto it hide it. The menu's **Keyboard** (keys.conf: `keyboard`) does
-the same, showing it or hiding it. Either holds till a text field
+onto it hide it, as does its **Hide ▼** key, atop the left strip. The
+menu's **Keyboard** (keys.conf: `keyboard`) does the same, showing it or
+hiding it. Either holds till a text field
 wants it (it shows again) or a keyboard connects. While it shows, a
 keyboard gone doesn't bring up the Bluetooth window.
 

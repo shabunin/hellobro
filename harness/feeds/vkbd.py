@@ -27,7 +27,7 @@ for i, row in enumerate(ROWS):
     for w, k in row:
         if k: KEYS[k] = (int((x + w / 2) * u), top + i * h + h // 2)
         x += w
-for side, strip in enumerate([['HOME', 'PGUP', 'PGDN', 'END', 'TAB', 'SHIFT'],
+for side, strip in enumerate([['HIDE', 'HOME', 'PGUP', 'PGDN', 'END', 'TAB', 'SHIFT'],
                               ['ESC', 'DEL', 'TAB2', 'MOD', 'ALT', 'CTRL', 'SHIFT2']]):
     kh = min(h, top // len(strip))
     for i, k in enumerate(strip):

@@ -2,8 +2,8 @@
 # keyboard there, two fingers up from the screen's foot show it anyway,
 # full screen too, and two down onto it hide it. With the keyboard gone
 # it doesn't come by itself; a tap on the launcher's find line brings
-# it, two fingers down put it away, and the keyboard back stays as it
-# is. APP_EXTRA a settings file with kbd-gone=off. The log says "two-finger swipe: on-screen keyboard true", false,
+# it, its Hide key (atop the left strip) puts it away, and the keyboard
+# back stays as it is. APP_EXTRA a settings file with kbd-gone=off. The log says "two-finger swipe: on-screen keyboard true", false,
 # and "on-screen keyboard: true" for the find line.
 # app: hellobro
 import os, sys
@@ -22,6 +22,9 @@ down(); time.sleep(3)
 fullscreen(); time.sleep(3)
 feedlib.kbd.close(); time.sleep(14)                       # no keyboard: still none on the screen
 tap(W // 2, H - 185); time.sleep(3)                     # the find line (Sizes for fingers): it shows
-down(); time.sleep(3)
+h = min(max(min(W, H - 46) * 4 // 5 // 15, 56), 84)       # vkLayout's, as vkbd.py
+top, sw = H - 5 * h, min(int(W / 15), 100)
+kh = min(h, top // 7)
+tap(sw // 2, top - 7 * kh + kh // 2); time.sleep(3)       # Hide
 feedlib.kbd = open(os.path.join(feedlib.d, 'event4'), 'wb', buffering=0); time.sleep(4)
 exit_app()
