@@ -435,9 +435,10 @@ func renameNotebook(a *bro, from, to string) error {
 			return err
 		}
 	}
-	for i, p := range exportPaths(from) { // its export, and only that: a PDF of the same name may be someone else's
-		if isExport(p) && !fileExists(exportPaths(to)[i]) {
-			os.Rename(p, exportPaths(to)[i])
+	top := filepath.Join(notesDir(), filepath.FromSlash(to))
+	for after, p := range exportsOf(from) { // its exports, and only those
+		if !fileExists(top + after) {
+			os.Rename(p, top+after)
 		}
 	}
 	if nw != nil {

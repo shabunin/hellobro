@@ -50,24 +50,20 @@ func TestExportPath(t *testing.T) {
 	shareRoot = t.TempDir()
 	nd := filepath.Join(shareRoot, "Notebooks")
 	os.MkdirAll(nd, 0o755)
-	if got := exportPath("lecture"); got != filepath.Join(nd, "lecture.pdf") {
-		t.Errorf("none there: %s", got)
-	}
-	// someone else's PDF is left be
+	// someone else's PDF is left be; ours are found, as they were named once too
 	os.WriteFile(filepath.Join(nd, "lecture.pdf"), []byte("%PDF-1.7\nslides"), 0o644)
-	if got := exportPath("lecture"); got != filepath.Join(nd, "lecture (notebook).pdf") {
-		t.Errorf("beside a PDF: %s", got)
-	}
-	// ours is written over
 	m := image.NewGray(image.Rect(0, 0, 4, 4))
-	writeAtomic(filepath.Join(nd, "plan.pdf"), imagesPDF([]pdfImagePage{{m, 10, 10}}))
-	if got := exportPath("plan"); got != filepath.Join(nd, "plan.pdf") {
-		t.Errorf("an export there: %s", got)
+	for _, f := range []string{"plan.pdf", "plan 2026-10-30 14.05.07.pdf", "lecture 2026-10-30 14.05.07.pdf", "lecture (notebook).pdf"} {
+		writeAtomic(filepath.Join(nd, f), imagesPDF([]pdfImagePage{{m, 10, 10}}))
+	}
+	os.WriteFile(filepath.Join(nd, "plan 2026-10-31 09.00.00.pdf"), []byte("%PDF-1.7\nsomeone's"), 0o644)
+	if got := exportsOf("lecture"); len(got) != 2 || got[" 2026-10-30 14.05.07.pdf"] == "" || got[" (notebook).pdf"] == "" {
+		t.Errorf("lecture's: %v", got)
 	}
 	if _, err := os.Stat(filepath.Join(nd, "plan.pdf.new")); !os.IsNotExist(err) {
 		t.Errorf("the new file's left: %v", err)
 	}
-	// renamed, a notebook takes only its own export along
+	// renamed, a notebook takes only its own exports along
 	a := &bro{}
 	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
 	for _, n := range []string{"lecture", "plan"} {
@@ -82,7 +78,9 @@ func TestExportPath(t *testing.T) {
 	if err := renameNotebook(a, "plan", "plans"); err != nil {
 		t.Fatal(err)
 	}
-	for f, want := range map[string]bool{"lecture.pdf": true, "talk.pdf": false, "talk.xopp": true, "plan.pdf": false, "plans.pdf": true} {
+	for f, want := range map[string]bool{"lecture.pdf": true, "talk.pdf": false, "talk.xopp": true, "talk 2026-10-30 14.05.07.pdf": true,
+		"talk (notebook).pdf": true, "plan.pdf": false, "plans.pdf": true, "plans 2026-10-30 14.05.07.pdf": true,
+		"plan 2026-10-31 09.00.00.pdf": true, "plans 2026-10-31 09.00.00.pdf": false} {
 		if fileExists(filepath.Join(nd, f)) != want {
 			t.Errorf("%s there: %v, want %v", f, !want, want)
 		}
@@ -154,5 +152,8 @@ func TestExportPNGName(t *testing.T) {
 	at := time.Date(2026, 10, 30, 14, 5, 7, 0, time.Local)
 	if got, want := exportPNGName("Work/plan", 2, at), "plan p3 2026-10-30 14.05.07.png"; got != want {
 		t.Errorf("%q, want %q", got, want)
+	}
+	if got, want := globEscape("a*b[1].pdf"), `a\*b\[1].pdf`; got != want {
+		t.Errorf("escaped %q, want %q", got, want)
 	}
 }

@@ -794,8 +794,8 @@ and the last two written.
   in `Notebooks/`, four deep at most.
 - **rename** on a row (or F2) types its name in the row: Enter or
   **ok** keeps it, Esc or **cancel** doesn't. Without a keyboard, the
-  one on the screen shows for it. A notebook's PDF export is renamed
-  with it (only one hellobro wrote); a folder's notebooks go with it,
+  one on the screen shows for it. A notebook's PDF exports are renamed
+  with it (only ones hellobro wrote); a folder's notebooks go with it,
   open ones too.
 - **move** on a row (or m) moves it to another folder: Folders shows
   where it is, with **move here** and **cancel** at the top; open a
@@ -904,11 +904,10 @@ its gray.
   tap), **PNG** of the page shown (n), or cancel. Settings, **Notebook
   export** can make it always the one without asking; `:export pdf` and
   `:export png` don't ask either. The PDF is the notebook next to its
-  `.xopp`, `Notebooks/NAME.pdf`: a picture of each page at 200 dpi, gray,
-  to send, print, or hand an LLM. If a PDF hellobro didn't write is
-  there (Xournal++'s lecture beside its notes), it's left be, and the
-  export is `NAME (notebook).pdf`. All the pages to the last written
-  on (of one on a PDF, only the pages written on). The PNG is the page
+  `.xopp`, `Notebooks/NAME DATE TIME.pdf` (each export its own, as
+  `2026-10-30 14.05.07`): a picture of each page at 200 dpi, gray, to
+  send, print, or hand an LLM. All the pages to the last written on (of
+  one on a PDF, only the pages written on). The PNG is the page
   shown alone, at `Clips/NAME pN DATE TIME.png` (each export its own, as
   `2026-10-30 14.05.07`) and `Clips/latest.png` too, as a PDF's cut
   does, for a program in Alpine to take. It's done aside; a note on the

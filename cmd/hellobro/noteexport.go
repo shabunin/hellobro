@@ -1,8 +1,8 @@
 package main
 
 // Exporting a notebook: "export" (or Ctrl+E) asks which, as Settings'
-// "Notebook export" has it: a PDF, NAME.pdf by its .xopp in Notebooks/,
-// a picture of each page (200 dpi, gray: for a computer, a printer, or
+// "Notebook export" has it: a PDF, "NAME DATE TIME.pdf" by its .xopp in
+// Notebooks/ (each export its own), a picture of each page (200 dpi, gray: for a computer, a printer, or
 // an LLM to read); of pages on a PDF (from Xournal++), the pages written
 // on. Or the page shown as a PNG in Clips/, as "NAME pN DATE TIME.png"
 // (each export its own) and latest.png, as a PDF's cut is (bookcut.go):
@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	xdraw "golang.org/x/image/draw"
@@ -122,7 +123,7 @@ func (w *noteWin) exportAs(a *bro, as string) {
 		if as == "png" {
 			msg, err = exportPNG(name, paper, pdfPath, shown, at)
 		} else {
-			msg, err = exportPDF(name, paper, pdfPath, pages)
+			msg, err = exportPDF(name, paper, pdfPath, pages, at)
 		}
 		a.Do(func() {
 			w.exporting = false
@@ -147,9 +148,9 @@ func exportDoc(pdfPath string) (*pdf.Doc, error) {
 	return pdf.Open(pdfPath)
 }
 
-// exportPDF draws pages and writes them as the notebook's PDF; it says
-// where.
-func exportPDF(name, paper, pdfPath string, pages []exportPage) (string, error) {
+// exportPDF draws pages and writes them as the notebook's PDF, named for
+// when it was asked (at); it says where.
+func exportPDF(name, paper, pdfPath string, pages []exportPage, at time.Time) (string, error) {
 	doc, err := exportDoc(pdfPath)
 	if err != nil {
 		return "", err
@@ -165,7 +166,7 @@ func exportPDF(name, paper, pdfPath string, pages []exportPage) (string, error) 
 		}
 		imgs = append(imgs, pdfImagePage{img: m, w: pg.pt[0], h: pg.pt[1]})
 	}
-	out := exportPath(name)
+	out := filepath.Join(notesDir(), filepath.FromSlash(name)+exportStamp(at)+".pdf")
 	if err := writeAtomic(out, imagesPDF(imgs)); err != nil {
 		return "", err
 	}
@@ -203,31 +204,46 @@ func exportPNG(name, paper, pdfPath string, shown exportPage, at time.Time) (str
 }
 
 // exportPNGName is the page n's PNG, exported at: the notebook's own name
-// (in a folder too), the page and when, as the card takes it (no colons).
+// (in a folder too), the page and when.
 func exportPNGName(name string, n int, at time.Time) string {
-	return fmt.Sprintf("%s p%d %s.png", filepath.Base(name), n+1, at.Format("2006-01-02 15.04.05"))
+	return fmt.Sprintf("%s p%d%s.png", filepath.Base(name), n+1, exportStamp(at))
 }
+
+// exportStamp is when an export was asked, after its name: as the card
+// takes it (no colons).
+func exportStamp(at time.Time) string { return at.Format(" 2006-01-02 15.04.05") }
 
 // exportMark is in the PDFs exports write: what's written over, or
 // moved with a notebook renamed, is only ever one of those.
 const exportMark = "%hellobro notebook export\n"
 
-// exportPaths are where the notebook name's export may be: NAME.pdf,
-// or, if a PDF of someone else's is there (Xournal++'s lecture.pdf
-// beside lecture.xopp), NAME (notebook).pdf.
-func exportPaths(name string) [2]string {
+// exportsOf are the notebook name's exports, by what's after its name in
+// theirs: " DATE TIME.pdf", and as they were once, ".pdf" and
+// " (notebook).pdf". Only ours: a PDF of the same name may be someone
+// else's (Xournal++'s lecture.pdf beside lecture.xopp).
+func exportsOf(name string) map[string]string {
 	p := filepath.Join(notesDir(), filepath.FromSlash(name))
-	return [2]string{p + ".pdf", p + " (notebook).pdf"}
+	ps, _ := filepath.Glob(globEscape(p) + " ????-??-?? ??.??.??.pdf")
+	ps = append(ps, p+".pdf", p+" (notebook).pdf")
+	out := map[string]string{}
+	for _, f := range ps {
+		if isExport(f) {
+			out[strings.TrimPrefix(f, p)] = f
+		}
+	}
+	return out
 }
 
-// exportPath is where the notebook name is exported to: the first of
-// its exportPaths that's free or an export already.
-func exportPath(name string) string {
-	ps := exportPaths(name)
-	if !fileExists(ps[0]) || isExport(ps[0]) {
-		return ps[0]
+// globEscape is p as a glob matching only itself.
+func globEscape(p string) string {
+	var b strings.Builder
+	for _, r := range p {
+		if strings.ContainsRune(`*?[\`, r) {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
 	}
-	return ps[1]
+	return b.String()
 }
 
 // isExport says whether the file at p is one an export wrote.
