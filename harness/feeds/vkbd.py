@@ -58,5 +58,5 @@ vtype("echo gone gone gone"); hold('BS', 1.5); time.sleep(1)   # Backspace held:
 vk('ESC'); time.sleep(1)                                  # Esc at the edge: a tap
 vtype("ls /"); vk('ENTER'); time.sleep(2)
 feedlib.kbd = open(os.path.join(feedlib.d, 'event4'), 'wb', buffering=0); time.sleep(4)   # back: it hides
-menu(); keys("on-screen"); time.sleep(1); key(ENTER); time.sleep(3)                      # shown again
+menu(); keys("keyboard"); time.sleep(1) ; key(ENTER); time.sleep(3)                      # shown again
 exit_app()

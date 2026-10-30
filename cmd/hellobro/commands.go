@@ -142,6 +142,7 @@ func makeCommands() []*command {
 		&command{id: "lock", title: "Lock the screen", keys: []string{"meta+shift+x"}, run: (*bro).lock},
 		&command{id: "wifi", title: "Wi-Fi on / off", run: func(a *bro) { a.radioToggle(panelWiFi) }},
 		&command{id: "bluetooth", title: "Bluetooth on / off", run: func(a *bro) { a.radioToggle(panelBT) }},
+		&command{id: "airplane", title: "Airplane mode: Wi-Fi and Bluetooth off (again: back on)", run: (*bro).airplane},
 		&command{id: "wifi.scan", title: "Wi-Fi: look for networks", run: onRadio("wifi", func(a *bro) { a.radioPoll(true) })},
 		&command{id: "wifi.join", title: "Wi-Fi: join a network by its name", run: onRadio("wifi", func(a *bro) {
 			a.radioAsk(&radioPrompt{panel: panelWiFi, kind: "ssid", text: "The network's name (SSID):"})

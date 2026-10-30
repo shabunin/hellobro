@@ -344,6 +344,9 @@ func (a *bro) radiosOn() {
 		return
 	}
 	r.onDone = true
+	if a.mem.Airplane != nil {
+		return // airplane mode: they stay off till it's left
+	}
 	a.radioStart()
 	wifi, bt := r.wifi, r.bt
 	a.radioRun(panelWiFi, "turning Wi-Fi and Bluetooth on…", func(p func(string)) error {
@@ -362,8 +365,89 @@ func (a *bro) radiosOn() {
 	})
 }
 
+// radiosWere is which radios were on before airplane mode.
+type radiosWere struct {
+	WiFi      bool `json:"wifi,omitempty"`
+	Bluetooth bool `json:"bluetooth,omitempty"`
+}
+
+// airplane turns Wi-Fi and Bluetooth off, keeping which were on; again,
+// it turns those back on. Bluetooth goes first: Wi-Fi's chip is its too,
+// and only with Bluetooth off does it lose its power.
+func (a *bro) airplane() {
+	a.radioStart()
+	r := &a.rs
+	wifi, bt := r.wifi, r.bt
+	if was := a.mem.Airplane; was != nil {
+		a.mem.Airplane = nil
+		a.mem.save()
+		a.Toast("airplane mode off", 3*time.Second)
+		a.radioRun(panelWiFi, "leaving airplane mode…", func(p func(string)) error {
+			var errs []error
+			if was.Bluetooth {
+				if err := bt.SetPower(true); err != nil {
+					errs = append(errs, fmt.Errorf("bluetooth: %w", err))
+				}
+			}
+			if was.WiFi {
+				if err := wifi.SetPower(true, p); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			bt.Keep()
+			wifi.Keep()
+			return errors.Join(errs...)
+		})
+		return
+	}
+	a.mem.Airplane = &radiosWere{}
+	a.mem.save()
+	a.Toast("airplane mode: Wi-Fi and Bluetooth off", 3*time.Second)
+	a.radioRun(panelWiFi, "airplane mode: turning the radios off…", func(p func(string)) error {
+		ws := wifi.Status()
+		bs, _ := bt.Status()
+		a.Do(func() {
+			if a.mem.Airplane != nil {
+				a.mem.Airplane.WiFi, a.mem.Airplane.Bluetooth = ws.On, bs.Powered
+				a.mem.save()
+			}
+		})
+		var errs []error
+		if bs.Powered {
+			if err := bt.SetPower(false); err != nil {
+				errs = append(errs, fmt.Errorf("bluetooth: %w", err))
+			}
+		}
+		if err := wifi.SetPower(false, p); err != nil {
+			errs = append(errs, err)
+		}
+		bt.Keep() // and so when we quit: Nickel finds them off
+		wifi.Keep()
+		return errors.Join(errs...)
+	})
+}
+
+// airplaneOver forgets airplane mode: a radio's been turned on by hand.
+func (a *bro) airplaneOver() {
+	if a.mem.Airplane != nil {
+		a.mem.Airplane = nil
+		a.mem.save()
+	}
+}
+
+// airplaneNote is airplane mode's, for the menu.
+func (a *bro) airplaneNote() string {
+	if a.mem.Airplane != nil {
+		return "on: tap to leave"
+	}
+	return "Wi-Fi, Bluetooth off"
+}
+
 func (a *bro) wifiPower() {
 	on := !a.rs.ws.On
+	if on {
+		a.airplaneOver()
+	}
 	what := map[bool]string{true: "turning Wi-Fi on…", false: "turning Wi-Fi off…"}[on]
 	wifi, bt := a.rs.wifi, a.rs.bt
 	a.radioRun(panelWiFi, what, func(p func(string)) error {
@@ -385,6 +469,9 @@ func wifiOff(wifi radio.WiFi, bt radio.Bluetooth, progress func(string)) error {
 
 func (a *bro) btPower() {
 	on := !a.rs.bs.Powered
+	if on {
+		a.airplaneOver()
+	}
 	what := map[bool]string{true: "turning Bluetooth on…", false: "turning Bluetooth off…"}[on]
 	a.radioRun(panelBT, what, func(func(string)) error { return a.rs.bt.SetPower(on) })
 }

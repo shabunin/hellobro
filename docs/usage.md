@@ -87,10 +87,16 @@ right where the Kobo is on the network, the Wi-Fi's name and its address
 and the time. It looks again every 15 s. In a binding mode (Meta+R,
 say) it says which (`grab` too, while the keys are grabbed), and what plays, and for a moment what was copied.
 
-A swipe up or down along the right edge of the screen opens the menu:
-rotate the screen, touch calibration, the on-screen keyboard, sleep,
-lock, the switcher, and quit, back to Nickel. Tap one, or type to narrow and Enter; Esc closes
-it. Two fingers swiped left anywhere go to the next workspace, swiped
+A swipe up or down along the right edge of the screen opens the menu,
+tiles big enough for a finger, each an icon, a word and its keys: rotate
+the screen, touch calibration, the on-screen keyboard, the light,
+airplane mode, sleep, lock, the switcher (Go to…), and quit, back to
+Nickel. Tap one, or its number, or the arrows and Enter (or type to
+narrow); Esc or a tap outside closes it. **Airplane** turns Wi-Fi and
+Bluetooth off, keeping which were on; tapped again (the tile says it's
+on) it turns those back on, as does turning one on in its window. It
+stays through a restart, and Nickel finds them off when hellobro quits.
+The switcher has it too (`airplane` in keys.conf). Two fingers swiped left anywhere go to the next workspace, swiped
 right to the one before, as pages turn (where the screen tells two
 fingers apart). Settings, **Workspaces by touch**, one finger as well:
 a swipe in from the right edge, at any height, to the next, in from
@@ -969,8 +975,8 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
   PgUp/PgDn go through them. They're kept in `settings`.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
   since Nickel wakes up thinking so; networks and devices added stay.
-  "Wi-Fi and Bluetooth at start", turned on, has hellobro turn both on
-  as it starts and leave them on when it quits (or restarts into a new
+  "Wi-Fi and Bluetooth at start", turned on (and not in airplane mode,
+  the menu's), has hellobro turn both on as it starts and leave them on when it quits (or restarts into a new
   build). Nickel may still turn them off soon after, if you were in
   hellobro a while: its idle timers run out while it's frozen. On
   the first opening of their windows, what's found of the setup (Kobo's variables,

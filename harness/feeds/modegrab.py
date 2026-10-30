@@ -13,7 +13,7 @@ tap(tab_x(0), tabs_y); time.sleep(2)                 # workspace 1: the launcher
 keys("2"); time.sleep(3)                             # the Kobo's sh
 keys("cat -v\n"); time.sleep(1)
 mod(KEY_G, shift=True); time.sleep(2)                # grab
-menu(); keys("5"); time.sleep(2)                     # Go to…: the switcher, by touch
+menu(); keys("8"); time.sleep(2)                     # Go to…: the switcher, by touch
 keys("resize"); time.sleep(1); key(ENTER); time.sleep(3)  # resize mode
 keys("x"); key(LEFT); key(RIGHT, shift=True); key(KEY_C, ctrl=True); time.sleep(3)
 key(ESC); time.sleep(3)                              # done

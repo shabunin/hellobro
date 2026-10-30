@@ -604,12 +604,26 @@ func (a *bro) menu() {
 		a.closePicker()
 	}
 	var entries []pickEntry
-	for _, id := range []string{"rotate", "calibrate", "keyboard", "sleep", "lock", "palette", "quit"} {
-		if c := commandByID(id); c != nil {
-			entries = append(entries, pickEntry{kind: "command", title: c.title, detail: a.keyLabels(c.id), do: func() { c.run(a) }})
+	for _, t := range []struct{ id, title, note, icon string }{
+		{"rotate", "Rotate", "the screen", "rotate"},
+		{"calibrate", "Touch", "calibrate", "touch"},
+		{"keyboard", "Keyboard", "on the screen", "keyboard"},
+		{"light.toggle", "Light", "on / off", "light"},
+		{"airplane", "Airplane", a.airplaneNote(), "airplane"},
+		{"sleep", "Sleep", "", "sleep"},
+		{"lock", "Lock", "the screen", "lock"},
+		{"palette", "Go to…", "the switcher", "switcher"},
+		{"quit", "Quit", "back to Nickel", "quit"},
+	} {
+		if c := commandByID(t.id); c != nil {
+			note := t.note // what it is, or its keys; airplane mode's, how it is
+			if k := a.keyLabels(c.id); k != "" && t.id != "airplane" {
+				note = k
+			}
+			entries = append(entries, pickEntry{kind: "command", title: t.title, detail: note, icon: t.icon, do: func() { c.run(a) }})
 		}
 	}
-	a.openMenu("hello bro", "type to narrow, or tap", entries, nil)
+	a.openTiles("hello bro", "type to narrow, or tap", entries)
 }
 
 // TabTap goes to the workspace tapped in the bar.

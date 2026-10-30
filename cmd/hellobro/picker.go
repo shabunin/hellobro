@@ -24,6 +24,7 @@ var pickRowH = 58 // sizes.go: taller for fingers
 
 type pickEntry struct {
 	kind, title, detail string
+	icon                string // appIcon's, for a menu of tiles
 	current             bool
 	do                  func()
 	score               int
@@ -37,6 +38,7 @@ type picker struct {
 	sel, top    int
 	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
 	rows        []image.Rectangle
+	tiles       int // a menu of tiles, this many across (0: rows)
 }
 
 func (a *bro) openPicker() {
@@ -96,6 +98,15 @@ func (a *bro) openMenu(title, hint string, entries []pickEntry, extra func(strin
 	a.showPicker(&picker{title: title, hint: hint, all: entries, extra: extra})
 }
 
+// openTiles puts up a menu of tiles, an icon and words each, for
+// fingers: the quick menu.
+func (a *bro) openTiles(title, hint string, entries []pickEntry) {
+	a.showPicker(&picker{title: title, hint: hint, all: entries, tiles: 2})
+}
+
+// pickTileH is a tile's height in a menu of tiles.
+func pickTileH() int { return pickRowH * 7 / 4 }
+
 func (a *bro) showPicker(p *picker) {
 	b := a.screenFree()
 	w := min(1100, b.Dx()-80)
@@ -104,6 +115,10 @@ func (a *bro) showPicker(p *picker) {
 		n++
 	}
 	h := 136 + min(max(1, n), pickRowsMax)*pickRowH + 16
+	if p.tiles > 0 {
+		p.tiles = max(2, min(3, w/340))
+		h = 136 + (n+p.tiles-1)/p.tiles*(pickTileH()+12) + 16
+	}
 	top := b.Min.Y + max(40, b.Dy()/8)
 	h = min(h, b.Max.Y-40-top)
 	p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
@@ -230,17 +245,26 @@ func fuzzy(q, text string) int {
 func (a *bro) drawPicker() {
 	p, c := a.picker, a.C
 	rows := (p.box.Dy() - 152) / pickRowH
+	if p.tiles > 0 {
+		rows = (p.box.Dy() - 152) / (pickTileH() + 12) * p.tiles
+	}
+	step := max(1, p.tiles) // tiles scroll by rows of them
+	rows = max(step, rows-rows%step)
 	if p.sel < p.top {
-		p.top = p.sel
+		p.top = p.sel - p.sel%step
 	}
 	if p.sel >= p.top+rows {
-		p.top = p.sel - rows + 1
+		p.top = p.sel - p.sel%step - rows + step
 	}
 	c.Fill(p.box, kobo.White)
 	c.Frame(p.box, 4, kobo.Black)
 	head := image.Rect(p.box.Min.X+24, p.box.Min.Y+10, p.box.Max.X-24, p.box.Min.Y+60)
 	c.Text(a.F.Panel, head, p.title, kobo.Black, kobo.AlignLeft)
-	c.Text(a.F.Small, head, "type to narrow · ↑ ↓ Enter · Esc closes", kobo.Dark, kobo.AlignRight)
+	keys := "type to narrow · ↑ ↓ Enter · Esc closes"
+	if p.tiles > 0 {
+		keys = "tap one, or the arrows and Enter · Esc closes"
+	}
+	c.Text(a.F.Small, head, keys, kobo.Dark, kobo.AlignRight)
 	in := image.Rect(p.box.Min.X+20, head.Max.Y+6, p.box.Max.X-20, head.Max.Y+64)
 	c.Frame(in, 2, kobo.Black)
 	q := "› " + p.query
@@ -257,6 +281,22 @@ func (a *bro) drawPicker() {
 	y := in.Max.Y + 10
 	if len(p.shown) == 0 {
 		c.Text(a.F.Body, image.Rect(in.Min.X+16, y, in.Max.X, y+pickRowH), "nothing matches", kobo.Dark, kobo.AlignLeft)
+	}
+	if p.tiles > 0 {
+		tw := (in.Dx() - (p.tiles-1)*12) / p.tiles
+		for n := p.top; n < min(len(p.shown), p.top+rows); n++ {
+			e, i := p.shown[n], n-p.top
+			x, ty := in.Min.X+i%p.tiles*(tw+12), y+i/p.tiles*(pickTileH()+12)
+			r := image.Rect(x, ty, x+tw, ty+pickTileH())
+			p.rows = append(p.rows, r)
+			num := 0
+			if p.query == "" && n < 9 {
+				num = n + 1
+			}
+			a.drawTile(r, launchTile{name: e.title, note: e.detail, icon: e.icon, num: num}, n == p.sel, false)
+		}
+		a.Mark(p.box, true)
+		return
 	}
 	for n := p.top; n < min(len(p.shown), p.top+rows); n++ {
 		e := p.shown[n]
@@ -309,9 +349,17 @@ func (a *bro) pickerKey(code uint16, value int32) {
 	case p.query == "" && p.extra == nil && ch >= "1" && ch <= "9" && !m.ctrl: // a name typed can start with one
 		a.pick(int(ch[0] - '1'))
 		return
-	case code == keyUp || code == kobo.KeyTab && m.shift:
+	case p.tiles > 0 && (code == keyUp || code == keyDown): // tiles: a row up or down, if there's one
+		to := p.sel + p.tiles
+		if code == keyUp {
+			to = p.sel - p.tiles
+		}
+		if to >= 0 && to < len(p.shown) {
+			p.sel = to
+		}
+	case code == keyUp || code == kobo.KeyTab && m.shift || p.tiles > 0 && code == keyLeft:
 		p.sel = (p.sel + len(p.shown) - 1) % max(1, len(p.shown))
-	case code == keyDown || code == kobo.KeyTab:
+	case code == keyDown || code == kobo.KeyTab || p.tiles > 0 && code == keyRight:
 		p.sel = (p.sel + 1) % max(1, len(p.shown))
 	case code == kobo.KeyBackspace && m.ctrl, m.ctrl && ch == "u":
 		p.query = ""
