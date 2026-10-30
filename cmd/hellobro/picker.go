@@ -226,7 +226,6 @@ func (a *bro) unpick() {
 		return
 	}
 	a.DrawPage()
-	a.drawStat(true)
 }
 
 // goHost connects to h: in the launcher in focus, else in a new window.

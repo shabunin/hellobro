@@ -1,13 +1,14 @@
 package main
 
-// The status bar, along the bottom, fullscreen too: what's
-// playing on the left; the battery, its temperature, CPU and memory use
-// on the right. Ctrl+Shift+B (or its key in keys.conf) shows or hides it
-// (remembered in status-bar), a tap on it plays or pauses.
+// What the bar says of the system, at its right, before the clock: the
+// battery, its temperature, CPU and memory use, read every few seconds
+// (there was a status bar of its own along the bottom for it once).
+// Meta+Shift+B (the command statusbar, or its key in keys.conf) hides the
+// bar or shows it, remembered in bar; a tap on what's playing in it plays
+// or pauses.
 
 import (
 	"fmt"
-	"image"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,88 +18,40 @@ import (
 	"hellobro/kobo"
 )
 
-var statH = 34 // sizes.go: taller for fingers
-
 const (
-	statEvery  = 5 * time.Second
-	statBarTxt = "status-bar"
+	statEvery = 5 * time.Second
+	barTxt    = "bar"
 )
 
 type statBar struct {
-	off         bool            // hidden
-	r           image.Rectangle // on screen; empty when hidden
-	shown       string          // what's on screen
-	at          time.Time       // the last sample
-	sys         string          // the right side, as last sampled
-	idle, total uint64          // /proc/stat's CPU counters at the last sample
-	bat         string          // the battery's sysfs folder, once found
+	at          time.Time // the last sample
+	sys         string    // what it says, as last sampled
+	idle, total uint64    // /proc/stat's CPU counters at the last sample
+	bat         string    // the battery's sysfs folder, once found
 }
 
-func (a *bro) loadStatBar() {
-	b, _ := os.ReadFile(kobo.AppFile(statBarTxt))
-	a.stat.off = strings.TrimSpace(string(b)) == "off"
+// loadBar has the bar hidden if it was. Before anything is laid out.
+func (a *bro) loadBar() {
+	b, _ := os.ReadFile(kobo.AppFile(barTxt))
+	a.BarOff = strings.TrimSpace(string(b)) == "off"
 }
 
-// layoutStat takes the bar's strip off the bottom of the windows' area.
-func (a *bro) layoutStat() {
-	s := &a.stat
-	s.r, s.shown = image.Rectangle{}, ""
-	if s.off {
-		return
+// toggleBar hides the bar, or shows it: the windows have its room
+// meanwhile.
+func (a *bro) toggleBar() {
+	state := "off"
+	if a.BarOff {
+		state = "on"
 	}
-	b := &a.wm.area
-	s.r = image.Rect(b.Min.X, b.Max.Y-statH, b.Max.X, b.Max.Y)
-	b.Max.Y = s.r.Min.Y - wmGap/2
+	os.WriteFile(kobo.AppFile(barTxt), []byte(state+"\n"), 0o644)
+	a.SetBarOff(!a.BarOff)
 }
 
-func (a *bro) toggleStat() {
-	a.stat.off = !a.stat.off
-	state := "on"
-	if a.stat.off {
-		state = "off"
-	}
-	os.WriteFile(kobo.AppFile(statBarTxt), []byte(state+"\n"), 0o644)
-	a.Layout(a.lay)
-	if !a.overlay() && !a.Calibrating() {
-		a.DrawPage()
-		a.MarkFlash(a.lay.Page)
-	}
-}
-
-// statTick samples the system every few seconds.
+// statTick samples the system every few seconds, for the bar.
 func (a *bro) statTick() {
-	if s := &a.stat; !s.r.Empty() && time.Since(s.at) >= statEvery {
+	if s := &a.stat; time.Since(s.at) >= statEvery {
 		s.sample()
-		a.drawStat(false)
-	}
-}
-
-// drawStat draws the bar if what it says changed, or anyway.
-func (a *bro) drawStat(force bool) {
-	s := &a.stat
-	if s.r.Empty() || a.Calibrating() || a.GaugeUp() || a.overlay() {
-		return
-	}
-	if s.at.IsZero() {
-		s.sample()
-	}
-	left := a.nowPlaying()
-	if left == "" {
-		left = "♪"
-		if k := a.keyLabel("music.play"); k != "" {
-			left += "  " + k + ": play"
-		}
-	}
-	if text := left + "\x00" + s.sys; text != s.shown || force {
-		s.shown = text
-		c := a.C
-		c.Fill(s.r, kobo.White)
-		c.Fill(image.Rect(s.r.Min.X, s.r.Min.Y, s.r.Max.X, s.r.Min.Y+2), kobo.Black)
-		t := image.Rect(s.r.Min.X+12, s.r.Min.Y+2, s.r.Max.X-12, s.r.Max.Y)
-		c.Text(a.F.Small, t, s.sys, kobo.Black, kobo.AlignRight)
-		t.Max.X -= kobo.TextWidth(a.F.Small, s.sys) + 32
-		c.Text(a.F.Small, t, left, kobo.Black, kobo.AlignLeft)
-		a.Mark(s.r, true)
+		a.SetSystem(s.sys)
 	}
 }
 
@@ -111,12 +64,12 @@ func (s *statBar) sample() {
 		s.bat = batteryDir()
 	}
 	if c, err := os.ReadFile(s.bat + "/capacity"); err == nil {
-		b := "bat " + strings.TrimSpace(string(c)) + "%"
+		b := strings.TrimSpace(string(c)) + "%"
 		if st, _ := os.ReadFile(s.bat + "/status"); strings.TrimSpace(string(st)) == "Charging" {
 			b += "↑"
 		}
 		if t, err := readInt(s.bat + "/temp"); err == nil {
-			b += fmt.Sprintf(" %d °C", (t+5)/10) // tenths of a degree
+			b += fmt.Sprintf(" %d°C", (t+5)/10) // tenths of a degree
 		}
 		parts = append(parts, b)
 	}

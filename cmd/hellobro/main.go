@@ -102,7 +102,6 @@ func main() {
 	updateTrial() // before anything that might hang
 	a := &bro{media: mediaState{kick: make(chan struct{}, 1)}}
 	a.vk = vkbdState{held: map[*kobo.Gesture]vkHeld{}, latched: map[uint16]bool{}, since: time.Now()}
-	a.loadStatBar()
 	a.set = loadSettings()
 	a.applySizes() // before anything is laid out
 	a.vk.on = a.setting("vkbd") == "on"
@@ -111,6 +110,7 @@ func main() {
 	a.tv.hosts = a.mem.hosts()
 	radio.StateDir = kobo.AppFile("")
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true, Bar: true}, a)
+	a.loadBar() // the App's, before it's up
 	profileOn.Store(a.setting("profile") == "on")
 	alpineBus.Store(a.setting("alpine-bus") == "on")
 	a.applyLightIdle()
@@ -138,7 +138,6 @@ func (a *bro) Layout(L kobo.Layout) {
 	if !L.Full {
 		a.wm.area = a.wm.area.Inset(wmGap / 2)
 	}
-	a.layoutStat()
 	if a.tv.fontPx != 0 {
 		a.termGeometry() // the cells' size
 	}
@@ -171,7 +170,7 @@ func (a *bro) Tap(p image.Point) {
 		a.keySetTap(p)
 	case a.picker != nil:
 		a.pickerTap(p)
-	case p.In(a.stat.r):
+	case !a.lay.Full && !a.BarOff && a.nowPlaying() != "" && p.In(a.StatusNote()): // what's playing, in the bar
 		a.mediaKey(kobo.KeyPlayPause)
 	case !a.lay.Full && p.Y < a.lay.Page.Min.Y: // the bar, not a workspace's name in it
 		a.openWorkspaces()

@@ -30,7 +30,7 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
   - **Settings**, hellobro's own, in groups: Light; Sleep; Keyboard
     (the Bluetooth window when it's gone); Touch (touch marks, how
     workspaces turn by touch); At start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
-    CPU profiles); Terminal (notifications, the status bar); Alpine;
+    CPU profiles); Terminal (notifications, the bar); Alpine;
     Keys;
   - **Battery**: the charge, the current it gives (mA, W), the gauge's
     time left, temperature, how fast it went down lately (measured from
@@ -91,11 +91,16 @@ back as a launcher.
 
 ## The bar and the keys' focus
 
-One bar at the top, as i3's: the workspaces at its left, and at its
-right where the Kobo is on the network, the Wi-Fi's name and its address
-(`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`), the battery
-and the time. It looks again every 15 s. In a binding mode (Meta+R,
-say) it says which (`grab` too, while the keys are grabbed), and what plays, and for a moment what was copied.
+One bar at the top, as i3's, and no other: the workspaces at its left,
+and at its right where the Kobo is on the network, the Wi-Fi's name and
+its address (`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`), the
+battery (charge, temperature), CPU and memory use, and the time
+(`71% 31°C · cpu 7% · ram 71% · 14:05`). The network's looked at every
+15 s, the rest every 5 s. In a binding mode (Meta+R, say) it says which
+(`grab` too, while the keys are grabbed), and what plays (a tap on that
+plays or pauses), and for a moment what was copied. Meta+Shift+B hides
+it, the windows taking its room, and shows it again (Settings, Terminal,
+The bar; remembered in `bar`); a full-screen window has none either.
 
 A swipe up or down along the right edge of the screen opens the menu,
 tiles big enough for a finger, each an icon, a word and its keys: rotate
@@ -117,7 +122,7 @@ lifted after moving, each for 3 s; the log has each touch then, to the
 millisecond.
 
 Settings, Touch, **Sizes**: **for fingers** (the default) has a
-taller bar, status bar and title strips, bigger window buttons, and
+taller bar and title strips, bigger window buttons, and
 taller rows in menus, Settings, Wi-Fi and Bluetooth, the books' and
 notebooks' lists, and the strips over a notebook's page and under a
 book's; **compact** fits more on the screen, for a keyboard. It
@@ -265,6 +270,7 @@ say which; keys.conf still says meta for the Mod key either way.
 | Meta+1…0, Meta+Shift+1…0 | go to a workspace, send the window there |
 | Meta+O | the workspaces as tiles, and a new one |
 | Meta+B, Meta+V | split: the next window beside, below |
+| Meta+Shift+B | hide the bar, show it again |
 | Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
 | Meta+F | fullscreen (or its strip's fullscreen; a swipe in from the top edge leaves it) |
 | Meta+Shift+Space | floating |
@@ -482,10 +488,6 @@ ended is noted above it.
 - Ctrl+= / Ctrl+- / Ctrl+0: font size, the terminal in focus's: the
   others keep theirs. A new terminal takes the size last set. Each
   window's is kept with the layout in `hellobro.json`.
-- A status bar along the bottom, under the windows, fullscreen too: what's playing, and the
-  battery (charge, temperature), CPU and memory use, every 5 s.
-  Ctrl+Shift+B hides or shows it (remembered in `status-bar`); a tap on it
-  plays or pauses.
 - While connected, every other key goes to the remote, Esc included, but
   for hellobro's own (the commands' keys: Meta+Shift+E quits, say). A
   program there that wants one of them gets it if keys.conf frees it:
@@ -971,10 +973,10 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
 
 - Anywhere: Ctrl+Shift+Space plays or pauses, Ctrl+Shift+< and > go to
   the previous and next track; so do media keys, and the volume keys (a
-  headset's, a keyboard's) set the player's volume. A tap on the status
-  bar plays or pauses. They go to the player that's playing, or else one
-  that's paused.
-- What it plays shows in the bar and the status bar, and in light
+  headset's, a keyboard's) set the player's volume. A tap on what plays,
+  in the bar, plays or pauses. They go to the player that's playing, or
+  else one that's paused.
+- What it plays shows in the bar, and in light
   sleep. While it plays, hellobro doesn't quit by itself.
 - Headphones' buttons work only when BlueZ sends them as keys, which it
   does while no media player is registered with it. On the Kobo, Nickel

@@ -142,6 +142,7 @@ type App struct {
 	Tab        int
 	Full       bool           // the page has the whole screen
 	Covered    bool           // the Program has something over the whole screen, the bar too: it's not drawn
+	BarOff     bool           // Config.Bar's bar hidden (SetBarOff): the page has the screen
 	Keyboard   string         // the keyboard connected, if any
 	kbds       map[string]int // the keyboards connected, by name: how many of each
 	LightIdle  time.Duration  // the light goes off after this long untouched (0: never)
@@ -179,6 +180,8 @@ type App struct {
 	call    chan func() // work from goroutines, run on the UI loop
 
 	status     string          // the header's status text, as drawn
+	system     string          // the Program's say on the system (SetSystem), in the status
+	noteR      image.Rectangle // where the status's note is drawn, empty: none
 	note       string          // the Program's, left of it
 	network    string          // the Program's, first: the Wi-Fi and the address
 	dirty      []dirtyRect     // pending screen updates, blitted one at a time
@@ -720,6 +723,17 @@ func (a *App) SwitchTab(t int) {
 }
 
 // SetFull gives the page the whole screen, or puts the app back around it.
+// SetBarOff hides Config.Bar's bar, or shows it: the page has the whole
+// screen meanwhile, the windows of a full screen's Program as it were.
+func (a *App) SetBarOff(off bool) {
+	if off == a.BarOff {
+		return
+	}
+	a.BarOff = off
+	a.WaitBlit()
+	a.relayout()
+}
+
 func (a *App) SetFull(on bool) {
 	if on == a.Full {
 		return

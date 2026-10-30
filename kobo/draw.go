@@ -350,16 +350,22 @@ func (a *App) layout() Layout {
 	for _, t := range a.Tabs() {
 		labels = append(labels, a.cfg.Tabs[t])
 	}
-	return makeLayout(a.scr.info.ViewW, a.scr.info.ViewH, a.F, a.cfg, labels, a.tabInfo, a.Full)
+	return makeLayout(a.scr.info.ViewW, a.scr.info.ViewH, a.F, a.cfg, labels, a.tabInfo, a.Full, a.BarOff)
 }
 
 // makeLayout places the frame for tabs (their labels, as shown, and with
-// Config.Bar what's in each); full gives the whole screen to the page.
-func makeLayout(w, h int, f Fonts, cfg Config, tabs, info []string, full bool) Layout {
+// Config.Bar what's in each); full gives the whole screen to the page,
+// and so does barOff with Config.Bar, the page still a page.
+func makeLayout(w, h int, f Fonts, cfg Config, tabs, info []string, full, barOff bool) Layout {
 	L := Layout{W: w, H: h, Landscape: w > h, Full: full, bar: cfg.Bar}
 	if full { // no header, tabs or footer: nothing else to draw or tap
 		L.Page = image.Rect(0, 0, w, h)
 		L.Body = L.Page
+		return L
+	}
+	if cfg.Bar && barOff {
+		L.Page = image.Rect(0, 0, w, h)
+		L.Body = L.Page.Inset(Pad)
 		return L
 	}
 	if cfg.Bar {
@@ -780,6 +786,19 @@ func (a *App) SetStatus(note string) {
 	}
 }
 
+// SetSystem puts what the Program says of the system (the battery, the
+// CPU) in the status, after the network, for the battery's percentage.
+func (a *App) SetSystem(s string) {
+	if s != a.system {
+		a.system = s
+		a.drawStatus()
+	}
+}
+
+// StatusNote is where the status's note (SetStatus) is drawn, for a tap
+// on it; empty when there's none.
+func (a *App) StatusNote() image.Rectangle { return a.noteR }
+
 // SetNetwork puts the network first in the header's status, where the
 // orientation goes otherwise: "home-wifi · 192.168.1.20".
 func (a *App) SetNetwork(s string) {
@@ -799,26 +818,28 @@ func (a *App) Notify(text string) {
 
 // drawStatus refreshes the note, battery & clock text, if they changed.
 func (a *App) drawStatus() {
-	s := statusText(a.scr.info, a.network)
+	s := statusText(a.scr.info, a.network, a.system)
 	note := a.note
 	if a.notice != "" {
 		note = a.notice
 	}
-	if s+"\x00"+note == a.status || a.calib != nil || a.Full || a.Covered {
+	if s+"\x00"+note == a.status || a.calib != nil || a.Full || a.Covered || a.L.status.Empty() {
 		return
 	}
 	a.status = s + "\x00" + note
 	r := a.L.status
 	a.C.Fill(r, Black)
 	a.C.Text(a.F.Small, r, s, Light, AlignRight)
+	a.noteR = image.Rectangle{}
 	if note != "" {
 		r.Max.X -= TextWidth(a.F.Small, s) + 28
 		a.C.Text(a.F.Small, r, note, White, AlignRight)
+		a.noteR = image.Rect(max(r.Min.X, r.Max.X-TextWidth(a.F.Small, note)), r.Min.Y, r.Max.X, r.Max.Y)
 	}
 	a.Mark(a.L.status, true)
 }
 
-func statusText(s ScreenInfo, network string) string {
+func statusText(s ScreenInfo, network, system string) string {
 	first := network
 	switch {
 	case first != "":
@@ -828,7 +849,9 @@ func statusText(s ScreenInfo, network string) string {
 		first = "portrait"
 	}
 	parts := []string{first}
-	if b, err := os.ReadFile("/sys/class/power_supply/battery/capacity"); err == nil {
+	if system != "" {
+		parts = append(parts, system)
+	} else if b, err := os.ReadFile("/sys/class/power_supply/battery/capacity"); err == nil {
 		bat := strings.TrimSpace(string(b)) + "%"
 		if st, err := os.ReadFile("/sys/class/power_supply/battery/status"); err == nil && strings.TrimSpace(string(st)) == "Charging" {
 			bat += " charging"
@@ -840,7 +863,7 @@ func statusText(s ScreenInfo, network string) string {
 }
 
 func (a *App) drawTabs() {
-	if a.Full || a.Covered {
+	if a.Full || a.Covered || a.BarOff && a.L.bar {
 		return
 	}
 	if a.L.bar {

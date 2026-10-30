@@ -118,3 +118,20 @@ func TestSqueeze(t *testing.T) {
 		}
 	}
 }
+
+// The bar hidden (SetBarOff), the page has the screen, with nothing of
+// the bar's left to draw or tap; shown, it's under the bar.
+func TestLayoutBarOff(t *testing.T) {
+	f, cfg := LoadFonts(), Config{Bar: true}
+	on := makeLayout(1404, 1872, f, cfg, []string{"1", "2"}, nil, false, false)
+	off := makeLayout(1404, 1872, f, cfg, []string{"1", "2"}, nil, false, true)
+	if on.Page.Min.Y != barH || len(on.tabs) != 2 || on.status.Empty() {
+		t.Errorf("bar shown: page %v, %d tabs, status %v", on.Page, len(on.tabs), on.status)
+	}
+	if off.Page != image.Rect(0, 0, 1404, 1872) || off.Full || len(off.tabs) != 0 || !off.status.Empty() || !off.tabBar.Empty() {
+		t.Errorf("bar hidden: page %v, full %v, %d tabs, status %v, bar %v", off.Page, off.Full, len(off.tabs), off.status, off.tabBar)
+	}
+	if off.Body != off.Page.Inset(Pad) {
+		t.Errorf("bar hidden: body %v, want the page's inset", off.Body)
+	}
+}

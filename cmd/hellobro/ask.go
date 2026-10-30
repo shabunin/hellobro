@@ -139,7 +139,6 @@ func (a *bro) answer(i int) {
 	}
 	a.asking = nil
 	a.DrawPage()
-	a.drawStat(true)
 	if i >= 0 && q.opts[i].do != nil {
 		q.opts[i].do()
 	}

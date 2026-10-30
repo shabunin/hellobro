@@ -743,7 +743,6 @@ func (a *bro) Draw() {
 	a.drawTabs()
 	if a.sketching() {
 		a.drawSketch()
-		a.drawStat(true)
 		a.drawVkbd(nil)
 		return
 	}
@@ -753,7 +752,6 @@ func (a *bro) Draw() {
 		}
 	}
 	a.drawFloats(image.Rectangle{})
-	a.drawStat(true)
 	a.drawVkbd(nil)
 }
 

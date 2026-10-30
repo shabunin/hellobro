@@ -78,7 +78,6 @@ func (a *bro) drawInfo() {
 func (a *bro) closeInfo() {
 	a.info = nil
 	a.DrawPage()
-	a.drawStat(true)
 }
 
 // infoText is what's copied: a fact a line.

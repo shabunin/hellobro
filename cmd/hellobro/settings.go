@@ -102,7 +102,7 @@ var settingList = []setting{
 	{key: "notify-note", label: "… a note in the corner, if it doesn't", title: "Notifications: a note in the corner, if it doesn't",
 		values: []string{"3", "5", "10", "off"},
 		shown:  []string{"for 3 s", "for 5 s", "for 10 s", "none"}},
-	{key: "status-bar", label: "Status bar%s", cmd: "statusbar",
+	{key: "bar", label: "The bar%s", cmd: "statusbar",
 		values: []string{"on", "off"},
 		shown:  []string{"shown", "hidden"}},
 	{key: "alpine-bus", group: "Alpine", label: "System bus access", title: "Alpine: system bus access",
@@ -160,7 +160,7 @@ func settingCommands() []*command {
 	var cs []*command
 	for i, st := range settingList {
 		switch st.key {
-		case "share", "relay", "status-bar", "tabs", "keys":
+		case "share", "relay", "bar", "tabs", "keys":
 			continue
 		case "languages":
 			cs = append(cs, &command{id: "languages", title: "Setting: Languages to type in, ticked", run: (*bro).openLangs})
@@ -236,7 +236,7 @@ func loadSettings() settings {
 func (s settings) save() {
 	var b strings.Builder
 	for _, st := range settingList {
-		if st.key != "status-bar" && st.key != "tabs" && st.key != "keys" && st.key != "alpine-remove" { // kept in their own files, or none
+		if st.key != "bar" && st.key != "tabs" && st.key != "keys" && st.key != "alpine-remove" { // kept in their own files, or none
 			fmt.Fprintf(&b, "%s=%s\n", st.key, st.values[s[st.key]])
 		}
 	}
@@ -250,8 +250,8 @@ func (a *bro) setting(key string) string {
 	for _, st := range settingList {
 		if st.key == key {
 			switch key {
-			case "status-bar":
-				return map[bool]string{false: "on", true: "off"}[a.stat.off]
+			case "bar":
+				return map[bool]string{false: "on", true: "off"}[a.BarOff]
 			case "keys":
 				return fmt.Sprint(a.keys.named)
 			}
@@ -280,8 +280,8 @@ func (a *bro) stepSetting(i, d int) {
 	case "languages":
 		a.openLangs()
 		return
-	case "status-bar":
-		a.toggleStat()
+	case "bar":
+		a.toggleBar()
 	case "share": // off, on, pair: pairing turns it on and opens pairing, and stays "on"
 		was := a.set[st.key]
 		n := len(st.values)

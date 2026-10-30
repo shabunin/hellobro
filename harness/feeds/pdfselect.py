@@ -20,8 +20,8 @@ start()
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
 fullscreen(); time.sleep(5)
-tool = (W // 2 + 12, H - 75)                         # the fourth of the strip's buttons, over the status bar (the zoom's right of it)
-zout, zfit, zin = [(W // 2 + x, H - 75) for x in (128, 212, 296)]  # − 100% +
+tool = (W // 2 + 12, H - 52)                         # the fourth of the strip's buttons (the zoom's right of it)
+zout, zfit, zin = [(W // 2 + x, H - 52) for x in (128, 212, 296)]  # − 100% +
 tap(*tool); time.sleep(3)
 half = int(min(W, H) * 0.2)
 x0, y0, x1, y1 = W // 2 - half, int(H * 0.30), W // 2 + half, int(H * 0.42)

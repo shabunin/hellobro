@@ -9,7 +9,7 @@ Kobo e-reader. Bring a Bluetooth keyboard.
 </p>
 <p align="center">
   <img src="docs/screenshots/ssh.png" width="48.5%" alt="An SSH session">
-  <img src="docs/screenshots/ncmpcpp.png" width="48.5%" alt="ncmpcpp on mpd, the bar and the status bar showing what plays">
+  <img src="docs/screenshots/ncmpcpp.png" width="48.5%" alt="ncmpcpp on mpd, the bar showing what plays">
 </p>
 <p align="center">
   <img src="docs/screenshots/tiling.png" width="48.5%" alt="Wi-Fi, Sharing, Bluetooth and Settings, tiled">
@@ -57,7 +57,7 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   terminal on the Kobo itself.
 - **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to
   Bluetooth headphones. The media keys and the headphones' buttons work,
-  and the status bar shows what plays.
+  and the bar shows what plays.
 - **Sleep when idle**: untouched for 30 minutes on battery (Settings),
   the Kobo sleeps (music or not), so one left on the shelf keeps its
   charge. A toast at 10%.

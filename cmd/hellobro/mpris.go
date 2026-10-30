@@ -232,7 +232,6 @@ func (a *bro) setPlayers(ps []player) {
 	a.media.players = ps
 	if now := a.nowPlaying(); now != was {
 		a.SetStatus(now)
-		a.drawStat(false)
 	}
 	a.SetLockLines(a.lockLines())
 }
