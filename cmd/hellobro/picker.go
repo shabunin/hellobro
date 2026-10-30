@@ -136,6 +136,9 @@ func (a *bro) openTiles(title, hint string, entries []pickEntry) {
 func pickTileH() int { return pickRowH * 7 / 4 }
 
 func (a *bro) showPicker(p *picker) {
+	if a.picker != nil && a.picker.wide && !p.wide { // the bar back first: this one leaves it be
+		a.unpick()
+	}
 	b := a.screenFree()
 	w := min(1100, b.Dx()-80)
 	n := len(p.all)
@@ -146,6 +149,7 @@ func (a *bro) showPicker(p *picker) {
 	top := b.Min.Y + max(40, b.Dy()/8)
 	if p.wide { // the whole screen: as many across as makes them biggest
 		p.box = b
+		a.Covered = true // the bar's not drawn over it
 		p.tiles, p.tileW, p.tileH = wideTiles(n, b.Dx()-40, b.Dy()-p.chrome()-16, a.wm.area)
 		a.picker = p
 		a.filterPicker()
@@ -183,9 +187,7 @@ func wideTiles(n, w, h int, area image.Rectangle) (cols, tileW, tileH int) {
 
 // closePicker takes the menu down; the page comes back.
 func (a *bro) closePicker() {
-	a.picker = nil
-	a.DrawPage()
-	a.drawStat(true)
+	a.unpick()
 }
 
 // pick runs the entry shown at n.
@@ -209,9 +211,22 @@ func (a *bro) pick(n int) {
 		}
 		return
 	}
-	a.picker = nil
-	a.DrawPage() // what's under the menu, whatever comes next draws over it
+	a.unpick() // what's under the menu, whatever comes next draws over it
 	e.do()
+}
+
+// unpick takes the menu down and draws what was under it: the page, or
+// for one over the whole screen (the workspaces') the bar too.
+func (a *bro) unpick() {
+	wide := a.picker != nil && a.picker.wide
+	a.picker = nil
+	if wide {
+		a.Covered = false
+		a.DrawAll()
+		return
+	}
+	a.DrawPage()
+	a.drawStat(true)
 }
 
 // goHost connects to h: in the launcher in focus, else in a new window.

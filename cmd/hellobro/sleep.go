@@ -69,8 +69,8 @@ func (a *bro) Sleep() func() {
 	a.slp.asleep = true
 	a.noteExit() // what's written, and where each book is, kept: it may not wake
 	a.bookExit()
-	a.picker = nil   // the sleep screen goes over it; waking draws the page
-	a.pausePlayers() // the Bluetooth audio goes with the radio: on again after, where it was
+	a.picker, a.Covered = nil, false // the sleep screen goes over it; waking draws the page
+	a.pausePlayers()                 // the Bluetooth audio goes with the radio: on again after, where it was
 	a.unmountAll(true)
 	a.radioStart()
 	r, s := &a.rs, &a.slp
@@ -162,7 +162,7 @@ func (a *bro) lock() {
 	if k == "" {
 		hint = ""
 	}
-	a.picker = nil // what's open stays put; the switcher would only be in the way
+	a.picker, a.Covered = nil, false // what's open stays put; the switcher would only be in the way
 	a.App.Lock(hint, a.lockLines())
 	if a.Keyboard == "" || k == "" { // no key to unlock it: swipes
 		a.SetLockSwipes(a.lockSwipes())

@@ -141,6 +141,7 @@ type App struct {
 	L          Layout
 	Tab        int
 	Full       bool           // the page has the whole screen
+	Covered    bool           // the Program has something over the whole screen, the bar too: it's not drawn
 	Keyboard   string         // the keyboard connected, if any
 	kbds       map[string]int // the keyboards connected, by name: how many of each
 	LightIdle  time.Duration  // the light goes off after this long untouched (0: never)

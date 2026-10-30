@@ -748,6 +748,10 @@ func (a *App) drawAll(flash bool) {
 	a.markAll(flash)
 }
 
+// DrawAll draws everything again: after something that covered the
+// whole screen, the bar and the footer too.
+func (a *App) DrawAll() { a.drawAll(false) }
+
 func (a *App) drawHeader() {
 	if a.Full || a.L.bar { // the bar has it all: drawTabs
 		return
@@ -800,7 +804,7 @@ func (a *App) drawStatus() {
 	if a.notice != "" {
 		note = a.notice
 	}
-	if s+"\x00"+note == a.status || a.calib != nil || a.Full {
+	if s+"\x00"+note == a.status || a.calib != nil || a.Full || a.Covered {
 		return
 	}
 	a.status = s + "\x00" + note
@@ -836,7 +840,7 @@ func statusText(s ScreenInfo, network string) string {
 }
 
 func (a *App) drawTabs() {
-	if a.Full {
+	if a.Full || a.Covered {
 		return
 	}
 	if a.L.bar {
