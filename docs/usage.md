@@ -785,7 +785,7 @@ its gray.
   plain, for the whole notebook.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
   last page, if it has something on it, a new page. Once a pen has
-  written, a finger swiped across the page turns it too (leftward: the
+  written (or as the settings say, below), a finger swiped across the page turns it too (leftward: the
   next, as pages turn).
 - The page counter between the arrows (or O) shows all the pages
   small, a screenful at a time (the arrows, PgUp, PgDn or a finger
@@ -800,9 +800,12 @@ its gray.
   or O, goes back to the page.
 - Till then fingers write: a stylus without a battery (or a Kobo Stylus
   with a flat one) is a finger to the screen. A pen seen once is
-  remembered (`pen` in `hellobro.json`); take it out to write with
-  fingers again. Near the left and right edges a finger writes nothing:
-  those are the light's and the workspaces' swipes.
+  remembered (`pen` in `hellobro.json`). Settings, Touch, **A finger
+  in a notebook** chooses instead: **writes** (fingers always write, as
+  the pen does) or **turns** (fingers only turn pages, so a hand resting
+  on the screen writes nothing; only the pen writes). Near the left and
+  right edges a finger writes nothing: those are the light's and the
+  workspaces' swipes (full screen, the edges are the page's too).
 - A page is the screen's shape, upright, fitted into the window. Where
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;

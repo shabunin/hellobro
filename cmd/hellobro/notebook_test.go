@@ -342,3 +342,24 @@ func TestNoteChangedOnDisk(t *testing.T) {
 		t.Errorf("again: %q, %v", w.nb.name, err)
 	}
 }
+
+// A finger turns a notebook's pages, or writes: as the settings say, or
+// once a pen has written.
+func TestFingerTurns(t *testing.T) {
+	for _, c := range []struct {
+		set  string
+		pen  bool
+		want bool
+	}{
+		{"auto", false, false}, {"auto", true, true},
+		{"writes", false, false}, {"writes", true, false},
+		{"turns", false, true}, {"turns", true, true},
+	} {
+		st := settingList[settingIndex("note-finger")]
+		a := &bro{set: settings{"note-finger": slices.Index(st.values, c.set)}}
+		a.mem.Pen = c.pen
+		if got := a.fingerTurns(); got != c.want {
+			t.Errorf("%s, pen %v: turns %v, want %v", c.set, c.pen, got, c.want)
+		}
+	}
+}

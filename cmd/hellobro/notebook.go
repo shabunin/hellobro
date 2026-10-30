@@ -1079,11 +1079,9 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if w.selecting {
 		return a.noteSelTouch(w, slot, p, g)
 	}
-	if !ev.Pen {
-		if a.mem.Pen {
-			g.Owner = ownLeaf
-			return true
-		}
+	if !ev.Pen && a.fingerTurns() {
+		g.Owner = ownLeaf
+		return true
 	}
 	if a.nt.ink != nil {
 		return false
@@ -1099,6 +1097,19 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	a.Ink(true)
 	a.noteInkTo(k, p, a.notePressure(ev))
 	return true
+}
+
+// fingerTurns is whether a finger on a notebook's page turns it,
+// rather than writing: as the settings say, or by itself once a pen has
+// written (a stylus without a battery is a finger to the screen).
+func (a *bro) fingerTurns() bool {
+	switch a.setting("note-finger") {
+	case "writes":
+		return false
+	case "turns":
+		return true
+	}
+	return a.mem.Pen
 }
 
 // notePressure is how hard the pen pressed; a finger's is a middling
