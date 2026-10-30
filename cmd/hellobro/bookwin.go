@@ -975,7 +975,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 			return true
 		}
 		w.ex = nil
-		a.exAsk(false)
+		a.vkAsk(false)
 		if ok {
 			a.exRun(w.exCmds(a), e.text, func(text string) { w.exOpen(a, text) })
 		}
@@ -1140,7 +1140,7 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 	}
 	if w.ex != nil { // a tap elsewhere leaves the line
 		w.ex = nil
-		a.exAsk(false)
+		a.vkAsk(false)
 		w.draw(a)
 		return
 	}
@@ -1193,12 +1193,11 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 func (w *bookWin) closing(a *bro) {
 	if w.ex != nil {
 		w.ex = nil
-		a.exAsk(false)
+		a.vkAsk(false)
 	}
 	if w.edit != nil {
 		w.edit = nil
-		a.vk.ask = false
-		a.vkApply()
+		a.vkAsk(false)
 	}
 	w.gone = true
 	w.save(a)

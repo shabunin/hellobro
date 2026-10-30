@@ -377,6 +377,10 @@ type radiosWere struct {
 func (a *bro) airplane() {
 	a.radioStart()
 	r := &a.rs
+	if r.wBusy != "" { // which were on isn't kept till it's done
+		a.Toast("the radios are busy: a moment", 3*time.Second)
+		return
+	}
 	wifi, bt := r.wifi, r.bt
 	if was := a.mem.Airplane; was != nil {
 		a.mem.Airplane = nil

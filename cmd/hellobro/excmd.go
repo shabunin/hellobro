@@ -160,12 +160,6 @@ func exKey(e *exLine, code uint16, ch string) (done, ok bool) {
 	return nameKey(&e.text, code, ch)
 }
 
-// exAsk shows the keyboard on the screen for the line, or lets it go.
-func (a *bro) exAsk(on bool) {
-	a.vk.ask = on
-	a.vkApply()
-}
-
 // exNumber is arg as a page's number (from 1), or how far in ("40%").
 func exNumber(arg string) (n int, pct bool, err error) {
 	s, pct := strings.CutSuffix(arg, "%")

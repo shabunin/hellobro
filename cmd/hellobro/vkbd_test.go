@@ -3,6 +3,7 @@ package main
 import (
 	"image"
 	"testing"
+	"time"
 
 	"hellobro/kobo"
 )
@@ -32,6 +33,34 @@ func TestVkLayout(t *testing.T) {
 		}
 		if right != page.Max.X || rest.Dx() < page.Dx()*4/5 || rest.Dy() < page.Dy()/2 {
 			t.Errorf("%v: rows to %d, %v left", page, right, rest)
+		}
+	}
+}
+
+func TestVkWanted(t *testing.T) {
+	vals := settingList[settingIndex("vkbd")].values
+	for _, c := range []struct {
+		set, kbd string
+		ask      bool
+		said     int
+		want     bool
+	}{
+		{set: "fields", want: false},
+		{set: "fields", ask: true, want: true},
+		{set: "fields", ask: true, kbd: "NuPhy", want: false},
+		{set: "off", ask: true, want: false},
+		{set: "auto", want: true},
+		{set: "auto", kbd: "NuPhy", want: false},
+		{set: "on", kbd: "NuPhy", want: true},
+		{set: "fields", said: 1, want: true}, // swiped up
+		{set: "on", said: -1, want: false},   // swiped down
+		{set: "off", said: 1, want: true},    // the menu's
+		{set: "fields", ask: true, said: -1, want: false},
+	} {
+		a := &bro{App: &kobo.App{Keyboard: c.kbd}, set: settings{"vkbd": indexOf(vals, c.set)}}
+		a.vk = vkbdState{ask: c.ask, said: c.said, since: time.Now().Add(-time.Minute)}
+		if got := a.vkWanted(); got != c.want {
+			t.Errorf("%+v: shows %v", c, got)
 		}
 	}
 }

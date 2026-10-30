@@ -299,8 +299,7 @@ func (w *notesWin) startEdit(a *bro, key string, dir bool, text string) {
 	if key == "" {
 		w.sel = 0
 	}
-	a.vk.ask = true
-	a.vkApply()
+	a.vkAsk(true)
 	w.draw(a)
 }
 
@@ -308,8 +307,7 @@ func (w *notesWin) startEdit(a *bro, key string, dir bool, text string) {
 func (w *notesWin) endEdit(a *bro, ok bool) {
 	e := w.edit
 	w.edit = nil
-	a.vk.ask = false
-	defer a.vkApply()
+	defer a.vkAsk(false)
 	if ok && e != nil {
 		if err := w.rename(a, e); err != nil {
 			a.Notify(err.Error())
@@ -630,7 +628,6 @@ func (w *notesWin) closing(a *bro) {
 	w.move = nil
 	if w.edit != nil {
 		w.edit = nil
-		a.vk.ask = false
-		a.vkApply()
+		a.vkAsk(false)
 	}
 }

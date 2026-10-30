@@ -10,8 +10,12 @@ package main
 // swipes start, waits: lifted it's a tap, held it's pressed, and moved
 // it's the swipe (the menu's, a workspace's).
 //
-// It's Settings' "On-screen keyboard": off, on, or auto, which shows it
-// a while after the last keyboard went and hides it as one comes.
+// It's Settings' "On-screen keyboard": off; fields, only while a text
+// field is typed in (a name, the find line, a note's text); auto, which
+// shows it a while after the last keyboard went and hides it as one
+// comes; or on. Two fingers swiped up from the screen's foot show it
+// whatever the setting, and down onto it hide it, as the menu's
+// Keyboard does: till a field comes, or a keyboard.
 
 import (
 	"image"
@@ -30,6 +34,7 @@ const (
 	vkEvery    = 80 * time.Millisecond
 	vkAutoWait = 10 * time.Second // a keyboard's naps and blips are shorter
 	vkSlop     = 30               // px a finger on a key at an edge may wander before it's a swipe
+	vkFoot     = 100              // px up from the screen's foot where two fingers swiped up show it
 )
 
 type vkey struct {
@@ -55,6 +60,7 @@ type vkbdState struct {
 	next    time.Time       // the held key's next repeat
 	since   time.Time       // the keyboard went (or we started): auto waits from it
 	ask     bool            // a name's being typed (notelist.go): it shows if there's no keyboard
+	said    int             // shown (1) or hidden (-1) by a swipe or the menu, whatever the setting
 }
 
 // vkItem is a key in a row, w units wide; code 0 is a gap.
@@ -341,10 +347,14 @@ func (a *bro) vkTick() {
 
 // vkWanted says whether it should show now.
 func (a *bro) vkWanted() bool {
-	if a.vk.ask && a.Keyboard == "" {
+	if a.vk.said != 0 {
+		return a.vk.said > 0
+	}
+	set := a.setting("vkbd")
+	if a.vk.ask && a.Keyboard == "" && set != "off" {
 		return true
 	}
-	switch a.setting("vkbd") {
+	switch set {
 	case "on":
 		return true
 	case "auto":
@@ -371,11 +381,59 @@ func (a *bro) vkApply() {
 	}
 }
 
-// vkToggle shows it if it's hidden, else hides it: the setting on or off.
+// vkToggle shows it if it's hidden, else hides it, whatever the
+// setting: till a text field wants it, or a keyboard comes.
 func (a *bro) vkToggle() {
-	i := settingIndex("vkbd")
-	a.set["vkbd"] = indexOf(settingList[i].values, map[bool]string{false: "on", true: "off"}[a.vk.on])
-	a.set.save()
+	a.vk.said = map[bool]int{false: 1, true: -1}[a.vk.on]
 	a.vkApply()
-	a.drawSettings()
+}
+
+// vkAsk shows it for a text field being typed in, if there's no other
+// keyboard (and even if it was hidden), or lets it go.
+func (a *bro) vkAsk(on bool) {
+	if on && a.vk.said < 0 {
+		a.vk.said = 0
+	}
+	a.vk.ask = on
+	a.vkApply()
+}
+
+// vkSwipe takes two fingers going up from the screen's foot (shown), or
+// down onto it while it shows (hidden): true once it's done.
+func (a *bro) vkSwipe(f, g *kobo.Gesture) bool {
+	if a.Locked() {
+		return false
+	}
+	up := func(g *kobo.Gesture) int { // how far up it went, if it's mostly up
+		d := g.Last.Sub(g.Start)
+		if kobo.Abs(d.Y) < 2*kobo.Abs(d.X) {
+			return 0
+		}
+		return -d.Y
+	}
+	foot := a.C.Bounds().Max.Y - vkFoot
+	switch {
+	case !a.vk.on && f.Start.Y >= foot && g.Start.Y >= foot:
+		if up(f) < pairSwipe || up(g) < pairSwipe {
+			return false
+		}
+		a.vk.said = 1
+	case a.vk.on && f.Start.Y < a.vk.top && g.Start.Y < a.vk.top:
+		if up(f) > -pairSwipe || up(g) > -pairSwipe || max(f.Last.Y, g.Last.Y) < a.vk.top-pairSwipe {
+			return false
+		}
+		a.vk.said = -1
+	default:
+		return false
+	}
+	log.Printf("two-finger swipe: on-screen keyboard %v", a.vk.said > 0)
+	a.vkApply()
+	return true
+}
+
+// vkFromFoot says f and g both came down at the screen's foot: two
+// fingers for the keyboard, not a pinch.
+func (a *bro) vkFromFoot(f, g *kobo.Gesture) bool {
+	foot := a.C.Bounds().Max.Y - vkFoot
+	return !a.vk.on && f.Start.Y >= foot && g.Start.Y >= foot
 }

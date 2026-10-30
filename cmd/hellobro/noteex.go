@@ -103,7 +103,7 @@ func (w *noteWin) exOpen(a *bro, text string) {
 		return
 	}
 	w.ex = &exLine{text: text}
-	a.exAsk(true)
+	a.vkAsk(true)
 	a.drawEx(a.exStrip(w.p.Body), w.ex, w.exCmds(a))
 }
 

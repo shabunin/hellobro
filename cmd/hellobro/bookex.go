@@ -95,7 +95,7 @@ func (w *bookWin) exOpen(a *bro, text string) {
 		return
 	}
 	w.ex, w.note = &exLine{text: text}, nil
-	a.exAsk(true)
+	a.vkAsk(true)
 	w.draw(a)
 }
 

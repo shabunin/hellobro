@@ -128,7 +128,7 @@ func (w *noteWin) textAt(a *bro, page int, p image.Point) {
 		w.nb.pages[page] = append(w.nb.pages[page], k.s)
 	}
 	w.typing = k
-	a.exAsk(true) // the on-screen keyboard, if there's no other
+	a.vkAsk(true) // the on-screen keyboard, if there's no other
 	w.typed(a, k.s.box)
 }
 
@@ -140,7 +140,7 @@ func (w *noteWin) endTyping(a *bro) {
 		return
 	}
 	w.typing = nil
-	a.exAsk(false)
+	a.vkAsk(false)
 	pg := w.nb.pages[k.page]
 	put := func(s *noteStroke) { // in k.s's place
 		for i := range pg {

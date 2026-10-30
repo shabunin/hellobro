@@ -58,6 +58,20 @@ def stroke(pts, slot=0, pen=False, pressure=None):
     else:
         frame(slot, ID=-1)
     time.sleep(0.6)
+def pair(a, b, dx, dy, n=20):
+    """Two fingers down at a and b, going dx, dy together in n steps."""
+    ids = []
+    for slot, (x, y) in enumerate((a, b)):
+        tid[0] += 1; ids.append(tid[0])
+        frame(slot, ID=tid[0], TOOL=0, **at(x, y), P=30); time.sleep(0.02)
+    for i in range(1, n + 1):
+        for slot, (x, y) in enumerate((a, b)):
+            frame(slot, **at(x + dx * i // n, y + dy * i // n), P=30)
+        time.sleep(0.012)
+    for slot in (0, 1):
+        frame(slot, ID=-1)
+    time.sleep(0.6)
+
 def keys(text):
     shifted = '!@#$%^&*()_+QWERTYUIOP{}ASDFGHJKL:"~|ZXCVBNM<>?'
     rows = [(2, "1234567890-=", "!@#$%^&*()_+"), (16, "qwertyuiop[]", "QWERTYUIOP{}"),

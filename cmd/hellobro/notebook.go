@@ -932,7 +932,7 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 	w.endTyping(a)
 	if w.ex != nil { // a tap leaves the line
 		w.ex = nil
-		a.exAsk(false)
+		a.vkAsk(false)
 		w.draw(a)
 		return
 	}
@@ -1028,7 +1028,7 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 			return true
 		}
 		w.ex = nil
-		a.exAsk(false)
+		a.vkAsk(false)
 		if ok {
 			a.exRun(w.exCmds(a), e.text, func(text string) { w.exOpen(a, text) })
 		}
@@ -1077,7 +1077,7 @@ func (w *noteWin) closing(a *bro) {
 	w.endTyping(a)
 	if w.ex != nil {
 		w.ex = nil
-		a.exAsk(false)
+		a.vkAsk(false)
 	}
 	if a.nt.ink != nil && a.nt.ink.w == w {
 		a.nt.ink = nil
@@ -1183,6 +1183,9 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		a.mem.save()
 	}
 	if !ev.Pen && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) { // the edges' swipes (none full screen)
+		return false
+	}
+	if !ev.Pen && !a.vk.on && p.Y >= a.C.Bounds().Max.Y-vkFoot { // the foot's: two fingers there bring the keyboard
 		return false
 	}
 	if w.selecting {

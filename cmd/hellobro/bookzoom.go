@@ -212,7 +212,7 @@ func (a *bro) pairMove() {
 	if a.pinch == nil {
 		w, ok := a.windowAt(f.Start).(*bookWin)
 		d0 := dist(f.Start, g.Start)
-		if !ok || !w.canZoom() || a.windowAt(g.Start) != window(w) || math.Abs(d1-d0) < pinchStart {
+		if !ok || !w.canZoom() || a.windowAt(g.Start) != window(w) || math.Abs(d1-d0) < pinchStart || a.vkFromFoot(f, g) {
 			a.pairSwipe()
 			return
 		}

@@ -40,7 +40,9 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   reconnects by itself. tmux, htop, helix, Claude Code all work.
 - **On-screen keyboard**: a laptop's rows under the windows and the
   modifiers in strips at the sides, for when there's no Bluetooth
-  keyboard: shown always, or by itself while none is connected.
+  keyboard: shown for a text field only, by itself while none is
+  connected, or always; two fingers swiped up from the screen's foot
+  bring it.
 - **Books**: a reader for EPUBs, in the Kobo's own fonts, with the
   books' pictures and styles, a page at a time, with bookmarks; and
   PDFs, drawn by MuPDF, their margins trimmed, pinched to zoom.

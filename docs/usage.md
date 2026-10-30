@@ -158,11 +158,19 @@ on), and a finger that moves is the edge's swipe, the menu's or a
 workspace's, as it is without the keyboard. The light's swipe is above
 the left strip.
 
-Settings, **On-screen keyboard**: off; auto, shown once no keyboard has
-been connected for 10 s (and hidden as one connects); or always. The
-menu's **On-screen keyboard: show / hide** (keys.conf: `keyboard`) sets
-it on or off. While it shows, a keyboard gone doesn't bring up the
-Bluetooth window.
+Settings, **On-screen keyboard**: for a text field (the first, at
+first), shown only while one is typed in, with no keyboard connected: a
+name, the launcher's find line, a ":" line, a notebook's text, and
+hidden once it's done (never for a terminal); off; auto, shown once no
+keyboard has been connected for 10 s (and hidden as one connects); or
+always.
+
+Two fingers swiped up from the screen's very foot (the last 100 px)
+show it whatever the setting, full screen too; two fingers swiped down
+onto it hide it. The menu's **Keyboard** (keys.conf: `keyboard`) does
+the same, showing it or hiding it. Either holds till a text field
+wants it (it shows again) or a keyboard connects. While it shows, a
+keyboard gone doesn't bring up the Bluetooth window.
 
 A question over the page (a saved host's menu, read-only or
 read-write, restart into a new build) has its answers as buttons: the

@@ -231,6 +231,9 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 			if a.keyLabel("lock") != "" {
 				a.SetLockSwipes(nil) // its keys unlock again
 			}
+			if a.vk.said > 0 { // shown by hand: a keyboard's here now
+				a.vk.said = 0
+			}
 			a.kbdBack()
 		}
 		return true
@@ -374,7 +377,14 @@ func (a *bro) pairUp(g *kobo.Gesture) bool {
 // before (to the right), once both have gone far enough across.
 func (a *bro) pairSwipe() {
 	f, g := a.pair[0], a.pair[1]
-	if f == nil || g == nil || a.Full { // full screen, only a swipe from the top leaves it
+	if f == nil || g == nil {
+		return
+	}
+	if a.vkSwipe(f, g) {
+		a.pair = [2]*kobo.Gesture{}
+		return
+	}
+	if a.Full { // full screen, only a swipe from the top leaves it (and the keyboard's)
 		return
 	}
 	dir := pairDir(f) + pairDir(g)

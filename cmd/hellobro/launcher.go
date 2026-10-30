@@ -414,8 +414,7 @@ func (a *bro) drawMenu(t *termSession) {
 	}
 	pn.picks = append(pn.picks, launchPick{field, func() {
 		m.asked = true
-		a.vk.ask = true
-		a.vkApply()
+		a.vkAsk(true)
 	}})
 	keys := "1–9, or ↑ ↓ ← → and Enter   " + a.keyHints("launcher", "another window", "palette", "the switcher", "kill", "close it") + "   Esc: close this window"
 	c.Text(a.F.Small, image.Rect(bottom.Min.X, field.Max.Y+8, bottom.Max.X, field.Max.Y+8+small), keys, kobo.Mid, kobo.AlignLeft)
@@ -436,8 +435,7 @@ func (a *bro) launchDo(t *termSession, do func()) func() {
 func (a *bro) launchUnask(t *termSession) {
 	if t.pane.menu.asked {
 		t.pane.menu.asked = false
-		a.vk.ask = false
-		a.vkApply()
+		a.vkAsk(false)
 	}
 }
 

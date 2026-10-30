@@ -31,8 +31,7 @@ func placeName(path string, pl bookPlace) string {
 // startRename types a new name for the book at path, in its row.
 func (w *bookWin) startRename(a *bro, path, name string) {
 	w.edit = &noteEdit{key: path, text: name}
-	a.vk.ask = true
-	a.vkApply()
+	a.vkAsk(true)
 	w.draw(a)
 }
 
@@ -40,8 +39,7 @@ func (w *bookWin) startRename(a *bro, path, name string) {
 func (w *bookWin) endRename(a *bro, ok bool) {
 	e := w.edit
 	w.edit = nil
-	a.vk.ask = false
-	defer a.vkApply()
+	defer a.vkAsk(false)
 	if ok && e != nil {
 		if err := renameBook(a, e.key, strings.TrimSpace(e.text)); err != nil {
 			a.Notify(err.Error())
