@@ -53,7 +53,7 @@ var settingList = []setting{
 		values: []string{"15", "30", "60", "off"},
 		shown:  []string{"Bluetooth full screen after 15 s", "Bluetooth full screen after 30 s", "Bluetooth full screen after 1 min", "nothing comes up"}},
 	{key: "vkbd", label: "On-screen keyboard%s", cmd: "keyboard",
-		values: []string{"fields", "off", "auto", "on"},
+		values: []string{"fields", "none", "auto", "on"},
 		shown:  []string{"for a text field (a name, find, a note's text)", "off", "when no keyboard is connected (after 10 s)", "always"}},
 	{key: "touch-marks", group: "Touch", label: "Touch marks",
 		values: []string{"off", "on"},
@@ -140,6 +140,10 @@ func settingLine(i int) int {
 // settingRenamed are keys as they were once, by what they are now.
 var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
+// valueRenamed are values that mean another now: the on-screen
+// keyboard's "off" showed it for a text field.
+var valueRenamed = map[string]string{"vkbd=off": "fields"}
+
 // The defaults, by key: the index of a value.
 var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2}
 
@@ -207,6 +211,9 @@ func loadSettings() settings {
 		for _, st := range settingList {
 			if st.key != k {
 				continue
+			}
+			if now, ok := valueRenamed[k+"="+v]; ok {
+				v = now
 			}
 			for i, sv := range st.values {
 				if sv == v {

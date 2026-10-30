@@ -351,7 +351,7 @@ func (a *bro) vkWanted() bool {
 		return a.vk.said > 0
 	}
 	set := a.setting("vkbd")
-	if a.vk.ask && a.Keyboard == "" && set != "off" {
+	if a.vk.ask && a.Keyboard == "" && set != "none" {
 		return true
 	}
 	switch set {

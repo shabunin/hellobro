@@ -48,13 +48,13 @@ func TestVkWanted(t *testing.T) {
 		{set: "fields", want: false},
 		{set: "fields", ask: true, want: true},
 		{set: "fields", ask: true, kbd: "NuPhy", want: false},
-		{set: "off", ask: true, want: false},
+		{set: "none", ask: true, want: false},
 		{set: "auto", want: true},
 		{set: "auto", kbd: "NuPhy", want: false},
 		{set: "on", kbd: "NuPhy", want: true},
 		{set: "fields", said: 1, want: true}, // swiped up
 		{set: "on", said: -1, want: false},   // swiped down
-		{set: "off", said: 1, want: true},    // the menu's
+		{set: "none", said: 1, want: true},   // the menu's
 		{set: "fields", ask: true, said: -1, want: false},
 	} {
 		a := &bro{App: &kobo.App{Keyboard: c.kbd}, set: settings{"vkbd": indexOf(vals, c.set)}}
