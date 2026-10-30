@@ -87,8 +87,8 @@ func (a *bro) openWorkspaces() {
 	}
 	es = append(es, pickEntry{kind: "workspace", title: "New workspace", detail: "+",
 		paint: func(r image.Rectangle) { a.drawNewTile(r) }, do: a.newWorkspace})
-	p := &picker{title: "Workspaces", hint: "tap one · 1–9 · arrows, Enter · n: a new one · Esc closes",
-		all: es, tiles: 1, wide: true, keysOnly: true, refresh: a.drawThumbs}
+	p := &picker{all: es, // no title nor hint: the tiles have the whole screen; the keys are in the docs
+		tiles: 1, wide: true, keysOnly: true, refresh: a.drawThumbs}
 	p.key = func(ch string) {
 		switch {
 		case ch >= "0" && ch <= "9": // as Meta+1…0

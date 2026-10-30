@@ -55,6 +55,9 @@ type picker struct {
 
 // chrome is the height of p's title, line and margins: what isn't rows.
 func (p *picker) chrome() int {
+	if p.title == "" {
+		return 46
+	}
 	if p.keysOnly {
 		return 86
 	}
@@ -337,15 +340,19 @@ func (a *bro) drawPicker() {
 	c.Fill(p.box, kobo.White)
 	c.Frame(p.box, 4, kobo.Black)
 	head := image.Rect(p.box.Min.X+24, p.box.Min.Y+10, p.box.Max.X-24, p.box.Min.Y+60)
-	c.Text(a.F.Panel, head, p.title, kobo.Black, kobo.AlignLeft)
-	keys := "type to narrow · ↑ ↓ Enter · Esc closes"
-	switch {
-	case p.keysOnly:
-		keys = p.hint
-	case p.tiles > 0:
-		keys = "tap one, or the arrows and Enter · Esc closes"
+	if p.title == "" { // none: the tiles from the top
+		head.Max.Y = p.box.Min.Y + 20
+	} else {
+		c.Text(a.F.Panel, head, p.title, kobo.Black, kobo.AlignLeft)
+		keys := "type to narrow · ↑ ↓ Enter · Esc closes"
+		switch {
+		case p.keysOnly:
+			keys = p.hint
+		case p.tiles > 0:
+			keys = "tap one, or the arrows and Enter · Esc closes"
+		}
+		c.Text(a.F.Small, head, keys, kobo.Dark, kobo.AlignRight)
 	}
-	c.Text(a.F.Small, head, keys, kobo.Dark, kobo.AlignRight)
 	in := image.Rect(p.box.Min.X+20, head.Max.Y-4, p.box.Max.X-20, head.Max.Y-4)
 	if !p.keysOnly {
 		in = image.Rect(p.box.Min.X+20, head.Max.Y+6, p.box.Max.X-20, head.Max.Y+64)
