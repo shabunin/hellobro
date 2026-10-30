@@ -98,7 +98,7 @@ def key(code, shift=False, ctrl=False, alt=False, meta=False):
     time.sleep(0.15)
 UP, DOWN, ENTER, ESC, TAB, BACKSPACE, SPACE, F11 = 103, 108, 28, 1, 15, 14, 57, 87
 PGUP, PGDN, KEY_T, LEFT, RIGHT, KEY_P = 104, 109, 20, 105, 106, 25
-KEY_F, KEY_M = 33, 50
+KEY_E, KEY_F, KEY_M = 18, 33, 50
 HOME, END = 102, 107
 MINUS = 12
 def mod(code, **kv): key(code, meta=True, **kv)       # Meta+key: the window manager's
@@ -120,10 +120,10 @@ def menu():
     stroke([(W - 50, H * 2 // 3 - i * 15) for i in range(21)]); time.sleep(2)
 
 def exit_app():
-    """Taps the header's exit button; in hellobro, its menu, then Quit."""
+    """Taps the header's exit button; in hellobro, Meta+Shift+E (quit):
+    full screen, the menu's swipe is the window's."""
     if BAR:
-        menu()
-        keys("quit"); time.sleep(1); key(ENTER)
+        mod(KEY_E, shift=True)
     else:
         tap(W - 16 - 45, 38)
     time.sleep(3)
