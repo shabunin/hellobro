@@ -69,8 +69,9 @@ one goes once you leave it), Meta+Shift+1…0 send the window in focus to
 one, and a tap on one goes there. An empty workspace lists the keys (as
 they are, keys.conf's too), and a tap on it opens a window.
 
-A tap on the bar away from the workspaces (or Meta+O, or the menu's
-**Workspaces**) shows them all as tiles over the whole screen, each a
+A tap on the bar away from the workspaces, or two fingers swiped down
+from the screen's top (full screen too), or Meta+O, or the menu's
+**Workspaces**, shows them all as tiles over the whole screen, each a
 small drawing of its windows as they're laid out, the one shown framed.
 What's in the windows shows too, as it is now, and again every few
 seconds while they're up: a terminal's output, a book's page, a

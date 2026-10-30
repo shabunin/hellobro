@@ -787,7 +787,7 @@ func (a *App) onTouch(ev TouchEv) {
 			g.light, g.lightFrom = true, a.light.level
 			log.Printf("light swipe from %d%%", g.lightFrom)
 		}
-		if dy := (p.Y - g.Start.Y) * g.unfull; g.unfull != 0 && !g.unfulled && dy > unfullMove && dy > 2*Abs(p.X-g.Start.X) {
+		if dy := (p.Y - g.Start.Y) * g.unfull; g.unfull != 0 && g.Owner == 0 && !g.unfulled && dy > unfullMove && dy > 2*Abs(p.X-g.Start.X) { // a finger of the Program's (two together, say) isn't this
 			g.unfulled = true
 			log.Print("fullscreen: swiped down from the top")
 			a.SetFull(false)

@@ -34,7 +34,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   stacked containers, floating windows, a scratchpad, binding modes, and
   i3's IPC, so `i3-msg`, `swaymsg` and i3ipc scripts work, and
   `hellobro-msg notify TEXT` puts up a note. One slim bar at the top
-  lists each workspace's windows; a tap on it shows them all as tiles,
+  lists each workspace's windows; a tap on it (or two fingers down from
+  the top) shows them all as tiles,
   over the whole screen, what's in their windows drawn small and live,
   with a + for a new one, so fingers alone make and find them. The windows
   come back as they were left.

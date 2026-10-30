@@ -382,7 +382,7 @@ func (a *bro) pairSwipe() {
 	if f == nil || g == nil {
 		return
 	}
-	if a.vkSwipe(f, g) {
+	if a.wsSwipe(f, g) || a.vkSwipe(f, g) {
 		a.pair = [2]*kobo.Gesture{}
 		return
 	}

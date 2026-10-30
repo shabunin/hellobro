@@ -4,7 +4,8 @@ package main
 // windows drawn small as they're laid out, and one more for a new
 // workspace (a launcher in it, so it stays: an empty one goes as it's
 // left). A tap goes there; Esc or a tap outside closes. A tap on the
-// bar's empty part, the menu's Workspaces or Meta+O puts it up.
+// bar's empty part, two fingers swiped down from the screen's top, the
+// menu's Workspaces or Meta+O puts it up.
 //
 // What's in the windows shows too, as it is now, and again every few
 // seconds while the tiles are up. The tiles come up at once, with the
@@ -27,7 +28,29 @@ import (
 	"hellobro/wm"
 )
 
-const wsHeadH = 44 // a workspace tile's header: its name, how many windows
+const (
+	wsHeadH = 44  // a workspace tile's header: its name, how many windows
+	wsTop   = 100 // px down from the screen's top where two fingers swiped down put the tiles up
+)
+
+// wsSwipe takes two fingers going down from the screen's top: the
+// tiles up, true once they are.
+func (a *bro) wsSwipe(f, g *kobo.Gesture) bool {
+	top := a.C.Bounds().Min.Y + wsTop
+	if a.Locked() || a.picker != nil || f.Start.Y >= top || g.Start.Y >= top {
+		return false
+	}
+	down := func(g *kobo.Gesture) bool { // far enough, and mostly down
+		d := g.Last.Sub(g.Start)
+		return d.Y >= pairSwipe && d.Y >= 2*kobo.Abs(d.X)
+	}
+	if !down(f) || !down(g) {
+		return false
+	}
+	log.Print("two-finger swipe: the workspaces")
+	a.openWorkspaces()
+	return true
+}
 
 // openWorkspaces puts the workspaces up, the one shown lit.
 func (a *bro) openWorkspaces() {
