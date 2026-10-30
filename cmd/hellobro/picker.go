@@ -25,6 +25,7 @@ var pickRowH = 58 // sizes.go: taller for fingers
 type pickEntry struct {
 	kind, title, detail string
 	icon                string // appIcon's, for a menu of tiles
+	on                  bool   // a tile for what's on now: dark
 	stay                bool   // picked, the menu stays (a tick)
 	current             bool
 	do                  func()
@@ -304,7 +305,10 @@ func (a *bro) drawPicker() {
 			if p.query == "" && n < 9 {
 				num = n + 1
 			}
-			a.drawTile(r, launchTile{name: e.title, note: e.detail, icon: e.icon, num: num}, n == p.sel, false)
+			a.drawTile(r, launchTile{name: e.title, note: e.detail, icon: e.icon, num: num}, e.on, false)
+			if n == p.sel { // the keys' choice: ringed, as dark is on
+				a.C.Frame(r.Inset(-6), 4, kobo.Black)
+			}
 		}
 		a.Mark(p.box, true)
 		return

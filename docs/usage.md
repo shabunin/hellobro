@@ -91,10 +91,10 @@ A swipe up or down along the right edge of the screen opens the menu,
 tiles big enough for a finger, each an icon, a word and its keys: rotate
 the screen, touch calibration, the on-screen keyboard, the light,
 airplane mode, sleep, lock, the switcher (Go to…), and quit, back to
-Nickel. Tap one, or its number, or the arrows and Enter (or type to
-narrow); Esc or a tap outside closes it. **Airplane** turns Wi-Fi and
-Bluetooth off, keeping which were on; tapped again (the tile says it's
-on) it turns those back on, as does turning one on in its window. It
+Nickel. Tap one, or its number, or the arrows (the one they're on has
+a ring) and Enter (or type to narrow); Esc or a tap outside closes it. **Airplane** turns Wi-Fi and
+Bluetooth off, keeping which were on; tapped again (its tile is dark
+while it's on) it turns those back on, as does turning one on in its window. It
 stays through a restart, and Nickel finds them off when hellobro quits.
 The switcher has it too (`airplane` in keys.conf). Two fingers swiped left anywhere go to the next workspace, swiped
 right to the one before, as pages turn (where the screen tells two

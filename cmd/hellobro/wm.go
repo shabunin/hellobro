@@ -620,7 +620,8 @@ func (a *bro) menu() {
 			if k := a.keyLabels(c.id); k != "" && t.id != "airplane" {
 				note = k
 			}
-			entries = append(entries, pickEntry{kind: "command", title: t.title, detail: note, icon: t.icon, do: func() { c.run(a) }})
+			entries = append(entries, pickEntry{kind: "command", title: t.title, detail: note, icon: t.icon,
+				on: t.id == "airplane" && a.mem.Airplane != nil, do: func() { c.run(a) }})
 		}
 	}
 	a.openTiles("hello bro", "type to narrow, or tap", entries)
