@@ -441,7 +441,7 @@ type ipcHost struct{ wmHost }
 
 // ipcCommands are hellobro's commands the socket may run.
 var ipcCommands = map[string]bool{
-	"launcher": true, "palette": true, "reload": true,
+	"launcher": true, "palette": true, "workspaces": true, "reload": true,
 	"music.play": true, "music.next": true, "music.prev": true, "music.stop": true, "music.louder": true, "music.quieter": true,
 	"statusbar": true, "font.bigger": true, "font.smaller": true, "font.reset": true,
 	"light.up": true, "light.down": true, "light.toggle": true, "rotate": true,

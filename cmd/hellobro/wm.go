@@ -72,6 +72,7 @@ type wmState struct {
 	tall      bool                // and it was portrait
 	thumbs    map[window]*wsThumb // the windows small, for the workspaces' tiles
 	offscreen bool                // the windows are drawing on a canvas not the screen's: nothing to update
+	off       *image.Gray         // that canvas, kept
 }
 
 type wmTab struct {

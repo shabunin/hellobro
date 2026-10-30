@@ -42,3 +42,22 @@ func TestWideTiles(t *testing.T) {
 		}
 	}
 }
+
+// shrink3 is scaleGray's 3:1, fast: the same pixels, a part of a bigger
+// image too, what's left over left out.
+func TestShrink3(t *testing.T) {
+	big := image.NewGray(image.Rect(0, 0, 40, 30))
+	for i := range big.Pix {
+		big.Pix[i] = uint8(i * 37 % 251)
+	}
+	for _, r := range []image.Rectangle{image.Rect(0, 0, 9, 6), image.Rect(5, 4, 35, 28), image.Rect(1, 2, 12, 10)} {
+		src := big.SubImage(r).(*image.Gray)
+		got := shrink3(src)
+		w, h := r.Dx()/3, r.Dy()/3
+		want := image.NewGray(image.Rect(0, 0, w, h))
+		scaleGray(want, want.Rect, big.SubImage(image.Rect(r.Min.X, r.Min.Y, r.Min.X+w*3, r.Min.Y+h*3)).(*image.Gray))
+		if got.Rect != want.Rect || string(got.Pix) != string(want.Pix) {
+			t.Errorf("shrink3 of %v: %v %v, want %v %v", r, got.Rect, got.Pix, want.Rect, want.Pix)
+		}
+	}
+}

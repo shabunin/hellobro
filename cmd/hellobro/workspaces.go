@@ -7,7 +7,9 @@ package main
 // bar's empty part, the menu's Workspaces or Meta+O puts it up.
 //
 // What's in the windows shows too, as it is now, and again every few
-// seconds while the tiles are up. A terminal's cells are there whether
+// seconds while the tiles are up. The tiles come up at once, with the
+// windows as they were drawn small last (the workspace shown's from the
+// screen), and what changed is drawn again as soon as the panel's done. A terminal's cells are there whether
 // it shows or not, so it's drawn from them (placed, it would be resized,
 // and what runs in it). The others are placed where they'd be on their
 // workspace, drawn on a canvas of their own and put back: a book has
@@ -17,7 +19,9 @@ import (
 	"fmt"
 	"hash/fnv"
 	"image"
+	"log"
 	"strconv"
+	"time"
 
 	"hellobro/kobo"
 	"hellobro/wm"
@@ -33,7 +37,10 @@ func (a *bro) openWorkspaces() {
 			delete(a.wm.thumbs, w)
 		}
 	}
-	a.drawThumbs()
+	start := time.Now()
+	if !a.overlay() {
+		a.keepShown()
+	}
 	var es []pickEntry
 	sel := 0
 	for _, ws := range t.Workspaces() {
@@ -75,6 +82,8 @@ func (a *bro) openWorkspaces() {
 	a.showPicker(p)
 	p.sel = sel
 	a.drawPicker()
+	p.lookedAt = time.Time{} // the windows drawn again once that's on the panel
+	log.Printf("workspaces: up in %v", time.Since(start).Round(time.Millisecond))
 }
 
 // newWorkspace goes to the first workspace number not taken, with a
@@ -204,7 +213,7 @@ type wsThumb struct {
 }
 
 // thumbScale is how much smaller a window's kept: about a tile's share.
-const thumbScale = 3
+const thumbScale = 3 // shrink3's
 
 // drawThumbs draws every window but the terminals (termThumb) small:
 // each placed where it would be on its workspace and drawn on a canvas
@@ -218,7 +227,11 @@ func (a *bro) drawThumbs() {
 		a.wm.thumbs = map[window]*wsThumb{}
 	}
 	t := a.wm.tree
-	off := kobo.Blank(a.C.Rect.Size())
+	start := time.Now()
+	if a.wm.off == nil || a.wm.off.Rect != a.C.Rect { // kept: each window's part is cleared as it's drawn
+		a.wm.off = kobo.Blank(a.C.Rect.Size())
+	}
+	off := a.wm.off
 	screen := a.C.Gray
 	a.C.Gray, a.wm.offscreen = off, true
 	defer func() {
@@ -226,6 +239,12 @@ func (a *bro) drawThumbs() {
 		t.Render() // the workspace shown's places, as they were
 	}()
 	cur := t.Current()
+	took := map[string]time.Duration{}
+	defer func() {
+		if d := time.Since(start); d > 300*time.Millisecond {
+			log.Printf("workspaces: the windows drawn small in %v: %v", d.Round(time.Millisecond), took)
+		}
+	}()
 	for _, ws := range t.Workspaces() {
 		fs := t.LayOut(ws)
 		for _, n := range t.Find(func(o *wm.Node) bool { return o.Leaf() && o.Visible && wm.WorkspaceOf(o) == ws }) {
@@ -241,23 +260,70 @@ func (a *bro) drawThumbs() {
 			if gui && ws != cur {
 				g.shown = true // not coming up for real: no scan, no sample
 			}
+			at := time.Now()
 			a.C.Fill(p.Outer, kobo.White) // not what the one before left
 			w.place(a, p)
 			w.draw(a)
 			if ws != cur {
 				w.place(a, kobo.Panel{})
 			}
-			r := p.Body.Intersect(off.Rect)
-			if r.Dx() < thumbScale || r.Dy() < thumbScale {
-				continue
-			}
-			img := image.NewGray(image.Rect(0, 0, r.Dx()/thumbScale, r.Dy()/thumbScale))
-			scaleGray(img, img.Rect, off.SubImage(r).(*image.Gray))
-			h := fnv.New64a()
-			h.Write(img.Pix)
-			a.wm.thumbs[w] = &wsThumb{img: img, sum: h.Sum64()}
+			took[fmt.Sprintf("%T", w)] += time.Since(at).Round(time.Millisecond)
+			a.keepThumb(w, off, p.Body)
 		}
 	}
+}
+
+// keepShown keeps the windows of the workspace shown small, as they are
+// on the screen: nothing drawn, so the tiles come up at once.
+func (a *bro) keepShown() {
+	if a.C.Gray == nil {
+		return
+	}
+	for _, n := range a.wm.tree.Shown() {
+		if w := a.wm.wins[n]; w != nil {
+			if t, ok := w.(*termSession); !ok || !t.connected() {
+				a.keepThumb(w, a.C.Gray, w.panel(a).Body)
+			}
+		}
+	}
+}
+
+// keepThumb keeps r of m as w's thumb.
+func (a *bro) keepThumb(w window, m *image.Gray, r image.Rectangle) {
+	r = r.Intersect(m.Rect)
+	if r.Dx() < thumbScale || r.Dy() < thumbScale {
+		return
+	}
+	img := shrink3(m.SubImage(r).(*image.Gray))
+	h := fnv.New64a()
+	h.Write(img.Pix)
+	if a.wm.thumbs == nil {
+		a.wm.thumbs = map[window]*wsThumb{}
+	}
+	a.wm.thumbs[w] = &wsThumb{img: img, sum: h.Sum64()}
+}
+
+// shrink3 is m a third of its size, each pixel the average of the 3×3
+// under it: what scaleGray does, without its general case's work per
+// pixel, which on the Kobo took a few hundred ms for a screenful.
+func shrink3(m *image.Gray) *image.Gray {
+	w, h := m.Rect.Dx()/3, m.Rect.Dy()/3 // what's left over is left out
+	img := image.NewGray(image.Rect(0, 0, w, h))
+	acc := make([]int, w)
+	for y := range h {
+		clear(acc)
+		for sy := y * 3; sy < y*3+3; sy++ {
+			row := m.Pix[m.PixOffset(m.Rect.Min.X, m.Rect.Min.Y+sy):][: w*3 : w*3]
+			for x := range acc {
+				acc[x] += int(row[x*3]) + int(row[x*3+1]) + int(row[x*3+2])
+			}
+		}
+		out := img.Pix[y*img.Stride:][:w]
+		for x, s := range acc {
+			out[x] = uint8(s / 9)
+		}
+	}
+	return img
 }
 
 // thumbOf is w small: a terminal as it is now, another as it was kept;
@@ -349,8 +415,7 @@ func (a *bro) termThumb(t *termSession) *image.Gray {
 		}
 	}
 	a.C.Gray = screen
-	img := image.NewGray(image.Rect(0, 0, full.Rect.Dx()/thumbScale, full.Rect.Dy()/thumbScale))
-	scaleGray(img, img.Rect, full)
+	img := shrink3(full)
 	if a.wm.thumbs == nil {
 		a.wm.thumbs = map[window]*wsThumb{}
 	}
