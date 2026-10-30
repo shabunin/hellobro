@@ -37,16 +37,16 @@ gui("notebook"); time.sleep(3)
 fullscreen(); time.sleep(4)
 x0, x1 = W // 8, (W * 3 // 8 if W > H else W * 7 // 8)
 stroke(wave(H // 4, x0, x1), pen=True, pressure=lambda t: 2000); time.sleep(2)
-bar = buttons(0, 60)                               # pen eraser select undo redo clear paste paper export …
-tap(*bar[0]); time.sleep(3)                        # the pen's choices
+bar = buttons(0, 60)                               # ‹ All Notebooks, pen, eraser, select, text, undo, redo, paste, paper, export …
+tap(*bar[1]); time.sleep(3)                        # the pen's choices
 ch = buttons(62, 140)
 tap(*ch[2]); time.sleep(2); tap(*ch[4]); time.sleep(2)   # bold, gray
 stroke(wave(H // 2, x0, x1), pen=True, pressure=lambda t: 2000); time.sleep(3)
 key(24); time.sleep(5)                             # O: the pages, small
-strip = buttons(0, 60)                             # open, new before, new after, copy page, clear page, …
-tap(*strip[4]); time.sleep(2)                      # clear: it asks
+strip = buttons(0, 60)                             # ‹ All Notebooks, open, new before, new after, copy page, clear page, …
+tap(*strip[5]); time.sleep(2)                      # clear: it asks
 time.sleep(5)                                      # and forgets
-tap(*strip[4]); time.sleep(1); tap(*strip[4]); time.sleep(4)  # twice: cleared
+tap(*strip[5]); time.sleep(1); tap(*strip[5]); time.sleep(4)  # twice: cleared
 key(44, ctrl=True); time.sleep(4)                  # Ctrl+Z: back
 key(24); time.sleep(4)                             # the page again
 key(31); time.sleep(2)                             # S: the select tool
