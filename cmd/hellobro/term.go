@@ -1121,6 +1121,7 @@ func (a *bro) termTick() {
 	if slices.ContainsFunc(ts, func(t *termSession) bool { return t.state == termWaiting }) {
 		a.drawTermStatus() // the countdown
 	}
+	a.pickerTick()
 	if a.GaugeUp() || a.overlay() {
 		return // something is up over the terminal: drawing under it would be undone when it goes
 	}

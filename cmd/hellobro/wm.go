@@ -51,25 +51,26 @@ const (
 type wmState struct {
 	tree      *wm.Tree
 	wins      map[*wm.Node]window
-	area      image.Rectangle   // where the windows go
-	mode      string            // the keys' binding mode: "" is the default
-	moving    time.Time         // the last move, while the windows show as boxes (wmMoved)
-	grab      window            // the window every key goes to while it's in focus, but grab's own; nil: none
-	typing    window            // the window in focus, typing into another device, as grabTyping saw it
-	tabs      []wmTab           // tabbed and stacked containers' tabs, as drawn
-	frames    []image.Rectangle // the frames around tabbed windows, as drawn
-	laid      string            // what was placed last: another layout is a new screen
-	focus     window            // the focus as drawn
-	names     []string          // the workspaces in the bar
-	info      []string          // and what's in each
-	empty     image.Rectangle   // an empty workspace's hint, for a tap
-	drag      *wmDrag           // a floating window being moved by its strip
-	composing bool              // drawing the floating windows over what was drawn
-	starts    []func()          // what the windows brought back run (wmRestore)
-	kept      string            // the layout as last kept, JSON
-	changed   time.Time         // the first change since
-	oriented  bool              // the workspaces laid along the screen once
-	tall      bool              // and it was portrait
+	area      image.Rectangle     // where the windows go
+	mode      string              // the keys' binding mode: "" is the default
+	moving    time.Time           // the last move, while the windows show as boxes (wmMoved)
+	grab      window              // the window every key goes to while it's in focus, but grab's own; nil: none
+	typing    window              // the window in focus, typing into another device, as grabTyping saw it
+	tabs      []wmTab             // tabbed and stacked containers' tabs, as drawn
+	frames    []image.Rectangle   // the frames around tabbed windows, as drawn
+	laid      string              // what was placed last: another layout is a new screen
+	focus     window              // the focus as drawn
+	names     []string            // the workspaces in the bar
+	info      []string            // and what's in each
+	empty     image.Rectangle     // an empty workspace's hint, for a tap
+	drag      *wmDrag             // a floating window being moved by its strip
+	composing bool                // drawing the floating windows over what was drawn
+	starts    []func()            // what the windows brought back run (wmRestore)
+	kept      string              // the layout as last kept, JSON
+	changed   time.Time           // the first change since
+	oriented  bool                // the workspaces laid along the screen once
+	tall      bool                // and it was portrait
+	thumbs    map[window]*wsThumb // the windows small, for the workspaces' tiles
 }
 
 type wmTab struct {
@@ -380,7 +381,11 @@ func (a *bro) wmRunWith(line string, h wm.Host) []wm.Result {
 	if wmMove(line) {
 		a.wmMoved()
 	}
+	was := a.wm.tree.Current()
 	rs := a.wm.tree.Run(line, h)
+	if a.wm.tree.Current() != was && !a.overlay() {
+		a.keepThumbs() // the canvas is still the workspace left
+	}
 	for _, r := range rs {
 		if !r.Success {
 			log.Printf("wm: %q: %s", line, r.Error)

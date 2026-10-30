@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"hellobro/kobo"
@@ -28,6 +29,7 @@ type pickEntry struct {
 	on                  bool                    // a tile for what's on now: dark
 	stay                bool                    // picked, the menu stays (a tick)
 	paint               func(r image.Rectangle) // draws its tile, for one that isn't an icon's
+	changed             func() bool             // its tile would be drawn otherwise now (paint's)
 	current             bool
 	do                  func()
 	score               int
@@ -41,9 +43,10 @@ type picker struct {
 	sel, top    int
 	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
 	rows        []image.Rectangle
-	tiles       int  // a menu of tiles, this many across (0: rows)
-	tileH       int  // their height (0: pickTileH's)
-	wide        bool // the screen's width, tiles as it is: the workspaces'
+	tiles       int       // a menu of tiles, this many across (0: rows)
+	tileH       int       // their height (0: pickTileH's)
+	wide        bool      // the screen's width, tiles as it is: the workspaces'
+	lookedAt    time.Time // the tiles last asked whether they changed
 }
 
 // tileHeight is a tile's height in p.
@@ -430,5 +433,28 @@ func (a *bro) pickerTap(pt image.Point) {
 	}
 	if !pt.In(a.picker.box) {
 		a.closePicker()
+	}
+}
+
+// pickerTick draws again the tiles that changed under it, a few seconds
+// apart at most: the workspaces' terminals as their output comes.
+func (a *bro) pickerTick() {
+	p := a.picker
+	if p == nil || p.tiles == 0 || time.Since(p.lookedAt) < 2*time.Second || a.Blitting() {
+		return
+	}
+	p.lookedAt = time.Now()
+	for i, r := range p.rows {
+		n := p.top + i
+		if n >= len(p.shown) {
+			break
+		}
+		if e := p.shown[n]; e.changed != nil && e.paint != nil && e.changed() {
+			e.paint(r)
+			if n == p.sel {
+				a.C.Frame(r.Inset(-6), 4, kobo.Black)
+			}
+			a.Mark(r.Inset(-6), true)
+		}
 	}
 }
