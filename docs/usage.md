@@ -876,8 +876,10 @@ its gray.
   does, for a program in Alpine to take. It's done aside; a note says
   when it's written.
 - `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
-  on a computer to go on writing, add text, or export a PDF. What
-  hellobro doesn't draw yet (text, a picture background) stays as it was when it writes the notebook again; only the
+  on a computer to go on writing, add text, or export a PDF. Its texts
+  show and are edited here too (the text tool). What hellobro doesn't
+  draw yet (a picture background) stays as it was when it writes the
+  notebook again; only the
   layers become one. A notebook is written whole or not at all (a new
   file, then in the old one's place); if the card won't take it (full,
   say), a note says so, the window keeps it, and it's tried again, even
