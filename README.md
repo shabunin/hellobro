@@ -18,6 +18,10 @@ Kobo e-reader. Bring a Bluetooth keyboard.
 <p align="center">
   <img src="docs/screenshots/launcher.png" width="98%" alt="The launcher: terminals, books and notebooks, settings, the Kobo, as tiles for a finger">
 </p>
+<p align="center">
+  <img src="docs/screenshots/workspaces.png" width="62%" alt="The workspaces as tiles, what's in their windows drawn small and live: a shell and Wi-Fi, a book, Bluetooth and Settings, + for a new one">
+  <img src="docs/screenshots/workspaces-portrait.png" width="35%" alt="The same, the Kobo upright">
+</p>
 
 hellobro takes the screen over from Nickel, draws its own e-ink UI through
 [FBInk](https://github.com/NiLuJe/FBInk), and gives Nickel back when you

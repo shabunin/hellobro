@@ -26,17 +26,19 @@ func TestFreeWorkspace(t *testing.T) {
 func TestWideTiles(t *testing.T) {
 	sq := image.Rect(0, 0, 100, 100)
 	for _, c := range []struct {
-		n, w, h   int
-		area      image.Rectangle
-		cols, thH int
+		n, w, h  int
+		area     image.Rectangle
+		cols, tw int
 	}{
-		{2, 1000, 1000, sq, 2, wsHeadH + 494},   // one across is too high
-		{4, 1000, 1000, sq, 3, wsHeadH + 325},   // two rows of two are too
-		{1, 1000, 2000, sq, 1, wsHeadH + 1000},  // one: the whole width
-		{100, 1000, 1000, sq, 6, wsHeadH + 156}, // none fit: the smallest
+		{2, 1000, 1000, sq, 2, 494},                           // side by side: one over another is smaller
+		{4, 1000, 1000, sq, 2, 444},                           // two by two, the height holds them
+		{1, 1000, 2000, sq, 1, 1000},                          // one: the whole width
+		{4, 1832, 1302, image.Rect(0, 0, 1872, 1330), 2, 837}, // the Kobo in landscape
+		{100, 1000, 1000, sq, 6, 156},                         // none fit: six across, scrolled
 	} {
-		if cols, th := wideTiles(c.n, c.w, c.h, c.area); cols != c.cols || th != c.thH {
-			t.Errorf("wideTiles(%d, %d, %d) = %d, %d; want %d, %d", c.n, c.w, c.h, cols, th, c.cols, c.thH)
+		cols, tw, th := wideTiles(c.n, c.w, c.h, c.area)
+		if cols != c.cols || tw != c.tw || th != wsHeadH+tw*c.area.Dy()/c.area.Dx() {
+			t.Errorf("wideTiles(%d, %d, %d) = %d, %d, %d; want %d, %d", c.n, c.w, c.h, cols, tw, th, c.cols, c.tw)
 		}
 	}
 }

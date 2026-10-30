@@ -44,6 +44,7 @@ type picker struct {
 	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
 	rows        []image.Rectangle
 	tiles       int             // a menu of tiles, this many across (0: rows)
+	tileW       int             // their width (0: the box's, shared)
 	tileH       int             // their height (0: pickTileH's)
 	wide        bool            // the whole screen, tiles as it is: the workspaces'
 	keysOnly    bool            // no line to type in: a key typed is key's
@@ -145,7 +146,7 @@ func (a *bro) showPicker(p *picker) {
 	top := b.Min.Y + max(40, b.Dy()/8)
 	if p.wide { // the whole screen: as many across as makes them biggest
 		p.box = b
-		p.tiles, p.tileH = wideTiles(n, b.Dx()-40, b.Dy()-p.chrome()-16, a.wm.area)
+		p.tiles, p.tileW, p.tileH = wideTiles(n, b.Dx()-40, b.Dy()-p.chrome()-16, a.wm.area)
 		a.picker = p
 		a.filterPicker()
 		a.drawPicker()
@@ -162,22 +163,22 @@ func (a *bro) showPicker(p *picker) {
 	a.drawPicker()
 }
 
-// wideTiles is how many tiles across, and how high, n of them fit
-// biggest in w×h: each the shape of area, a header over it.
-func wideTiles(n, w, h int, area image.Rectangle) (cols, tileH int) {
-	best := 0
+// wideTiles is how many tiles across, how wide and how high n of them
+// are, fit biggest in w×h: each the shape of area, a header over it.
+// The width or the height may be what holds them back.
+func wideTiles(n, w, h int, area image.Rectangle) (cols, tileW, tileH int) {
+	aw, ah := max(1, area.Dx()), max(1, area.Dy())
 	for c := 1; c <= 6; c++ {
-		tw := (w - (c-1)*12) / c
-		th := wsHeadH + tw*area.Dy()/max(1, area.Dx())
-		if rows := (n + c - 1) / c; rows*(th+12) <= h && tw > best {
-			best, cols, tileH = tw, c, th
+		rows := (n + c - 1) / c
+		tw := min((w-(c-1)*12)/c, ((h-rows*12)/rows-wsHeadH)*aw/ah)
+		if tw > tileW {
+			cols, tileW = c, tw
 		}
 	}
-	if cols == 0 { // too many: the smallest, scrolled
-		cols = 6
-		tileH = wsHeadH + (w-60)/6*area.Dy()/max(1, area.Dx())
+	if tileW < 100 { // too many: six across, scrolled
+		cols, tileW = 6, (w-60)/6
 	}
-	return cols, tileH
+	return cols, tileW, wsHeadH + tileW*ah/aw
 }
 
 // closePicker takes the menu down; the page comes back.
@@ -353,9 +354,14 @@ func (a *bro) drawPicker() {
 	}
 	if p.tiles > 0 {
 		tw := (in.Dx() - (p.tiles-1)*12) / p.tiles
+		left := in.Min.X
+		if p.tileW > 0 { // narrower: centered
+			tw = p.tileW
+			left += (in.Dx() - p.tiles*tw - (p.tiles-1)*12) / 2
+		}
 		for n := p.top; n < min(len(p.shown), p.top+rows); n++ {
 			e, i := p.shown[n], n-p.top
-			x, ty := in.Min.X+i%p.tiles*(tw+12), y+i/p.tiles*(p.tileHeight()+12)
+			x, ty := left+i%p.tiles*(tw+12), y+i/p.tiles*(p.tileHeight()+12)
 			r := image.Rect(x, ty, x+tw, ty+p.tileHeight())
 			p.rows = append(p.rows, r)
 			num := 0
