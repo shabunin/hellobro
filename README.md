@@ -65,7 +65,7 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   typed from a keyboard; a select
   tool to move, scale, turn, copy and duplicate strokes and pasted PDF
   clips; all the pages small, to add, copy, move and delete them; two
-  pages side by side in landscape; exported as a PDF. All Notebooks
+  pages side by side in landscape; exported as a PDF, or a page as a PNG. All Notebooks
   lists them (recent, all, in folders) to open, rename and delete. Kept as
   Xournal++ files, to go on with on a computer.
 - **Power**: the battery (draw, time left, drain rate, a 12 h graph) and

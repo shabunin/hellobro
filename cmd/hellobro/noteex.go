@@ -63,7 +63,17 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 			return nil
 		}},
 		{"pages o", "", "the pages' view, on or off", func(string) error { w.overviewOn(a, !w.overview); return nil }},
-		{"export", "", "the PDF export", func(string) error { w.export(a); return nil }},
+		{"export", "pdf|png", "export: a PDF of the pages, or this page as a PNG (none: asks)", func(arg string) error {
+			switch arg {
+			case "":
+				w.export(a)
+			case "pdf", "png":
+				w.exportAs(a, arg)
+			default:
+				return errors.New("export: pdf or png")
+			}
+			return nil
+		}},
 		{"write w", "", "write it now", func(string) error {
 			if !w.keep(a) {
 				return errors.New("it can't be written now: it's kept as soon as it can be")

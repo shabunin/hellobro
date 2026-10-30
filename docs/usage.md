@@ -899,16 +899,19 @@ its gray.
 - A notebook written on a PDF in Xournal++ shows the PDF's pages under
   the ink, if the PDF is where the `.xopp` says (blank a moment the
   first time: MuPDF takes most of a second a page).
-- **export** (or Ctrl+E) writes the notebook as a PDF next to its
+- **export** (or Ctrl+E) asks: **PDF** of the pages (lit: Enter or a
+  tap), **PNG** of the page shown (n), or cancel. Settings, **Notebook
+  export** can make it always the one without asking; `:export pdf` and
+  `:export png` don't ask either. The PDF is the notebook next to its
   `.xopp`, `Notebooks/NAME.pdf`: a picture of each page at 200 dpi, gray,
   to send, print, or hand an LLM. If a PDF hellobro didn't write is
   there (Xournal++'s lecture beside its notes), it's left be, and the
   export is `NAME (notebook).pdf`. All the pages to the last written
-  on (of one on a PDF, only the pages written on). The page shown goes
-  to `Clips/NAME pN DATE TIME.png` (each export its own, as
+  on (of one on a PDF, only the pages written on). The PNG is the page
+  shown alone, at `Clips/NAME pN DATE TIME.png` (each export its own, as
   `2026-10-30 14.05.07`) and `Clips/latest.png` too, as a PDF's cut
   does, for a program in Alpine to take. It's done aside; a note on the
-  page says when it's written, and the PNG's name.
+  page says when it's written, and where.
 - `.xopp` is [Xournal++](https://xournalpp.github.io/)'s: open it there
   on a computer to go on writing, add text, or export a PDF. Its texts
   show and are edited here too (the text tool). What hellobro doesn't
@@ -935,7 +938,7 @@ The same line as a book's ([":" commands in a book](#-commands-in-a-book)).
 | `:pen`, `:eraser`, `:select`, `:text`, `:u`, `:redo` | the tools; undo, redo |
 | `:paper lines` | squares, lines or plain |
 | `:o` | the pages' view, on or off |
-| `:w`, `:export` | written now; the PDF export |
+| `:w`, `:export [pdf\|png]` | written now; the export (asks, unless said) |
 | `:e NAME` | another notebook here: its name, or the one it begins; none so named, a new one beside this |
 | `:rename NAME`, `:mv FOLDER` | renamed; moved to the folder (made if need be; `:mv /` the top) |
 | `:ls`, `:q` | All Notebooks; close the window (`:wq` too: it's written anyway) |

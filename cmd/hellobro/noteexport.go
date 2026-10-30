@@ -1,13 +1,14 @@
 package main
 
-// Exporting a notebook: "export" (or Ctrl+E) writes it as a PDF, NAME.pdf
-// by its .xopp in Notebooks/, a picture of each page (200 dpi, gray: for
-// a computer, a printer, or an LLM to read); of pages on a PDF (from
-// Xournal++), the pages written on. And the page shown as a PNG in Clips/,
-// as "NAME pN DATE TIME.png" (each export its own) and latest.png, as a
-// PDF's cut is (bookcut.go): for a program in Alpine to take. It's drawn
-// away from the screen's loop, from what the pages were when it was
-// asked; a note on the page says when it's written, and where.
+// Exporting a notebook: "export" (or Ctrl+E) asks which, as Settings'
+// "Notebook export" has it: a PDF, NAME.pdf by its .xopp in Notebooks/,
+// a picture of each page (200 dpi, gray: for a computer, a printer, or
+// an LLM to read); of pages on a PDF (from Xournal++), the pages written
+// on. Or the page shown as a PNG in Clips/, as "NAME pN DATE TIME.png"
+// (each export its own) and latest.png, as a PDF's cut is (bookcut.go):
+// for a program in Alpine to take. It's drawn away from the screen's
+// loop, from what the pages were when it was asked; a note on the page
+// says when it's written, and where.
 
 import (
 	"bytes"
@@ -68,14 +69,42 @@ func (w *noteWin) exportPage(n int) exportPage {
 		strokes: slices.Clone(w.strokes(n)), pdfPage: w.pdfPage(n)}
 }
 
-// export writes the notebook as a PDF, and the page shown as a PNG.
+// export exports the notebook as the setting has it: asking (the PDF
+// first, Enter's), or at once.
 func (w *noteWin) export(a *bro) {
 	w.endTyping(a)
 	if w.exporting {
 		return
 	}
+	switch a.setting("note-export") {
+	case "pdf":
+		w.exportAs(a, "pdf")
+	case "png":
+		w.exportAs(a, "png")
+	default:
+		n := len(w.exportPages())
+		all := fmt.Sprintf("PDF: the %d pages", n)
+		if n == 1 {
+			all = "PDF: the page"
+		}
+		a.choose("Export "+filepath.Base(w.nb.name), "as a PDF in Notebooks/, or this page as a PNG in Clips/",
+			askOpt{all, "p", func() { w.exportAs(a, "pdf") }},
+			askOpt{fmt.Sprintf("PNG: page %d", w.cur+1), "n", func() { w.exportAs(a, "png") }},
+			askOpt{"cancel", "c", nil})
+	}
+}
+
+// exportAs writes the notebook as a PDF ("pdf"), or the page shown as a
+// PNG ("png").
+func (w *noteWin) exportAs(a *bro, as string) {
+	if w.exporting {
+		return
+	}
 	pages, shown := w.exportPages(), w.exportPage(min(w.cur, len(w.nb.pages)-1))
-	if len(pages) == 0 {
+	if as == "png" {
+		pages = []exportPage{shown}
+	}
+	if as == "pdf" && len(pages) == 0 {
 		a.Notify("nothing written on it to export")
 		return
 	}
@@ -88,7 +117,13 @@ func (w *noteWin) export(a *bro) {
 	a.Notify("exporting " + count + "…")
 	at := time.Now()
 	go func() {
-		msg, pngName, err := exportNotebook(name, paper, pdfPath, pages, shown, at)
+		var msg string
+		var err error
+		if as == "png" {
+			msg, err = exportPNG(name, paper, pdfPath, shown, at)
+		} else {
+			msg, err = exportPDF(name, paper, pdfPath, pages)
+		}
 		a.Do(func() {
 			w.exporting = false
 			if err != nil {
@@ -97,60 +132,74 @@ func (w *noteWin) export(a *bro) {
 				a.Toast("not exported: "+err.Error(), 8*time.Second)
 				return
 			}
-			log.Printf("notebook %s: exported, %s", name, count)
+			log.Printf("notebook %s: exported, %s as %s", name, count, as)
 			a.Notify(msg)
-			a.Toast("exported: Clips/"+pngName, 6*time.Second)
+			a.Toast(msg, 6*time.Second)
 		})
 	}()
 }
 
-// exportNotebook draws pages and writes them, the page shown as a PNG
-// named for when it was asked (at); it says where, and the PNG's name.
-func exportNotebook(name, paper, pdfPath string, pages []exportPage, shown exportPage, at time.Time) (string, string, error) {
-	var doc *pdf.Doc
-	if pdfPath != "" {
-		var err error
-		if doc, err = pdf.Open(pdfPath); err != nil {
-			return "", "", err
-		}
+// exportDoc is the PDF under a notebook, if it's on one (to close).
+func exportDoc(pdfPath string) (*pdf.Doc, error) {
+	if pdfPath == "" {
+		return nil, nil
+	}
+	return pdf.Open(pdfPath)
+}
+
+// exportPDF draws pages and writes them as the notebook's PDF; it says
+// where.
+func exportPDF(name, paper, pdfPath string, pages []exportPage) (string, error) {
+	doc, err := exportDoc(pdfPath)
+	if err != nil {
+		return "", err
+	}
+	if doc != nil {
 		defer doc.Close()
 	}
 	var imgs []pdfImagePage
-	var shownImg *image.Gray
 	for _, pg := range pages {
 		m, err := renderNotePage(pg, paper, doc, noteExportDPI)
 		if err != nil {
-			return "", "", fmt.Errorf("page %d: %w", pg.n+1, err)
+			return "", fmt.Errorf("page %d: %w", pg.n+1, err)
 		}
 		imgs = append(imgs, pdfImagePage{img: m, w: pg.pt[0], h: pg.pt[1]})
-		if pg.n == shown.n {
-			shownImg = m
-		}
-	}
-	if shownImg == nil {
-		var err error
-		if shownImg, err = renderNotePage(shown, paper, doc, noteExportDPI); err != nil {
-			return "", "", err
-		}
 	}
 	out := exportPath(name)
 	if err := writeAtomic(out, imagesPDF(imgs)); err != nil {
-		return "", "", err
+		return "", err
+	}
+	rel, _ := filepath.Rel(notesDir(), out)
+	return "exported: Notebooks/" + filepath.ToSlash(rel), nil
+}
+
+// exportPNG draws the page shown and writes it as a PNG in Clips/, named
+// for when it was asked (at), and as latest.png; it says where.
+func exportPNG(name, paper, pdfPath string, shown exportPage, at time.Time) (string, error) {
+	doc, err := exportDoc(pdfPath)
+	if err != nil {
+		return "", err
+	}
+	if doc != nil {
+		defer doc.Close()
+	}
+	m, err := renderNotePage(shown, paper, doc, noteExportDPI)
+	if err != nil {
+		return "", err
 	}
 	var b bytes.Buffer
-	png.Encode(&b, shownImg) // into memory: it can't fail
+	png.Encode(&b, m) // into memory: it can't fail
 	clips := filepath.Join(booksRoot(), "Clips")
 	if err := os.MkdirAll(clips, 0o755); err != nil {
-		return "", "", err
+		return "", err
 	}
 	pngName := exportPNGName(name, shown.n, at)
 	for _, f := range []string{pngName, "latest.png"} {
 		if err := writeAtomic(filepath.Join(clips, f), b.Bytes()); err != nil {
-			return "", "", err
+			return "", err
 		}
 	}
-	rel, _ := filepath.Rel(notesDir(), out)
-	return fmt.Sprintf("exported: Notebooks/%s; page %d as Clips/%s", filepath.ToSlash(rel), shown.n+1, pngName), pngName, nil
+	return "exported: Clips/" + pngName, nil
 }
 
 // exportPNGName is the page n's PNG, exported at: the notebook's own name

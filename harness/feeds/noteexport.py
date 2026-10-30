@@ -1,7 +1,8 @@
 # Exporting a notebook (noteexport.go): a new notebook, fullscreen, a
-# circle and a wave; Right, a line on the next page; Ctrl+E: OUT's
-# Notebooks/NAME.pdf (NAME (notebook).pdf beside someone else's),
-# Clips/NAME pN DATE TIME.png and Clips/latest.png; a note on the page.
+# circle and a wave; Right, a line on the next page; Ctrl+E asks, Enter
+# (the PDF): OUT's Notebooks/NAME.pdf (NAME (notebook).pdf beside
+# someone else's); Ctrl+E again, n (the PNG): Clips/NAME pN DATE TIME.png
+# and Clips/latest.png; each with a note on the page.
 # HELLOBRO_BOOKS: a directory, where Clips/ goes.
 # app: hellobro
 import os, sys
@@ -21,6 +22,9 @@ stroke(circle(cx, H // 3, 120), pen=True, pressure=lambda t: 2500); time.sleep(2
 stroke(wave(H // 2, cx - 250, cx + 250), pen=True, pressure=lambda t: 2500); time.sleep(3)
 key(RIGHT); time.sleep(3)
 stroke([(cx - 200 + i * 20, H * 2 // 3) for i in range(21)], pen=True, pressure=lambda t: 2500); time.sleep(3)
-key(18, ctrl=True); time.sleep(20)                # Ctrl+E
+key(18, ctrl=True); time.sleep(3)                 # Ctrl+E: PDF or PNG?
+key(ENTER); time.sleep(15)                        # the PDF
+key(18, ctrl=True); time.sleep(3)
+keys("n"); time.sleep(10)                         # the PNG, page 2
 fullscreen(); time.sleep(3)
 exit_app()
