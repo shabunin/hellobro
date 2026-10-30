@@ -1140,6 +1140,13 @@ func blackWhite(img *image.Gray) {
 }
 
 // WaitBlit waits for the update in flight, if any.
+// Show sends what's marked to the panel now, not at the next tick: a
+// button shown pressed before the slow work it starts.
+func (a *App) Show() {
+	a.WaitBlit()
+	a.flush()
+}
+
 func (a *App) WaitBlit() {
 	if a.blitting {
 		if err := <-a.done; err != nil {

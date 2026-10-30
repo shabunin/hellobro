@@ -239,9 +239,9 @@ func (w *bookWin) corners() [4]image.Point {
 // buttons; a picked corner put there; a corner's dot picked; else a
 // corner placed, the first or the second (and the cut is made).
 func (w *bookWin) selectTap(a *bro, p image.Point) {
-	for _, r := range w.cutRows {
+	for i, r := range w.cutRows {
 		if p.In(r.r) {
-			r.do()
+			w.pressCut(a, i)
 			return
 		}
 	}
@@ -304,7 +304,7 @@ func drawCorner(c kobo.Canvas, p image.Point, picked bool, clip image.Rectangle)
 // drawCut draws the rectangle cut out, if there's one, and its buttons:
 // under it, or over it if there's no room under it.
 func (w *bookWin) drawCut(a *bro) {
-	w.cutRows = nil
+	w.cutRows, w.cutLabels = nil, nil
 	r, c := w.cut, a.C
 	if w.selecting && w.corner != nil {
 		drawCorner(c, *w.corner, true, w.view.dst)
@@ -338,10 +338,35 @@ func (w *bookWin) drawCut(a *bro) {
 	for i, label := range labels {
 		b := image.Rect(x, y, x+widths[i], y+h)
 		x += widths[i] + gap
-		c.Fill(b, kobo.White)
-		c.Frame(b, 3, kobo.Black)
-		c.Text(a.F.Panel, b, label, kobo.Black, kobo.AlignCenter)
-		w.cutRows = append(w.cutRows, bookRow{b, do[i]})
+		drawCutButton(a, b, label, false)
+		w.cutRows, w.cutLabels = append(w.cutRows, bookRow{b, do[i]}), append(w.cutLabels, label)
+	}
+}
+
+// drawCutButton draws a cut's button, dark while it's pressed.
+func drawCutButton(a *bro, b image.Rectangle, label string, pressed bool) {
+	bg, fg := uint8(kobo.White), uint8(kobo.Black)
+	if pressed {
+		bg, fg = kobo.Black, kobo.White
+	}
+	a.C.Fill(b, bg)
+	a.C.Frame(b, 3, kobo.Black)
+	a.C.Text(a.F.Panel, b, label, fg, kobo.AlignCenter)
+}
+
+// pressCut runs a cut's button r, shown pressed meanwhile: on the panel
+// at once, as what it does may take a while (a copy, a save: the page
+// rendered again), and a button that doesn't change looks missed. Then
+// it's drawn as it was, if it's still there (zoom and × draw anew).
+func (w *bookWin) pressCut(a *bro, i int) {
+	r, label := w.cutRows[i], w.cutLabels[i]
+	drawCutButton(a, r.r, label, true)
+	a.Mark(r.r, false) // black and white: the fast waveform
+	a.Show()
+	r.do()
+	if i < len(w.cutRows) && w.cutRows[i].r == r.r && w.cutLabels[i] == label && !w.cut.Empty() {
+		drawCutButton(a, r.r, label, false)
+		a.Mark(r.r, false)
 	}
 }
 

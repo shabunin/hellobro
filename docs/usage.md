@@ -755,6 +755,9 @@ again, or Esc, to put it down. Under the rectangle:
   as 400% goes, in its middle (one page at a time only);
 - **×**, a tap elsewhere or Esc takes it away, as does turning the page.
 
+A button tapped goes black till it's done, so a slow copy or save
+shows it was heard.
+
 A scanned page has no text: copy and save keep it as a picture.
 
 The layout is the `book` package's: lines broken at spaces and after

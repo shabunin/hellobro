@@ -156,6 +156,7 @@ type bookWin struct {
 	views     []pdfView       // the pages showing
 	cut       image.Rectangle // a part cut out, on the screen (bookcut.go)
 	cutRows   []bookRow       // its buttons
+	cutLabels []string        // and what they say, to show one pressed
 	selecting bool            // the select tool: taps place the cut's corners
 	corner    *image.Point    // the first corner, placed
 	grab      int             // a corner of the cut picked, to be moved: 1–4; 0 none
@@ -1164,9 +1165,9 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 		return
 	}
 	if !w.cut.Empty() { // a part cut out: its buttons, or away with it
-		for _, r := range w.cutRows {
+		for i, r := range w.cutRows {
 			if p.In(r.r) {
-				r.do()
+				w.pressCut(a, i)
 				return
 			}
 		}
