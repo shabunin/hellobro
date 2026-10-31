@@ -195,6 +195,22 @@ func alpineJail(shared bool) error {
 		nosuid, nodev, noexec, rdonly = syscall.MS_NOSUID, syscall.MS_NODEV, syscall.MS_NOEXEC, syscall.MS_RDONLY
 		bind                          = syscall.MS_BIND | syscall.MS_REC
 	)
+	// Read-only first, on the Kobo's side: the share's bind below takes
+	// these mounts in with it (MS_REC). Made after it, at the jail's
+	// paths, they'd go wherever /mnt/onboard/.adds was by then, and the
+	// image's /mnt is any jail's to move and put a decoy in its place.
+	for _, p := range jailReadOnlyAt("/.oldroot", shareRoot, alpineImg) {
+		src := "/.oldroot" + p
+		if err := noSymlinkIn("/.oldroot", p); err != nil {
+			return err
+		}
+		if err := syscall.Mount(src, src, "", bind, ""); err != nil {
+			return fmt.Errorf("mounting %s: %w", p, err)
+		}
+		if err := syscall.Mount("", src, "", syscall.MS_BIND|syscall.MS_REMOUNT|rdonly|nosuid|nodev, ""); err != nil {
+			return fmt.Errorf("mounting %s read-only: %w", p, err)
+		}
+	}
 	for _, m := range []struct {
 		src, dst, fs string
 		flags        uintptr
@@ -286,9 +302,9 @@ func alpineJail(shared bool) error {
 			writeNewIn("/", "/etc/asound.conf", 0o644, alsaConf)
 		}
 	}
-	// Read-only: what runs as root outside the jail, and what of /proc
-	// would change the Kobo itself.
-	for _, p := range append(jailReadOnly(shareRoot, alpineImg), "/proc/sys", "/proc/sysrq-trigger", "/proc/irq", "/proc/bus") {
+	// Read-only: what of /proc would change the Kobo itself (the
+	// storage's, above, before the share came in).
+	for _, p := range []string{"/proc/sys", "/proc/sysrq-trigger", "/proc/irq", "/proc/bus"} {
 		if _, err := os.Lstat(p); err != nil {
 			continue
 		}
@@ -423,13 +439,17 @@ func rootShell() string {
 // what runs as root outside it (the Kobo's .adds and .kobo: the
 // launcher, NickelMenu's entries, KoboRoot.tgz), and the folder the
 // jail's own image is in, if it's on the storage. Those that are there.
-func jailReadOnly(storage, img string) []string {
+func jailReadOnly(storage, img string) []string { return jailReadOnlyAt("", storage, img) }
+
+// jailReadOnlyAt is jailReadOnly with the Kobo's / at root (the jail's
+// /.oldroot, before it goes).
+func jailReadOnlyAt(root, storage, img string) []string {
 	var out []string
 	for _, p := range []string{filepath.Join(storage, ".adds"), filepath.Join(storage, ".kobo"), filepath.Dir(img)} {
 		if !strings.HasPrefix(p, storage+"/") || slices.ContainsFunc(out, func(o string) bool { return p == o || strings.HasPrefix(p, o+"/") }) {
 			continue // not the storage's, or read-only already
 		}
-		if _, err := os.Lstat(p); err == nil {
+		if _, err := os.Lstat(root + p); err == nil {
 			out = append(out, p)
 		}
 	}

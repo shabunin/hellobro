@@ -232,3 +232,14 @@ func TestWriteNewIn(t *testing.T) {
 		t.Errorf("written outside the root: %v", ents)
 	}
 }
+
+// TestJailReadOnlyAt: looked for under the Kobo's / as the jail has it
+// before it goes, named as the jail's paths.
+func TestJailReadOnlyAt(t *testing.T) {
+	old := t.TempDir()
+	os.MkdirAll(filepath.Join(old, "/mnt/onboard/.adds/hellobro"), 0o755)
+	got := jailReadOnlyAt(old, "/mnt/onboard", "/mnt/onboard/.adds/hellobro/alpine.img")
+	if fmt.Sprint(got) != "[/mnt/onboard/.adds]" {
+		t.Errorf("%v", got)
+	}
+}
