@@ -85,8 +85,9 @@ type WiFi interface {
 	// after it powers the chip off too.
 	Down(progress func(string)) error
 	// Restore puts the power back as it was before the first SetPower:
-	// what Nickel expects when it wakes.
-	Restore()
+	// what Nickel expects when it wakes. With keepChip (Bluetooth on),
+	// off is Down: the chip keeps its power, Bluetooth's too.
+	Restore(keepChip bool)
 	// Keep makes the power as it is now the one Restore puts back.
 	Keep()
 }
@@ -634,12 +635,19 @@ func (w *wpaWiFi) Keep() {
 	w.initial = &on
 }
 
-func (w *wpaWiFi) Restore() {
+func (w *wpaWiFi) Restore(keepChip bool) {
 	if w.initial == nil || *w.initial == w.running() {
 		return
 	}
 	log.Printf("wifi: putting the power back as Kobo had it: %v", *w.initial)
-	if err := w.SetPower(*w.initial, func(s string) { log.Printf("wifi: %s", s) }); err != nil {
+	progress := func(s string) { log.Printf("wifi: %s", s) }
+	var err error
+	if !*w.initial && keepChip {
+		err = w.Down(progress)
+	} else {
+		err = w.SetPower(*w.initial, progress)
+	}
+	if err != nil {
 		log.Printf("wifi: %v", err)
 	}
 }

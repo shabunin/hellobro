@@ -262,7 +262,10 @@ func (a *bro) radioExit() {
 		r.wifi.Keep()
 	}
 	r.bt.Restore()
-	r.wifi.Restore()
+	// Wi-Fi off cuts the chip's power, Bluetooth's too: not with it on
+	// (Nickel's headphones, while it's frozen).
+	bs, _ := r.bt.Status()
+	r.wifi.Restore(bs.Powered)
 }
 
 // nickelClosed says launch.sh closed Nickel for our run (the nickel

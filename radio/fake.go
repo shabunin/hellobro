@@ -130,8 +130,8 @@ func (f *fakeWiFi) SetPower(on bool, progress func(string)) error {
 	return nil
 }
 
-func (f *fakeWiFi) Restore() {}
-func (f *fakeWiFi) Keep()    {}
+func (f *fakeWiFi) Restore(bool) {}
+func (f *fakeWiFi) Keep()        {}
 
 type fakeBT struct {
 	mu          sync.Mutex
