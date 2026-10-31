@@ -488,6 +488,29 @@ func (l *layout) setLine(line []frag, b *Block, bi, left, width int, align Align
 	l.placed = true
 }
 
+// offAt is where byte i of f's text is in the block's: past the soft
+// hyphens taken out before it (and at it: it comes after them).
+func (f *frag) offAt(i int) int {
+	n := 0
+	for _, p := range f.soft {
+		if p <= i {
+			n++
+		}
+	}
+	return f.off + i + n*len("\u00ad")
+}
+
+// softAfter are f's soft hyphens after byte i, from there.
+func (f *frag) softAfter(i int) []int {
+	var out []int
+	for _, p := range f.soft {
+		if p > i {
+			out = append(out, p-i)
+		}
+	}
+	return out
+}
+
 // hyphenate breaks the word fs[j] where it may (as the book's soft
 // hyphens say, else the patterns), as late as still fits in room with
 // a hyphen; false if it can't.
@@ -522,13 +545,8 @@ func (l *layout) hyphenate(fs []frag, j int, room fixed.Int26_6, b *Block) ([]fr
 		}
 		a, c := f, f
 		a.text, a.w, a.soft = head, w, nil
-		c.text, c.off, c.soft = f.text[p:], f.off+p, nil
+		c.text, c.off, c.soft = f.text[p:], f.offAt(p), f.softAfter(p)
 		c.w = font.MeasureString(face, c.text)
-		for _, q := range pts[k+1:] {
-			if f.soft != nil {
-				c.soft = append(c.soft, q-p)
-			}
-		}
 		out := append(fs[:j:j], a, c)
 		return append(out, fs[j+1:]...), true
 	}
@@ -556,7 +574,7 @@ func splitFrag(fs []frag, i int, face font.Face, room fixed.Int26_6) []frag {
 	}
 	a, b := f, f
 	a.text, a.w = f.text[:cut], w
-	b.text, b.off = f.text[cut:], f.off+cut
+	b.text, b.off, b.soft = f.text[cut:], f.offAt(cut), f.softAfter(cut)
 	b.w = font.MeasureString(face, b.text)
 	out := append(fs[:i:i], a, b)
 	return append(out, fs[i+1:]...)

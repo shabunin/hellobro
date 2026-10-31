@@ -253,3 +253,27 @@ func TestLayoutHyphens(t *testing.T) {
 		t.Errorf("soft hyphens: %d breaks, shown: %v", n, strings.Contains(all, "\u00ad"))
 	}
 }
+
+// A line that starts after a soft hyphen starts where its text is in
+// the block's, the hyphens taken out before it counted.
+func TestLayoutSoftOffsets(t *testing.T) {
+	text := strings.Repeat("con\u00adsid\u00ader\u00ading ", 12)
+	ch := &Chapter{Blocks: []Block{para(text)}}
+	s := Settings{W: 200, H: 0, Px: 30, Lang: "ru"}
+	s.H = int(float64(s.Px)*1.4) + 2 // a line a page: each line's start is a page's
+	n := 0
+	for _, p := range Layout(ch, s, goFaces{}, nil) {
+		if len(p.Items) == 0 || p.Start.Off == 0 {
+			continue
+		}
+		first := strings.TrimSuffix(p.Items[0].Text, "-")
+		got := strings.ReplaceAll(text[p.Start.Off:], "\u00ad", "")
+		if !strings.HasPrefix(got, first) {
+			t.Errorf("page at %d: text there %q, the line %q", p.Start.Off, got[:min(len(got), 12)], first)
+		}
+		n++
+	}
+	if n == 0 {
+		t.Error("no line after the first")
+	}
+}
