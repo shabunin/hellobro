@@ -16,10 +16,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/math/fixed"
 
 	"hellobro/kobo"
 )
@@ -42,18 +44,65 @@ type noteTyping struct {
 	pos  int // the cursor: a byte in the text
 }
 
-// noteTextFaces are the text's font at each size it's drawn (px).
-var noteTextFaces = map[int]font.Face{}
+// noteTextFaces are the text's font at each size it's drawn (px). An
+// export draws in its own goroutine while the loop draws pages: the map
+// is locked, and so is each face, as opentype's keep a buffer of their
+// own for measuring.
+var noteTextFaces struct {
+	sync.Mutex
+	m map[int]font.Face
+}
 
 func noteTextFace(px int) font.Face {
 	px = max(4, px)
-	f, ok := noteTextFaces[px]
+	noteTextFaces.Lock()
+	defer noteTextFaces.Unlock()
+	f, ok := noteTextFaces.m[px]
 	if !ok {
-		f = kobo.Face(goregular.TTF, float64(px))
-		noteTextFaces[px] = f
+		if noteTextFaces.m == nil {
+			noteTextFaces.m = map[int]font.Face{}
+		}
+		f = &lockedFace{f: kobo.Face(goregular.TTF, float64(px))}
+		noteTextFaces.m[px] = f
 	}
 	return f
 }
+
+// lockedFace is a face for more than one goroutine. Glyph's mask is the
+// face's own, drawn over by its next: kobo's glyph cache copies it, under
+// its lock, the only one asking for glyphs.
+type lockedFace struct {
+	mu sync.Mutex
+	f  font.Face
+}
+
+func (l *lockedFace) Close() error { l.mu.Lock(); defer l.mu.Unlock(); return l.f.Close() }
+
+func (l *lockedFace) Glyph(dot fixed.Point26_6, r rune) (image.Rectangle, image.Image, image.Point, fixed.Int26_6, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.f.Glyph(dot, r)
+}
+
+func (l *lockedFace) GlyphBounds(r rune) (fixed.Rectangle26_6, fixed.Int26_6, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.f.GlyphBounds(r)
+}
+
+func (l *lockedFace) GlyphAdvance(r rune) (fixed.Int26_6, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.f.GlyphAdvance(r)
+}
+
+func (l *lockedFace) Kern(r0, r1 rune) fixed.Int26_6 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.f.Kern(r0, r1)
+}
+
+func (l *lockedFace) Metrics() font.Metrics { l.mu.Lock(); defer l.mu.Unlock(); return l.f.Metrics() }
 
 // textStroke is t with its top left at (page units).
 func textStroke(t *noteText, at image.Point) *noteStroke {

@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"image"
 	"strings"
+	"sync"
 	"testing"
+
+	"golang.org/x/image/font"
 
 	"hellobro/kobo"
 	"hellobro/wm"
@@ -88,5 +91,27 @@ func TestNoteTyping(t *testing.T) {
 	w.endTyping(a)
 	if len(w.nb.pages[0]) != 1 || len(w.undo) != 1 {
 		t.Errorf("an empty one: %d on the page, %d to undo", len(w.nb.pages[0]), len(w.undo))
+	}
+}
+
+// TestNoteTextFaceShared: the faces are asked for and measured with from
+// goroutines at once, as an export does while the loop draws.
+func TestNoteTextFaceShared(t *testing.T) {
+	var wg sync.WaitGroup
+	for g := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for px := range 40 {
+				f := noteTextFace(10 + (px+g)%40)
+				if font.MeasureString(f, "hello bro").Ceil() <= 0 {
+					t.Error("no width")
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	if noteTextFace(20) != noteTextFace(20) {
+		t.Error("a face per ask")
 	}
 }
