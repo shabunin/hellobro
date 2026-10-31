@@ -2,7 +2,8 @@
 # and down it; 5 is Wi-Fi and 6 Bluetooth, each turned off and on again
 # with the menu staying up, its tile saying how it is (the log says
 # "radio: turning Wi-Fi off…" and so on); 4, the light, off and on
-# ("light: 0%"). Then Airplane by its command
+# ("light: 0%"); 3, the on-screen keyboard, shown, then the menu again
+# with its tile dark, and hidden. Then Airplane by its command
 # in the switcher: the radios off, and back on.
 # app: hellobro
 import os, sys
@@ -18,7 +19,9 @@ key(6); time.sleep(6)                     # Wi-Fi on
 key(7); time.sleep(6)                     # Bluetooth on
 key(5); time.sleep(4)                     # 4: the light off
 key(5); time.sleep(4)                     # and on, as it was
-key(ESC); time.sleep(2)
+key(4); time.sleep(4)                     # 3: the on-screen keyboard shown
+menu(); time.sleep(3)                     # its tile dark
+key(4); time.sleep(4)                     # hidden again, the menu gone
 gui("airplane"); time.sleep(5)            # the radios off
 gui("airplane"); time.sleep(5)            # back on
 exit_app()

@@ -644,6 +644,11 @@ func (a *bro) menuEntries() []pickEntry {
 			if l > 0 {
 				e.detail = strconv.Itoa(l) + "%"
 			}
+		case t.id == "keyboard": // shown or not; the menu goes, so it's seen coming or going
+			e.on, e.detail = a.vk.on, "hidden"
+			if a.vk.on {
+				e.detail = "shown"
+			}
 		case t.id == "wifi":
 			e.on, e.stay, e.do = r.ws.On, true, func() { a.radioFlip(panelWiFi) }
 			e.hold = func() { a.openGUI("wifi") } // held: its window, the networks

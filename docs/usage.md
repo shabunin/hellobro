@@ -112,7 +112,8 @@ a ring) and Enter (or type to narrow); Esc or a tap outside closes it.
 **Light**, **Wi-Fi** and **Bluetooth** turn it on or off where they
 are, the menu staying up: a tile is dark while it's on, and says how
 it is (the light's level, the network joined, on, off, or "a moment…"
-while a radio changes). A finger held on Wi-Fi or Bluetooth opens its
+while a radio changes). **Keyboard**'s tile is dark while the on-screen
+keyboard shows; a tap shows or hides it, the menu going. A finger held on Wi-Fi or Bluetooth opens its
 window instead: the networks, the devices.
 
 **Airplane mode** (`airplane` in keys.conf and the switcher) turns
