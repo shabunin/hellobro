@@ -91,7 +91,15 @@ func mountMain(dir, mode string) {
 	go func() { // the host gone: nothing here can work any more
 		c.Wait()
 		log.Printf("%s: the host's gone", dir)
-		srv.Unmount()
+		if err := srv.Unmount(); err != nil {
+			// Busy (a shell cd'd in it): go-fuse tries fusermount then,
+			// which the Kobo hasn't got, and we'd serve a dead host for
+			// good. Detached, it goes once nothing's in it; we go now,
+			// so hellobro hears the mount's gone.
+			log.Printf("%s: unmounting: %v; detached", dir, err)
+			syscall.Unmount(dir, syscall.MNT_DETACH)
+			os.Exit(1)
+		}
 	}()
 	srv.Wait()
 }

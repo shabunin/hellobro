@@ -142,6 +142,10 @@ func (a *bro) mountHost(t *termSession, h sshHost, rw, quiet bool) {
 					if err == nil {
 						m.asked = true
 						m.stop()
+						go func() { // no zombie: its process ends, and goes
+							m.cmd.Wait()
+							os.Remove(m.dir)
+						}()
 					}
 					delete(a.mnt.on, h.name)
 					return
