@@ -415,3 +415,25 @@ func TestGfxLimits(t *testing.T) {
 		t.Errorf("%d numbers kept", n)
 	}
 }
+
+// TestWriteStale: what a closed connection's reader still has goes
+// nowhere: not into a nil emulator, nor into the next session's.
+func TestWriteStale(t *testing.T) {
+	old := vt.NewSafeEmulator(20, 6)
+	defer old.Close()
+	ts := &termSession{state: termConnected}
+	if ts.writeTo(old, []byte("late")) {
+		t.Error("written with the session closed")
+	}
+	ts.emu = vt.NewSafeEmulator(20, 6)
+	defer ts.emu.Close()
+	if ts.writeTo(old, []byte("late")) {
+		t.Error("written into the next session")
+	}
+	if got := ts.emu.CellAt(0, 0); got != nil && got.Content == "l" {
+		t.Error("the old output shows in the next session")
+	}
+	if !ts.writeTo(ts.emu, []byte("new")) {
+		t.Error("the session's own output dropped")
+	}
+}

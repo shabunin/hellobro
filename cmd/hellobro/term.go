@@ -148,10 +148,19 @@ type termPane struct {
 }
 
 // write puts the remote's output into the emulator.
-func (t *termSession) write(p []byte) {
+func (t *termSession) write(p []byte) { t.writeTo(t.emu, p) }
+
+// writeTo puts output read for emu into it, if it's still the session's:
+// a closed connection's reader may still have some (the SSH channel's
+// buffer drains after Close), which goes to no other emulator.
+func (t *termSession) writeTo(emu *vt.SafeEmulator, p []byte) bool {
 	t.mu.Lock()
-	t.gfx.feed(p, func(b []byte) { t.emu.Write(b) }, t.gfxCommand)
-	t.mu.Unlock()
+	defer t.mu.Unlock()
+	if emu == nil || t.emu != emu {
+		return false
+	}
+	t.gfx.feed(p, func(b []byte) { emu.Write(b) }, t.gfxCommand)
+	return true
 }
 
 // touchedRows are the rows the emulator changed since the last call, and
@@ -984,8 +993,9 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	if h := t.target; h.user == share.KeysUser && h.key != "" {
 		a.rememberDevice(h.key, h.name)
 	}
-	t.emu = vt.NewSafeEmulator(cols, rows)
+	emu := vt.NewSafeEmulator(cols, rows)
 	t.mu.Lock()
+	t.emu = emu
 	t.gfx = kittyGfx{cell: a.face(t).cell()}
 	t.mu.Unlock()
 	t.emu.SetDefaultForegroundColor(color.Black) // what apps get when they ask, so they pick light-theme colors
@@ -1014,15 +1024,13 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	} else {
 		log.Printf("ssh: connected to %s, %d×%d", t.target, cols, rows)
 	}
-	emu := t.emu
 	go func() { // remote → emulator
 		buf := make([]byte, 32<<10)
 		var err error
 		for {
 			var n int
 			n, err = back.Read(buf)
-			if n > 0 {
-				t.write(buf[:n])
+			if n > 0 && t.writeTo(emu, buf[:n]) {
 				t.dirty.Store(true)
 			}
 			if err != nil {
@@ -1089,8 +1097,12 @@ func (a *bro) termClose(t *termSession) {
 	}
 	if t.back != nil {
 		t.back.close()
-		t.emu.Close()
-		t.back, t.emu = nil, nil
+		emu := t.emu
+		t.mu.Lock() // the reader may be writing into it
+		t.emu = nil
+		t.mu.Unlock()
+		emu.Close()
+		t.back = nil
 	}
 	t.gen++
 	t.state = termIdle
