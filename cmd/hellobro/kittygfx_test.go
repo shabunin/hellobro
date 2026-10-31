@@ -466,3 +466,18 @@ func TestGfxFeedStops(t *testing.T) {
 		t.Errorf("%d commands, %q passed on; want 1, \"a\"", n, out.String())
 	}
 }
+
+// A transfer left mid-way (its program died) is given up after a while:
+// the next command is its own, not a chunk of it.
+func TestGfxChunkGap(t *testing.T) {
+	ts, read := gfxTerm(t, 20, 6)
+	ts.write([]byte("\x1b_Ga=t,i=3,f=100,m=1;AAAA\x1b\\"))
+	ts.gfx.last = time.Now().Add(-kgChunkGap - time.Second)
+	ts.write([]byte("\x1b_Ga=t,i=4,s=1,v=1,f=24;" + base64.StdEncoding.EncodeToString([]byte{0, 0, 0}) + "\x1b\\"))
+	if r := read(); r != "\x1b_Gi=4;OK\x1b\\" {
+		t.Errorf("answer %q, want i=4's", r)
+	}
+	if ts.gfx.load != nil || ts.gfx.images[4] == nil {
+		t.Errorf("load %v, image 4 %v", ts.gfx.load, ts.gfx.images[4])
+	}
+}

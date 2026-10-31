@@ -27,6 +27,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	uv "github.com/charmbracelet/ultraviolet"
@@ -43,6 +44,7 @@ const (
 	kgMaxPlaces = 512
 	kgMaxCells  = 255 // a placement's rows and columns: they're a byte each in the rune
 	kgRune0     = 0xF0000
+	kgChunkGap  = 10 * time.Second // a transfer with no chunk for this long is given up
 )
 
 // The scanner's states: what of a command's start it has seen.
@@ -59,9 +61,10 @@ const (
 // t.mu, but for the placements renderTerm takes, which don't change.
 type kittyGfx struct {
 	state int8
-	cmd   []byte // the command so far, after the G
-	over  bool   // it grew too long: it's dropped
-	load  *kgCmd // a transfer in chunks, so far
+	cmd   []byte    // the command so far, after the G
+	over  bool      // it grew too long: it's dropped
+	load  *kgCmd    // a transfer in chunks, so far
+	last  time.Time // its last chunk
 
 	cell    image.Point // a cell's size in pixels
 	images  map[uint32]*kgImage
@@ -348,6 +351,9 @@ func (g *kittyGfx) cellSize() image.Point {
 func (t *termSession) gfxCommand(emu *vt.SafeEmulator, b []byte) bool {
 	g := &t.gfx
 	c, err := parseKgCmd(b)
+	if g.load != nil && time.Since(g.last) > kgChunkGap {
+		g.load = nil // its program went mid-way: this isn't its
+	}
 	if g.load != nil { // the next chunk: only m (and q) count
 		l := g.load
 		if len(l.data)+len(c.data) > kgMaxData {
@@ -358,13 +364,14 @@ func (t *termSession) gfxCommand(emu *vt.SafeEmulator, b []byte) bool {
 		l.data = append(l.data, c.data...)
 		l.q = max(l.q, c.q)
 		if err == nil && c.m == 1 {
+			g.last = time.Now()
 			return true
 		}
 		g.load = nil
 		c, err = *l, nil
 	} else if err == nil && c.m == 1 {
 		c.data = append([]byte(nil), c.data...)
-		g.load = &c
+		g.load, g.last = &c, time.Now()
 		return true
 	}
 	if err != nil {
