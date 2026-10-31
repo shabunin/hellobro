@@ -2,7 +2,7 @@ package main
 
 // Cutting a part of a PDF's page out: the pen drawn across the page, or
 // a finger held still a moment then moved (as in the terminals), makes a
-// rectangle. So does the select tool (its button under the page): a
+// rectangle. So does the select tool (its button on the bar): a
 // finger dragged across at once, or taps, one corner, then the other.
 // With it the rectangle changes by fingers too: a corner's dot dragged
 // moves that corner, a side dragged that side, the inside the whole of

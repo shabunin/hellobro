@@ -1,7 +1,7 @@
 package main
 
 // PDFs in the reader: a PDF is a book whose chapters are its pages, so
-// the shelf, the contents (its outline), bookmarks, the strip under the
+// the shelf, the contents (its outline), bookmarks, the bar over the
 // page and turning pages are the books' own. Here: a page drawn by MuPDF
 // (package pdf), gray, its white margins trimmed, as big as the window
 // takes it whole, or as wide as the window, then zoomed if asked; one
@@ -257,7 +257,7 @@ func (w *bookWin) drawPDF(a *bro) {
 	}
 	w.drawCut(a)
 	w.drawPageMark(a)
-	w.drawFoot(a)
+	w.drawBar(a)
 	w.drawAhead(a)
 }
 
@@ -329,18 +329,6 @@ func (w *bookWin) pdfWords(n int) string {
 	s := strings.Join(strings.Fields(text), " ")
 	if len(s) > n {
 		s = strings.ToValidUTF8(s[:n], "") + "…"
-	}
-	return s
-}
-
-// pdfFootName is the strip's left: the page, and the outline's line.
-func (w *bookWin) pdfFootName() string {
-	s := fmt.Sprintf("%d / %d", w.spine+1, len(w.b.Spine))
-	if w.laid.two && w.spine+1 < len(w.b.Spine) {
-		s = fmt.Sprintf("%d–%d / %d", w.spine+1, w.spine+2, len(w.b.Spine))
-	}
-	if name := w.chapterName(); name != "" {
-		s += "  ·  " + name
 	}
 	return s
 }

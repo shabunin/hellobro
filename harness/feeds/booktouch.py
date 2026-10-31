@@ -18,15 +18,15 @@ key(ENTER); time.sleep(4)                            # the first book
 fullscreen(); time.sleep(3)
 for _ in range(4): swipe(W * 0.7, H / 2, W * 0.3, H / 2)   # on
 swipe(W * 0.3, H / 2, W * 0.7, H / 2)                      # back
-tap(W - 70, 50); time.sleep(3)                       # the corner: bookmarked
+tap(W - 70, 110); time.sleep(3)                      # the corner: bookmarked
 swipe(W * 0.7, H / 2, W * 0.3, H / 2)
-tap(W // 2 - 100, H - 75); time.sleep(3)             # ☰: the contents
+tap(*barbtn(0)); time.sleep(3)                       # ☰: the contents
 swipe(W / 2, H * 0.7, W / 2, H * 0.3)                # a screenful on
 swipe(W / 2, H * 0.3, W / 2, H * 0.7)                # and back
 L, R = 182, W - 292
 tap(L + 3 * (R - L) // 4, 40); time.sleep(3)         # the Bookmarks tab
 tap(W // 2, 124); time.sleep(3)                      # the bookmark's page
-tap(W - 70, 50); time.sleep(3)                       # the corner: taken away
-tap(W // 2 - 100, H - 75); time.sleep(3)             # ☰
+tap(W - 70, 110); time.sleep(3)                      # the corner: taken away
+tap(*barbtn(0)); time.sleep(3)                       # ☰
 tap(90, 40); time.sleep(4)                           # ‹ books: the shelf
 exit_app()

@@ -157,9 +157,11 @@ type bookWin struct {
 	cut       image.Rectangle // a part cut out, on the screen (bookcut.go)
 	cutRows   []bookRow       // its buttons
 	cutLabels []string        // and what they say, to show one pressed
-	selecting bool            // the select tool: taps place the cut's corners
-	corner    *image.Point    // the first corner, placed
-	grab      int             // a corner of the cut picked, to be moved: 1–4; 0 none
+	bar       image.Rectangle // the bar along the top of a page (toolbar.go), and its buttons as last drawn
+	btns      []barBtn
+	selecting bool         // the select tool: taps place the cut's corners
+	corner    *image.Point // the first corner, placed
+	grab      int          // a corner of the cut picked, to be moved: 1–4; 0 none
 	err       string
 	opening   bool           // the book's being opened (newBookWin)
 	laying    *bookLayingOut // an EPUB's chapter being laid out, aside
@@ -346,7 +348,7 @@ func (a *bro) bookPx() int {
 func (w *bookWin) place(a *bro, p kobo.Panel) {
 	p.Name = w.Title()
 	w.p = p
-	w.rows = nil
+	w.rows, w.btns = nil, nil
 	w.pageShown = false
 	w.dropCut()
 	w.note = nil
@@ -358,8 +360,9 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	if w.pdf != nil { // its own margins are enough
 		mx, my = 8, 8
 	}
-	foot := max(footMin, kobo.TextWidth(a.F.Small, "M")*2+8) // the strip under the page: room for its buttons
-	w.area = image.Rect(body.Min.X+mx, body.Min.Y+my, body.Max.X-mx, body.Max.Y-foot)
+	in := body.Inset(kobo.Pad / 2)
+	w.bar = image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Min.Y+barHeight())
+	w.area = image.Rect(body.Min.X+mx, w.bar.Max.Y+my, body.Max.X-mx, body.Max.Y-my)
 }
 
 func (w *bookWin) panel(a *bro) kobo.Panel {
@@ -376,10 +379,8 @@ func (w *bookWin) status() string {
 		return fmt.Sprintf("%d books", len(w.shelf))
 	case w.b == nil || len(w.pages) == 0:
 		return ""
-	case w.pdf != nil:
-		return fmt.Sprintf("%d/%d · %d%%", w.spine+1, len(w.b.Spine), w.pct())
 	}
-	return fmt.Sprintf("%d/%d · %d%%", w.page+1, len(w.pages), w.pct())
+	return fmt.Sprintf("%d%%", w.pct()) // the page and the chapter are on the bar
 }
 
 // pct is how far into the book the page is.
@@ -547,7 +548,7 @@ func (w *bookWin) drawPage(a *bro) {
 	}
 	w.pics = pics // only these pages' are kept
 	w.drawPageMark(a)
-	w.drawFoot(a)
+	w.drawBar(a)
 	w.drawNote(a)
 }
 
@@ -717,7 +718,7 @@ func (w *bookWin) drawList(a *bro) {
 	if len(lines) == 0 {
 		msg := "no contents in this book"
 		if w.listMks {
-			msg = "no bookmarks yet: b, or the ribbon under the page"
+			msg = "no bookmarks yet: b, or the ribbon over the page"
 		}
 		a.C.Text(f, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), msg, kobo.Dark, kobo.AlignLeft)
 		return
@@ -1141,7 +1142,7 @@ func (w *bookWin) openContents(a *bro) {
 
 // tap: on the list or the style panel, a row; on a page, the left
 // third back, the rest on, the top the contents but for its right
-// corner, a bookmark, the strip under it its buttons (bookmarks.go).
+// corner, a bookmark; the bar over it, its buttons (bookmarks.go).
 func (w *bookWin) tap(a *bro, p image.Point) {
 	body := w.p.Body
 	if !p.In(body) {
@@ -1163,7 +1164,7 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 		return
 	}
 	if w.selecting && w.pdf != nil {
-		if !(p.Y >= w.area.Max.Y && w.footTap(a, p)) {
+		if !(p.In(w.bar) && w.barTap(a, p)) {
 			w.selectTap(a, p)
 		}
 		return
@@ -1185,13 +1186,14 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 	}
 	link := w.linkAt(p)
 	switch {
+	case p.In(w.bar) && w.b != nil:
+		w.barTap(a, p)
 	case p.In(w.markCorner()) && w.b != nil:
 		w.toggleMark(a)
 	case link != "":
 		w.followLink(a, link)
-	case p.Y < body.Min.Y+body.Dy()/8:
+	case p.Y < w.area.Min.Y+w.area.Dy()/8:
 		w.openContents(a)
-	case p.Y >= w.area.Max.Y && w.b != nil && w.footTap(a, p):
 	case p.X < body.Min.X+body.Dx()/3:
 		w.turn(a, -1)
 	default:

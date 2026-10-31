@@ -27,7 +27,7 @@ key(108); time.sleep(1); key(ENTER); time.sleep(3)     # SF
 key(14); time.sleep(3)                                 # Backspace: up, Fiction
 key(108); time.sleep(1); key(108); time.sleep(1)
 key(ENTER); time.sleep(8)                              # the book
-tap(W // 2 - 100, H - 75); time.sleep(4)               # ☰: its contents
+tap(*barbtn(0)); time.sleep(4)                         # ☰: its contents
 tap(*ALL); time.sleep(5)                               # All Books
 tap(*BACK); time.sleep(6)                              # back to the book
 key(31); time.sleep(4)                                 # s: the style panel

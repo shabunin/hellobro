@@ -18,7 +18,7 @@ start()
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
 fullscreen(); time.sleep(5)
-tap(W // 2 + 12, H - 52); time.sleep(3)              # the select tool
+tap(*barbtn(3)); time.sleep(3)                       # the select tool
 half = int(min(W, H) * 0.2)
 tap(W // 2 - half, int(H * 0.30)); time.sleep(3)
 tap(W // 2 + half, int(H * 0.42)); time.sleep(4); note("cut")

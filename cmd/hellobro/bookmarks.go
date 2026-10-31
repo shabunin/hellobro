@@ -1,8 +1,9 @@
 package main
 
-// Bookmarks, and the strip under a book's page: its buttons for the
-// contents (☰), the style panel (Aa) and a bookmark (a ribbon, filled
-// when the page has one). A bookmark is a place in a chapter, as the
+// Bookmarks, and the bar over a book's page (toolbar.go, as a
+// notebook's): its buttons for the shelf, the contents (☰), the style
+// panel (Aa), a bookmark (a ribbon, filled when the page has one), and
+// the pages. A bookmark is a place in a chapter, as the
 // place a book was left is; the contents' second tab lists them.
 
 import (
@@ -156,102 +157,146 @@ func (w *bookWin) deleteMark(a *bro, i int) {
 	w.draw(a)
 }
 
-// --- the strip under the page ---
+// --- the bar along the top (toolbar.go) ---
 
-// The strip under a book's page: how tall at least, a button's width
-// (sizes.go: bigger for fingers).
-var footMin, footButton = 64, 100
-
-const (
-	zoomButton = 84 // a PDF's zoom buttons': − 100% +
-	zoomGap    = 24 // between them and the rest
-)
-
-// footButtons are the strip's buttons: the contents, the style, a
-// bookmark, and in a PDF the select tool (bookcut.go), side by side in
-// its middle (with the zoom buttons, if they show).
-func (w *bookWin) footButtons() (toc, style, mark, sel image.Rectangle) {
-	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y)
-	n, width := 3, 3*footButton
+// barTools are the bar's: All Books, back from a link, the contents,
+// the style, a bookmark; a PDF's select tool (bookcut.go) and zoom
+// (one page at a time). Then those that go first where there's no room.
+func (w *bookWin) barTools() (tools []barBtn, drops []string) {
+	tools = []barBtn{{id: "all", label: "‹ All Books"}}
+	if w.from != nil {
+		tools = append(tools, barBtn{id: "back", label: "‹ back"})
+	}
+	tools = append(tools, barBtn{id: "toc"}, barBtn{id: "style"}, barBtn{id: "mark"})
 	if w.pdf != nil {
-		n, width = 4, 4*footButton
+		tools = append(tools, barBtn{id: "select"})
+		if !w.laid.two {
+			tools = append(tools, barBtn{id: "zoom out"}, barBtn{id: "fit", label: "100%"}, barBtn{id: "zoom in"})
+		}
 	}
-	if w.zoomShows() {
-		width += zoomGap + 3*zoomButton
-	}
-	x := (foot.Min.X+foot.Max.X)/2 - width/2
-	bs := make([]image.Rectangle, 4)
-	for i := range n {
-		bs[i] = image.Rect(x+i*footButton, foot.Min.Y, x+(i+1)*footButton, foot.Max.Y)
-	}
-	return bs[0], bs[1], bs[2], bs[3]
+	return tools, []string{"fit", "style", "zoom out", "zoom in"}
 }
 
-// zoomShows is whether the strip has a PDF's zoom buttons: it zooms
-// (one page at a time), and there's room for them.
-func (w *bookWin) zoomShows() bool {
-	return w.pdf != nil && !w.laid.two && w.area.Dx() >= 4*footButton+zoomGap+3*zoomButton+2*160
-}
-
-// zoomButtons are a PDF's zoom buttons, right of the select tool:
-// out, back to the fit (100%), in. Empty if they don't show.
-func (w *bookWin) zoomButtons() (out, fit, in image.Rectangle) {
-	if !w.zoomShows() {
-		return
+// counter is which pages show: a PDF's of all, an EPUB's of the chapter.
+func (w *bookWin) counter() string {
+	n, of := w.page, len(w.pages)
+	if w.pdf != nil {
+		n, of = w.spine, len(w.b.Spine)
 	}
-	_, _, _, sel := w.footButtons()
-	r := image.Rect(sel.Max.X+zoomGap, sel.Min.Y, sel.Max.X+zoomGap+zoomButton, sel.Max.Y)
-	return r, r.Add(image.Pt(zoomButton, 0)), r.Add(image.Pt(2*zoomButton, 0))
+	if w.laid.two && n+1 < of {
+		return fmt.Sprintf("%d–%d / %d", n+1, n+2, of)
+	}
+	return fmt.Sprintf("%d / %d", n+1, of)
 }
 
-// drawFoot draws the strip: the chapter, the buttons, how far in.
-func (w *bookWin) drawFoot(a *bro) {
+// atEnd says the page shown is the book's first (d < 0) or its last.
+func (w *bookWin) atEnd(d int) bool {
+	if d < 0 {
+		return w.spine == 0 && w.page == 0
+	}
+	last := len(w.pages) - 1
+	if w.laid.two {
+		last -= last % 2
+	}
+	return w.spine == len(w.b.Spine)-1 && w.page >= last
+}
+
+// drawBar lays the bar out and draws it: the select tool black while
+// it's in hand, what can't be done now gray.
+func (w *bookWin) drawBar(a *bro) {
+	tools, drops := w.barTools()
+	cw := kobo.TextWidth(a.F.Small, "999 / 999")
+	if w.laid.two {
+		cw = kobo.TextWidth(a.F.Small, "999–999 / 999")
+	}
+	w.btns = layTop(a, w.bar, tools, drops, cw)
 	c := a.C
-	toc, style, mark, sel := w.footButtons()
-	out, fit, in := w.zoomButtons()
-	foot := image.Rect(w.area.Min.X, w.area.Max.Y, w.area.Max.X, w.p.Body.Max.Y-4)
-	last := mark.Union(sel).Union(in)
-	name, ink := w.chapterName(), uint8(kobo.Mid)
-	if w.pdf != nil {
-		name = w.pdfFootName()
-	} else if w.from != nil {
-		name, ink = "‹ back", kobo.Black
+	c.Fill(w.bar, kobo.White)
+	for _, b := range w.btns {
+		on := b.id == "select" && w.selecting
+		off := b.id == "prev" && w.atEnd(-1) || b.id == "next" && w.atEnd(1) ||
+			(b.id == "fit" || b.id == "zoom out") && w.zoom <= pdfZoomMin
+		drawBarBtn(a, b, on, off, func(r image.Rectangle, ink, bg uint8) bool {
+			m, s := r.Min.Add(r.Max).Div(2), r.Dy()/4
+			switch b.id {
+			case "toc": // ☰: three lines
+				for k := -1; k <= 1; k++ {
+					c.Fill(image.Rect(m.X-s, m.Y+k*s*2/3-1, m.X+s, m.Y+k*s*2/3+2), ink)
+				}
+			case "style":
+				c.Text(a.F.Body, r, "Aa", ink, kobo.AlignCenter)
+			case "mark": // filled while the page has one
+				ribbon(c, image.Rect(m.X-s*2/3, m.Y-s, m.X+s*2/3, m.Y+s), len(w.pageMarks()) > 0, ink)
+			case "select":
+				drawIcon(c, noteIcon("select", ""), r, ink, bg)
+			case "zoom out", "zoom in": // −, +: bars, as ☰'s
+				c.Fill(image.Rect(m.X-s, m.Y-1, m.X+s, m.Y+2), ink)
+				if b.id == "zoom in" {
+					c.Fill(image.Rect(m.X-1, m.Y-s, m.X+2, m.Y+s), ink)
+				}
+			default:
+				return false
+			}
+			return true
+		})
 	}
-	c.Text(a.F.Small, image.Rect(foot.Min.X, foot.Min.Y, toc.Min.X-12, foot.Max.Y), name, ink, kobo.AlignLeft)
-	c.Text(a.F.Small, image.Rect(last.Max.X+12, foot.Min.Y, foot.Max.X, foot.Max.Y), fmt.Sprintf("%d%%", w.pct()), kobo.Mid, kobo.AlignRight)
-	// ☰: three lines
-	m := toc.Min.Add(toc.Max).Div(2)
-	for k := -1; k <= 1; k++ {
-		c.Fill(image.Rect(m.X-14, m.Y+k*9-2, m.X+14, m.Y+k*9+1), kobo.Dark)
-	}
-	c.Text(a.F.Body, style, "Aa", kobo.Dark, kobo.AlignCenter)
-	m = mark.Min.Add(mark.Max).Div(2)
-	ribbon(c, image.Rect(m.X-10, m.Y-14, m.X+10, m.Y+14), len(w.pageMarks()) > 0, kobo.Dark)
-	if !sel.Empty() { // the select tool: a rectangle with its corners' dots, black while it's in hand
-		ink := uint8(kobo.Dark)
-		if w.selecting {
-			c.Fill(sel.Inset(8), kobo.Black)
-			ink = kobo.White
+	drawBarCounter(a, barCounter(w.btns, w.bar, false), w.counter(), false)
+	if n := len(w.btns); n > 2 { // between the tools and the arrows, if there's room: the chapter, how far in
+		gap := image.Rect(w.btns[n-3].r.Max.X+2*barGap, w.bar.Min.Y, w.btns[n-1].r.Min.X-2*barGap, w.bar.Max.Y)
+		text := fmt.Sprintf("%d%%", w.pct())
+		if name := w.chapterName(); name != "" {
+			text = name + " · " + text
 		}
-		m = sel.Min.Add(sel.Max).Div(2)
-		r := image.Rect(m.X-18, m.Y-12, m.X+18, m.Y+12)
-		c.Frame(r, 2, ink)
-		for _, p := range []image.Point{r.Min, {r.Max.X - 1, r.Min.Y}, r.Max.Sub(image.Pt(1, 1)), {r.Min.X, r.Max.Y - 1}} {
-			c.Disc(p, 4, ink, sel)
+		if gap.Dx() >= 120 {
+			c.Text(a.F.Small, gap, kobo.Fit(a.F.Small, text, gap.Dx()), kobo.Mid, kobo.AlignCenter)
 		}
 	}
-	if !in.Empty() {
-		m = out.Min.Add(out.Max).Div(2) // −, + : bars, as ☰'s
-		c.Fill(image.Rect(m.X-14, m.Y-2, m.X+14, m.Y+2), kobo.Dark)
-		m = in.Min.Add(in.Max).Div(2)
-		c.Fill(image.Rect(m.X-14, m.Y-2, m.X+14, m.Y+2), kobo.Dark)
-		c.Fill(image.Rect(m.X-2, m.Y-14, m.X+2, m.Y+14), kobo.Dark)
-		ink := uint8(kobo.Dark)
-		if w.zoom == pdfZoomMin { // there already
-			ink = kobo.Mid
+}
+
+// barTap does what a tap at p on the bar asks: true if it was on it.
+func (w *bookWin) barTap(a *bro, p image.Point) bool {
+	if p.In(barCounter(w.btns, w.bar, false)) { // the pages, small; an EPUB's contents
+		if w.pdf != nil {
+			w.showPages(a)
+		} else {
+			w.openContents(a)
 		}
-		c.Text(a.F.Small, fit, "100%", ink, kobo.AlignCenter)
+		return true
 	}
+	for _, b := range w.btns {
+		if !p.In(b.r) {
+			continue
+		}
+		switch b.id {
+		case "all":
+			w.toShelf(a)
+		case "back":
+			w.goBack(a)
+		case "toc":
+			w.openContents(a)
+		case "style":
+			w.openStyle(a)
+		case "mark":
+			w.toggleMark(a)
+		case "select":
+			w.selecting = !w.selecting
+			w.dropCut()
+			log.Printf("pdf: select tool %v", w.selecting)
+			w.draw(a)
+		case "zoom out":
+			w.zoomStep(a, -1)
+		case "zoom in":
+			w.zoomStep(a, 1)
+		case "fit":
+			w.setZoom(a, pdfZoomMin, w.area.Min.Add(w.area.Max).Div(2))
+		case "prev":
+			w.turn(a, -1)
+		case "next":
+			w.turn(a, 1)
+		}
+		return true
+	}
+	return p.In(w.bar) // between the buttons: nothing
 }
 
 // drawPageMark hangs a ribbon in the top margin at the right, if the
@@ -260,7 +305,7 @@ func (w *bookWin) drawPageMark(a *bro) {
 	if len(w.pageMarks()) == 0 {
 		return
 	}
-	top := w.p.Body.Min.Y
+	top := w.bar.Max.Y
 	ribbon(a.C, image.Rect(w.area.Max.X-22, top, w.area.Max.X, max(top+16, w.area.Min.Y-6)), true, kobo.Black)
 }
 
@@ -288,37 +333,6 @@ func ribbon(c kobo.Canvas, r image.Rectangle, filled bool, g uint8) {
 		in := image.Rect(r.Min.X+3, r.Min.Y+3, r.Max.X-3, r.Max.Y-4)
 		shape(in, kobo.White)
 	}
-}
-
-// footTap does what a tap at p on the strip under the page asks, if
-// it's on a button.
-func (w *bookWin) footTap(a *bro, p image.Point) bool {
-	toc, style, mark, sel := w.footButtons()
-	out, fit, in := w.zoomButtons()
-	switch {
-	case p.In(out):
-		w.zoomStep(a, -1)
-	case p.In(in):
-		w.zoomStep(a, 1)
-	case p.In(fit):
-		w.setZoom(a, pdfZoomMin, w.area.Min.Add(w.area.Max).Div(2))
-	case p.In(sel):
-		w.selecting = !w.selecting
-		w.dropCut()
-		log.Printf("pdf: select tool %v", w.selecting)
-		w.draw(a)
-	case p.In(toc):
-		w.openContents(a)
-	case p.In(style):
-		w.openStyle(a)
-	case p.In(mark):
-		w.toggleMark(a)
-	case w.from != nil && p.X < toc.Min.X: // "‹ back", after a link
-		w.goBack(a)
-	default:
-		return false
-	}
-	return true
 }
 
 // --- the list's tabs ---
@@ -375,7 +389,7 @@ func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
 // there bookmarks it, or takes its bookmark away.
 func (w *bookWin) markCorner() image.Rectangle {
 	body := w.p.Body
-	return image.Rect(w.area.Max.X-120, body.Min.Y, body.Max.X, w.area.Min.Y+100)
+	return image.Rect(w.area.Max.X-120, w.bar.Max.Y, body.Max.X, w.area.Min.Y+100)
 }
 
 // swipe: on a page, across it turns it (to the left on, to the right

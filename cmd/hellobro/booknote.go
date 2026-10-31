@@ -2,8 +2,8 @@ package main
 
 // A link tapped on an EPUB's page: what it points at shows in a box over
 // the page, a note most often (its number, raised), so it's read without
-// leaving the page. "go there" goes to it; the strip under the page then
-// has "‹ back" where the chapter's name was. A link to a whole chapter
+// leaving the page. "go there" goes to it; the bar over the page then
+// has "‹ back", after ‹ All Books. A link to a whole chapter
 // goes there at once. The notes may be in a file not read in order (the
 // end notes), and a long one: it's read aside.
 

@@ -23,8 +23,8 @@ func (a *bro) sizesBig() bool {
 func (a *bro) applySizes() {
 	big := a.sizesBig()
 	kobo.SetBig(big)
-	pickRowH, setRowH, setRowMin, radioRowH, libRowMin, footMin, footButton = 58, 50, 40, 56, 64, 64, 100
+	pickRowH, setRowH, setRowMin, radioRowH, libRowMin = 58, 50, 40, 56, 64
 	if big {
-		pickRowH, setRowH, setRowMin, radioRowH, libRowMin, footMin, footButton = 92, 76, 76, 80, 88, 84, 120
+		pickRowH, setRowH, setRowMin, radioRowH, libRowMin = 92, 76, 76, 80, 88
 	}
 }

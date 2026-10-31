@@ -387,7 +387,7 @@ type noteWin struct {
 	selPage    int
 	mark       *noteMark // where the next paste goes
 	penMenu    bool      // the pen's choices out (notepen.go)
-	penOpts    []noteBtn
+	penOpts    []barBtn
 	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
 	slotSize   image.Point // the page size the slots are for
 	exporting  bool        // a PDF of it being written (noteexport.go)
@@ -403,14 +403,9 @@ type noteWin struct {
 	bar   image.Rectangle // the tools' strip
 	side  bool            // it stands along the left: a narrow window (layBar)
 	ex    *exLine         // a ":" command being typed (noteex.go)
-	btns  []noteBtn
+	btns  []barBtn
 	slots []image.Rectangle // the pages on screen, left to right: cur, cur+1
 	scale float64           // screen px a page unit
-}
-
-type noteBtn struct {
-	id, label string
-	r         image.Rectangle
 }
 
 func (w *noteWin) Title() string    { return "Notebook " + w.nb.name }
@@ -470,10 +465,7 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 	if p.Outer.Empty() {
 		return
 	}
-	h := 56
-	if kobo.IsBig() {
-		h = 76
-	}
+	h := barHeight()
 	b := p.Body.Inset(kobo.Pad / 2)
 	w.bar = image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+h)
 	if tools, _ := barTools(false); w.barNeed(a, tools) > w.barRoom(a) && b.Dy() > b.Dx() { // not all on top: down the side (the pens' tools say, so it stays put for the overview's)
@@ -523,34 +515,18 @@ func (w *noteWin) counter() string {
 // barTools are the tools on the strip (the overview's, or the pen's
 // and the rest), All Notebooks first, and those that go first where
 // there's no room for all.
-func barTools(overview bool) (tools []noteBtn, drops []string) {
-	all := noteBtn{id: "all", label: "‹ All Notebooks"} // at the left always, as the books' All Books (notelist.go)
+func barTools(overview bool) (tools []barBtn, drops []string) {
+	all := barBtn{id: "all", label: "‹ All Notebooks"} // at the left always, as the books' All Books (notelist.go)
 	if overview {
-		return []noteBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}},
+		return []barBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}},
 			[]string{"undo", "copy page", "new before"}
 	}
-	return []noteBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}},
+	return []barBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}},
 		[]string{"paper", "export", "redo", "paste"}
 }
 
-const noteBarGap = 10 // between the strip's buttons
-
-// barWidth is b's width on the strip along the top.
-func (w *noteWin) barWidth(a *bro, b noteBtn) int {
-	if b.label == "" { // a picture
-		return w.bar.Dy() + 8
-	}
-	return max(kobo.TextWidth(a.F.Small, b.label)+36, w.bar.Dy()+8)
-}
-
 // barNeed is how wide tools are along the top.
-func (w *noteWin) barNeed(a *bro, tools []noteBtn) int {
-	n := 0
-	for _, t := range tools {
-		n += w.barWidth(a, t) + noteBarGap
-	}
-	return n
-}
+func (w *noteWin) barNeed(a *bro, tools []barBtn) int { return barNeed(a, w.bar, tools) }
 
 // barCounter is how wide the page counter is.
 func (w *noteWin) barCounter(a *bro) int {
@@ -562,66 +538,40 @@ func (w *noteWin) barCounter(a *bro) int {
 
 // barRoom is the room along the top for the tools: the page arrows and
 // counter are at its end.
-func (w *noteWin) barRoom(a *bro) int {
-	return w.bar.Dx() - 2*(w.bar.Dy()+8) - w.barCounter(a) - 4*noteBarGap
-}
+func (w *noteWin) barRoom(a *bro) int { return barRoom(w.bar, w.barCounter(a)) }
 
 // layBar lays the tools along the strip, as many as fit: what's left
 // out goes from the least needed. Down the side, the page arrows and
 // counter are at its foot.
 func (w *noteWin) layBar(a *bro) {
 	tools, drops := barTools(w.overview)
-	pages := []noteBtn{{id: "prev"}, {id: "next"}}
+	pages := []barBtn{{id: "prev"}, {id: "next"}}
 	if w.side {
 		w.laySide(a, tools, drops, pages)
 		w.layPenMenu(a)
 		return
 	}
-	room := w.barRoom(a)
-	for _, drop := range drops {
-		if w.barNeed(a, tools) <= room {
-			break
-		}
-		tools = slices.DeleteFunc(tools, func(t noteBtn) bool { return t.id == drop })
-	}
-	if w.barNeed(a, tools) > room { // narrower still: All Notebooks its arrow alone, then the last tools go (and it, last)
-		tools[0].label = "‹"
-	}
-	for len(tools) > 0 && w.barNeed(a, tools) > room {
-		tools = tools[:len(tools)-1]
-	}
-	x := w.bar.Min.X
-	for _, t := range tools {
-		t.r = image.Rect(x, w.bar.Min.Y+4, x+w.barWidth(a, t), w.bar.Max.Y-4)
-		w.btns = append(w.btns, t)
-		x = t.r.Max.X + noteBarGap
-	}
-	x = w.bar.Max.X
-	for _, t := range []noteBtn{pages[1], pages[0]} {
-		t.r = image.Rect(x-w.barWidth(a, t), w.bar.Min.Y+4, x, w.bar.Max.Y-4)
-		w.btns = append(w.btns, t)
-		x = t.r.Min.X - w.barCounter(a) - 2*noteBarGap
-	}
+	w.btns = layTop(a, w.bar, tools, drops, w.barCounter(a))
 	w.layPenMenu(a)
 }
 
 // laySide lays the tools down the strip along the left, one under
 // another, and at its foot the page before, the counter and the next.
 // A short window still leaves some out, as along the top.
-func (w *noteWin) laySide(a *bro, tools []noteBtn, drops []string, pages []noteBtn) {
+func (w *noteWin) laySide(a *bro, tools []barBtn, drops []string, pages []barBtn) {
 	bh := noteSideH(w.bar.Dx())
-	room := w.bar.Dy() - 3*(bh+noteBarGap)
+	room := w.bar.Dy() - 3*(bh+barGap)
 	tools[0].label = "‹"
 	if w.overview {
-		tools[slices.IndexFunc(tools, func(t noteBtn) bool { return t.id == "clear" })].label = "clear"
+		tools[slices.IndexFunc(tools, func(t barBtn) bool { return t.id == "clear" })].label = "clear"
 	}
 	for _, drop := range drops {
-		if len(tools)*(bh+noteBarGap) <= room {
+		if len(tools)*(bh+barGap) <= room {
 			break
 		}
-		tools = slices.DeleteFunc(tools, func(t noteBtn) bool { return t.id == drop })
+		tools = slices.DeleteFunc(tools, func(t barBtn) bool { return t.id == drop })
 	}
-	for len(tools) > 0 && len(tools)*(bh+noteBarGap) > room {
+	for len(tools) > 0 && len(tools)*(bh+barGap) > room {
 		tools = tools[:len(tools)-1]
 	}
 	in := w.bar.Inset(4)
@@ -629,13 +579,13 @@ func (w *noteWin) laySide(a *bro, tools []noteBtn, drops []string, pages []noteB
 	for _, t := range tools {
 		t.r = image.Rect(in.Min.X, y, in.Max.X, y+bh)
 		w.btns = append(w.btns, t)
-		y = t.r.Max.Y + noteBarGap
+		y = t.r.Max.Y + barGap
 	}
 	y = in.Max.Y
-	for _, t := range []noteBtn{pages[1], pages[0]} { // the next at the foot; the counter between (counterRect)
+	for _, t := range []barBtn{pages[1], pages[0]} { // the next at the foot; the counter between (counterRect)
 		t.r = image.Rect(in.Min.X, y-bh, in.Max.X, y)
 		w.btns = append(w.btns, t)
-		y = t.r.Min.Y - bh - 2*noteBarGap
+		y = t.r.Min.Y - bh - 2*barGap
 	}
 }
 
@@ -667,8 +617,7 @@ func (w *noteWin) drawTitle(a *bro) {
 
 // drawBar draws the tools, the one in hand black, and which pages.
 func (w *noteWin) drawBar(a *bro) {
-	c := a.C
-	c.Fill(w.bar, kobo.White)
+	a.C.Fill(w.bar, kobo.White)
 	for _, b := range w.btns {
 		on := b.id == "pen" && !w.erasing && !w.selecting && !w.texting || b.id == "eraser" && w.erasing || b.id == "select" && w.selecting || b.id == "text" && w.texting
 		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 ||
@@ -676,65 +625,25 @@ func (w *noteWin) drawBar(a *bro) {
 		if w.overview && b.id != "undo" && b.id != "all" {
 			off = w.ovOff(b.id)
 		}
-		bg, ink := uint8(kobo.White), uint8(kobo.Black)
-		switch {
-		case on:
-			bg, ink = kobo.Black, kobo.White
-		case off:
-			ink = kobo.Mid
-		}
-		label := b.label
 		if b.id == "clear" && w.clearAsking() {
-			bg, ink, label = kobo.Black, kobo.White, "tap again"
+			b.label, on, off = "tap again", true, false
 		}
-		c.Fill(b.r, bg)
-		c.Frame(b.r, 2, kobo.Black)
-		switch icon := noteIcon(b.id, w.nb.paper); {
-		case icon != nil:
-			drawIcon(c, icon, b.r, ink, bg)
-		case label == "‹": // All Notebooks, its arrow alone: big enough to see
-			c.Text(a.F.Panel, b.r, label, ink, kobo.AlignCenter)
-		default:
-			c.Text(a.F.Small, b.r, label, ink, kobo.AlignCenter)
-		}
+		ink, bg := drawBarBtn(a, b, on, off, func(r image.Rectangle, ink, bg uint8) bool {
+			if icon := noteIcon(b.id, w.nb.paper); icon != nil {
+				drawIcon(a.C, icon, r, ink, bg)
+				return true
+			}
+			return false
+		})
 		if b.id == "pen" { // what it writes, under it
 			w.drawPenSample(a, b.r, ink, bg)
 		}
-		if b.id == "prev" || b.id == "next" { // the font has no arrows: a triangle
-			m, h := b.r.Min.Add(b.r.Max).Div(2), b.r.Dy()/4
-			for dy := -h; dy <= h; dy++ {
-				l := h - kobo.Abs(dy)
-				if b.id == "next" {
-					c.Fill(image.Rect(m.X-h/2, m.Y+dy, m.X-h/2+l+1, m.Y+dy+1), ink)
-				} else {
-					c.Fill(image.Rect(m.X+h/2-l, m.Y+dy, m.X+h/2+1, m.Y+dy+1), ink)
-				}
-			}
-		}
 	}
-	if r := w.counterRect(); !r.Empty() { // a button too: the pages, small
-		bg, ink := uint8(kobo.White), uint8(kobo.Black)
-		if w.overview {
-			bg, ink = kobo.Black, kobo.White
-		}
-		c.Fill(r, bg)
-		c.Frame(r, 2, kobo.Black)
-		c.Text(a.F.Small, r, w.counter(), ink, kobo.AlignCenter)
-	}
+	drawBarCounter(a, w.counterRect(), w.counter(), w.overview) // a button too: the pages, small
 }
 
 // counterRect is the page counter's, between the arrows.
-func (w *noteWin) counterRect() image.Rectangle {
-	n := len(w.btns)
-	if n < 2 {
-		return image.Rectangle{}
-	}
-	prev, next := w.btns[n-1].r, w.btns[n-2].r
-	if w.side {
-		return image.Rect(prev.Min.X, prev.Max.Y+6, prev.Max.X, next.Min.Y-6)
-	}
-	return image.Rect(prev.Max.X+6, w.bar.Min.Y+4, next.Min.X-6, w.bar.Max.Y-4)
-}
+func (w *noteWin) counterRect() image.Rectangle { return barCounter(w.btns, w.bar, w.side) }
 
 // drawPages draws the pages where they're in clip: the paper, then the
 // strokes over it.

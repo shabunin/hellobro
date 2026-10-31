@@ -1,11 +1,11 @@
 # The PDF select tool (bookcut.go): the first book, a PDF, in fullscreen;
-# the tool from the strip under the page, one corner tapped, then the
+# the tool from the bar, one corner tapped, then the
 # other: a rectangle with a dot at each corner. The bottom-right dot
 # tapped (it goes white), then tapped further down and right: bigger.
 # Dragged: the top left dot up and left, the right side right, the
 # inside down (the whole of it). Copied; a drag elsewhere: a new one,
 # zoomed: the page as big as it fills the window, in the middle. The
-# strip's zoom buttons: −, +, 100%. The tool put down again. HELLOBRO_BOOKS: a directory with a PDF first
+# bar's zoom buttons: −, +, 100%. The tool put down again. HELLOBRO_BOOKS: a directory with a PDF first
 # by name.
 # app: hellobro
 import os, sys
@@ -20,8 +20,8 @@ start()
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
 fullscreen(); time.sleep(5)
-tool = (W // 2 + 12, H - 52)                         # the fourth of the strip's buttons (the zoom's right of it)
-zout, zfit, zin = [(W // 2 + x, H - 52) for x in (128, 212, 296)]  # − 100% +
+tool = barbtn(3)                                     # the select tool, the zoom's right of it
+zout, zfit, zin = barbtn(4), barbtn(5), barbtn(6)    # − 100% +
 tap(*tool); time.sleep(3)
 half = int(min(W, H) * 0.2)
 x0, y0, x1, y1 = W // 2 - half, int(H * 0.30), W // 2 + half, int(H * 0.42)

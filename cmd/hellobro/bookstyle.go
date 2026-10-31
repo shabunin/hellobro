@@ -4,7 +4,7 @@ package main
 // fonts, each shown in itself; the size, the lines' spacing, the
 // margins, justified or not, hyphens or not; the pages, this book's
 // (one, two side by side, or two if the window's wide); and a paragraph
-// set as the books will be. s or a tap under the page opens it, Esc or Done goes
+// set as the books will be. s or Aa on the bar opens it, Esc or Done goes
 // back to the page. It's the reader's own: the app's Settings don't
 // have it.
 

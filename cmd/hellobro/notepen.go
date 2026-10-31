@@ -109,7 +109,7 @@ func colorGray(c string, marker bool) uint8 {
 // down the side; a row too long for the window goes on under.
 func (w *noteWin) layPenMenu(a *bro) {
 	w.penOpts = nil
-	i := slices.IndexFunc(w.btns, func(b noteBtn) bool { return b.id == "pen" })
+	i := slices.IndexFunc(w.btns, func(b barBtn) bool { return b.id == "pen" })
 	if i < 0 {
 		return
 	}
@@ -130,7 +130,7 @@ func (w *noteWin) layPenMenu(a *bro) {
 				x, y = x0, y+h+8
 			}
 			r := image.Rect(x, y, x+wd, y+h)
-			w.penOpts = append(w.penOpts, noteBtn{id: o, label: o, r: r})
+			w.penOpts = append(w.penOpts, barBtn{id: o, label: o, r: r})
 			x = r.Max.X + 8
 		}
 	}

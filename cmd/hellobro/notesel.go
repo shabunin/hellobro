@@ -142,17 +142,17 @@ func (w *noteWin) turnDot(r image.Rectangle) image.Point {
 
 // selButtons are the buttons by what's taken: under it, or over it if
 // there's no room under it (nor the turning dot there).
-func (w *noteWin) selButtons(a *bro) []noteBtn {
+func (w *noteWin) selButtons(a *bro) []barBtn {
 	r := w.selScreen()
 	if r.Empty() {
 		return nil
 	}
 	area := w.paperArea()
 	h := 48
-	var bs []noteBtn
+	var bs []barBtn
 	x := 0
 	for _, id := range []string{"copy", "cut", "duplicate", "turn", "delete"} {
-		b := noteBtn{id: id, r: image.Rect(x, 0, x+h+16, h)}
+		b := barBtn{id: id, r: image.Rect(x, 0, x+h+16, h)}
 		bs = append(bs, b)
 		x = b.r.Max.X + 8
 	}
@@ -309,7 +309,7 @@ func (a *bro) noteSelTouch(w *noteWin, slot int, p image.Point, g *kobo.Gesture)
 	if r := w.selScreen(); !r.Empty() {
 		d.page, d.at = w.selPage, w.slots[w.selPage-w.cur]
 		switch cs := corners(r); {
-		case slices.ContainsFunc(w.selButtons(a), func(b noteBtn) bool { return p.In(b.r) }):
+		case slices.ContainsFunc(w.selButtons(a), func(b barBtn) bool { return p.In(b.r) }):
 			d.kind = dragButton
 		case near(p, w.turnDot(r), noteHandle):
 			d.kind = dragTurn

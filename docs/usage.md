@@ -137,8 +137,8 @@ millisecond.
 Settings, Touch, **Sizes**: **for fingers** (the default) has a
 taller bar and title strips, bigger window buttons, and
 taller rows in menus, Settings, Wi-Fi and Bluetooth, the books' and
-notebooks' lists, and the strips over a notebook's page and under a
-book's; **compact** fits more on the screen, for a keyboard. It
+notebooks' lists, and the bars over a notebook's and a book's page;
+**compact** fits more on the screen, for a keyboard. It
 changes at once (also in the switcher: "setting: sizes"). A
 notebook in a window too narrow for all its tools along the top (and
 taller than wide) has them down its left side instead, all of them,
@@ -672,13 +672,17 @@ and for PDFs, drawn by MuPDF (below).
   (back), by a swipe across the page (to the left on, to the right
   back), or with Space, → ↓ PgDn, j, l (on) and ← ↑ PgUp, Backspace,
   k, h (back). Home and End go to the chapter's start and end.
-- Under the page are three buttons: **☰** the contents, **Aa** the
-  style panel, and a ribbon for a bookmark (a PDF's has the select
-  tool too, below).
+- Over the page is a bar, as over a notebook's: **‹ All Books** (the
+  shelf; q too), **☰** the contents, **Aa** the style panel, a ribbon
+  for a bookmark (a PDF's has the select tool and its zoom too, below),
+  and at its right ◀ the page before, which page (of the chapter in an
+  EPUB, of all in a PDF; tapped: the contents, or a PDF's pages) and ▶
+  the next. Between the tools and ◀, when there's room: the chapter and
+  how far in. In a narrow window the least needed buttons go.
 - A link in an EPUB, tapped (a note's number, say), shows what it
   points at in a box at the foot of the page: a tap elsewhere (or Esc)
   closes it, **go there** (or Enter) goes to it. Then **‹ back** is
-  under the page, where the chapter's name was: a tap on it comes back.
+  on the bar, after ‹ All Books: a tap on it comes back.
   A link to a whole chapter goes there at once.
 - **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
   (tap one), the size, the lines' spacing, the margins (± each),
@@ -690,7 +694,7 @@ and for PDFs, drawn by MuPDF (below).
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
   **f** (Shift+F back) goes through the fonts.
-- **t**, Enter, **☰** or a tap at the top shows the contents: pick a
+- **t**, Enter, **☰** or a tap at the page's top shows the contents: pick a
   chapter, or swipe up and down for more. Esc or "back to the book"
   leaves them, "‹ All Books" goes to the shelf (on a page, Esc and q do too).
 - **b**, a tap on the ribbon or on the page's top right corner
@@ -719,8 +723,8 @@ or a font changed says **laying out…** for that moment. Their pages are drawn 
 `pdf`), with their white margins trimmed, as big as the screen takes the
 whole page. **s** or **Aa** has their own panel: **Fit** the whole page
 or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and
-**-** on the page too, and − **100%** + in the strip under it, right of
-the select tool; each PDF its own, kept with its place), **Trim
+**-** on the page too, and − **100%** + on the bar, right of the
+select tool; each PDF its own, kept with its place), **Trim
 white margins** on or off, and **Pages**
 as for EPUBs (each PDF its own): two side by side are each
 whole, meeting in the middle as a book's do, turned two at a time, the
@@ -747,7 +751,7 @@ down, or PgUp and PgDn, goes a screenful.
 To cut a part of a PDF's page out, draw a rectangle across it with the
 pen, or hold a finger still on the page a moment, then move it (as to
 select in a terminal). Or take the select tool, the rectangle with
-dots at its corners in the strip under the page (PDFs only; black
+dots at its corners on the bar over the page (PDFs only; black
 while it's in hand): drag a finger across the page, and the rectangle
 follows it at once; or tap one corner, then the opposite one. Each
 corner then has a dot. Drag a dot to move that corner, a side to move
