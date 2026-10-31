@@ -16,6 +16,8 @@ func TestFreeWorkspace(t *testing.T) {
 		{[]string{"2", "3"}, "1"},
 		{[]string{"1", "3"}, "2"},
 		{[]string{"1", "mail", "2"}, "3"},
+		{[]string{"1", "2:mail"}, "3"}, // number 2 is 2:mail's
+		{[]string{"01"}, "2"},
 	} {
 		if got := freeWorkspace(c.names); got != c.want {
 			t.Errorf("freeWorkspace(%q) = %s, want %s", c.names, got, c.want)

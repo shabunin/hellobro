@@ -22,6 +22,7 @@ import (
 	"image"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"hellobro/kobo"
@@ -171,14 +172,18 @@ func (a *bro) newWorkspace() {
 	a.openLauncher()
 }
 
-// freeWorkspace is the smallest number from 1 that no name is.
+// freeWorkspace is the smallest number from 1 that no name starts with:
+// "workspace number 3" goes to "3:mail", as i3 has it.
 func freeWorkspace(names []string) string {
-	taken := map[string]bool{}
+	taken := map[int]bool{}
 	for _, s := range names {
-		taken[s] = true
+		digits := s[:len(s)-len(strings.TrimLeft(s, "0123456789"))]
+		if n, err := strconv.Atoi(digits); err == nil {
+			taken[n] = true
+		}
 	}
 	n := 1
-	for taken[strconv.Itoa(n)] {
+	for taken[n] {
 		n++
 	}
 	return strconv.Itoa(n)
