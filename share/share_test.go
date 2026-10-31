@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -317,5 +318,32 @@ func TestKeysNoPty(t *testing.T) {
 	var exited *ssh.ExitError
 	if out, err := sess.Output("id"); err == nil || errors.As(err, &exited) { // ran, and ended: refused is wanted
 		t.Errorf("ran without a terminal: %q, %v", out, err)
+	}
+}
+
+// Connections still in the handshake count: a crowd of silent ones
+// can't pile up past maxConns.
+func TestHandshakesCount(t *testing.T) {
+	s, err := Start(Config{Addr: "127.0.0.1:0", StateDir: t.TempDir(), Root: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for range maxConns {
+		c, err := net.Dial("tcp", s.Addr().String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.Close()
+		c.Read(make([]byte, 1)) // the server's banner: it's handling us
+	}
+	c, err := net.Dial("tcp", s.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := io.ReadAll(c); err != nil {
+		t.Errorf("one too many: %v, want it closed", err)
 	}
 }

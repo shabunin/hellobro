@@ -89,6 +89,7 @@ type Server struct {
 	mu    sync.Mutex
 	conns map[int]*conn
 	next  int
+	shake int // connections still in the handshake: they count too
 
 	pairCode  string
 	pairUntil time.Time
@@ -473,7 +474,10 @@ func (s *Server) ServeConn(nc net.Conn) {
 
 func (s *Server) handle(nc net.Conn) {
 	s.mu.Lock()
-	full := len(s.conns) >= maxConns
+	full := len(s.conns)+s.shake >= maxConns
+	if !full {
+		s.shake++
+	}
 	s.mu.Unlock()
 	if full {
 		nc.Close()
@@ -482,6 +486,9 @@ func (s *Server) handle(nc net.Conn) {
 	nc.SetDeadline(time.Now().Add(2 * time.Minute)) // to get through the handshake: typing a code takes a while
 	sc, chans, reqs, err := ssh.NewServerConn(nc, s.ssh)
 	if err != nil {
+		s.mu.Lock()
+		s.shake--
+		s.mu.Unlock()
 		log.Printf("share: %s: %v", nc.RemoteAddr(), err)
 		s.cfg.Notify(Event{Kind: "refused", Note: fmt.Sprintf("%s: %v", hostOf(nc.RemoteAddr()), err)})
 		nc.Close()
@@ -489,6 +496,7 @@ func (s *Server) handle(nc net.Conn) {
 	}
 	nc.SetDeadline(time.Time{})
 	s.mu.Lock()
+	s.shake--
 	s.next++
 	c := &conn{c: sc, info: ConnInfo{ID: s.next, Addr: hostOf(sc.RemoteAddr()), User: sc.User(), Since: time.Now()}}
 	s.conns[c.info.ID] = c
