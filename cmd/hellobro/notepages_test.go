@@ -68,3 +68,15 @@ func TestNotePages(t *testing.T) {
 		t.Error("an empty only page deleted")
 	}
 }
+
+// TestNotePagesPastEnd: a choice past the last page (the screenful of
+// the new page's tile alone) changes nothing, and doesn't crash.
+func TestNotePagesPastEnd(t *testing.T) {
+	a := &noteStroke{pts: []notePt{{1, 1, 10}}}
+	for _, id := range []string{"copy page", "delete", "clear", "earlier", "later", "new before", "new after"} {
+		w := &noteWin{nb: &notebook{pages: [][]*noteStroke{{a}, {a}}}, ovSel: 2}
+		if w.pageEdit(id) || len(w.nb.pages) != 2 {
+			t.Errorf("%s past the end: did it, %d pages", id, len(w.nb.pages))
+		}
+	}
+}

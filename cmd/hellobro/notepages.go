@@ -215,7 +215,9 @@ func (w *noteWin) ovTurn(a *bro, by int) {
 		return
 	}
 	w.ovFirst = first
-	w.ovSel = max(first, min(w.ovSel, first+per-1, len(w.nb.pages)-1))
+	// The last screenful may hold only the new page's tile: the choice
+	// stays on the last page then, before it.
+	w.ovSel = min(len(w.nb.pages)-1, max(first, min(w.ovSel, first+per-1)))
 	w.show(a)
 	if a.shows(w) {
 		a.MarkFlash(w.paperArea())
@@ -261,6 +263,9 @@ func (w *noteWin) pageAct(a *bro, id string) {
 // to undo; false if it can't.
 func (w *noteWin) pageEdit(id string) bool {
 	nb, n := w.nb, w.ovSel
+	if n < 0 || n >= len(nb.pages) {
+		return false
+	}
 	nb.padMeta()
 	var ops []noteOp
 	switch id {
