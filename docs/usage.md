@@ -795,7 +795,7 @@ line if it takes something (`:size `, then the size).
 | `:12` | page 12: a PDF's, or of the chapter shown in an EPUB |
 | `:40%` | 40% into the book |
 | `:ch 3` | chapter 3 (of the book's files, in order) |
-| `:/word`, `:f word` | the next page with the word on it (an EPUB's; any case); `:/` again: the next |
+| `:/word`, `:f word` | the next page with the word on it (any case; a PDF's text across its lines too); `:/` again: the next |
 | `:toc`, `:marks`, `:mark` | the contents, the bookmarks; a bookmark here (or not) |
 | `:back` | back from a link followed |
 | `:s`, `:size 30`, `:font lit` | the style panel; the size; the font that matches best |

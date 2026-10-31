@@ -129,7 +129,7 @@ func (w *bookWin) exPage(a *bro, arg string) error {
 // aside: a long book's chapters take a while to read.
 func (w *bookWin) exFind(a *bro, word string) error {
 	if w.pdf != nil {
-		return errors.New("looking for a word: in EPUBs only, for now")
+		return w.exFindPDF(a, word)
 	}
 	spine, at := w.spine, w.at
 	if word == "" {
@@ -163,4 +163,68 @@ func (w *bookWin) exFind(a *bro, word string) error {
 		})
 	}()
 	return nil
+}
+
+// exFindPDF is exFind's for a PDF: the next page with word in its text,
+// this one first (:/ alone: the one after the last found).
+func (w *bookWin) exFindPDF(a *bro, word string) error {
+	from := w.spine
+	if word == "" {
+		if w.found == nil {
+			return errors.New(":/ what?")
+		}
+		word, from = w.found.text, w.found.spine+1
+	}
+	a.Notify("looking for " + word + "…")
+	d, n, gen := w.pdf, len(w.b.Spine), time.Now()
+	w.finding = gen
+	go func() {
+		t := time.Now()
+		page, ok := pdfFind(n, from, word, d.Text, func() bool { return w.gone || w.finding != gen })
+		log.Printf("book: %q found %v in %v", word, ok, time.Since(t).Round(time.Millisecond))
+		a.Do(func() {
+			if w.gone || w.finding != gen {
+				return
+			}
+			if !ok {
+				a.Notify(word + ": not in the book")
+				return
+			}
+			w.found = &bookFind{text: word, spine: page}
+			if page != w.spine {
+				w.goTo(page, book.Pos{})
+			}
+			w.list = false
+			w.draw(a)
+			a.Notify(fmt.Sprintf("%s is on page %d (:/ the next)", word, page+1))
+		})
+	}()
+	return nil
+}
+
+// pdfFind is the first of n pages from from on, round, whose text has
+// q in it, case and line breaks aside (a word cut by a hyphen at a
+// line's end too).
+func pdfFind(n, from int, q string, text func(int) (string, error), stop func() bool) (int, bool) {
+	q = squash(q)
+	if q == "" || n == 0 {
+		return 0, false
+	}
+	for k := range n {
+		if stop() {
+			return 0, false
+		}
+		i := (from + k) % n
+		if s, err := text(i); err == nil && strings.Contains(squash(s), q) {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// squash is s in lower case, its runs of space one space, a hyphen at a
+// line's end gone with the break.
+func squash(s string) string {
+	s = strings.ReplaceAll(s, "-\n", "")
+	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
 }

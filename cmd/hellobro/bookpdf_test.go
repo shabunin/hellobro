@@ -36,3 +36,28 @@ func TestFileName(t *testing.T) {
 		t.Errorf("fileName cut at 4: %q", got)
 	}
 }
+
+func TestPDFFind(t *testing.T) {
+	pages := []string{"Cover", "Chapter one:\nthe little\nengine", "a hyphen-\nated word", "THE END"}
+	text := func(i int) (string, error) { return pages[i], nil }
+	never := func() bool { return false }
+	for _, c := range []struct {
+		from int
+		q    string
+		page int
+		ok   bool
+	}{
+		{0, "little engine", 1, true}, // across a line break
+		{0, "hyphenated", 2, true},    // a hyphen at a line's end
+		{2, "the", 3, true},           // from the page on
+		{3, "cover", 0, true},         // round to the start
+		{1, "the", 1, true},           // the page itself first
+		{0, "nowhere", 0, false},
+		{0, "  ", 0, false},
+	} {
+		page, ok := pdfFind(len(pages), c.from, c.q, text, never)
+		if page != c.page || ok != c.ok {
+			t.Errorf("pdfFind(from %d, %q) = %d, %v; want %d, %v", c.from, c.q, page, ok, c.page, c.ok)
+		}
+	}
+}
