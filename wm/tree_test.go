@@ -200,6 +200,7 @@ func TestOps(t *testing.T) {
 		{"remove focus goes back", "1:splith[a+, b, c*]", func(t *Tree) { t.Remove(w(t, "c")) }, "1:splith[a*, b]"},
 		{"remove unfocused", "1:splith[a, b*]", func(t *Tree) { t.Remove(w(t, "a")) }, "1:splith[b*]"},
 		{"remove container", "1:splith[a, splitv[b, c]*]", func(t *Tree) { t.Remove(t.Focused()) }, "1:splith[a*]"},
+		{"remove a focused container's windows", "1:splith[a, splitv[b, c]*]", func(t *Tree) { t.Remove(w(t, "b")); t.Remove(w(t, "c")); t.Open(win("d")) }, "1:splith[a, d*]"},
 		{"remove floating", "1:splith[a] float[f*]", func(t *Tree) { t.Remove(w(t, "f")) }, "1:splith[a*]"},
 
 		{"split", "1:splith[a, b*]", func(t *Tree) { t.Split(t.Focused(), SplitV); t.Open(win("c")) }, "1:splith[a, splitv[b, c*]]"},

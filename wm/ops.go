@@ -60,12 +60,20 @@ func (t *Tree) Remove(n *Node) {
 	}
 	detach(n)
 	left := t.tidy(p)
-	if had {
+	// A focused container goes too when its last window does, as the
+	// windows of a kill are removed one by one: the focus was never in
+	// what each took out, but it isn't in the tree any more.
+	if had || !t.attached(t.focused) {
 		if left == nil {
 			left = t.Current()
 		}
 		t.focus(descend(left))
 	}
+}
+
+// attached says whether n is still in the tree.
+func (t *Tree) attached(n *Node) bool {
+	return t.within(n, t.Root)
 }
 
 // within says whether n is c or in it.
