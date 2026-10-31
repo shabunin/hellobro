@@ -308,16 +308,18 @@ func (a *bro) guiFocused(key string) bool {
 	return ok && g.key == key
 }
 
-// openWin opens w next to the window in focus, and focuses it.
-func (a *bro) openWin(w window) {
+// openWin opens w next to the window in focus, and focuses it; false if
+// there are too many windows for another.
+func (a *bro) openWin(w window) bool {
 	if len(a.wm.wins) >= maxWins {
 		a.Notify(fmt.Sprintf("%d windows are enough", maxWins))
-		return
+		return false
 	}
 	n := a.wm.tree.Open(w)
 	a.wm.wins[n] = w
 	log.Printf("wm: opened %s on %s", w.Title(), a.wm.tree.Current().Name)
 	a.wmApply()
+	return true
 }
 
 // openLauncher opens a launcher: a terminal that asks what to run.
@@ -410,7 +412,9 @@ func (h wmHost) Kill(n *wm.Node) {
 // would be root for whoever reaches the IPC from a jail.
 func (h wmHost) Exec(cmd string) error {
 	t := &termSession{}
-	h.a.openWin(t)
+	if !h.a.openWin(t) { // nothing started where no window shows it
+		return fmt.Errorf("%d windows are enough", maxWins)
+	}
 	h.a.termStartAlpine(t, cmd)
 	return nil
 }
@@ -455,7 +459,9 @@ func (h wmHost) Command(n *wm.Node, name string, args []string) (bool, error) {
 			a.openLauncher()
 		case "alpine", "sh":
 			t := &termSession{}
-			a.openWin(t)
+			if !a.openWin(t) {
+				return true, fmt.Errorf("%d windows are enough", maxWins)
+			}
 			a.termStartShell(t, args[0] == "alpine")
 		case "ssh":
 			if len(args) < 2 {
