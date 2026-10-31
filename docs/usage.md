@@ -708,7 +708,11 @@ and for PDFs, drawn by MuPDF (below).
   s while reading, and when its window closes), as a place in its
   chapter, so another size or font finds the page again. The screen
   flashes clean every 8 pages.
-- In fullscreen (Meta+F) the page has the whole screen.
+- In fullscreen (Meta+F) the page has the whole screen: a PDF's has no
+  bar then (keys, two fingers to zoom, a tap at the page's top for the
+  contents), an EPUB's keeps it. Settings, Books, **A book's bar,
+  fullscreen** chooses: **hidden for a PDF**, **hidden** for every
+  book, or **shown** (the switcher: "fullscreen books").
 - Two pages side by side (**Pages** in the style panel) turn two at a
   time; each chapter starts on the left.
 
@@ -896,6 +900,9 @@ its gray.
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
   writing on the second makes it a page.
+- Fullscreen, a notebook keeps its bar. Settings, Notebooks, **A
+  notebook's bar, fullscreen**, **hidden**, leaves the page all of the
+  screen: the pen writes, keys do the rest (the overview keeps it).
 - **select** (or S) takes what's written, and pictures, to change
   them; the pen and fingers both work with it. Tap a stroke or a
   picture to take it (the ink over a picture first), or draw a

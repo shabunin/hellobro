@@ -69,7 +69,13 @@ var settingList = []setting{
 	{key: "touch-size", label: "Sizes", title: "Sizes: for fingers or compact",
 		values: []string{"fingers", "compact"},
 		shown:  []string{"for fingers: taller strips, rows and buttons", "compact: more on the screen"}},
-	{key: "note-export", group: "Notebooks", label: "Notebook export",
+	{key: "book-bar", group: "Books", label: "A book's bar, fullscreen", title: "Fullscreen books: the bar",
+		values: []string{"pdf", "hidden", "shown"},
+		shown:  []string{"hidden for a PDF", "hidden: keys, pinches, the page's top", "shown"}},
+	{key: "note-bar", group: "Notebooks", label: "A notebook's bar, fullscreen", title: "Fullscreen notebooks: the bar",
+		values: []string{"shown", "hidden"},
+		shown:  []string{"shown", "hidden: the pen and keys only"}},
+	{key: "note-export", label: "Notebook export",
 		values: []string{"ask", "pdf", "png"},
 		shown:  []string{"asks: a PDF of the pages, or a PNG of the page shown", "a PDF of the pages", "a PNG of the page shown"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
@@ -320,6 +326,8 @@ func (a *bro) stepSetting(i, d int) {
 			a.vkApply()
 		case "touch-size":
 			a.applySizes()
+			a.Relayout()
+		case "book-bar", "note-bar":
 			a.Relayout()
 		}
 	}

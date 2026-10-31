@@ -8,7 +8,36 @@ import (
 
 	"hellobro/kobo"
 	"hellobro/pdf"
+	"hellobro/wm"
 )
+
+// The bar's left out of a window fullscreen only, as the settings say:
+// a book's of a PDF's (the default) or of any, a notebook's if asked.
+func TestBarOff(t *testing.T) {
+	for _, c := range []struct {
+		key, set  string
+		full, pdf bool
+		want      bool
+	}{
+		{"book-bar", "pdf", true, true, true}, {"book-bar", "pdf", true, false, false},
+		{"book-bar", "pdf", false, true, false}, {"book-bar", "hidden", true, false, true},
+		{"book-bar", "hidden", false, false, false}, {"book-bar", "shown", true, true, false},
+		{"note-bar", "shown", true, false, false}, {"note-bar", "hidden", true, false, true},
+		{"note-bar", "hidden", false, false, false},
+	} {
+		st := settingList[settingIndex(c.key)]
+		a := &bro{set: settings{c.key: slices.Index(st.values, c.set)}}
+		a.wm.tree = wm.New(image.Rect(0, 0, 900, 900), kobo.FoldH)
+		a.wm.wins = map[*wm.Node]window{}
+		w := &bookWin{}
+		n := a.wm.tree.Open(w)
+		a.wm.wins[n] = w
+		a.wm.tree.SetFullscreen(n, c.full)
+		if got := a.barOff(w, c.key, c.pdf); got != c.want {
+			t.Errorf("%s %s, fullscreen %v, pdf %v: off %v, want %v", c.key, c.set, c.full, c.pdf, got, c.want)
+		}
+	}
+}
 
 // A book's bar fits its window, however narrow, with fingers' sizes
 // too: nothing overlaps or goes past its end, the arrows and the

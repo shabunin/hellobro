@@ -209,6 +209,10 @@ func (w *bookWin) drawBar(a *bro) {
 	if w.laid.two {
 		cw = kobo.TextWidth(a.F.Small, "999–999 / 999")
 	}
+	if w.bar.Empty() { // fullscreen, without it (barOff)
+		w.btns = nil
+		return
+	}
 	w.btns = layTop(a, w.bar, tools, drops, cw)
 	c := a.C
 	c.Fill(w.bar, kobo.White)

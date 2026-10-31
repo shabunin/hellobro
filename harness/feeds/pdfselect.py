@@ -17,6 +17,7 @@ def buttons(x1, y1):                       # where drawCut puts copy, save, zoom
     return (x0 + 70, y1 + 42), (x0 + 220, y1 + 42), (x0 + 370, y1 + 42), (x0 + 482, y1 + 42)
 
 start()
+for _ in range(2): gui("fullscreen books")           # the bar: hidden for a PDF, hidden, shown
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
 fullscreen(); time.sleep(5)

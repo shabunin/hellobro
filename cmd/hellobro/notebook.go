@@ -473,9 +473,14 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 		cw := max(h+8, kobo.TextWidth(a.F.Small, "99 / 99")+20)
 		w.bar = image.Rect(b.Min.X, b.Min.Y, b.Min.X+cw, b.Max.Y)
 	}
+	if !w.overview && a.barOff(w, "note-bar", false) { // the pen and the keys only (the overview keeps it: its buttons are all it has)
+		w.side, w.bar = false, image.Rect(b.Min.X, p.Body.Min.Y, b.Max.X, p.Body.Min.Y)
+	}
 	w.slotSize = w.pageSize(w.cur)
 	w.slots, w.scale = noteSlots(w.paperArea().Inset(kobo.Pad/2), w.slotSize)
-	w.layBar(a)
+	if !w.bar.Empty() {
+		w.layBar(a)
+	}
 }
 
 // pages is where the pages show, all told.

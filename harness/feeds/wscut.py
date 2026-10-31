@@ -15,6 +15,7 @@ def note(what):
 
 KEY_O = 24
 start()
+for _ in range(2): gui("fullscreen books")           # the bar: hidden for a PDF, hidden, shown
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
 fullscreen(); time.sleep(5)

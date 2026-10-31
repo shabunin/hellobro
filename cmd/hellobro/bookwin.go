@@ -362,6 +362,9 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	}
 	in := body.Inset(kobo.Pad / 2)
 	w.bar = image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Min.Y+barHeight())
+	if a.barOff(w, "book-bar", w.pdf != nil) { // the page has all of it: keys, pinches and the page's top for the rest
+		w.bar = image.Rect(in.Min.X, body.Min.Y, in.Max.X, body.Min.Y)
+	}
 	w.area = image.Rect(body.Min.X+mx, w.bar.Max.Y+my, body.Max.X-mx, body.Max.Y-my)
 }
 

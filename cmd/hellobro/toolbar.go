@@ -27,6 +27,17 @@ func barHeight() int {
 	return 56
 }
 
+// barOff says w has no bar, fullscreen as it is: the settings (key)
+// leave it out of a window fullscreen, of a PDF's (pdf) or of any.
+func (a *bro) barOff(w window, key string, pdf bool) bool {
+	n := a.nodeOf(w)
+	if n == nil || !n.Fullscreen {
+		return false
+	}
+	s := a.setting(key)
+	return s == "hidden" || s == "pdf" && pdf
+}
+
 // barBtnWidth is b's width on bar: a picture's about square, words as
 // wide as they are.
 func barBtnWidth(a *bro, bar image.Rectangle, b barBtn) int {
