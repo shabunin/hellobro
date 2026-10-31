@@ -49,7 +49,7 @@ var settingList = []setting{
 		shown:  []string{"never by itself", "after 5 min untouched", "after 15 min untouched", "after 30 min untouched", "after 1 h untouched", "after 2 h untouched"}},
 	{key: "mod", group: "Keyboard", label: "Mod key, the window keys'",
 		values: []string{"super", "alt"},
-		shown:  []string{"Super, the Win key (Meta+Enter…)", "Alt (Alt+Enter…; the Win key is Alt then)"}},
+		shown:  []string{"Super, the Win key", "Alt (the Win key is Alt then)"}},
 	{key: "kbd-gone", label: "The keyboard gone", title: "The keyboard gone: Bluetooth",
 		values: []string{"15", "30", "60", "off"},
 		shown:  []string{"Bluetooth full screen after 15 s", "Bluetooth full screen after 30 s", "Bluetooth full screen after 1 min", "nothing comes up"}},

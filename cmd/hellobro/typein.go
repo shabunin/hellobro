@@ -8,7 +8,7 @@ package main
 // first time, that device asks on its screen whether this one may type
 // there; allowed, our key is kept there for typing only (share's
 // command="…"). The window is a terminal running hellobro-keys there:
-// while it's in focus every key goes to it, as grabbed (Meta+Shift+G
+// while it's in focus every key goes to it, as grabbed (Mod+Shift+G
 // gives them back, for a moment). Kitty's protocol carries them whole,
 // Super and the releases too.
 
@@ -190,7 +190,7 @@ func (a *bro) grabTyping() {
 // device grabs the keys when it gets the focus (or connects in it), and
 // lets go when it's done; any grab ends with the focus going elsewhere.
 // typing is the window in focus that was typing, last time we looked:
-// once let go (Meta+Shift+G), it's not grabbed again till it's back.
+// once let go (Mod+Shift+G), it's not grabbed again till it's back.
 func grabFor(w, grab, typing window) (window, window) {
 	t, _ := w.(*termSession)
 	switch {

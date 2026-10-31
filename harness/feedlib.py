@@ -120,7 +120,7 @@ PGUP, PGDN, KEY_T, LEFT, RIGHT, KEY_P = 104, 109, 20, 105, 106, 25
 KEY_E, KEY_F, KEY_M = 18, 33, 50
 HOME, END = 102, 107
 MINUS = 12
-def mod(code, **kv): key(code, meta=True, **kv)       # Meta+key: the window manager's
+def mod(code, **kv): key(code, meta=True, **kv)       # Mod+key: the window manager's
 
 def fullscreen(): mod(KEY_F)                           # on and off
 # A fullscreen book's bar (toolbar.go), compact: ‹ All Books at the left,
@@ -143,7 +143,7 @@ def menu():
     stroke([(W - 50, H * 2 // 3 - i * 15) for i in range(21)]); time.sleep(2)
 
 def exit_app():
-    """Taps the header's exit button; in hellobro, Meta+Shift+E (quit):
+    """Taps the header's exit button; in hellobro, Mod+Shift+E (quit):
     full screen, the menu's swipe is the window's."""
     if BAR:
         mod(KEY_E, shift=True)
@@ -168,8 +168,8 @@ def tab(n):
     if n == 2:
         mod(ENTER); time.sleep(1.5); keys("2"); time.sleep(1.5)
     elif n == 3:                                      # Wi-Fi and Sharing above, Bluetooth and Settings below
-        gui("wi-fi"); mod(48); gui("sharing")         # Meta+B: beside it
-        mod(105); mod(47); gui("bluetooth")           # Meta+Left, Meta+V
+        gui("wi-fi"); mod(48); gui("sharing")         # Mod+B: beside it
+        mod(105); mod(47); gui("bluetooth")           # Mod+Left, Mod+V
         mod(106); mod(47); gui("settings")
         mod(105); mod(103)                            # back to Wi-Fi
     elif n == 4:

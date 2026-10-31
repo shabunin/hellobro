@@ -1,6 +1,6 @@
 # The Settings list on a short screen (landscape): not all its rows fit,
 # so the hint under it pages to the rest and back, and ↓ ↑ scroll it.
-# Its groups' headings come along. Settings under the launcher (Meta+V),
+# Its groups' headings come along. Settings under the launcher (Mod+V),
 # half the screen's height.
 # app: hellobro
 import os, sys

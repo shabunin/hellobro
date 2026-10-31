@@ -2,7 +2,7 @@
 # Shift+Tab goes back, Enter presses a button. In Wi-Fi from its list:
 # disconnect, forget, round to turn off and scan; back to turn off, on to
 # scan, Enter: it scans. Sharing beside it: Tab to pair, Enter: pairing.
-# Settings under it: its list pages with PgDn. Meta+Left goes to the
+# Settings under it: its list pages with PgDn. Mod+Left goes to the
 # window beside, whose list has the focus, and a touch takes the ring
 # away. FAKE_SNAP_AREA=1 snapshots the ring's small updates.
 # app: hellobro
@@ -17,14 +17,14 @@ for _ in range(4):
 key(TAB, shift=True); time.sleep(1)                   # back: turn off
 key(TAB); time.sleep(1)                               # scan
 key(ENTER); time.sleep(3)                             # pressed: scanning
-mod(48); gui("sharing")                               # Meta+B: beside it
+mod(48); gui("sharing")                               # Mod+B: beside it
 key(TAB); time.sleep(1)                               # pair
 key(ENTER); time.sleep(3)                             # pressed: pairing
-mod(47); gui("settings")                              # Meta+V: under it
+mod(47); gui("settings")                              # Mod+V: under it
 key(TAB); time.sleep(1)                               # its list (the only control)
 key(PGDN); time.sleep(1.5)                            # paged down
 key(PGUP); time.sleep(1)
-mod(105); time.sleep(2)                               # Meta+Left: Wi-Fi
+mod(105); time.sleep(2)                               # Mod+Left: Wi-Fi
 key(TAB); time.sleep(1)                               # the ring from its list on
 tap(W // 4, H // 2); time.sleep(2)                    # a touch: no ring
 exit_app()

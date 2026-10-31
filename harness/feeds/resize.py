@@ -1,4 +1,4 @@
-# The resize mode: two windows side by side, Meta+R, wider three times,
+# The resize mode: two windows side by side, Mod+R, wider three times,
 # shorter once (nothing: they're side by side), then Enter. While it's on
 # the windows are gray boxes ("resize mode", each one's name and size),
 # the one in focus framed black; Enter lays them out for real.

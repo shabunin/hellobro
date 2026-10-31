@@ -5,7 +5,7 @@ package main
 // workspace (a launcher in it, so it stays: an empty one goes as it's
 // left). A tap goes there; Esc or a tap outside closes. A tap on the
 // bar's empty part, two fingers swiped down from the screen's top, the
-// menu's Workspaces or Meta+O puts it up.
+// menu's Workspaces or Mod+O puts it up.
 //
 // What's in the windows shows too, as it is now, and again every few
 // seconds while the tiles are up. The tiles come up at once, with the
@@ -138,7 +138,7 @@ func (a *bro) openWorkspaces() {
 		tiles: 1, wide: true, keysOnly: true, refresh: a.drawThumbs}
 	p.key = func(ch string) {
 		switch {
-		case ch >= "0" && ch <= "9": // as Meta+1…0
+		case ch >= "0" && ch <= "9": // as Mod+1…0
 			if ch == "0" {
 				ch = "10"
 			}

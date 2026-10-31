@@ -2,7 +2,7 @@
 # shells, 2 an illustrated EPUB, 3 a PDF with a part cut out and copied
 # beside a notebook it's pasted in, 4 a notebook written in, 5 Wi-Fi
 # beside Bluetooth, 6 Settings, 7 a PDF's pages small, 8 the books;
-# Meta+O puts them up. A new notebook comes from the launcher's line:
+# Mod+O puts them up. A new notebook comes from the launcher's line:
 # the switcher's "notebook" finds 3's. The shells start again with nothing of the PC's
 # (env -i, a prompt and a title of their own), as in wsshots. No window
 # is left showing the launcher (its Kobo shell tile names the PC's

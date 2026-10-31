@@ -1,7 +1,7 @@
 # Settings' Keys: the list, then a command's key asked for (a plain
-# letter turned down, Meta+Y taken), the list again; the new key dims the
-# light, Meta+] brightens it, Meta+\ turns it off and on. The log says
-# "keys: light.down: [meta+y]", then "light:" four times.
+# letter turned down, Mod+Y taken), the list again; the new key dims the
+# light, Mod+] brightens it, Mod+\ turns it off and on. The log says
+# "keys: light.down: [mod+y]", then "light:" four times.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,7 +19,7 @@ key(KA); time.sleep(2)                                # a plain letter: no
 key(KY, meta=True); time.sleep(3)                     # taken: the list again
 key(ESC); time.sleep(2)
 key(KY, meta=True); time.sleep(1)                     # dimmer
-key(KRB, meta=True); time.sleep(3)                    # brighter (Meta+]), the gauge up a moment
-key(KBS, meta=True); time.sleep(3)                    # off (Meta+\)
+key(KRB, meta=True); time.sleep(3)                    # brighter (Mod+]), the gauge up a moment
+key(KBS, meta=True); time.sleep(3)                    # off (Mod+\)
 key(KBS, meta=True); time.sleep(3)                    # on, as it was
 exit_app()

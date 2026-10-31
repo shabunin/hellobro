@@ -45,7 +45,7 @@ restrict,port-forwarding,permitlisten="127.0.0.1:2222",permitopen="127.0.0.1:202
   Or from the Kobo itself, in an SSH session to the VPS (as root, say),
   in an editor on that file: type the line's start, `restrict,…` up to
   the space before the key, then "Paste the Kobo's SSH key" in the
-  switcher (Meta+D) types the key in.
+  switcher (Mod+D) types the key in.
 - The PC's key is its `~/.ssh/id_ed25519.pub` (`ssh-keygen -t ed25519`
   if there's none).
 
@@ -112,7 +112,7 @@ hellobro has to be running for any of it.
 
 ## Using it
 
-**On the Kobo**, the PC: `home` in the switcher (Meta+D) or a
+**On the Kobo**, the PC: `home` in the switcher (Mod+D) or a
 launcher.
 
 **On the PC**, the Kobo (the pairing from home still holds):

@@ -1,6 +1,6 @@
 # The bar's system and music (portrait), for a Linux player: the battery,
 # CPU and RAM at the bar's right; play from the keys, what plays in the
-# bar, next and previous; Meta+Shift+B hides the bar and shows it again;
+# bar, next and previous; Mod+Shift+B hides the bar and shows it again;
 # a tap on what plays pauses it; fullscreen has no bar; workspace 2 has it
 # too. Wants MPRIS=1 (the stand-in mpv). NOTE_X: where what plays is.
 # app: hellobro

@@ -1,6 +1,6 @@
 # Battery (with a history from APP_EXTRA's battery-history, if any) and
 # What uses it, side by side (the launcher closed first), sampled every
-# 5 s. Meta+Right moves the focus to What uses it, Meta+F gives it the
+# 5 s. Mod+Right moves the focus to What uses it, Mod+F gives it the
 # screen and back; then the same for Battery. The battery is the
 # harness's stand-in.
 # app: hellobro
@@ -10,7 +10,7 @@ from feedlib import *
 
 start(); time.sleep(3)
 mod(16, shift=True); time.sleep(2)                    # the launcher closed
-gui("battery"); mod(48); gui("what uses")             # Meta+B: beside it
+gui("battery"); mod(48); gui("what uses")             # Mod+B: beside it
 time.sleep(10)                                        # two samples in
 mod(LEFT); time.sleep(2)                              # the focus: Battery
 mod(RIGHT); time.sleep(2)                             # What uses it

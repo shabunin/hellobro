@@ -48,29 +48,29 @@ focus), a **+** for a launcher next to it, and at its end **float**
 back), **fullscreen**, and **close** (a terminal's shell or connection
 ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
 one that has it. Full screen, a swipe down from the top edge of the
-screen, or Meta+F, puts it back. It's the only swipe there: the edges
+screen, or Mod+F, puts it back. It's the only swipe there: the edges
 are the window's, so no light or menu by swiping, and no workspace
 swipes.
 
 New windows open next to the one in focus, along its container: side
-by side, or one above another after Meta+V (split vertically; Meta+B,
-horizontally, side by side). Meta+E turns a container round, Meta+W
-tabs it (a row of tabs, one window shown), Meta+S stacks it (a title
-each, one above another, one window shown). Meta+F gives the window the
+by side, or one above another after Mod+V (split vertically; Mod+B,
+horizontally, side by side). Mod+E turns a container round, Mod+W
+tabs it (a row of tabs, one window shown), Mod+S stacks it (a title
+each, one above another, one window shown). Mod+F gives the window the
 whole screen (again, or a swipe in from the top or bottom edge, gives it
-back); Meta+Shift+Space (or its strip's float) floats it over the others (drag
+back); Mod+Shift+Space (or its strip's float) floats it over the others (drag
 it by its strip; a floating window is put back with the same key, or
 tile).
 
 **Workspaces** are in the bar at the top, numbered, each with its
 windows' titles after its number (`1 Alpine · Wi-Fi · Battery`), the one
-shown in white: Meta+1…Meta+0 go to one (made as you go there; an empty
-one goes once you leave it), Meta+Shift+1…0 send the window in focus to
+shown in white: Mod+1…Mod+0 go to one (made as you go there; an empty
+one goes once you leave it), Mod+Shift+1…0 send the window in focus to
 one, and a tap on one goes there. An empty workspace lists the keys (as
 they are, keys.conf's too), and a tap on it opens a window.
 
 A tap on the bar away from the workspaces, or two fingers swiped down
-from the screen's top (full screen too), or Meta+O, or the menu's
+from the screen's top (full screen too), or Mod+O, or the menu's
 **Workspaces**, shows them all as tiles over the whole screen, each a
 small drawing of its windows as they're laid out, the one shown framed.
 What's in the windows shows too, as it is now, and again every few
@@ -83,7 +83,7 @@ all its windows (what runs in them ends). Keys: 1…9 and 0 go to that
 workspace, **n** makes a new one, **x** is the × of the one the arrows
 are on, the arrows and Enter pick one, Esc closes.
 
-Meta+Shift+Minus puts the window away (i3's scratchpad), Meta+Minus
+Mod+Shift+Minus puts the window away (i3's scratchpad), Mod+Minus
 brings it back, floating, and puts it away again.
 
 The windows are kept as they're left, in `hellobro.json`, and come back
@@ -100,9 +100,9 @@ and at its right where the Kobo is on the network, the Wi-Fi's name and
 its address (`HomeNet · 192.168.1.20`; or `no network`, `Wi-Fi off`), the
 battery (charge, temperature), CPU and memory use, and the time
 (`71% 31°C · cpu 7% · ram 71% · 14:05`). The network's looked at every
-15 s, the rest every 5 s. In a binding mode (Meta+R, say) it says which
+15 s, the rest every 5 s. In a binding mode (Mod+R, say) it says which
 (`grab` too, while the keys are grabbed), and what plays (a tap on that
-plays or pauses), and for a moment what was copied. Meta+Shift+B hides
+plays or pauses), and for a moment what was copied. Mod+Shift+B hides
 it, the windows taking its room, and shows it again (Settings, Terminal,
 The bar; remembered in `bar`); a full-screen window has none either.
 
@@ -146,18 +146,18 @@ the page arrows and counter at the foot; the pen's choices open beside
 the pen. Narrow and short, the least needed go. `HELLOBRO_TOUCH=big` or
 `small` in `launch.sh`'s environment overrides it.
 
-Meta and the arrows (or h j k l, as vim has them) move the focus
-between the windows; with Shift, the window itself moves. Meta+A
+Mod and the arrows (or h j k l, as vim has them) move the focus
+between the windows; with Shift, the window itself moves. Mod+A
 focuses the container around the window (its whole tabbed group, say,
-to move it all), Meta+Tab and Meta+Shift+Tab the next and the previous
+to move it all), Mod+Tab and Mod+Shift+Tab the next and the previous
 window on the workspace.
 
-Meta+R is the resize mode: the arrows (or h j k l) make the window in
-focus wider or narrower, taller or shorter; Enter, Esc or Meta+R again
+Mod+R is the resize mode: the arrows (or h j k l) make the window in
+focus wider or narrower, taller or shorter; Enter, Esc or Mod+R again
 ends it. In a mode only its keys count, even in a grabbed window: no key, not even Shift or Ctrl, reaches a window. While it lasts the windows are
 grey boxes with their sizes, the one in focus framed thick: the
 terminals take their new size once, when it ends, not at every step.
-Moving windows is the same: while Meta+Shift and the arrows move one
+Moving windows is the same: while Mod+Shift and the arrows move one
 (tiled or floating), the windows are boxes; a second after the last
 move, or at once on any other key or a touch, they're laid out for real.
 
@@ -176,7 +176,7 @@ in a cross at the right), a strip at the left (Hide, Home, PgUp, PgDn,
 End, Tab, Shift) and one at the right (Esc, Del, Tab, Mod, Alt, Ctrl,
 Shift). Its keys are a keyboard's: the window manager's keys, the
 terminals', kitty's, all as from a real one. Shift, Ctrl, Alt and Mod
-(Meta, the window keys') hold till the next key is up, shown in black;
+(the window keys') hold till the next key is up, shown in black;
 tapped again they let go. Held Shift, the keys show their capitals and
 symbols. A key held goes on, as a keyboard's does.
 
@@ -216,7 +216,7 @@ US keyboard's places. Greek's accents are dead keys, as on any Greek
 keyboard: `;` then a vowel is ά, έ, ή…, Shift+`;` then ι or υ is ϊ, ϋ;
 an accent and a space is the accent alone. Only what's typed changes: text in
 a terminal, a name, the find line, a ":" line, a notebook's text, a
-password. The keys' commands stay where they are (Ctrl+C, Meta+D, a
+password. The keys' commands stay where they are (Ctrl+C, Mod+D, a
 book's letters), and so do keys.conf's names. Not in English, the bar
 says which; hellobro starts in the first.
 
@@ -227,7 +227,7 @@ button's letter picks it, Esc closes the question.
 
 ## The switcher
 
-Meta+D or Meta+Space, anywhere, is a switcher in the manner of rofi (or
+Mod+D or Mod+Space, anywhere, is a switcher in the manner of rofi (or
 dmenu, which i3 has there): the windows (and where they are), the
 workspaces, the saved hosts (a new terminal to one), a new Alpine or
 Kobo shell, the settings' windows, and the commands, each with its
@@ -267,35 +267,36 @@ The bar says what was copied or pasted, for a moment.
 
 ## Keys
 
-The keys are hellobro's commands', i3's with Meta (the Win key). Settings,
+The keys are hellobro's commands', i3's with Mod (the Win key). Settings,
 Keyboard, "Mod key" makes it Alt instead, as i3's `set $mod Mod1`: then
 Alt+Enter opens a window, and the Win key does what Alt did. The hints
-say which; keys.conf still says meta for the Mod key either way.
+say Mod either way (and Win for the Win key, when Alt is Mod), and
+keys.conf says mod (meta, as an older hellobro wrote it, works too).
 
 | Key | |
 | --- | --- |
-| Meta+Enter | a new window: a launcher |
-| Meta+D, Meta+Space | the switcher |
-| Meta+Shift+Q | close the window in focus |
-| Meta+arrows, Meta+H/J/K/L | focus the window there |
-| Meta+Shift+arrows, Meta+Shift+H/J/K/L | move the window there |
-| Meta+Tab, Meta+Shift+Tab | the next, the previous window |
-| Meta+1…0, Meta+Shift+1…0 | go to a workspace, send the window there |
-| Meta+O | the workspaces as tiles, and a new one |
-| Meta+B, Meta+V | split: the next window beside, below |
-| Meta+Shift+B | hide the bar, show it again |
-| Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
-| Meta+F | fullscreen (or its strip's fullscreen; a swipe in from the top edge leaves it) |
-| Meta+Shift+Space | floating |
-| Meta+A | focus the container around |
-| Meta+Shift+Minus, Meta+Minus | put the window away, bring it back |
-| Meta+R | resize mode: arrows, then Enter or Esc |
-| Meta+Shift+C | read keys.conf again |
-| Meta+Shift+E | quit, back to Nickel (i3's exit) |
+| Mod+Enter | a new window: a launcher |
+| Mod+D, Mod+Space | the switcher |
+| Mod+Shift+Q | close the window in focus |
+| Mod+arrows, Mod+H/J/K/L | focus the window there |
+| Mod+Shift+arrows, Mod+Shift+H/J/K/L | move the window there |
+| Mod+Tab, Mod+Shift+Tab | the next, the previous window |
+| Mod+1…0, Mod+Shift+1…0 | go to a workspace, send the window there |
+| Mod+O | the workspaces as tiles, and a new one |
+| Mod+B, Mod+V | split: the next window beside, below |
+| Mod+Shift+B | hide the bar, show it again |
+| Mod+E, Mod+W, Mod+S | side by side ⇄ one above another, tabbed, stacked |
+| Mod+F | fullscreen (or its strip's fullscreen; a swipe in from the top edge leaves it) |
+| Mod+Shift+Space | floating |
+| Mod+A | focus the container around |
+| Mod+Shift+Minus, Mod+Minus | put the window away, bring it back |
+| Mod+R | resize mode: arrows, then Enter or Esc |
+| Mod+Shift+C | read keys.conf again |
+| Mod+Shift+E | quit, back to Nickel (i3's exit) |
 
 To change one: Settings, the Keys row (or "keys" in the switcher),
 lists the commands with their keys. Pick one and press its new key, with
-Ctrl, Alt or Meta (an F-key alone will do): it takes the place of the
+Ctrl, Alt or Mod (an F-key alone will do): it takes the place of the
 ones it had, and a command that had that key lets it go. Backspace
 leaves it no key, Delete puts its defaults back, Esc leaves it be.
 
@@ -307,11 +308,11 @@ or any of [i3's](https://i3wm.org/docs/userguide.html#list_of_commands),
 as i3's `bindsym`:
 
 ```
-meta+t       layout tabbed; focus parent  # i3's, any line of them
+mod+t       layout tabbed; focus parent  # i3's, any line of them
 f1           workspace number 1
 f2           workspace number 2
-meta+o       [class="hellobro" instance="wifi"] focus
-meta+x       exec htop                    # in a new Alpine window
+mod+o       [class="hellobro" instance="wifi"] focus
+mod+x       exec htop                    # in a new Alpine window
 ctrl+shift+n launcher
 f12          -                            # not ours: the terminal gets F12
 none         focus prev                   # no key at all
@@ -354,7 +355,7 @@ apk add i3wm && i3-msg -t get_workspaces    # i3's own, if you like
 light a moment if it's off, as a terminal's notification (Settings,
 Terminal: off, the light, the note's seconds). From a script, a cron
 job, mpd's song change: `make && hellobro-msg notify "make: done"`.
-It's a command like any: `meta+n notify hi bro` in keys.conf works too.
+It's a command like any: `mod+n notify hi bro` in keys.conf works too.
 
 Commands, the tree, workspaces, outputs, marks, the version, binding
 modes and state, `keys.conf` as the config, ticks and sync; and the
@@ -387,7 +388,7 @@ gives Nickel its own level back.
 
 ## Sleep
 
-The power button, Shift+Meta+S, the menu (a swipe along the right edge), or "Sleep"
+The power button, Shift+Mod+S, the menu (a swipe along the right edge), or "Sleep"
 in the switcher put the Kobo to sleep with hellobro still up, as Nickel would (a sleep
 screen, the light off, suspend to RAM); the power button wakes it, and
 it's all as it was. A player that plays is paused first (Bluetooth goes off),
@@ -415,9 +416,9 @@ sleep or quit for it.
 
 ## Lock
 
-Shift+Meta+X (or Lock in the menu) locks the screen, for a bag or a hand: touch does nothing
+Shift+Mod+X (or Lock in the menu) locks the screen, for a bag or a hand: touch does nothing
 and keys go nowhere, but the music's keys, the power button (sleep),
-and Shift+Meta+X again, which unlocks. The light goes off till then
+and Shift+Mod+X again, which unlocks. The light goes off till then
 (notifications don't flash it). The lock screen says hello bro, what
 plays and whether it's paused, a low battery, how to unlock, the
 version and where it's from; it changes only when one of them does. The windows go on behind it, as they are when it
@@ -438,7 +439,7 @@ gone**: after 15 s, 30 s or 1 min, or nothing comes up.
 
 ## The launcher
 
-A new window (Meta+Enter, a window's **+**, or the first one) is a
+A new window (Mod+Enter, a window's **+**, or the first one) is a
 launcher: what hellobro has, as tiles to tap, in groups.
 
 - **Terminals**: **Alpine** (1), the **Kobo shell** (2), each saved
@@ -470,7 +471,7 @@ ended is noted above it.
 
 ## Terminal
 
-- A launcher (Meta+Enter, or a window's +) asks what to run
+- A launcher (Mod+Enter, or a window's +) asks what to run
   ([The launcher](#the-launcher)): **1** Alpine, **2** the Kobo's sh
   (Enter alone: the tile lit, Alpine at first), **3** and on a saved
   host, or a host typed in. Esc closes it.
@@ -502,11 +503,11 @@ ended is noted above it.
   others keep theirs. A new terminal takes the size last set. Each
   window's is kept with the layout in `hellobro.json`.
 - While connected, every other key goes to the remote, Esc included, but
-  for hellobro's own (the commands' keys: Meta+Shift+E quits, say). A
+  for hellobro's own (the commands' keys: Mod+Shift+E quits, say). A
   program there that wants one of them gets it if keys.conf frees it:
   `ctrl+shift+v -`.
-- **Grab** (Meta+Shift+G) gives every key to the window in focus,
-  hellobro's own too, till Meta+Shift+G again: for tmux, a desktop or
+- **Grab** (Mod+Shift+G) gives every key to the window in focus,
+  hellobro's own too, till Mod+Shift+G again: for tmux, a desktop or
   another hellobro on the other end, with keys of their own. The bar
   says `grab` while it's on.
 - A program that asks for kitty's keyboard protocol (`CSI > flags u`:
@@ -709,7 +710,7 @@ and for PDFs, drawn by MuPDF (below).
   s while reading, and when its window closes), as a place in its
   chapter, so another size or font finds the page again. The screen
   flashes clean every 8 pages.
-- In fullscreen (Meta+F) the page has the whole screen: a PDF's has no
+- In fullscreen (Mod+F) the page has the whole screen: a PDF's has no
   bar then (keys, two fingers to zoom, a tap at the page's top for the
   contents), an EPUB's keeps it. The style panel's **Bar, fullscreen**
   (s or Aa) changes that, for all PDFs or all EPUBs.
@@ -817,7 +818,7 @@ commands, in columns over the page; any key or a tap takes it down.
 ## Notebooks
 
 A notebook is pages to write on with the pen: sums worked out by hand,
-say. "Notebook" in the switcher (Meta+D) opens a new one; the ones
+say. "Notebook" in the switcher (Mod+D) opens a new one; the ones
 you have are listed there by name (the date and time each was made,
 till it's renamed); the launcher has **Notebooks**, **New notebook**
 and the last two written.
@@ -1108,7 +1109,7 @@ is a tile in the launcher after the saved hosts: **Kobo Libra**,
 types there: a window logs in to it as `hellobro-keys`, and what's typed
 in it goes to a keyboard made there (uinput), which that hellobro takes
 for any other. While the window is in focus every key goes there,
-hellobro's own too, as grabbed (Meta+Shift+G gives them back here, and
+hellobro's own too, as grabbed (Mod+Shift+G gives them back here, and
 again to it); the bar says `typing into …`. Ctrl+] ends it.
 
 The first time, the other device asks on its screen whether this one
@@ -1176,11 +1177,11 @@ It's only installed when asked for: `make install-tools`.
 ## In both apps
 
 In both: swipe the left edge for the frontlight (in hellobro also
-Meta+] / Meta+[, and Meta+\ for on/off; in brotools Ctrl+Alt+Up/Down
-and Ctrl+Alt+L). Fullscreen (Meta+F in
+Mod+] / Mod+[, and Mod+\ for on/off; in brotools Ctrl+Alt+Up/Down
+and Ctrl+Alt+L). Fullscreen (Mod+F in
 hellobro): swipe down from the top edge to leave it; the left edge's
 light and the right edge's menu wait till then. The exit
-button leaves, and so does Esc in brotools, Meta+Shift+E in hellobro (where Esc
+button leaves, and so does Esc in brotools, Mod+Shift+E in hellobro (where Esc
 is the terminal's, or closes what's open);
 the power button sleeps. brotools also leaves after 3 minutes idle;
 hellobro doesn't, it sleeps instead (Sleep).

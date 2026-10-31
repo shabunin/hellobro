@@ -124,7 +124,7 @@ would play. Wi-Fi and Bluetooth are stand-ins (`HELLOBRO_FAKE_RADIO`;
 and no mDNS (it would claim kobo.local on the real network). The app's log ends up in `OUT/stdout.txt`, snapshots in `OUT/screen`
 (`calls.txt` there lists every update with its waveform). The feeds live in
 `harness/feeds`, each with an `# app:` line naming the app it drives, and
-their shared helpers in `harness/feedlib.py` (`mod()` for Meta and a key,
+their shared helpers in `harness/feedlib.py` (`mod()` for Mod and a key,
 `gui()` for a settings' window). A few feeds still say Ctrl+Alt+1–4
 (`tab()`, from the tabs that were): that's a workspace laid out as the
 tab was.

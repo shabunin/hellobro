@@ -20,7 +20,8 @@ func TestParseKey(t *testing.T) {
 		{"ctrl+shift+.", "Ctrl+Shift+>"},
 		{"ctrl+shift+space", "Ctrl+Shift+Space"},
 		{"ctrl+pgdn", "Ctrl+PgDn"},
-		{"meta+tab", "Meta+Tab"},
+		{"mod+tab", "Mod+Tab"},
+		{"meta+tab", "Mod+Tab"}, // mod's name before
 		{"alt+shift+ctrl+x", "Ctrl+Shift+Alt+X"},
 		{"ctrl+shift+1", "Ctrl+Shift+1"},
 		{"brightnessup", "Brightness+"},
@@ -149,7 +150,7 @@ f6 [class="terminal"] focus
 
 func TestFooter(t *testing.T) {
 	for conf, want := range map[string]string{
-		"":                         "workspaces: tap or Meta+1–9",
+		"":                         "workspaces: tap or Mod+1–9",
 		"alt+1 workspace number 1": "workspaces: tap",
 		"none workspace number 9":  "workspaces: tap",
 	} {
@@ -163,7 +164,7 @@ func TestFooter(t *testing.T) {
 
 func TestKeyString(t *testing.T) {
 	for name, code := range keyCodes {
-		for _, mods := range []uint8{0, modCtrl | modShift, modAlt | modMeta} {
+		for _, mods := range []uint8{0, modCtrl | modShift, modAlt | modMod} {
 			c := combo{mods, code}
 			back, err := parseKey(c.String())
 			if err != nil || back != c {
@@ -189,10 +190,10 @@ func TestRewriteKeys(t *testing.T) {
 		{"workspace next", nil, true, "none music.stop|f7 layout tabbed; focus parent|[resize]|x mode default"},
 		{"workspace next", []combo{}, false, "none music.stop|f7 layout tabbed; focus parent|none workspace next|[resize]|x mode default"},
 		{"music.stop", []combo{k("ctrl+alt+d")}, false, "f5 workspace next|f7 layout tabbed; focus parent|ctrl+alt+d music.stop|[resize]|x mode default"},
-		// Meta+K was focus up's: it keeps its other.
-		{"music.stop", []combo{k("meta+k")}, false, "f5 workspace next|f7 layout tabbed; focus parent|focus up's|meta+k music.stop|[resize]|x mode default"},
-		// Meta+A was focus parent's only key: it has none then.
-		{"music.stop", []combo{k("meta+a")}, false, "f5 workspace next|f7 layout tabbed; focus parent|none focus parent|meta+a music.stop|[resize]|x mode default"},
+		// Mod+K was focus up's: it keeps its other.
+		{"music.stop", []combo{k("meta+k")}, false, "f5 workspace next|f7 layout tabbed; focus parent|focus up's|mod+k music.stop|[resize]|x mode default"},
+		// Mod+A was focus parent's only key: it has none then.
+		{"music.stop", []combo{k("meta+a")}, false, "f5 workspace next|f7 layout tabbed; focus parent|none focus parent|mod+a music.stop|[resize]|x mode default"},
 		// F7 was keys.conf's own line: it goes.
 		{"music.stop", []combo{k("f7")}, false, "f5 workspace next|f7 music.stop|[resize]|x mode default"},
 	} {
@@ -204,7 +205,7 @@ func TestRewriteKeys(t *testing.T) {
 				got = append(got, l)
 			}
 		}
-		want := strings.ReplaceAll(c.want, "focus up's", "meta+up focus up")
+		want := strings.ReplaceAll(c.want, "focus up's", "mod+up focus up")
 		if g := strings.Join(got, "|"); g != want {
 			t.Errorf("%s %v %v: %q, want %q", c.id, c.keys, c.reset, g, want)
 		}
@@ -221,13 +222,13 @@ func TestKeysOf(t *testing.T) {
 		ids  []string
 		want string
 	}{
-		{[]string{"launcher"}, "Meta+Enter"},
-		{[]string{"focus left", "focus down", "focus up", "focus right"}, "Meta+H/Down/Up/Right"},
-		{[]string{"split h", "split v"}, "Meta+B/V"},
-		{[]string{"workspace number 2", "workspace number 3", "workspace number 4", "workspace number 5", "workspace number 10"}, "Meta+2…0"},
-		{[]string{"workspace number 1", "workspace number 2"}, "F1, Meta+2"},
-		{[]string{"copy", "launcher"}, "Ctrl+Shift+C, Meta+Enter"},
-		{[]string{"quit"}, "Shift+Meta+E"},
+		{[]string{"launcher"}, "Mod+Enter"},
+		{[]string{"focus left", "focus down", "focus up", "focus right"}, "Mod+H/Down/Up/Right"},
+		{[]string{"split h", "split v"}, "Mod+B/V"},
+		{[]string{"workspace number 2", "workspace number 3", "workspace number 4", "workspace number 5", "workspace number 10"}, "Mod+2…0"},
+		{[]string{"workspace number 1", "workspace number 2"}, "F1, Mod+2"},
+		{[]string{"copy", "launcher"}, "Ctrl+Shift+C, Mod+Enter"},
+		{[]string{"quit"}, "Shift+Mod+E"},
 		{[]string{"focus child"}, ""},
 	} {
 		if got := a.keysOf(c.ids...); got != c.want {
@@ -236,28 +237,35 @@ func TestKeysOf(t *testing.T) {
 	}
 }
 
-// With Alt as the Mod key, Alt runs keys.conf's meta keys, the Win key
-// its alt ones, and the hints say what to press.
+// With Alt as the Mod key, Alt runs keys.conf's mod keys, the Win key
+// its alt ones; the hints say Mod for the Mod key, and Win for the other.
 func TestModIsAlt(t *testing.T) {
 	defer func() { modIsAlt = false }()
-	c, err := parseKey("meta+enter")
+	c, err := parseKey("mod+enter")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := c.label(); got != "Meta+Enter" {
+	w, _ := parseKey("alt+shift+x")
+	if got := c.label(); got != "Mod+Enter" {
 		t.Errorf("Super: label %q", got)
 	}
+	if got := w.label(); got != "Shift+Alt+X" {
+		t.Errorf("Super: alt's label %q", got)
+	}
 	modIsAlt = true
-	if got := c.label(); got != "Alt+Enter" {
+	if got := c.label(); got != "Mod+Enter" {
 		t.Errorf("Alt: label %q", got)
 	}
-	if got := c.String(); got != "meta+enter" {
-		t.Errorf("Alt: keys.conf has %q, still meta's", got)
+	if got := w.label(); got != "Shift+Win+X" {
+		t.Errorf("Alt: alt's label %q, the Win key's", got)
 	}
-	if got := swapMod(modAlt | modShift); got != modMeta|modShift {
-		t.Errorf("Alt+Shift held is %b, want meta+shift", got)
+	if got := c.String(); got != "mod+enter" {
+		t.Errorf("Alt: keys.conf has %q, still mod's", got)
 	}
-	if got := swapMod(modMeta); got != modAlt {
+	if got := swapMod(modAlt | modShift); got != modMod|modShift {
+		t.Errorf("Alt+Shift held is %b, want mod+shift", got)
+	}
+	if got := swapMod(modMod); got != modAlt {
 		t.Errorf("the Win key held is %b, want alt", got)
 	}
 }

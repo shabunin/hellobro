@@ -1,5 +1,5 @@
 # Moves show boxes till they settle: two windows side by side, the right
-# one moved left and back (Meta+Shift+arrows) quickly: gray boxes,
+# one moved left and back (Mod+Shift+arrows) quickly: gray boxes,
 # "moving"; a second later laid out for real, once. Then it floats and
 # moves down twice: boxes again, then in place.
 # app: hellobro

@@ -8,9 +8,9 @@ package main
 // something) or one of the settings' panels (Wi-Fi, Bluetooth, Sharing,
 // Settings, Battery, What uses it).
 //
-// The keys are i3's with Meta (the Win key): Meta+Enter a launcher,
-// Meta+D or Meta+Space the switcher, Meta+arrows the focus,
-// Meta+Shift+arrows the window, Meta+1…0 the workspaces (commands.go).
+// The keys are i3's with Mod (the Win key, or Alt): Mod+Enter a launcher,
+// Mod+D or Mod+Space the switcher, Mod+arrows the focus,
+// Mod+Shift+arrows the window, Mod+1…0 the workspaces (commands.go).
 // The window in focus gets the rest. A window's strip has its name (black
 // when it has the focus), + for a window next to it and × to close it.
 
@@ -337,7 +337,7 @@ func (a *bro) openGUI(key string) {
 }
 
 // fullWin puts w full screen, in focus. Out of it: a swipe down from the
-// top, or Meta+F.
+// top, or Mod+F.
 func (a *bro) fullWin(w window) {
 	if n := a.nodeOf(w); n != nil {
 		a.wm.tree.Focus(n)
@@ -575,7 +575,7 @@ func (a *bro) wmBar() {
 		hint := ""
 		if w.Num >= 0 && w.Num <= 10 {
 			hint = a.keyLabel(fmt.Sprintf("workspace number %d", w.Num))
-			hint = strings.TrimPrefix(hint, modsLabel(swapMod(modMeta)))
+			hint = strings.TrimPrefix(hint, modsShown(modMod))
 		}
 		hints = append(hints, hint)
 		if w == a.wm.tree.Current() {

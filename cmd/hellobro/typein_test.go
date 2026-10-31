@@ -24,10 +24,10 @@ func TestGrabFor(t *testing.T) {
 		}
 	}
 	step("the shell in focus", sh, nil)
-	grab = sh // Meta+Shift+G in it
+	grab = sh // Mod+Shift+G in it
 	step("still the shell", sh, sh)
 	step("focus to the typing window", typing, typing)
-	grab = nil // Meta+Shift+G: let go
+	grab = nil // Mod+Shift+G: let go
 	step("let go, still in focus", typing, nil)
 	step("focus to the shell", sh, nil)
 	step("focus back", typing, typing)

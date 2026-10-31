@@ -1,7 +1,7 @@
 # The bar, with no header: the workspaces with their windows' titles,
 # the status, the menu (a swipe along the right edge, closed by Esc); an empty
 # workspace's keys; a notification over the IPC socket; the Battery
-# window with the busiest processes; and quitting by Shift+Meta+E.
+# window with the busiest processes; and quitting by Shift+Mod+E.
 # snap.txt in OUT says which snapshot is which.
 # app: hellobro
 import json, os, socket, struct, sys

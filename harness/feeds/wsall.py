@@ -2,7 +2,7 @@
 # 1, a book on 2, the battery on 3. From 3 a tap on the bar puts them
 # up, the whole screen, no line to type in: the shell's count goes on
 # in its tile, the book shows its page. "n" makes 4 with a launcher;
-# Meta+O, then "1", goes back to 1. The log says "workspace number 4",
+# Mod+O, then "1", goes back to 1. The log says "workspace number 4",
 # then "workspace number 1".
 # app: hellobro
 import os, sys

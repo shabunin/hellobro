@@ -1,7 +1,7 @@
 # The workspaces at a glance (workspaces.go): the Kobo's sh beside the
 # launcher on 1, a launcher on 2; a tap on the bar's empty part puts
 # them up, drawn small, with + for a new one. "new", Enter: workspace 3
-# with a launcher. Meta+O again, 1: back on 1. The log says "workspace
+# with a launcher. Mod+O again, 1: back on 1. The log says "workspace
 # number 3", then "workspace \"1\"".
 # app: hellobro
 import os, sys

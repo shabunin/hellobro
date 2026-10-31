@@ -1,6 +1,6 @@
 # The docs' screenshot of the workspaces' tiles (workspaces.go): a
 # shell beside Wi-Fi on 1, a book on 2, Bluetooth over Settings on 3;
-# Meta+O puts them up. The shell starts again with nothing of the PC's
+# Mod+O puts them up. The shell starts again with nothing of the PC's
 # (env -i, a prompt and a title of its own) and the screen cleared: the
 # harness's would show the PC's user and host. The battery's window is
 # left out, as it lists the PC's processes. snap.txt in OUT says which

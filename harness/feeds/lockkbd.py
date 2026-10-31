@@ -1,4 +1,4 @@
-# The lock with the keyboard gone: Shift+Meta+X, then the keyboard goes
+# The lock with the keyboard gone: Shift+Mod+X, then the keyboard goes
 # (its FIFO closed): the lock screen lists its swipes. A short swipe up
 # and a slant do nothing; a swipe right unlocks and opens Bluetooth, full
 # screen; a swipe in from the top edge leaves it, and a tap on its ▢

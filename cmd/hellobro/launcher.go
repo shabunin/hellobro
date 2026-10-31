@@ -1,6 +1,6 @@
 package main
 
-// The launcher, a new window's (Meta+Enter): what runs here, as tiles
+// The launcher, a new window's (Mod+Enter): what runs here, as tiles
 // for a finger, in groups: the terminals (Alpine, the Kobo's sh, the
 // saved hosts, the nearby hellobros, by number as they always were),
 // books and notebooks, the settings' windows, and the Kobo itself.

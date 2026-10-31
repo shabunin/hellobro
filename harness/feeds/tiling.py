@@ -1,4 +1,4 @@
-# The window manager: a launcher on workspace 1, Meta+Enter another beside
+# The window manager: a launcher on workspace 1, Mod+Enter another beside
 # it, a settings window from the switcher, split below, tabbed and back,
 # a shell on workspace 2 moved to 1, floating, resized, fullscreen, put
 # away and back, closed.

@@ -7,7 +7,7 @@
 // settings, the battery and what uses it.
 //
 // A swipe along the right edge opens the menu. The keys are i3's,
-// with Meta, and the user's to change (commands.go); i3's commands come
+// with Mod, and the user's to change (commands.go); i3's commands come
 // in on a socket too (ipc.go). The music is a Linux player's, in an
 // Alpine session (mpris.go). The rest (the screen, touch, the frontlight
 // on the left edge, quitting) is the kobo package's.

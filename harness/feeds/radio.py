@@ -1,9 +1,9 @@
 # The radios' windows, the stand-ins (HELLOBRO_FAKE_RADIO, which run.sh
 # sets), Wi-Fi above Bluetooth (the launcher closed first): a network
 # with a wrong password and then the right one, a Bluetooth scan, pairing
-# with a code to confirm, Wi-Fi off and on; then the switcher (Meta+D,
+# with a code to confirm, Wi-Fi off and on; then the switcher (Mod+D,
 # typed into) opening Battery, fullscreen, the switcher over it; then
-# sleep (Shift+Meta+S, pretended: HELLOBRO_FAKE_SLEEP) and waking.
+# sleep (Shift+Mod+S, pretended: HELLOBRO_FAKE_SLEEP) and waking.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

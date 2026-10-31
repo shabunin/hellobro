@@ -1,7 +1,7 @@
-# The lock: music playing, Shift+Meta+X in a Kobo sh: the lock screen
-# with the track. A tap and an x go nowhere, Meta+D opens nothing; the
+# The lock: music playing, Shift+Mod+X in a Kobo sh: the lock screen
+# with the track. A tap and an x go nowhere, Mod+D opens nothing; the
 # headphones' next and pause keys still work, and the lock screen follows
-# them; asleep and awake, it's still locked. Shift+Meta+X again: unlocked, and "echo ok" reaches the shell,
+# them; asleep and awake, it's still locked. Shift+Mod+X again: unlocked, and "echo ok" reaches the shell,
 # without the x. The log says "lock: locked", "lock: unlocked". Wants
 # MPRIS=1 (the stand-in mpv).
 # app: hellobro

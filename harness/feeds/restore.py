@@ -7,5 +7,5 @@ from feedlib import *
 
 start()
 time.sleep(4)
-mod(3); time.sleep(4)                                 # Meta+2
+mod(3); time.sleep(4)                                 # Mod+2
 exit_app()

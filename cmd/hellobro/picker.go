@@ -1,7 +1,7 @@
 package main
 
-// The switcher, a fuzzy menu in the manner of rofi's combi mode: Meta+D
-// or Meta+Space (dmenu's key in i3) lists the windows, the workspaces,
+// The switcher, a fuzzy menu in the manner of rofi's combi mode: Mod+D
+// or Mod+Space (dmenu's key in i3) lists the windows, the workspaces,
 // the saved SSH hosts (a new terminal to one), new shells, the settings'
 // windows and the commands (commands.go). Typing narrows the list, Up/Down (or Tab,
 // Shift+Tab) move, Enter goes; with nothing typed, 1-9 go straight to

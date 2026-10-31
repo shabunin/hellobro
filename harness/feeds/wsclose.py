@@ -1,4 +1,4 @@
-# The workspaces' ×: Wi-Fi and Battery on 2, Settings on 3; Meta+O puts
+# The workspaces' ×: Wi-Fi and Battery on 2, Settings on 3; Mod+O puts
 # the tiles up. x on 3 (the arrows there) asks, x again closes its
 # window; then 2's × tapped (at CLOSE_XY, "x,y") asks, and again closes
 # both. The log says "workspaces: closing 3, 1 windows", then "closing

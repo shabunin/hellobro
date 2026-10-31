@@ -1,5 +1,5 @@
 # A PDF's cut kept through the workspaces' tiles: the first book, a PDF,
-# full screen; the select tool, a rectangle; Meta+O, Esc: the rectangle
+# full screen; the select tool, a rectangle; Mod+O, Esc: the rectangle
 # and its buttons are still there. snap.txt says which snapshot is
 # which. HELLOBRO_BOOKS: a directory with a PDF first by name.
 # app: hellobro

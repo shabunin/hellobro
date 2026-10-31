@@ -1,5 +1,5 @@
 # A mode's keys are its own, grab or not: the Kobo's sh runs cat -v,
-# grabbed (Meta+Shift+G), and the resize mode comes from the menu. In it,
+# grabbed (Mod+Shift+G), and the resize mode comes from the menu. In it,
 # x, the arrows, Shift and Ctrl+C reach nothing: cat shows none of them.
 # Esc ends it, and y goes to cat again (the grab still on).
 # app: hellobro

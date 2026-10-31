@@ -69,9 +69,9 @@ harness/relay.sh OUT                  # the relay, sshd playing the VPS
 - Log: `OUT/stdout.txt`. App files: `OUT/app`.
 - `APP_EXTRA=dir` copies files into the app's dir first (settings,
   relay.conf, keys, keys.conf). `SHARE_PORT` moves file sharing off 2022.
-- Feeds drive the window manager with Meta (`mod()` in feedlib) and
+- Feeds drive the window manager with Mod (`mod()` in feedlib) and
   open settings' windows through the switcher (`gui()`). hellobro has
-  no header: `exit_app()` quits with Meta+Shift+E (its menu, `menu()`,
+  no header: `exit_app()` quits with Mod+Shift+E (its menu, `menu()`,
   is a swipe along the right edge, not full screen), and `bar` is
   the feed of the bar, the menu, an empty workspace's keys and `notify`. A
   few feeds still say Ctrl+Alt+1–4 (`tab()`): that's a workspace laid

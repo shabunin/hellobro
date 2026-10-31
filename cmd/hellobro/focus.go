@@ -7,7 +7,7 @@ package main
 // and the window's letters, as before. The ring shows once Tab is used;
 // a touch takes it away (and the focus goes where it touched). The
 // terminals keep Tab: it's the shell's. Between the windows the focus
-// moves with Meta and the arrows (wm.go).
+// moves with Mod and the arrows (wm.go).
 
 import (
 	"image"

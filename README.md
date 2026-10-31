@@ -30,7 +30,7 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 ## What it does
 
 - **Windows, as i3 has them**: a tiling window manager with i3's keys
-  (Meta+Enter, Meta+arrows, Meta+1…0), workspaces, splits, tabbed and
+  (Mod+Enter, Mod+arrows, Mod+1…0), workspaces, splits, tabbed and
   stacked containers, floating windows, a scratchpad, binding modes, and
   i3's IPC, so `i3-msg`, `swaymsg` and i3ipc scripts work, and
   `hellobro-msg notify TEXT` puts up a note. One slim bar at the top
@@ -97,7 +97,7 @@ installed. hellobro is built and tested on the Elipsa (N604, firmware
    a terminal: `unzip hellobro-<version>.zip -d /path/to/KOBOeReader`.
 4. Eject the Kobo. Open **Hello Bro** from NickelMenu (the menu at the
    bottom right of the home screen). The first start asks you to tap two
-   targets, to calibrate the touch screen. Meta+Shift+E (Meta is the
+   targets, to calibrate the touch screen. Mod+Shift+E (Mod is the
    Win key), or quit in the menu (swipe along the right edge), goes back to Nickel.
 
 ### Updates over Wi-Fi
@@ -135,24 +135,24 @@ make dist            # a release's files, in dist/
 
 | | |
 | --- | --- |
-| Meta+Enter | a new window: the launcher, tiles for all the apps (1 Alpine, 2 the Kobo's sh, 3… a saved host) |
-| Meta+D, Meta+Space | go to: windows, workspaces, hosts, settings, commands |
-| Meta+arrows (or H J K L), with Shift | focus the window there, move it there |
-| Meta+1…0, with Shift | go to a workspace, send the window there |
-| Meta+B, Meta+V | split: the next window beside, below |
-| Meta+E, Meta+W, Meta+S | side by side ⇄ one above another, tabbed, stacked |
-| Meta+F | fullscreen, or a window's fullscreen (swipe in from the top or bottom edge to leave) |
-| Meta+Shift+Space | floating, or a window's float (tile puts it back) |
-| Meta+R | resize: the arrows, then Esc |
-| Meta+Shift+Q | close the window |
+| Mod+Enter | a new window: the launcher, tiles for all the apps (1 Alpine, 2 the Kobo's sh, 3… a saved host) |
+| Mod+D, Mod+Space | go to: windows, workspaces, hosts, settings, commands |
+| Mod+arrows (or H J K L), with Shift | focus the window there, move it there |
+| Mod+1…0, with Shift | go to a workspace, send the window there |
+| Mod+B, Mod+V | split: the next window beside, below |
+| Mod+E, Mod+W, Mod+S | side by side ⇄ one above another, tabbed, stacked |
+| Mod+F | fullscreen, or a window's fullscreen (swipe in from the top or bottom edge to leave) |
+| Mod+Shift+Space | floating, or a window's float (tile puts it back) |
+| Mod+R | resize: the arrows, then Esc |
+| Mod+Shift+Q | close the window |
 | pen across text, Ctrl+Shift+V | copy, paste |
 | Ctrl+Shift+Space | play / pause, anywhere |
 | Ctrl+Shift+< / > | previous / next track |
-| Shift+Meta+S, power button | sleep |
-| Shift+Meta+X | lock: touch does nothing till it again |
-| swipe the left edge, Meta+] / Meta+[ | frontlight |
-| Meta+\\ | frontlight on / off |
-| Meta+Shift+E, or the menu (swipe along the right edge) | back to Nickel |
+| Shift+Mod+S, power button | sleep |
+| Shift+Mod+X | lock: touch does nothing till it again |
+| swipe the left edge, Mod+] / Mod+[ | frontlight |
+| Mod+\\ | frontlight on / off |
+| Mod+Shift+E, or the menu (swipe along the right edge) | back to Nickel |
 
 Every key can be changed in Settings (Keys) or `keys.conf`, which takes
 any i3 command line and binding modes. See [Keys](docs/usage.md#keys)

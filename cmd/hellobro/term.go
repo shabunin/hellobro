@@ -1,7 +1,7 @@
 package main
 
 // The terminals: SSH, with a real PTY on the remote, a shell on the Kobo
-// itself, or Alpine in a jail, a window each. A new one (Meta+Enter) is a
+// itself, or Alpine in a jail, a window each. A new one (Mod+Enter) is a
 // launcher: it asks what to run, and goes back to asking when that ends.
 // Their output goes through an xterm emulator (charmbracelet/x/vt) into
 // a grid of cells, which we draw ourselves, redrawing only the cells that

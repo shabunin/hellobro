@@ -3,7 +3,7 @@ package main
 // What the bar says of the system, at its right, before the clock: the
 // battery, its temperature, CPU and memory use, read every few seconds
 // (there was a status bar of its own along the bottom for it once).
-// Meta+Shift+B (the command statusbar, or its key in keys.conf) hides the
+// Mod+Shift+B (the command statusbar, or its key in keys.conf) hides the
 // bar or shows it, remembered in bar; a tap on what's playing in it plays
 // or pauses.
 

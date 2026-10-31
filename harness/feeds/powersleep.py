@@ -1,6 +1,6 @@
 # The power button sleeps, music or not: no light sleep. Music playing,
 # a press: the player paused, the radios off, asleep (pretended), awake;
-# then Shift+Meta+S, the same. The log says "power button: sleeping",
+# then Shift+Mod+S, the same. The log says "power button: sleeping",
 # "sleep: going to sleep" twice. Wants MPRIS=1 (the stand-in mpv).
 # app: hellobro
 import os, sys

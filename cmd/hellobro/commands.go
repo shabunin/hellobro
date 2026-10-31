@@ -6,7 +6,7 @@ package main
 // takes any of those, as i3's bindsym does.
 //
 // keys.conf, next to hellobro, changes them: a line is a key and a
-// command ("meta+1 workspace number 1"), a key and "-", which frees it
+// command ("mod+1 workspace number 1"), a key and "-", which frees it
 // (a terminal gets it then), or "none" and a command, which has no key
 // then. A command named there loses its defaults. "[resize]" starts the
 // keys of a binding mode, i3's: in a mode only its keys count, till one
@@ -54,43 +54,43 @@ func wmCommand(line, title string, repeat bool, keys ...string) *command {
 
 func makeCommands() []*command {
 	cs := []*command{
-		{id: "launcher", title: "A new window", keys: []string{"meta+enter"}, run: (*bro).openLauncher},
-		{id: "workspaces", title: "Workspaces: all of them, small, to go to one or add one", keys: []string{"meta+o"}, run: (*bro).openWorkspaces},
-		{id: "palette", title: "Go to…", keys: []string{"meta+d", "meta+space"}, run: (*bro).openPicker, hidden: true},
-		wmCommand("kill", "Close the window in focus", false, "meta+shift+q"),
+		{id: "launcher", title: "A new window", keys: []string{"mod+enter"}, run: (*bro).openLauncher},
+		{id: "workspaces", title: "Workspaces: all of them, small, to go to one or add one", keys: []string{"mod+o"}, run: (*bro).openWorkspaces},
+		{id: "palette", title: "Go to…", keys: []string{"mod+d", "mod+space"}, run: (*bro).openPicker, hidden: true},
+		wmCommand("kill", "Close the window in focus", false, "mod+shift+q"),
 	}
 	for _, d := range []struct{ dir, arrow, letter string }{
 		{"left", "left", "h"}, {"down", "down", "j"}, {"up", "up", "k"}, {"right", "right", "l"},
 	} {
 		cs = append(cs,
-			wmCommand("focus "+d.dir, "Focus: the window "+d.dir+"wards", true, "meta+"+d.arrow, "meta+"+d.letter),
-			wmCommand("move "+d.dir, "Move the window "+d.dir, true, "meta+shift+"+d.arrow, "meta+shift+"+d.letter))
+			wmCommand("focus "+d.dir, "Focus: the window "+d.dir+"wards", true, "mod+"+d.arrow, "mod+"+d.letter),
+			wmCommand("move "+d.dir, "Move the window "+d.dir, true, "mod+shift+"+d.arrow, "mod+shift+"+d.letter))
 	}
 	cs = append(cs,
-		wmCommand("focus next", "Focus: the next window", true, "meta+tab"),
-		wmCommand("focus prev", "Focus: the window before", true, "meta+shift+tab"),
-		wmCommand("focus parent", "Focus: the container around", false, "meta+a"),
+		wmCommand("focus next", "Focus: the next window", true, "mod+tab"),
+		wmCommand("focus prev", "Focus: the window before", true, "mod+shift+tab"),
+		wmCommand("focus parent", "Focus: the container around", false, "mod+a"),
 		wmCommand("focus child", "Focus: back into the container", false),
 		wmCommand("focus mode_toggle", "Focus: floating / tiled windows", false),
-		wmCommand("split h", "Split: the next window to the right", false, "meta+b"),
-		wmCommand("split v", "Split: the next window below", false, "meta+v"),
-		wmCommand("layout toggle split", "Layout: side by side / one above another", false, "meta+e"),
-		wmCommand("layout stacking", "Layout: stacked", false, "meta+s"),
-		wmCommand("layout tabbed", "Layout: tabbed", false, "meta+w"),
-		wmCommand("fullscreen toggle", "Fullscreen: the window in focus", false, "meta+f"),
-		&command{id: "grab", title: "Grab: every key to the window, till this again", keys: []string{"meta+shift+g"}, run: (*bro).toggleGrab},
-		wmCommand("floating toggle", "Floating: the window in focus", false, "meta+shift+space"),
-		wmCommand("move scratchpad", "Put the window away (the scratchpad)", false, "meta+shift+minus"),
-		wmCommand("scratchpad show", "Bring back a window put away", false, "meta+minus"),
-		wmCommand("mode resize", "Resize the windows: the arrows", false, "meta+r"),
+		wmCommand("split h", "Split: the next window to the right", false, "mod+b"),
+		wmCommand("split v", "Split: the next window below", false, "mod+v"),
+		wmCommand("layout toggle split", "Layout: side by side / one above another", false, "mod+e"),
+		wmCommand("layout stacking", "Layout: stacked", false, "mod+s"),
+		wmCommand("layout tabbed", "Layout: tabbed", false, "mod+w"),
+		wmCommand("fullscreen toggle", "Fullscreen: the window in focus", false, "mod+f"),
+		&command{id: "grab", title: "Grab: every key to the window, till this again", keys: []string{"mod+shift+g"}, run: (*bro).toggleGrab},
+		wmCommand("floating toggle", "Floating: the window in focus", false, "mod+shift+space"),
+		wmCommand("move scratchpad", "Put the window away (the scratchpad)", false, "mod+shift+minus"),
+		wmCommand("scratchpad show", "Bring back a window put away", false, "mod+minus"),
+		wmCommand("mode resize", "Resize the windows: the arrows", false, "mod+r"),
 		wmCommand("workspace back_and_forth", "Workspace: the one before", false),
 		wmCommand("workspace next", "Workspace: the next", false),
 		wmCommand("workspace prev", "Workspace: the one before in the bar", false),
 	)
 	for n := 1; n <= 10; n++ {
 		k := strconv.Itoa(n % 10)
-		ws := wmCommand(fmt.Sprintf("workspace number %d", n), fmt.Sprintf("Workspace %d", n), false, "meta+"+k)
-		mv := wmCommand(fmt.Sprintf("move container to workspace number %d", n), fmt.Sprintf("Move the window to workspace %d", n), false, "meta+shift+"+k)
+		ws := wmCommand(fmt.Sprintf("workspace number %d", n), fmt.Sprintf("Workspace %d", n), false, "mod+"+k)
+		mv := wmCommand(fmt.Sprintf("move container to workspace number %d", n), fmt.Sprintf("Move the window to workspace %d", n), false, "mod+shift+"+k)
 		ws.hidden, mv.hidden = true, true
 		cs = append(cs, ws, mv)
 	}
@@ -103,7 +103,7 @@ func makeCommands() []*command {
 		c.mode, c.hidden = "resize", true
 		cs = append(cs, c)
 	}
-	back := wmCommand("mode default", "Resize: done", false, "enter", "esc", "meta+r")
+	back := wmCommand("mode default", "Resize: done", false, "enter", "esc", "mod+r")
 	back.mode, back.hidden = "resize", true
 	cs = append(cs, back)
 
@@ -141,9 +141,9 @@ func makeCommands() []*command {
 		&command{id: "books", title: "Books: the shelf, to read one", run: (*bro).openShelf},
 		&command{id: "notebooks", title: "Notebooks: all of them, to open, rename, put in folders", run: (*bro).openNotes},
 		&command{id: "settings", title: "Settings", run: func(a *bro) { a.openGUI("settings") }, hidden: true}, // the switcher has its window
-		&command{id: "statusbar", title: "The bar: show / hide", keys: []string{"meta+shift+b"}, run: (*bro).toggleBar},
-		&command{id: "sleep", title: "Sleep", keys: []string{"meta+shift+s"}, run: func(a *bro) { a.App.Sleep() }},
-		&command{id: "lock", title: "Lock the screen", keys: []string{"meta+shift+x"}, run: (*bro).lock},
+		&command{id: "statusbar", title: "The bar: show / hide", keys: []string{"mod+shift+b"}, run: (*bro).toggleBar},
+		&command{id: "sleep", title: "Sleep", keys: []string{"mod+shift+s"}, run: func(a *bro) { a.App.Sleep() }},
+		&command{id: "lock", title: "Lock the screen", keys: []string{"mod+shift+x"}, run: (*bro).lock},
 		&command{id: "wifi", title: "Wi-Fi on / off", run: func(a *bro) { a.radioToggle(panelWiFi) }},
 		&command{id: "bluetooth", title: "Bluetooth on / off", run: func(a *bro) { a.radioToggle(panelBT) }},
 		&command{id: "airplane", title: "Airplane mode: Wi-Fi and Bluetooth off (again: back on)", run: (*bro).airplane},
@@ -157,15 +157,15 @@ func makeCommands() []*command {
 		&command{id: "sharing.pair", title: "Pair a computer", run: (*bro).sharePair},
 		&command{id: "relay", title: "Relay on / off", run: func(a *bro) { a.stepSetting(settingIndex("relay"), 1) }},
 		&command{id: "keys", title: "Keys: set a command's", run: func(a *bro) { a.openKeys(nil) }},
-		wmCommand("reload", "Keys: read keys.conf again", false, "meta+shift+c"),
+		wmCommand("reload", "Keys: read keys.conf again", false, "mod+shift+c"),
 	)
 	cs = append(cs, settingCommands()...)
 	cs = append(cs,
-		&command{id: "light.up", title: "Light: brighter", keys: []string{"meta+]", "brightnessup"}, repeat: true,
+		&command{id: "light.up", title: "Light: brighter", keys: []string{"mod+]", "brightnessup"}, repeat: true,
 			run: func(a *bro) { a.stepLight(lightStep) }},
-		&command{id: "light.down", title: "Light: dimmer", keys: []string{"meta+[", "brightnessdown"}, repeat: true,
+		&command{id: "light.down", title: "Light: dimmer", keys: []string{"mod+[", "brightnessdown"}, repeat: true,
 			run: func(a *bro) { a.stepLight(-lightStep) }},
-		&command{id: "light.toggle", title: "Light: on / off (the backlight)", keys: []string{"meta+\\"}, run: (*bro).toggleLight},
+		&command{id: "light.toggle", title: "Light: on / off (the backlight)", keys: []string{"mod+\\"}, run: (*bro).toggleLight},
 		&command{id: "rotate", title: "Rotate the screen", run: func(a *bro) { a.Rotate() }},
 	)
 	for r, name := range []string{"Portrait", "Landscape", "Portrait, upside down", "Landscape, the other way"} {
@@ -174,7 +174,7 @@ func makeCommands() []*command {
 	}
 	cs = append(cs,
 		&command{id: "calibrate", title: "Touch calibration", run: func(a *bro) { a.Calibrate() }},
-		&command{id: "quit", title: "Quit, back to Nickel", keys: []string{"meta+shift+e"}, run: func(a *bro) { a.Quit() }}, // i3's exit
+		&command{id: "quit", title: "Quit, back to Nickel", keys: []string{"mod+shift+e"}, run: func(a *bro) { a.Quit() }}, // i3's exit
 	)
 	return cs
 }
@@ -209,7 +209,7 @@ const (
 	modCtrl = 1 << iota
 	modShift
 	modAlt
-	modMeta
+	modMod
 )
 
 type modName struct {
@@ -218,23 +218,24 @@ type modName struct {
 	label string
 }
 
-var modNames = []modName{{"ctrl", modCtrl, "Ctrl"}, {"shift", modShift, "Shift"}, {"alt", modAlt, "Alt"}, {"meta", modMeta, "Meta"}}
+var modNames = []modName{{"ctrl", modCtrl, "Ctrl"}, {"shift", modShift, "Shift"}, {"alt", modAlt, "Alt"}, {"mod", modMod, "Mod"}}
 
 // modIsAlt says Alt is the window keys' modifier (Settings, "Mod key"),
-// as i3's "set $mod Mod1": keys.conf's meta is then Alt, and its alt the
+// as i3's "set $mod Mod1": keys.conf's mod is then Alt, and its alt the
 // Win key. What goes to a terminal is the keys as they are.
 var modIsAlt bool
 
-// swapMod swaps meta and alt in mods, when Alt is the Mod key.
+// swapMod swaps mod and alt in mods, the keys held for keys.conf's,
+// when Alt is the Mod key.
 func swapMod(mods uint8) uint8 {
 	if !modIsAlt {
 		return mods
 	}
-	m := mods &^ (modAlt | modMeta)
+	m := mods &^ (modAlt | modMod)
 	if mods&modAlt != 0 {
-		m |= modMeta
+		m |= modMod
 	}
-	if mods&modMeta != 0 {
+	if mods&modMod != 0 {
 		m |= modAlt
 	}
 	return m
@@ -276,9 +277,12 @@ func parseKey(s string) (combo, error) {
 		return c, fmt.Errorf("%q: + is shift+=", s)
 	}
 	for _, m := range parts[:len(parts)-1] {
+		if m == "meta" { // mod's name before
+			m = "mod"
+		}
 		i := slices.IndexFunc(modNames, func(n modName) bool { return n.name == m })
 		if i < 0 {
-			return c, fmt.Errorf("%q: no modifier %q (ctrl, shift, alt, meta)", s, m)
+			return c, fmt.Errorf("%q: no modifier %q (ctrl, shift, alt, mod)", s, m)
 		}
 		c.mods |= modNames[i].bit
 	}
@@ -305,7 +309,7 @@ func (c combo) label() string {
 	if ch, ok := kobo.KeyChar(c.code, false, false); ok && c.mods&modShift != 0 && ch != " " && !isAlnum(ch) {
 		name, _ = kobo.KeyChar(c.code, true, false) // Shift+, is <
 	}
-	return modsLabel(swapMod(c.mods)) + name
+	return modsShown(c.mods) + name
 }
 
 // String is c as keys.conf has it: "ctrl+shift+p".
@@ -317,7 +321,7 @@ func (c combo) String() string {
 	return strings.ToLower(modsLabel(c.mods)) + name
 }
 
-// modsLabel is "Ctrl+Alt+" for those.
+// modsLabel is "Ctrl+Alt+" for those, as keys.conf names them.
 func modsLabel(mods uint8) string {
 	var b strings.Builder
 	for _, m := range modNames {
@@ -328,14 +332,30 @@ func modsLabel(mods uint8) string {
 	return b.String()
 }
 
+// modsShown is mods as the hints say them: Mod is whichever the Mod key
+// is, and with Alt that, keys.conf's alt is the Win key.
+func modsShown(mods uint8) string {
+	var b strings.Builder
+	for _, m := range modNames {
+		if mods&m.bit != 0 {
+			l := m.label
+			if m.bit == modAlt && modIsAlt {
+				l = "Win"
+			}
+			b.WriteString(l + "+")
+		}
+	}
+	return b.String()
+}
+
 // modsList is mods as i3 names them: "ctrl", "shift", "mod1" (Alt),
-// "mod4" (Meta).
+// "mod4" (Mod).
 func modsList(mods uint8) []string {
 	ms := []string{}
 	for _, m := range []struct {
 		bit  uint8
 		name string
-	}{{modShift, "shift"}, {modCtrl, "ctrl"}, {modAlt, "mod1"}, {modMeta, "mod4"}} {
+	}{{modShift, "shift"}, {modCtrl, "ctrl"}, {modAlt, "mod1"}, {modMod, "mod4"}} {
 		if mods&m.bit != 0 {
 			ms = append(ms, m.name)
 		}
@@ -521,18 +541,18 @@ func (a *bro) keyModes() []string {
 
 func defaultKeysConf() string {
 	var b strings.Builder
-	b.WriteString(`# hellobro's keys. A line is a key and a command, "meta+1 workspace number 1",
+	b.WriteString(`# hellobro's keys. A line is a key and a command, "mod+1 workspace number 1",
 # a key and -, "f11 -": the key isn't ours then, a terminal gets it, or
 # none and a command, "none launcher": it has no key. A command named
 # here loses its default keys; the rest keep theirs. The window manager's
-# commands are i3's, any of them: "meta+t layout tabbed; focus parent".
+# commands are i3's, any of them: "mod+t layout tabbed; focus parent".
 # Settings, Keys, sets them too, and writes here.
 #
 # [name] starts a binding mode's keys (i3's "mode"): while it's on, only
 # those count. [default] goes back to the default's.
 #
-# Modifiers: ctrl shift alt meta (the Win key; Alt, with Settings' Mod key
-# Alt, and then alt is the Win key). Keys: a-z 0-9 f1-f12 tab
+# Modifiers: ctrl shift alt mod (the Win key; Alt, with Settings' Mod key
+# Alt, and then alt is the Win key; meta, as before, is mod). Keys: a-z 0-9 f1-f12 tab
 # space enter esc backspace up down left right pgup pgdn home end insert
 # delete, the marks (minus or -, = [ ] ; ' ` + "`" + ` \ , . /), brightnessup
 # brightnessdown, and any other by its Linux code: key183.
@@ -621,7 +641,7 @@ func (a *bro) applyFooter() {
 func (m keyMap) footer() string {
 	one, nine := m.keys["workspace number 1"], m.keys["workspace number 9"]
 	if len(one) > 0 && len(nine) > 0 && one[0].mods == nine[0].mods && one[0].code == kobo.Key1 && nine[0].code == kobo.Key1+8 {
-		return "workspaces: tap or " + modsLabel(swapMod(one[0].mods)) + "1–9"
+		return "workspaces: tap or " + modsShown(one[0].mods) + "1–9"
 	}
 	return "workspaces: tap"
 }
@@ -633,7 +653,7 @@ func (a *bro) mods() uint8 {
 	for _, x := range []struct {
 		on  bool
 		bit uint8
-	}{{m.ctrl, modCtrl}, {m.shift, modShift}, {m.alt, modAlt}, {m.meta, modMeta}} {
+	}{{m.ctrl, modCtrl}, {m.shift, modShift}, {m.alt, modAlt}, {m.meta, modMod}} {
 		if x.on {
 			b |= x.bit
 		}
@@ -700,7 +720,7 @@ func (a *bro) keyLabels(id string) string {
 }
 
 // reach is id's keys (the default mode's) that run it: not those another
-// command has first, which always can (keys.conf's "meta+left workspace
+// command has first, which always can (keys.conf's "mod+left workspace
 // prev" over focus left's default).
 func (m keyMap) reach(id string) []combo {
 	var ks []combo
@@ -713,8 +733,8 @@ func (m keyMap) reach(id string) []combo {
 	return ks
 }
 
-// keysOf is the first keys of ids, as one: "Meta+Left/Down/Up/Right"
-// where they differ in the key alone, "Meta+1…0" for more than four of
+// keysOf is the first keys of ids, as one: "Mod+Left/Down/Up/Right"
+// where they differ in the key alone, "Mod+1…0" for more than four of
 // those; or each, after commas.
 func (a *bro) keysOf(ids ...string) string {
 	var ks []string

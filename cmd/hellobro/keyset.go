@@ -81,7 +81,7 @@ func (a *bro) drawKeySet() {
 		def = "none"
 	}
 	c.Text(a.F.Small, image.Rect(in.Min.X, in.Min.Y+66, in.Max.X, in.Min.Y+106), "now: "+now+"   ·   by default: "+def, kobo.Dark, kobo.AlignLeft)
-	say := "Press the new key, with Ctrl, Alt or Meta (an F-key alone will do)."
+	say := "Press the new key, with Ctrl, Alt or Mod (an F-key alone will do)."
 	if k.note != "" {
 		say = k.note
 	}
@@ -117,7 +117,7 @@ func (a *bro) keySetKey(code uint16, value int32) {
 	case mods == 0 && code == keyDelete:
 		a.setKeys(k.c.id, nil, true)
 	case mods&^modShift == 0 && named && !isFKey(code):
-		k.note = combo{mods, code}.label() + " alone is for typing: with Ctrl, Alt or Meta, please."
+		k.note = combo{mods, code}.label() + " alone is for typing: with Ctrl, Alt or Mod, please."
 		a.drawKeySet()
 		return
 	default:
