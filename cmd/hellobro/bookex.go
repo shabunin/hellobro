@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"hellobro/book"
@@ -127,6 +128,17 @@ func (w *bookWin) exPage(a *bro, arg string) error {
 
 // exFind looks for word from the page on (:/ alone: the next one),
 // aside: a long book's chapters take a while to read.
+// newFind is the flag that stops a look about to start: set when
+// another starts, or the window closes. The look reads it away from
+// the loop.
+func (w *bookWin) newFind() *atomic.Bool {
+	if w.finding != nil {
+		w.finding.Store(true)
+	}
+	w.finding = new(atomic.Bool)
+	return w.finding
+}
+
 func (w *bookWin) exFind(a *bro, word string) error {
 	if w.pdf != nil {
 		return w.exFindPDF(a, word)
@@ -141,14 +153,13 @@ func (w *bookWin) exFind(a *bro, word string) error {
 		at.Off-- // the page's first word too
 	}
 	a.Notify("looking for " + word + "…")
-	b, gen := w.b, time.Now()
-	w.finding = gen
+	b, gen := w.b, w.newFind()
 	go func() {
 		t := time.Now()
-		s, pos, ok := b.Find(spine, at, word, func() bool { return w.gone || w.finding != gen })
+		s, pos, ok := b.Find(spine, at, word, gen.Load)
 		log.Printf("book: %q found %v in %v", word, ok, time.Since(t).Round(time.Millisecond))
 		a.Do(func() {
-			if w.gone || w.finding != gen {
+			if gen.Load() {
 				return
 			}
 			if !ok {
@@ -176,14 +187,13 @@ func (w *bookWin) exFindPDF(a *bro, word string) error {
 		word, from = w.found.text, w.found.spine+1
 	}
 	a.Notify("looking for " + word + "…")
-	d, n, gen := w.pdf, len(w.b.Spine), time.Now()
-	w.finding = gen
+	d, n, gen := w.pdf, len(w.b.Spine), w.newFind()
 	go func() {
 		t := time.Now()
-		page, ok := pdfFind(n, from, word, d.Text, func() bool { return w.gone || w.finding != gen })
+		page, ok := pdfFind(n, from, word, d.Text, gen.Load)
 		log.Printf("book: %q found %v in %v", word, ok, time.Since(t).Round(time.Millisecond))
 		a.Do(func() {
-			if w.gone || w.finding != gen {
+			if gen.Load() {
 				return
 			}
 			if !ok {

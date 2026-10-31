@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	xdraw "golang.org/x/image/draw"
@@ -198,17 +199,17 @@ type bookWin struct {
 	listN      int // the rows the list has room for
 	rows       []bookRow
 	shelf      []shelfBook
-	looking    bool      // the shelf is being looked for
-	shelfTab   int       // its tab: libRecent, libAll, libFolders
-	shelfDir   string    // the folder it shows, under booksRoot
-	back       string    // the book it was opened from, to go back to
-	named      string    // the name it was given, if it was (bookrename.go)
-	note       *bookNote // a link's target over the page (booknote.go)
-	from       *bookFrom // where a link was followed from
-	ex         *exLine   // a ":" command being typed (bookex.go)
-	found      *bookFind // the word looked for last
-	finding    time.Time // the look going on, if it's still wanted
-	edit       *noteEdit // a shelf's book's name being typed: key its path
+	looking    bool         // the shelf is being looked for
+	shelfTab   int          // its tab: libRecent, libAll, libFolders
+	shelfDir   string       // the folder it shows, under booksRoot
+	back       string       // the book it was opened from, to go back to
+	named      string       // the name it was given, if it was (bookrename.go)
+	note       *bookNote    // a link's target over the page (booknote.go)
+	from       *bookFrom    // where a link was followed from
+	ex         *exLine      // a ":" command being typed (bookex.go)
+	found      *bookFind    // the word looked for last
+	finding    *atomic.Bool // set, the look going on is no longer wanted
+	edit       *noteEdit    // a shelf's book's name being typed: key its path
 }
 
 func (w *bookWin) Title() string {
@@ -1217,6 +1218,9 @@ func (w *bookWin) closing(a *bro) {
 		a.vkAsk(false)
 	}
 	w.gone = true
+	if w.finding != nil {
+		w.finding.Store(true)
+	}
 	w.save(a)
 	if w.pdf != nil {
 		w.pdf.Close()
