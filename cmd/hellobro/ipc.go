@@ -219,8 +219,13 @@ func (a *bro) ipcDo(f func()) bool {
 }
 
 // ipcPut queues a message for c; one too slow to take it is dropped, the
-// loop never waits on it.
+// loop never waits on it. One dropped gets nothing more: an answer can
+// drop its own client (an event it sent filled the queue), and its out
+// is closed then.
 func (a *bro) ipcPut(c *ipcConn, typ uint32, payload []byte) {
+	if !a.ipc.conns[c] {
+		return
+	}
 	var b strings.Builder
 	ipcWrite(&b, typ, payload)
 	select {

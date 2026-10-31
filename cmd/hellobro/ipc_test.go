@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"image"
+	"net"
 	"strings"
 	"testing"
 
@@ -91,5 +92,21 @@ func TestMsgLine(t *testing.T) {
 		if got := msgLine(c.words); got != c.want {
 			t.Errorf("msgLine(%q) = %q, want %q", c.words, got, c.want)
 		}
+	}
+}
+
+// TestIPCDroppedByItsAnswer: a send_tick whose tick event fills the
+// client's queue drops it; the reply after must not go to its closed out.
+func TestIPCDroppedByItsAnswer(t *testing.T) {
+	a := &bro{}
+	a.ipc.conns = map[*ipcConn]bool{}
+	c, peer := net.Pipe()
+	defer peer.Close()
+	ic := &ipcConn{c: c, out: make(chan []byte, 1), events: map[string]bool{"tick": true}}
+	ic.out <- nil // full: the client reads nothing
+	a.ipc.conns[ic] = true
+	a.ipcPut(ic, ipcSendTick, a.ipcAnswer(ic, ipcSendTick, []byte("x")))
+	if a.ipc.conns[ic] {
+		t.Error("a client too slow kept")
 	}
 }
