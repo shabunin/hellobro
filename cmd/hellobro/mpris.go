@@ -17,13 +17,16 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
+	"path"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"golang.org/x/sys/unix"
 
 	"hellobro/kobo"
 )
@@ -148,13 +151,71 @@ func (a *bro) watchPlayers() {
 	}
 }
 
-// watchBus connects to a bus and has signals told when its players change.
-func watchBus(addr string, signals chan struct{}) (*dbus.Conn, error) {
-	conn, err := dbus.Connect(addr)
+// busTimeout is how long a bus has to answer, connecting: a jail's
+// listener that never does mustn't hold the watch up for good.
+const busTimeout = 3 * time.Second
+
+// dialBus dials addr: a session's bus by way of its jail's root (in
+// /proc), else a unix:path= as it is.
+func dialBus(addr string) (net.Conn, error) {
+	p, ok := strings.CutPrefix(addr, "unix:path=")
+	if !ok {
+		return nil, fmt.Errorf("%s: not a unix:path", addr)
+	}
+	if root, ok := strings.CutSuffix(p, jailBus); ok && strings.HasPrefix(root, "/proc/") {
+		return dialBusIn(root)
+	}
+	return net.DialTimeout("unix", p, busTimeout)
+}
+
+// dialBusIn dials the bus at jailBus under root, a jail's: got to a
+// directory at a time with no symlink followed, as one there (absolute)
+// would be the Kobo's path to us, any socket of the Kobo's.
+func dialBusIn(root string) (net.Conn, error) {
+	rfd, err := unix.Open(root, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
-	err = conn.AddMatchSignal(dbus.WithMatchObjectPath(mprisPath), dbus.WithMatchInterface("org.freedesktop.DBus.Properties"))
+	defer unix.Close(rfd)
+	dfd, err := dirIn(rfd, path.Dir(jailBus))
+	if err != nil {
+		return nil, err
+	}
+	defer unix.Close(dfd)
+	sfd, err := unix.Openat(dfd, path.Base(jailBus), unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer unix.Close(sfd)
+	var st unix.Stat_t
+	if err := unix.Fstat(sfd, &st); err != nil {
+		return nil, err
+	}
+	if st.Mode&unix.S_IFMT != unix.S_IFSOCK {
+		return nil, fmt.Errorf("%s: not a socket", jailBus)
+	}
+	return net.DialTimeout("unix", fmt.Sprintf("/proc/self/fd/%d", sfd), busTimeout)
+}
+
+// watchBus connects to a bus and has signals told when its players change.
+func watchBus(addr string, signals chan struct{}) (*dbus.Conn, error) {
+	nc, err := dialBus(addr)
+	if err != nil {
+		return nil, err
+	}
+	nc.SetDeadline(time.Now().Add(busTimeout)) // the handshake, the matches: a bus that doesn't answer fails them
+	conn, err := dbus.NewConn(nc)
+	if err != nil {
+		nc.Close()
+		return nil, err
+	}
+	err = conn.Auth(nil)
+	if err == nil {
+		err = conn.Hello()
+	}
+	if err == nil {
+		err = conn.AddMatchSignal(dbus.WithMatchObjectPath(mprisPath), dbus.WithMatchInterface("org.freedesktop.DBus.Properties"))
+	}
 	if err == nil {
 		err = conn.AddMatchSignal(dbus.WithMatchInterface("org.freedesktop.DBus"), dbus.WithMatchMember("NameOwnerChanged"),
 			dbus.WithMatchArg0Namespace("org.mpris.MediaPlayer2"))
@@ -163,6 +224,7 @@ func watchBus(addr string, signals chan struct{}) (*dbus.Conn, error) {
 		conn.Close()
 		return nil, err
 	}
+	nc.SetDeadline(time.Time{})
 	ch := make(chan *dbus.Signal, 16)
 	conn.Signal(ch) // closed with the connection
 	go func() {
