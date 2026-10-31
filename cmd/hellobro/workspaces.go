@@ -344,6 +344,9 @@ func (a *bro) drawThumbs() {
 			if tm, ok := w.(*termSession); ok && tm.connected() {
 				continue
 			}
+			if ws == cur && a.wm.thumbs[w] != nil { // kept from the screen as the tiles came up (keepShown): placed again, a book would drop its cut, its note
+				continue
+			}
 			p := a.panelFor(n, w, fs)
 			g, gui := w.(*guiWin)
 			if gui && ws != cur {
