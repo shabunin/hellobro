@@ -92,9 +92,8 @@ func (a *bro) paste(text, what string) {
 		a.updateTerm(t)
 	case t.connected():
 		a.clearSel()
-		// As xterm does: lines end in CR, as typed. Off the loop, as a
-		// big paste waits on the connection.
-		emu, s := t.emu, strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\r"), "\n", "\r")
+		// Off the loop, as a big paste waits on the connection.
+		emu, s := t.emu, pasteText(text)
 		go emu.Paste(s)
 	case t.state == termIdle && t.kind == kindSSH:
 		t.input += line
@@ -103,6 +102,23 @@ func (a *bro) paste(text, what string) {
 		return
 	}
 	a.Notify("pasted " + what)
+}
+
+// pasteText is text as it's typed in a paste, as xterm has it: lines end
+// in CR, and other control characters go (allowPasteControls off). An
+// ESC kept would let a clipboard a remote set (OSC 52) end the bracketed
+// paste early, "\e[201~rm -rf …\r", and type the rest as keys.
+func pasteText(text string) string {
+	text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\r"), "\n", "\r")
+	return strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\r' {
+			return r
+		}
+		if r < 0x20 || r >= 0x7f && r < 0xa0 {
+			return -1
+		}
+		return r
+	}, text)
 }
 
 // publicKey is the Kobo's public SSH key, made if there's none yet.

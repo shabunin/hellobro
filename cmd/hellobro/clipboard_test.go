@@ -54,3 +54,18 @@ func TestClipSummary(t *testing.T) {
 		}
 	}
 }
+
+func TestPasteText(t *testing.T) {
+	for in, want := range map[string]string{
+		"ls\n":                    "ls\r",
+		"a\r\nb\tc":               "a\rb\tc",
+		"\x1b[201~rm -rf /mnt\r":  "[201~rm -rf /mnt\r",
+		"x\x03y\x7fz\u009bw":      "xyzw",
+		"привет, bro ☕":           "привет, bro ☕",
+		"\x1b]52;c;YQ==\x07after": "]52;c;YQ==after",
+	} {
+		if got := pasteText(in); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+}
