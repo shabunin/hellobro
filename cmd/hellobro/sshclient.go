@@ -335,7 +335,10 @@ type sshSession struct {
 	stdout  io.Reader
 	lost    atomic.Bool // the keepalives went unanswered
 	done    chan struct{}
+	sizes   chan winSize // the last size asked for, not sent yet
 }
+
+type winSize struct{ cols, rows, w, h uint32 }
 
 // prompter asks the user something; echo=false for passwords.
 type prompter func(question string, echo bool) (string, error)
@@ -370,7 +373,7 @@ func dialSSH(h sshHost, o dialOpts) (*sshSession, string, error) {
 		return fail(fmt.Errorf("pty: %w", err))
 	}
 	sess.Setenv("LANG", "C.UTF-8") // most servers refuse it; harmless
-	s := &sshSession{client: client, session: sess, done: make(chan struct{})}
+	s := &sshSession{client: client, session: sess, done: make(chan struct{}), sizes: make(chan winSize, 1)}
 	if s.stdin, err = sess.StdinPipe(); err != nil {
 		return fail(err)
 	}
@@ -387,6 +390,7 @@ func dialSSH(h sshHost, o dialOpts) (*sshSession, string, error) {
 		return fail(fmt.Errorf("shell: %w", err))
 	}
 	go keepalive(client, s.done, &s.lost)
+	go s.sendSizes()
 	return s, typed, nil
 }
 
@@ -513,20 +517,43 @@ func (s *sshSession) Read(p []byte) (int, error)  { return s.stdout.Read(p) }
 func (s *sshSession) Write(p []byte) (int, error) { return s.stdin.Write(p) }
 
 // resize says the new size, in pixels too: x/crypto's WindowChange
-// leaves them 0, and programs that draw images want them.
+// leaves them 0, and programs that draw images want them. It's sent
+// away from the loop (a connection gone quiet blocks a write), the last
+// asked for winning. Only the loop calls it.
 func (s *sshSession) resize(cols, rows int, px image.Point) {
-	s.session.SendRequest("window-change", false, ssh.Marshal(struct{ Cols, Rows, W, H uint32 }{
-		uint32(cols), uint32(rows), uint32(px.X), uint32(px.Y)}))
+	select {
+	case <-s.sizes: // not sent yet: this one instead
+	default:
+	}
+	s.sizes <- winSize{uint32(cols), uint32(rows), uint32(px.X), uint32(px.Y)}
 }
 
+func (s *sshSession) sendSizes() {
+	for {
+		select {
+		case <-s.done:
+			return
+		case z := <-s.sizes:
+			s.session.SendRequest("window-change", false, ssh.Marshal(struct{ Cols, Rows, W, H uint32 }{z.cols, z.rows, z.w, z.h}))
+		}
+	}
+}
+
+// close hangs up, away from the loop: saying so to a server gone quiet
+// would block. The connection goes in 2 s whether it's said or not.
 func (s *sshSession) close() {
 	select {
 	case <-s.done:
+		return
 	default:
 		close(s.done)
 	}
-	s.session.Close()
-	s.client.Close()
+	go func() {
+		t := time.AfterFunc(2*time.Second, func() { s.client.Close() })
+		s.session.Close()
+		s.client.Close()
+		t.Stop()
+	}()
 }
 
 // ended says how the session ended, once its output did: a remote that
