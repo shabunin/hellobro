@@ -96,6 +96,10 @@ type termBackend interface {
 
 // termSession is one terminal: an SSH connection or a shell.
 type termSession struct {
+	// What the remote's output asks of the loop, the latest of each: a
+	// flood of bells or titles waits as one (latest).
+	newTitle, notice, clip latest[string]
+
 	kind   int
 	alpine bool   // a shell in the Alpine jail (alpine.go)
 	exec   string // what it runs there, if not a shell
@@ -1003,14 +1007,14 @@ func (a *bro) termStart(t *termSession, back termBackend, gen int) {
 	t.emu.SetScrollbackSize(1000)    // not shown; the default 10000 costs a big copy per line once full
 	t.emu.SetCallbacks(vt.Callbacks{ // they're called under t.mu, which the loop may want: not a.Do there
 		Title: func(s string) {
-			go a.Do(func() {
+			t.newTitle.put(a.Do, s, func(s string) {
 				t.title = s
 				if a.onScreen(t) {
 					a.drawTermStatus()
 				}
 			})
 		},
-		Bell: func() { go a.Do(func() { a.termNotify(t, "") }) },
+		Bell: func() { t.notice.put(a.Do, "", func(msg string) { a.termNotify(t, msg) }) },
 	})
 	t.kittyRegister(t.emu)
 	t.gfxRegister(t.emu)
@@ -1492,4 +1496,34 @@ func (a *bro) termSwipe(from, to image.Point) bool {
 		t.emu.SendMouse(uv.MouseWheelEvent(uv.Mouse{X: x, Y: y, Button: button}))
 	}
 	return true
+}
+
+// latest hands the loop a value, the last one put before the loop got to
+// it: puts while one waits only change what it gets. The emulator's
+// callbacks can come thousands a second (yes $'\a'), and a goroutine for
+// each, waiting on the loop, would grow till we ran out of memory.
+type latest[T any] struct {
+	mu     sync.Mutex
+	v      T
+	queued bool
+}
+
+func (l *latest[T]) put(do func(func()), v T, f func(T)) {
+	l.mu.Lock()
+	l.v = v
+	queued := l.queued
+	l.queued = true
+	l.mu.Unlock()
+	if queued {
+		return
+	}
+	go do(func() { f(l.take()) }) // not under the emulator's lock: the loop may want it
+}
+
+// take is the value put last, and lets the next put go to the loop.
+func (l *latest[T]) take() T {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.queued = false
+	return l.v
 }

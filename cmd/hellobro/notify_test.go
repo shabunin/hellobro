@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/vt"
 )
@@ -42,5 +45,27 @@ func TestEmulatorNotify(t *testing.T) {
 	emu.Write([]byte("hi\x1b]9;one\x07there\x1b]777;notify;two;three\x1b\\\x07"))
 	if len(got) != 2 || got[0] != "one" || got[1] != "two: three" || bells != 1 {
 		t.Errorf("got %q and %d bells", got, bells)
+	}
+}
+
+// TestLatest: a flood of puts while the loop is busy is one call, with
+// the last value; after it, the next put calls again.
+func TestLatest(t *testing.T) {
+	calls := make(chan func(), 100)
+	do := func(f func()) { calls <- f }
+	var l latest[string]
+	var got []string
+	for i := range 1000 {
+		l.put(do, fmt.Sprint(i), func(s string) { got = append(got, s) })
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := len(calls); n != 1 {
+		t.Fatalf("%d calls queued, want 1", n)
+	}
+	(<-calls)()
+	l.put(do, "again", func(s string) { got = append(got, s) })
+	(<-calls)()
+	if strings.Join(got, ",") != "999,again" {
+		t.Errorf("got %v", got)
 	}
 }

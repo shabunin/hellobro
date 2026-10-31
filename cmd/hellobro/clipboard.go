@@ -144,7 +144,7 @@ func (a *bro) osc52(t *termSession) func([]byte) bool {
 		if err != nil {
 			return true
 		}
-		go a.Do(func() { a.copyText(string(b), "") }) // not under the emulator's lock: the loop may want it
+		t.clip.put(a.Do, string(b), func(s string) { a.copyText(s, "") })
 		return true
 	}
 }

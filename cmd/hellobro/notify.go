@@ -23,7 +23,7 @@ const (
 func (a *bro) oscNotify(t *termSession) func([]byte) bool {
 	return func(data []byte) bool {
 		if msg, ok := parseNotify(string(data)); ok {
-			go a.Do(func() { a.termNotify(t, msg) }) // not under the emulator's lock: the loop may want it
+			t.notice.put(a.Do, msg, func(msg string) { a.termNotify(t, msg) })
 		}
 		return true
 	}
