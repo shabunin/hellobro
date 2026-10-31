@@ -210,11 +210,14 @@ func (w *bookWin) atEnd(d int) bool {
 	if d < 0 {
 		return w.spine == 0 && w.page == 0
 	}
-	last := len(w.pages) - 1
+	last, step := len(w.pages)-1, 1
 	if w.laid.two {
 		last -= last % 2
+		if w.pdf != nil { // its pages two at a time: the last two, or the last
+			step = 2
+		}
 	}
-	return w.spine == len(w.b.Spine)-1 && w.page >= last
+	return w.spine+step >= len(w.b.Spine) && w.page >= last
 }
 
 // drawBar lays the bar out and draws it: the select tool black while

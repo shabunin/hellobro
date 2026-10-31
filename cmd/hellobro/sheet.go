@@ -135,6 +135,7 @@ func bookKeys(pdf bool) [][2]string {
 		ks = append(turn, [][2]string{
 			{"+  −", "zoom in, out"},
 			{"o", "the pages, small"},
+			{"s", "the style: fit, margins, pages, the bar…"},
 		}...)
 	}
 	return append(ks, [][2]string{

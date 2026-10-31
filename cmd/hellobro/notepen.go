@@ -225,10 +225,11 @@ func (w *noteWin) optsTap(a *bro, p image.Point) bool {
 			w.changed = time.Now()
 		case noteWidthK[o.id] > 0:
 			a.mem.NoteWidth = o.id
+			a.mem.save()
 		default:
 			a.mem.NoteInk = o.id
+			a.mem.save()
 		}
-		a.mem.save()
 		w.place(a, w.p) // the tool's button says it
 		w.show(a)
 	}

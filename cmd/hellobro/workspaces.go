@@ -53,13 +53,11 @@ func (a *bro) wsCloseTap(ws *wm.Node) {
 	a.wm.wsClose = nil
 	ns := a.wm.tree.Find(func(o *wm.Node) bool { return o.Leaf() && wm.WorkspaceOf(o) == ws })
 	log.Printf("workspaces: closing %s, %d windows", ws.Name, len(ns))
-	a.picker = nil // put up again over what's left, in one go
-	for _, n := range ns {
-		if w := a.wm.wins[n]; w != nil {
-			a.closeWin(w)
-		}
+	for _, n := range ns { // all of them, then placed once, under the tiles: nothing drawn
+		wmHost{a}.Kill(n)
 	}
-	a.openWorkspaces()
+	a.wmApply()
+	a.openWorkspaces() // over what's left, the thumbs kept: the screen's still the tiles
 }
 
 // wsArmedFor says ws's × was tapped once, lately.

@@ -27,6 +27,11 @@ func TestPaperXopp(t *testing.T) {
 			t.Errorf("style %s: %q, want %q", style, got, want)
 		}
 	}
+	// lines-narrow, then graph in Xournal++: squares, the mark left behind
+	as := []xml.Attr{{Name: xml.Name{Local: "style"}, Value: "graph"}, {Name: xml.Name{Local: "hellobro-paper"}, Value: "lines-narrow"}}
+	if got := xoppPaper(as); got != "squares" {
+		t.Errorf("restyled: %q, want squares", got)
+	}
 }
 
 // The papers drawn: lines across from the margin down, squares across
@@ -48,10 +53,12 @@ func TestDrawPaper(t *testing.T) {
 		{"dots-narrow", []image.Point{{30, 90}, {60, 120}}, []image.Point{{45, 90}, {30, 100}}},
 	} {
 		m := kobo.Blank(size)
-		drawPaper(kobo.Canvas{Gray: m}, c.paper, size, image.Point{}, 1, m.Bounds(), 0x80)
+		drawPaper(kobo.Canvas{Gray: m}, c.paper, size, image.Point{}, 1, m.Bounds(), kobo.Light)
 		for _, p := range c.inked {
-			if m.GrayAt(p.X, p.Y).Y == 0xFF {
+			if y := m.GrayAt(p.X, p.Y).Y; y == 0xFF {
 				t.Errorf("%s: nothing at %v", c.paper, p)
+			} else if y < kobo.Mid { // the paper's light: the ink's what's dark
+				t.Errorf("%s: %#x at %v, darker than the paper's", c.paper, y, p)
 			}
 		}
 		for _, p := range c.blank {

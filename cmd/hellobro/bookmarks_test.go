@@ -110,3 +110,49 @@ func TestLaidOut(t *testing.T) {
 		t.Errorf("the anchor: page %d", w.page)
 	}
 }
+
+// TestAtEnd: the last page is the book's last chapter's, or with a
+// PDF's pages two side by side, the last two (or the last one alone).
+func TestAtEnd(t *testing.T) {
+	for _, c := range []struct {
+		name        string
+		spines, at  int
+		pages, page int
+		two, pdf    bool
+		first, last bool
+	}{
+		{"an epub's first", 3, 0, 4, 0, false, false, true, false},
+		{"an epub's last", 3, 2, 4, 3, false, false, false, true},
+		{"an epub's last chapter, not its last page", 3, 2, 4, 2, false, false, false, false},
+		{"an epub two: the last two", 3, 2, 4, 2, true, false, false, true},
+		{"a pdf's last", 10, 9, 1, 0, false, true, false, true},
+		{"a pdf two, even: 9-10", 10, 8, 1, 0, true, true, false, true},
+		{"a pdf two, even: 7-8", 10, 6, 1, 0, true, true, false, false},
+		{"a pdf two, odd: 11 alone", 11, 10, 1, 0, true, true, false, true},
+	} {
+		w := &bookWin{b: &book.Book{Spine: make([]string, c.spines)}, spine: c.at,
+			pages: make([]book.Page, c.pages), page: c.page}
+		w.laid.two = c.two
+		if c.pdf {
+			w.pdf = &pdf.Doc{}
+		}
+		if got := w.atEnd(-1); got != c.first {
+			t.Errorf("%s: at the start %v, want %v", c.name, got, c.first)
+		}
+		if got := w.atEnd(1); got != c.last {
+			t.Errorf("%s: at the end %v, want %v", c.name, got, c.last)
+		}
+	}
+}
+
+// TestListOpenEmpty: ↑ on a list with nothing in it (no bookmarks, a
+// PDF with no outline), then Enter: nothing, not a panic.
+func TestListOpenEmpty(t *testing.T) {
+	for _, mks := range []bool{true, false} {
+		w := &bookWin{path: "/b/x.pdf", b: &book.Book{Spine: make([]string, 3)}, list: true, listMks: mks, sel: -2}
+		w.listOpen(nil, w.sel)
+		if !w.list {
+			t.Errorf("marks %v: the list went", mks)
+		}
+	}
+}

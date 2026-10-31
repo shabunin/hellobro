@@ -544,6 +544,9 @@ func (a *bro) pickerHeld() {
 	case time.Since(g.At) >= pickHold:
 		p.held = nil
 		g.Ignored = "held on a tile" // no tap when it lifts
+		if p.heldN >= len(p.shown) || p.shown[p.heldN].hold == nil {
+			return // the menu narrowed, typed to, under the finger
+		}
 		e := p.shown[p.heldN]
 		a.unpick()
 		e.hold()

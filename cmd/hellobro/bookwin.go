@@ -667,6 +667,9 @@ func (w *bookWin) listLines() []string {
 }
 
 func (w *bookWin) listOpen(a *bro, i int) {
+	if i < 0 { // ↑ on an empty list: nothing drawn, so nothing kept the selection in it
+		return
+	}
 	if w.path == "" {
 		items := w.shelfItems()
 		switch {

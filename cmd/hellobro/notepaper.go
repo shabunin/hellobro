@@ -57,7 +57,7 @@ func drawPaper(c kobo.Canvas, paper string, size, at image.Point, k float64, cl 
 			c.Fill(image.Rect(at.X, y, px(size.X, at.X), y+1).Intersect(cl), ink)
 		}
 	case "dots":
-		d, ink := max(2, int(2.5*k+0.5)), ink*3/4 // a dot's side, and darker than a line: seen, not ink
+		d, ink := max(2, int(2.5*k+0.5)), uint8(int(ink)*3/4) // a dot's side, and darker than a line: seen, not ink
 		for v := notePaperTop; v < size.Y; v += rule {
 			y := px(v, at.Y) - d/2
 			if y+d < cl.Min.Y || y > cl.Max.Y {
@@ -75,11 +75,16 @@ func drawPaper(c kobo.Canvas, paper string, size, at image.Point, k float64, cl 
 var xoppStyles = map[string]string{"squares": "graph", "lines": "ruled", "plain": "plain", "dots": "dotted"}
 
 // xoppPaper is the paper a .xopp's background says, "" if none of ours.
+// The narrow mark counts while the style is still its kind's: changed
+// in Xournal++, the style's what it is now.
 func xoppPaper(as []xml.Attr) string {
+	kind := map[string]string{"graph": "squares", "ruled": "lines", "lined": "lines", "plain": "plain", "dotted": "dots"}[attr(as, "style")]
 	if p := attr(as, "hellobro-paper"); isPaper(p) {
-		return p
+		if k, _ := paperOf(p); k == kind {
+			return p
+		}
 	}
-	return map[string]string{"graph": "squares", "ruled": "lines", "lined": "lines", "plain": "plain", "dotted": "dots"}[attr(as, "style")]
+	return kind
 }
 
 // paperAttrs sets paper on a .xopp's background.
