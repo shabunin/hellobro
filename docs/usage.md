@@ -329,7 +329,7 @@ window). `[name]` starts a binding mode's keys, `[default]` goes back:
 pgup, pgdn, home, end, insert, delete, the marks (`- = [ ] ; ' , . /`,
 and `minus` for `-`), brightnessup and brightnessdown (a keyboard's
 light keys), and any other by its Linux code (`key183`), with any of
-ctrl, shift, alt and meta. Saved (over SFTP, say), it takes effect at
+ctrl, shift, alt and mod (meta works too). Saved (over SFTP, say), it takes effect at
 once; the log says what it didn't understand. The workspaces' corners,
 the hints and an empty workspace show the keys as they are. The ids of an older
 hellobro that have a match now are read as it (`tab.1` as `workspace
