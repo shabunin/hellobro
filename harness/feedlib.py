@@ -124,9 +124,9 @@ def mod(code, **kv): key(code, meta=True, **kv)       # Meta+key: the window man
 
 def fullscreen(): mod(KEY_F)                           # on and off
 # A fullscreen book's bar (toolbar.go), compact: ‹ All Books at the left,
-# then its pictures, each 64 wide and 10 apart: ☰ 0, Aa 1, the ribbon 2,
+# then its pictures, each 64 wide and 6 apart: ☰ 0, Aa 1, the ribbon 2,
 # and a PDF's select 3, − 4, 100% 5 (wider), + 6.
-def barbtn(k): return (193 + 74 * k, 36) if k < 5 else (577, 36) if k == 5 else (665, 36)
+def barbtn(k): return (189 + 70 * k, 36) if k < 5 else (553, 36) if k == 5 else (637, 36)
 F = lambda n: 58 + n                                  # F1..F10
 
 def power():

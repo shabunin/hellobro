@@ -67,8 +67,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
 - **Settings**: Wi-Fi and Bluetooth without going back to Nickel, and
   sharing: SFTP and SSH for a paired computer (`kobo.local`). Updates go
   over the air.
-- **Notebooks**: pages to write on with the pen, in a window: squared
-  paper, pens (fine to bold, gray, a marker), an eraser, undo; text
+- **Notebooks**: pages to write on with the pen, in a window: paper
+  plain, lined, squared or dotted (narrow too), pens (fine to bold, gray, a marker), an eraser, undo; text
   typed from a keyboard; a select
   tool to move, scale, turn, copy and duplicate strokes and pasted PDF
   clips; all the pages small, to add, copy, move and delete them; two

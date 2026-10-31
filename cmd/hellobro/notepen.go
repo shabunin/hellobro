@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"hellobro/kobo"
 )
@@ -105,11 +106,25 @@ func colorGray(c string, marker bool) uint8 {
 	return min(lum, 0xA0)
 }
 
-// layPenMenu lays the pen's choices under its button, or right of it
-// down the side; a row too long for the window goes on under.
-func (w *noteWin) layPenMenu(a *bro) {
-	w.penOpts = nil
-	i := slices.IndexFunc(w.btns, func(b barBtn) bool { return b.id == "pen" })
+// optGroups are a tool's choices, in groups: the pen's widths and inks,
+// the papers.
+func optGroups(tool string) [][]string {
+	if tool == "paper" {
+		return [][]string{strings.Fields(notePapers)}
+	}
+	return [][]string{noteWidths, noteInks}
+}
+
+// layOpts lays the choices of the tool w.optsOf says (the pen's, the
+// paper's) under its button, or right of it down the side; a row too
+// long for the window goes on under.
+func (w *noteWin) layOpts(a *bro) {
+	w.opts = nil
+	tool := w.optsOf
+	if tool == "" {
+		tool = "pen" // laid out anyway: the tests', and a tap's
+	}
+	i := slices.IndexFunc(w.btns, func(b barBtn) bool { return b.id == tool })
 	if i < 0 {
 		return
 	}
@@ -119,82 +134,125 @@ func (w *noteWin) layPenMenu(a *bro) {
 		x0, y = w.bar.Max.X+10, pen.Min.Y
 	}
 	end := w.paperArea().Max.X - 8
+	width := func(o string) int {
+		if tool == "paper" { // its picture, then its words
+			return h + kobo.TextWidth(a.F.Small, paperWords[o]) + 20
+		}
+		return max(kobo.TextWidth(a.F.Small, o)+36, h+8)
+	}
+	all := 0
+	for gi, group := range optGroups(tool) {
+		all += 24 * min(gi, 1)
+		for _, o := range group {
+			all += width(o) + 8
+		}
+	}
+	if x0+all > end && !w.side { // further left, to be one row if the window's wide enough
+		x0 = max(w.paperArea().Min.X+8, end-all)
+	}
 	x := x0
-	for gi, group := range [][]string{noteWidths, noteInks} {
+	for gi, group := range optGroups(tool) {
 		if gi > 0 {
 			x += 24
 		}
 		for _, o := range group {
-			wd := max(kobo.TextWidth(a.F.Small, o)+36, h+8)
+			label := o
+			if tool == "paper" {
+				label = paperWords[o]
+			}
+			wd := width(o)
 			if x+wd > end && x > x0 {
 				x, y = x0, y+h+8
 			}
 			r := image.Rect(x, y, x+wd, y+h)
-			w.penOpts = append(w.penOpts, barBtn{id: o, label: o, r: r})
+			w.opts = append(w.opts, barBtn{id: o, label: label, r: r})
 			x = r.Max.X + 8
 		}
 	}
 }
 
-// penMenuRect is where the pen's choices are, with their frame.
-func (w *noteWin) penMenuRect() image.Rectangle {
-	if !w.penMenu || len(w.penOpts) == 0 {
+// optsRect is where the choices are, with their frame, if they're out.
+func (w *noteWin) optsRect() image.Rectangle {
+	if w.optsOf == "" || len(w.opts) == 0 {
 		return image.Rectangle{}
 	}
-	r := w.penOpts[0].r
-	for _, o := range w.penOpts {
+	r := w.opts[0].r
+	for _, o := range w.opts {
 		r = r.Union(o.r)
 	}
 	return r.Inset(-8).Intersect(w.paperArea())
 }
 
-// drawPenMenu draws them, the chosen black, if it's open and in clip.
-func (w *noteWin) drawPenMenu(a *bro, clip image.Rectangle) {
-	m := w.penMenuRect()
+// drawOpts draws them, the chosen black, if they're out and in clip; a
+// paper's on itself.
+func (w *noteWin) drawOpts(a *bro, clip image.Rectangle) {
+	m := w.optsRect()
 	if m.Empty() || !m.Overlaps(clip) {
 		return
 	}
 	c := a.C
 	c.Fill(m, kobo.White)
 	c.Frame(m, 2, kobo.Black)
-	for _, o := range w.penOpts {
+	for _, o := range w.opts {
 		bg, ink := uint8(kobo.White), uint8(kobo.Black)
-		if o.id == a.penWidth() || o.id == a.penInk() {
+		if o.id == a.penWidth() || o.id == a.penInk() || o.id == w.nb.paper {
 			bg, ink = kobo.Black, kobo.White
 		}
 		c.Fill(o.r, bg)
 		c.Frame(o.r, 2, kobo.Black)
+		if w.optsOf == "paper" { // its picture, then its words
+			pic := image.Rect(o.r.Min.X, o.r.Min.Y, o.r.Min.X+o.r.Dy(), o.r.Max.Y)
+			drawIcon(c, paperIcon(o.id), pic, ink, bg)
+			c.Text(a.F.Small, image.Rect(pic.Max.X, o.r.Min.Y, o.r.Max.X-8, o.r.Max.Y), o.label, ink, kobo.AlignLeft)
+			continue
+		}
 		c.Text(a.F.Small, o.r, o.label, ink, kobo.AlignCenter)
 	}
 }
 
-// penMenuTap takes a tap on the pen's choices; false if it's not on them.
-func (w *noteWin) penMenuTap(a *bro, p image.Point) bool {
-	if !p.In(w.penMenuRect()) {
+// optsTap takes a tap on the choices; false if it's not on them.
+func (w *noteWin) optsTap(a *bro, p image.Point) bool {
+	if !p.In(w.optsRect()) {
 		return false
 	}
-	for _, o := range w.penOpts {
+	for _, o := range w.opts {
 		if !kobo.Hit(p, o.r) {
 			continue
 		}
-		if _, ok := noteWidthK[o.id]; ok {
+		switch {
+		case w.optsOf == "paper":
+			w.nb.paper = o.id
+			w.changed = time.Now()
+		case noteWidthK[o.id] > 0:
 			a.mem.NoteWidth = o.id
-		} else {
+		default:
 			a.mem.NoteInk = o.id
 		}
 		a.mem.save()
-		w.place(a, w.p) // the pen's button says it
+		w.place(a, w.p) // the tool's button says it
 		w.show(a)
 	}
 	return true
 }
 
-// closePenMenu puts the pen's choices away, if they're out.
-func (w *noteWin) closePenMenu(a *bro) {
-	if !w.penMenu {
+// toggleOpts puts tool's choices out, or away if they're out.
+func (w *noteWin) toggleOpts(a *bro, tool string) {
+	if w.optsOf == tool {
+		w.closeOpts(a)
 		return
 	}
-	r := w.penMenuRect()
-	w.penMenu = false
+	w.closeOpts(a)
+	w.optsOf = tool
+	w.layOpts(a)
+	w.show(a)
+}
+
+// closeOpts puts the choices away, if they're out.
+func (w *noteWin) closeOpts(a *bro) {
+	if w.optsOf == "" {
+		return
+	}
+	r := w.optsRect()
+	w.optsOf = ""
 	w.redraw(a, r)
 }

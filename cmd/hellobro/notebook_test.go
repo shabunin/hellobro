@@ -378,7 +378,7 @@ func TestNoteBarFits(t *testing.T) {
 		for _, ht := range []int{500, 1700} {
 			for wd := 300; wd <= 1400; wd += 25 {
 				for _, ov := range []bool{false, true} {
-					w := &noteWin{nb: &notebook{pages: [][]*noteStroke{nil}}, overview: ov, penMenu: true}
+					w := &noteWin{nb: &notebook{pages: [][]*noteStroke{nil}}, overview: ov, optsOf: "pen"}
 					body := image.Rect(0, 0, wd, ht)
 					w.place(a, kobo.Panel{Outer: body, Body: body})
 					at := fmt.Sprintf("%dx%d (big %v, overview %v, side %v)", wd, ht, big, ov, w.side)
@@ -407,7 +407,7 @@ func TestNoteBarFits(t *testing.T) {
 							t.Errorf("%s: a page at %v, not beside the strip %v", at, s, w.bar)
 						}
 					}
-					for _, o := range w.penOpts {
+					for _, o := range w.opts {
 						if o.r.Max.X > w.paperArea().Max.X || o.r.Overlaps(w.bar) {
 							t.Errorf("%s: the pen's %s at %v, out of %v", at, o.id, o.r, w.paperArea())
 						}

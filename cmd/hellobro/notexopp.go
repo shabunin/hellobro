@@ -90,8 +90,6 @@ func setAttr(as []xml.Attr, name, v string) []xml.Attr {
 	return append(as, xml.Attr{Name: xml.Name{Local: name}, Value: v})
 }
 
-var xoppPapers = map[string]string{"graph": "squares", "ruled": "lines", "lined": "lines", "plain": "plain"}
-
 // parseXopp reads a .xopp, gzipped or not.
 func parseXopp(name string, r io.Reader) (*notebook, error) {
 	br := bufio.NewReader(r)
@@ -112,8 +110,8 @@ func parseXopp(name string, r io.Reader) (*notebook, error) {
 	nb := &notebook{name: name, paper: "squares", attrs: doc.Attrs}
 	for i, xp := range doc.Pages {
 		pg := notePage{w: xp.Width, h: xp.Height, bg: xp.Background}
-		if bg := xp.Background; i == 0 && bg != nil && xoppPapers[attr(bg.Attrs, "style")] != "" {
-			nb.paper = xoppPapers[attr(bg.Attrs, "style")]
+		if bg := xp.Background; i == 0 && bg != nil && xoppPaper(bg.Attrs) != "" { // notepaper.go
+			nb.paper = xoppPaper(bg.Attrs)
 		}
 		var strokes []*noteStroke
 		for _, l := range xp.Layers {
@@ -221,7 +219,6 @@ func (nb *notebook) xoppText() []byte {
 	for n > 1 && blank(n-1) {
 		n--
 	}
-	style := map[string]string{"squares": "graph", "lines": "ruled", "plain": "plain"}[nb.paper]
 	for i, strokes := range nb.pages[:n] {
 		pg := defaultMeta()
 		if i < len(nb.meta) {
@@ -234,7 +231,7 @@ func (nb *notebook) xoppText() []byte {
 			bg.Attrs = append([]xml.Attr(nil), bg.Attrs...)
 		}
 		if t := attr(bg.Attrs, "type"); t == "" || t == "solid" { // a PDF's or a picture's stays as it is
-			bg.Attrs = setAttr(bg.Attrs, "style", style)
+			bg.Attrs = paperAttrs(bg.Attrs, nb.paper)
 		}
 		layer := xoppLayer{Rest: pg.extra}
 		for _, s := range strokes {

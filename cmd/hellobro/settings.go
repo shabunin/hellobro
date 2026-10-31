@@ -29,6 +29,7 @@ type setting struct {
 	key, label, cmd string
 	title           string // in the switcher, if not the label
 	group           string // a heading in the panel, before the first of each
+	app             string // an app's own ("notebook": notesettings.go): not in the panel, nor the switcher
 	values          []string
 	shown           []string
 }
@@ -60,7 +61,7 @@ var settingList = []setting{
 	{key: "touch-marks", group: "Touch", label: "Touch marks",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "a ring where it touched, a dot where it lifted, for 3 s"}},
-	{key: "note-finger", label: "A finger in a notebook",
+	{key: "note-finger", app: "notebook", label: "A finger in a notebook",
 		values: []string{"auto", "writes", "turns"},
 		shown:  []string{"writes, till a pen has: then it turns pages", "writes, as the pen does", "turns pages: only the pen writes"}},
 	{key: "edge-swipe", label: "Workspaces by touch",
@@ -69,7 +70,7 @@ var settingList = []setting{
 	{key: "touch-size", label: "Sizes", title: "Sizes: for fingers or compact",
 		values: []string{"fingers", "compact"},
 		shown:  []string{"for fingers: taller strips, rows and buttons", "compact: more on the screen"}},
-	{key: "note-export", group: "Notebooks", label: "Notebook export",
+	{key: "note-export", app: "notebook", label: "Notebook export",
 		values: []string{"ask", "pdf", "png"},
 		shown:  []string{"asks: a PDF of the pages, or a PNG of the page shown", "a PDF of the pages", "a PNG of the page shown"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
@@ -124,6 +125,9 @@ type setLine struct {
 var settingLines = func() []setLine {
 	var ls []setLine
 	for i, st := range settingList {
+		if st.app != "" {
+			continue
+		}
 		if st.group != "" {
 			ls = append(ls, setLine{head: st.group, i: -1})
 		}
@@ -159,6 +163,9 @@ var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2}
 func settingCommands() []*command {
 	var cs []*command
 	for i, st := range settingList {
+		if st.app != "" {
+			continue
+		}
 		switch st.key {
 		case "share", "relay", "bar", "tabs", "keys":
 			continue

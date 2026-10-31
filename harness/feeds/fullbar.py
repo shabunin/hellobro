@@ -2,9 +2,9 @@
 # say: HELLOBRO_BOOKS shelf2's a.pdf then pooh.epub. The PDF fullscreen:
 # no bar (the default), a tap at the top for its contents; s, its style
 # panel's Bar, fullscreen flipped: the bar. The EPUB fullscreen: its
-# bar, and its style panel's row. A new notebook fullscreen: its bar; its settings (the sliders)
-# put up, the bar flipped there, Esc: no bar; fullscreen off: the bar
-# again. snap.txt says which snapshot is which.
+# bar, and its style panel's row. A new notebook fullscreen: its bar;
+# its settings (the sliders) shown, the bar flipped there, Esc: no bar;
+# fullscreen off: the bar again. snap.txt says which snapshot is which.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -54,8 +54,8 @@ fullscreen(); time.sleep(4)
 mod(3); time.sleep(2)
 gui("notebook"); time.sleep(5)
 fullscreen(); time.sleep(5); note("notebook fullscreen")
-tap(*buttons(0, 60)[8]); time.sleep(4); note("notebook menu")  # ‹ All Notebooks, pen, …, paste, settings
-key(DOWN); time.sleep(1); key(ENTER); time.sleep(4); note("menu: bar hidden")
+tap(*buttons(0, 60)[10]); time.sleep(4); note("notebook settings")  # ‹ All Notebooks, pen, …, paper, export, settings
+key(DOWN); key(DOWN); time.sleep(1); key(ENTER); time.sleep(4); note("settings: bar hidden")
 key(ESC); time.sleep(5); note("notebook, no bar")
 fullscreen(); time.sleep(5); note("notebook, a window")
 exit_app()

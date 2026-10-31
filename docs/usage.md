@@ -850,8 +850,9 @@ and the last two written.
 
 Its buttons are pictures (below by their names): the pen, an eraser,
 a dotted rectangle (select), a T (text), arrows round (undo, redo), a clipboard
-(paste), sliders (its settings), a tray with an arrow out (export). Under the pen, a line as it writes: its width,
-its gray.
+(paste), a page as its paper is (paper), a tray with an arrow out
+(export), sliders (settings). Under the pen, a line as it writes: its
+width, its gray.
 
 - The pen writes; a heavier hand, a thicker line. **eraser** (or E)
   takes off each stroke the pen goes over; **pen** (or P) is back to
@@ -871,10 +872,20 @@ its gray.
   the eraser leaves it, as in Xournal++, where it's a text as its own
   are (14 pt; theirs show here too, at their size) and can be edited.
 - **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y).
-- **settings** (the sliders) puts up the notebook's own: **Paper**,
-  squares, lines or plain, for the whole notebook (`:paper` too), and
-  **Bar, fullscreen**, shown or hidden (every notebook). A tap or Enter
-  changes one, the menu staying up; Esc puts it away.
+- **paper** is a tool too: tap it for the papers, under it, each with
+  its picture: **plain**, **lines**, **squares**, **dots**, and each of
+  the three **narrow** (3.3 mm apart, not 5). A tap makes it the
+  notebook's, every page's (`:paper dots-narrow` too); its button shows
+  which; tap it again, or the page, to put them away. In Xournal++ they're
+  its ruled, graph and dotted backgrounds (the narrow ones as wide as
+  its own, marked so hellobro knows them again); the PDF and PNG export
+  them as on the screen.
+- **settings** (the sliders, or `:settings`) shows the notebooks'
+  settings over the window, with the books' header: ‹ All Notebooks,
+  **Settings**, **back to the notebook** (or Esc, q). **A finger**
+  (below), **Export** (below), **Bar, fullscreen** (below): a tap on a
+  value, or ↑ ↓ and Enter, ← →, steps it. They're the notebooks' own:
+  the app's Settings don't have them.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
   last page, if it has something on it, a new page. Once a pen has
   written (or as the settings say, below), a finger swiped across the page turns it too (leftward: the
@@ -892,8 +903,8 @@ its gray.
   or O, goes back to the page.
 - Till then fingers write: a stylus without a battery (or a Kobo Stylus
   with a flat one) is a finger to the screen. A pen seen once is
-  remembered (`pen` in `hellobro.json`). Settings, Touch, **A finger
-  in a notebook** chooses instead: **writes** (fingers always write, as
+  remembered (`pen` in `hellobro.json`). The notebook's settings, **A
+  finger**, chooses instead: **writes** (fingers always write, as
   the pen does) or **turns** (fingers only turn pages, so a hand resting
   on the screen writes nothing; only the pen writes). Near the left and
   right edges a finger writes nothing: those are the light's and the
@@ -902,7 +913,7 @@ its gray.
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
   writing on the second makes it a page.
-- Fullscreen, a notebook keeps its bar. **settings**, **Bar,
+- Fullscreen, a notebook keeps its bar. Its settings' **Bar,
   fullscreen**, hidden, leaves the page all of the screen: the pen
   writes, keys do the rest (the pages, small, keep it).
 - **select** (or S) takes what's written, and pictures, to change
@@ -946,8 +957,8 @@ its gray.
   the ink, if the PDF is where the `.xopp` says (blank a moment the
   first time: MuPDF takes most of a second a page).
 - **export** (or Ctrl+E) asks: **PDF** of the pages (lit: Enter or a
-  tap), **PNG** of the page shown (n), or cancel. Settings, **Notebook
-  export** can make it always the one without asking; `:export pdf` and
+  tap), **PNG** of the page shown (n), or cancel. The notebook's
+  settings, **Export**, can make it always the one without asking; `:export pdf` and
   `:export png` don't ask either. The PDF is the notebook next to its
   `.xopp`, `Notebooks/NAME DATE TIME.pdf` (each export its own, as
   `2026-10-30 14.05.07`): a picture of each page at 200 dpi, gray, to
@@ -982,7 +993,8 @@ and **?** its sheet of keys and commands too.
 | `:3`, `:p 3` | page 3 |
 | `:new`, `:copy`, `:delete`, `:clear` | a page after this one, a copy of it, this one gone, cleared (all undone with Ctrl+Z) |
 | `:pen`, `:eraser`, `:select`, `:text`, `:u`, `:redo` | the tools; undo, redo |
-| `:paper lines` | squares, lines or plain |
+| `:paper lines` | plain, lines, squares, dots, or one of them `-narrow` |
+| `:settings` | the notebook's settings |
 | `:o` | the pages' view, on or off |
 | `:w`, `:export [pdf\|png]` | written now; the export (asks, unless said) |
 | `:e NAME` | another notebook here: its name, or the one it begins; none so named, a new one beside this |

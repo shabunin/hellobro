@@ -272,17 +272,8 @@ func renderNotePage(pg exportPage, paper string, doc *pdf.Doc, dpi float64) (*im
 			return nil, err
 		}
 		kobo.CopyGray(m, bg.Bounds().Intersect(m.Bounds()), bg, image.Point{})
-	case paper == "squares" || paper == "lines":
-		if paper == "squares" {
-			for u := noteRule; u < pg.size.X; u += noteRule {
-				x := int(float64(u) * k)
-				c.Fill(image.Rect(x, 0, x+1, px.Y), noteExportRule)
-			}
-		}
-		for u := 2 * noteRule; u < pg.size.Y; u += noteRule {
-			y := int(float64(u) * k)
-			c.Fill(image.Rect(0, y, px.X, y+1), noteExportRule)
-		}
+	default:
+		drawPaper(c, paper, pg.size, image.Point{}, k, m.Bounds(), noteExportRule)
 	}
 	at := func(x, y int16) image.Point { return image.Pt(int(float64(x)*k+0.5), int(float64(y)*k+0.5)) }
 	for l := range 3 {

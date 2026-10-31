@@ -17,7 +17,7 @@ type barBtn struct {
 	r         image.Rectangle
 }
 
-const barGap = 10 // between the bar's buttons
+const barGap = 6 // between the bar's buttons
 
 // barHeight is the bar's (sizes: bigger for fingers).
 func barHeight() int {

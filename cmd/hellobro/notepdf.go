@@ -182,18 +182,8 @@ func (w *noteWin) drawPage(a *bro, n int, pg, cl image.Rectangle, lines bool) {
 			c.Fill(cl, kobo.White)
 			kobo.CopyGray(c.Gray, cl.Intersect(m.Bounds().Add(pg.Min)), m, cl.Min.Sub(pg.Min))
 		}
-	case !lines:
-	case w.nb.paper == "squares" || w.nb.paper == "lines":
-		if w.nb.paper == "squares" {
-			for u := noteRule; u < size.X; u += noteRule {
-				x := pg.Min.X + int(float64(u)*w.scale)
-				c.Fill(image.Rect(x, pg.Min.Y, x+1, pg.Max.Y).Intersect(cl), kobo.Light)
-			}
-		}
-		for u := 2 * noteRule; u < size.Y; u += noteRule {
-			y := pg.Min.Y + int(float64(u)*w.scale)
-			c.Fill(image.Rect(pg.Min.X, y, pg.Max.X, y+1).Intersect(cl), kobo.Light)
-		}
+	case lines:
+		drawPaper(c, w.nb.paper, size, pg.Min, w.scale, cl, kobo.Light) // notepaper.go
 	}
 	for l := range 3 {
 		for _, s := range w.strokes(n) {

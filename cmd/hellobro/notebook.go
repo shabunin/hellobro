@@ -54,7 +54,6 @@ const (
 	noteExt              = ".xopp"
 	noteOldExt           = ".hbnote"
 	noteDepth            = 4 // folders in folders, at most
-	notePapers           = "squares lines plain"
 
 	ownInk  = 7 // the pen writing or erasing in a notebook
 	ownLeaf = 8 // a finger on a notebook's page: maybe turning it
@@ -134,7 +133,7 @@ func parseHbnote(name string, r io.Reader) (*notebook, error) {
 		word, rest, _ := strings.Cut(sc.Text(), " ")
 		switch word {
 		case "paper":
-			if strings.Contains(notePapers, rest) && rest != "" {
+			if isPaper(rest) {
 				nb.paper = rest
 			}
 		case "page":
@@ -386,8 +385,11 @@ type noteWin struct {
 	sel        []*noteStroke // what it's taken, on selPage
 	selPage    int
 	mark       *noteMark // where the next paste goes
-	penMenu    bool      // the pen's choices out (notepen.go)
-	penOpts    []barBtn
+	optsOf     string    // whose choices are out, under its button: "pen", "paper", "" none (notepen.go)
+	opts       []barBtn
+	settings   bool // its settings shown, over it (notesettings.go)
+	setSel     int  // the row in focus there
+	setRows    []bookRow
 	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
 	slotSize   image.Point // the page size the slots are for
 	exporting  bool        // a PDF of it being written (noteexport.go)
@@ -526,34 +528,8 @@ func barTools(overview bool) (tools []barBtn, drops []string) {
 		return []barBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}},
 			[]string{"undo", "copy page", "new before"}
 	}
-	return []barBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "settings"}, {id: "export"}},
-		[]string{"settings", "export", "redo", "paste"}
-}
-
-// nextPaper turns the notebook's paper to the next kind.
-func (w *noteWin) nextPaper(a *bro) {
-	ps := strings.Fields(notePapers)
-	w.nb.paper = ps[(slices.Index(ps, w.nb.paper)+1)%len(ps)]
-	w.changed = time.Now()
-	w.place(a, w.p) // its button says another word
-	w.show(a)
-}
-
-// openMenu puts up the notebooks' own settings, over the page: this
-// one's paper, and the bar fullscreen. A tap or Enter changes one, the
-// menu staying up.
-func (w *noteWin) openMenu(a *bro) {
-	es := func() []pickEntry {
-		return []pickEntry{
-			{kind: "this one", title: "Paper", detail: w.nb.paper, stay: true, do: func() { w.nextPaper(a) }},
-			{kind: "all", title: "Bar, fullscreen", detail: fullBarWord(a.fullBar("note")), stay: true, do: func() {
-				a.flipFullBar("note")
-				w.place(a, w.p)
-				w.show(a)
-			}},
-		}
-	}
-	a.showPicker(&picker{title: "Notebook", hint: "Enter or a tap changes it · Esc closes", all: es(), entries: es})
+	return []barBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}, {id: "settings"}},
+		[]string{"export", "redo", "paste", "settings"}
 }
 
 // barNeed is how wide tools are along the top.
@@ -579,11 +555,11 @@ func (w *noteWin) layBar(a *bro) {
 	pages := []barBtn{{id: "prev"}, {id: "next"}}
 	if w.side {
 		w.laySide(a, tools, drops, pages)
-		w.layPenMenu(a)
+		w.layOpts(a)
 		return
 	}
 	w.btns = layTop(a, w.bar, tools, drops, w.barCounter(a))
-	w.layPenMenu(a)
+	w.layOpts(a)
 }
 
 // laySide lays the tools down the strip along the left, one under
@@ -629,9 +605,14 @@ func (w *noteWin) draw(a *bro) {
 	if w.p.Outer.Empty() {
 		return
 	}
-	w.fitSlots(a)
 	pn := w.panel(a)
 	a.DrawPanel(pn, "")
+	if w.settings { // notesettings.go
+		w.drawSettings(a)
+		a.Mark(pn.Outer, true)
+		return
+	}
+	w.fitSlots(a)
 	w.drawBar(a)
 	w.drawPages(a, w.paperArea())
 	if w.ex != nil {
@@ -659,7 +640,12 @@ func (w *noteWin) drawBar(a *bro) {
 		if b.id == "clear" && w.clearAsking() {
 			b.label, on, off = "tap again", true, false
 		}
+		on = on || b.id == w.optsOf && b.id == "paper"
 		ink, bg := drawBarBtn(a, b, on, off, func(r image.Rectangle, ink, bg uint8) bool {
+			if b.id == "paper" { // a page as the paper is
+				drawIcon(a.C, paperIcon(w.nb.paper), r, ink, bg)
+				return true
+			}
 			if icon := noteIcon(b.id); icon != nil {
 				drawIcon(a.C, icon, r, ink, bg)
 				return true
@@ -698,7 +684,7 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 		}
 	}
 	w.drawSel(a, clip)
-	w.drawPenMenu(a, clip)
+	w.drawOpts(a, clip)
 }
 
 // strokeLayer is which s is drawn with: the pictures under the
@@ -757,9 +743,14 @@ func (w *noteWin) show(a *bro) {
 	if !a.shows(w) {
 		return
 	}
+	if w.settings {
+		w.drawSettings(a)
+		a.Mark(w.p.Body, true)
+		return
+	}
 	w.fitSlots(a)
 	w.drawBar(a)
-	w.drawPages(a, w.paperArea()) // the pen's choices too, by the pages
+	w.drawPages(a, w.paperArea()) // the tools' choices too, by the pages
 	if w.ex != nil {
 		a.drawEx(a.exStrip(w.p.Body), w.ex, w.exCmds(a))
 	}
@@ -869,6 +860,10 @@ func (w *noteWin) showBar(a *bro) {
 }
 
 func (w *noteWin) tap(a *bro, p image.Point) {
+	if w.settings {
+		w.settingsTap(a, p)
+		return
+	}
 	w.endTyping(a)
 	if w.ex != nil { // a tap leaves the line
 		w.ex = nil
@@ -892,12 +887,13 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 			a.notesFrom(w)
 		case "pen", "eraser", "select", "text":
 			if b.id == "pen" && !w.erasing && !w.selecting && !w.texting { // in hand: its choices
-				w.penMenu = !w.penMenu
-				w.show(a)
+				w.toggleOpts(a, "pen")
 				break
 			}
-			w.closePenMenu(a)
+			w.closeOpts(a)
 			w.setTool(a, b.id)
+		case "paper":
+			w.toggleOpts(a, "paper")
 		case "undo", "redo":
 			w.doUndo(a, b.id == "undo")
 		case "clear":
@@ -920,7 +916,7 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 			w.clearUnask(a)
 			w.pageAct(a, "clear")
 		case "settings":
-			w.openMenu(a)
+			w.settingsOn(a, true)
 		case "paste":
 			w.paste(a)
 		case "export":
@@ -956,6 +952,9 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
 	if w.typing != nil && w.typeKey(a, code, ch) {
 		return true
+	}
+	if w.settings && w.ex == nil { // its keys, and none of the page's
+		return w.settingsKey(a, code, ch) || !m.ctrl
 	}
 	if e := w.ex; e != nil {
 		done, ok := exKey(e, code, ch)
@@ -1097,12 +1096,15 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if !ok || !a.shows(w) {
 		return false
 	}
-	if w.penMenu { // its choices: by the edge too
-		if w.penMenuTap(a, p) {
+	if w.settings { // its settings: taps, the window's (tap)
+		return false
+	}
+	if w.optsOf != "" { // a tool's choices: by the edge too
+		if w.optsTap(a, p) {
 			g.Owner = ownLeaf
 			return true
 		}
-		w.closePenMenu(a)
+		w.closeOpts(a)
 	}
 	if p.In(w.paperArea()) {
 		w.clearUnask(a)

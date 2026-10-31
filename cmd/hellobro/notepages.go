@@ -108,7 +108,7 @@ func (w *noteWin) ovShow() {
 // overviewOn shows the pages small, or the page again.
 func (w *noteWin) overviewOn(a *bro, on bool) {
 	w.endTyping(a)
-	w.overview, w.penMenu, w.sel, w.mark = on, false, nil, nil
+	w.overview, w.optsOf, w.sel, w.mark = on, "", nil, nil
 	if on {
 		w.ovSel = min(w.cur, len(w.nb.pages)-1)
 		w.ovShow()
