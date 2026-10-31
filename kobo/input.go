@@ -5,6 +5,7 @@ package kobo
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -181,13 +182,93 @@ func openTouch(d inputDev) (*touchDevice, error) {
 
 // absInfo wraps EVIOCGABS. A zero range means the query failed.
 func absInfo(f *os.File, code int) absRange {
-	var info [6]int32                                                           // value, minimum, maximum, fuzz, flat, resolution
-	req := uintptr(2<<30|'E'<<8) | unsafe.Sizeof(info)<<16 | uintptr(0x40+code) // _IOR('E', 0x40+abs, struct input_absinfo)
-	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), req, uintptr(unsafe.Pointer(&info))); errno != 0 {
-		log.Printf("EVIOCGABS %#x: %v", code, errno)
+	info, err := absQuery(f, code)
+	if err != nil {
+		log.Printf("EVIOCGABS %#x: %v", code, err)
 		return absRange{}
 	}
 	return absRange{info[1], info[2]}
+}
+
+// absQuery is EVIOCGABS: value, minimum, maximum, fuzz, flat, resolution.
+func absQuery(f *os.File, code int) ([6]int32, error) {
+	var info [6]int32
+	req := uintptr(2<<30|'E'<<8) | unsafe.Sizeof(info)<<16 | uintptr(0x40+code) // _IOR('E', 0x40+abs, struct input_absinfo)
+	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), req, uintptr(unsafe.Pointer(&info))); errno != 0 {
+		return info, errno
+	}
+	return info, nil
+}
+
+// mtSlots is EVIOCGMTSLOTS: code's value in each of n slots.
+func mtSlots(f *os.File, code, n int) ([]int32, error) {
+	buf := make([]int32, n+1)
+	buf[0] = int32(code)
+	req := uintptr(2<<30|'E'<<8|0x0a) | uintptr(len(buf)*4)<<16 // _IOC(_IOC_READ, 'E', 0x0a, len)
+	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), req, uintptr(unsafe.Pointer(&buf[0]))); errno != 0 {
+		return nil, errno
+	}
+	return buf[1:], nil
+}
+
+// keysDown is EVIOCGKEY: which keys (here, the pen's buttons) are held.
+func keysDown(f *os.File) ([0x300 / 8]byte, error) {
+	var bits [0x300 / 8]byte
+	req := uintptr(2<<30|'E'<<8|0x18) | unsafe.Sizeof(bits)<<16 // _IOC(_IOC_READ, 'E', 0x18, len)
+	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), req, uintptr(unsafe.Pointer(&bits))); errno != 0 {
+		return bits, errno
+	}
+	return bits, nil
+}
+
+// resync reads the contacts as the kernel has them, after events were
+// lost: a lift among them would have left a finger down for good. It
+// gives the slot now current, and whether a pen button is held. If the
+// panel can't say, every contact is taken as lifted.
+func (t *touchDevice) resync(slots map[int32]*contact, cur int32, button bool) (int32, bool) {
+	lift := func(err error) (int32, bool) {
+		log.Printf("touch: resync: %v: all lifted", err)
+		for _, c := range slots {
+			c.id, c.pressure = -1, 0
+		}
+		return cur, false
+	}
+	info, err := absQuery(t.f, absMTSlot)
+	if err != nil {
+		return lift(err)
+	}
+	n := int(info[2]) + 1
+	if n <= 0 || n > 64 {
+		return lift(fmt.Errorf("%d slots", n))
+	}
+	vals := map[int][]int32{}
+	for _, code := range []int{absMTTrackingID, absMTPositionX, absMTPositionY, absMTToolType, absMTPressure} {
+		if vals[code], err = mtSlots(t.f, code, n); err != nil {
+			return lift(err)
+		}
+	}
+	for c := range slots { // ones the panel hasn't are gone
+		if c < 0 || int(c) >= n {
+			slots[c].id = -1
+		}
+	}
+	for i := range n {
+		c, ok := slots[int32(i)]
+		if !ok {
+			if vals[absMTTrackingID][i] < 0 {
+				continue
+			}
+			c = &contact{}
+			slots[int32(i)] = c
+		}
+		c.id, c.x, c.y = vals[absMTTrackingID][i], vals[absMTPositionX][i], vals[absMTPositionY][i]
+		c.tool, c.pressure = vals[absMTToolType][i], vals[absMTPressure][i]
+	}
+	if keys, err := keysDown(t.f); err == nil {
+		held := func(k int) bool { return keys[k/8]&(1<<(k%8)) != 0 }
+		button = held(btnStylus) || held(btnStylus2) || held(btnToolRubber)
+	}
+	return info[0], button
 }
 
 type contact struct {
@@ -222,8 +303,11 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 
 	err := readEvents(t.f, func(typ, code uint16, val int32) {
 		if dropping { // the kernel's buffer overflowed: skip to the next complete frame
-			dropping = !(typ == evSyn && code == synReport)
-			return
+			if typ != evSyn || code != synReport {
+				return
+			}
+			dropping = false // and take the contacts from the kernel: the frame is as they are
+			cur, button = t.resync(slots, cur, button)
 		}
 		if k := [2]uint16{typ, code}; typ != evSyn && !seen[k] {
 			seen[k] = true
