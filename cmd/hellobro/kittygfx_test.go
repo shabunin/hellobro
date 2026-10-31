@@ -437,3 +437,20 @@ func TestWriteStale(t *testing.T) {
 		t.Error("the session's own output dropped")
 	}
 }
+
+// TestGfxPlaceBounded: a 1×1 image asked for 255×255 cells takes no more
+// than the terminal; a source offset past the image is an error.
+func TestGfxPlaceBounded(t *testing.T) {
+	ts, read := gfxTerm(t, 20, 6)
+	ts.write([]byte("\x1b_Ga=T,f=24,s=1,v=1,i=3,c=255,r=255;AAAA\x1b\\"))
+	read()
+	for _, pl := range ts.gfx.places {
+		if pl.cols > 20 || pl.rows > 6 {
+			t.Errorf("placed %d×%d cells in a 20×6 terminal", pl.cols, pl.rows)
+		}
+	}
+	ts.write([]byte("\x1b_Ga=p,i=3,x=5000\x1b\\"))
+	if r := read(); !strings.Contains(r, "EINVAL") {
+		t.Errorf("x past the image: %q", r)
+	}
+}

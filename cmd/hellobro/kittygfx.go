@@ -636,6 +636,9 @@ func (g *kittyGfx) delete(c *kgCmd) {
 // gfxPlace shows img at the cursor as c says.
 func (t *termSession) gfxPlace(c *kgCmd, img *kgImage) string {
 	g := &t.gfx
+	if c.x < 0 || c.y < 0 || c.x >= img.w || c.y >= img.h { // image.Rect would swap the corners
+		return "EINVAL:source rectangle outside the image"
+	}
 	src := image.Rect(c.x, c.y, img.w, img.h)
 	if c.w > 0 {
 		src.Max.X = min(src.Max.X, c.x+c.w)
@@ -659,7 +662,10 @@ func (t *termSession) gfxPlace(c *kgCmd, img *kgImage) string {
 	default:
 		pl.cols, pl.rows = ceilDiv(sw, cell.X), ceilDiv(sh, cell.Y)
 	}
-	pl.cols, pl.rows = max(1, min(kgMaxCells, pl.cols)), max(1, min(kgMaxCells, pl.rows))
+	// No bigger than the terminal: its tile is drawn whole, on the loop,
+	// and 255×255 cells of it would be a hundred megabytes and seconds.
+	maxC, maxR := min(kgMaxCells, t.emu.Width()), min(kgMaxCells, t.emu.Height())
+	pl.cols, pl.rows = max(1, min(maxC, pl.cols)), max(1, min(maxR, pl.rows))
 	if c.p != 0 || pl.virtual { // a placement of the same id goes (a virtual one, of no id, the last such)
 		for k, o := range g.places {
 			if o.img.id == img.id && o.pid == c.p && o.virtual == pl.virtual {
