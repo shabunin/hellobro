@@ -4,9 +4,9 @@ package main
 // fonts, each shown in itself; the size, the lines' spacing, the
 // margins, justified or not, hyphens or not; the pages, this book's
 // (one, two side by side, or two if the window's wide); and a paragraph
-// set as the books will be. s or Aa on the bar opens it, Esc or Done goes
-// back to the page. It's the reader's own: the app's Settings don't
-// have it.
+// set as the books will be; the bar, fullscreen. s or Aa on the bar
+// opens it, Esc or Done goes back to the page. It's the reader's own:
+// the app's Settings don't have it.
 
 import (
 	"fmt"
@@ -29,11 +29,12 @@ const (
 	styleJustify
 	styleHyph
 	stylePages
+	styleBar
 	styleDone
 	styleN
 )
 
-var styleLabels = [styleN]string{"Size", "Line spacing", "Margins", "Justified", "Hyphenation", "Pages", ""}
+var styleLabels = [styleN]string{"Size", "Line spacing", "Margins", "Justified", "Hyphenation", "Pages", "Bar, fullscreen", ""}
 
 // bookSample is what the panel sets as the books will be.
 var bookSample = &book.Chapter{Blocks: []book.Block{
@@ -121,6 +122,9 @@ func (w *bookWin) styleStep(a *bro, i, d int) {
 	case stylePages:
 		w.setPageMode(a, nextPages(w.pageMode, d))
 		return
+	case styleBar:
+		w.flipBar(a)
+		return
 	case styleDone:
 		w.closeStyle(a)
 		return
@@ -167,6 +171,7 @@ func (st bookStyle) values() [styleN]string {
 		onOff[!st.ragged],
 		onOff[!st.noHyphs],
 		"", // the book's own: drawStyle
+		"", // the EPUBs': drawStyle
 		"",
 	}
 }
@@ -250,6 +255,10 @@ func (w *bookWin) drawStyle(a *bro) {
 		right := r.Max.X
 		if k == stylePages {
 			box(image.Rect(right-260, r.Min.Y, right, r.Max.Y), bookPageWords[w.pageMode], func() { w.styleStep(a, i, 0) })
+			continue
+		}
+		if k == styleBar {
+			box(image.Rect(right-260, r.Min.Y, right, r.Max.Y), fullBarWord(a.fullBar("epub")), func() { w.styleStep(a, i, 0) })
 			continue
 		}
 		if k == styleJustify || k == styleHyph {

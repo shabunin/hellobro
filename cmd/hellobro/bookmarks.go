@@ -177,6 +177,22 @@ func (w *bookWin) barTools() (tools []barBtn, drops []string) {
 	return tools, []string{"fit", "style", "zoom out", "zoom in"}
 }
 
+// barKind is the book's, for its bar fullscreen (fullBar).
+func (w *bookWin) barKind() string {
+	if w.pdf != nil {
+		return "pdf"
+	}
+	return "epub"
+}
+
+// flipBar shows the bar fullscreen, or not, for books of this one's kind
+// (the style panel's row), and lays this one out again.
+func (w *bookWin) flipBar(a *bro) {
+	a.flipFullBar(w.barKind())
+	w.place(a, w.p)
+	w.draw(a)
+}
+
 // counter is which pages show: a PDF's of all, an EPUB's of the chapter.
 func (w *bookWin) counter() string {
 	n, of := w.page, len(w.pages)
@@ -232,7 +248,7 @@ func (w *bookWin) drawBar(a *bro) {
 			case "mark": // filled while the page has one
 				ribbon(c, image.Rect(m.X-s*2/3, m.Y-s, m.X+s*2/3, m.Y+s), len(w.pageMarks()) > 0, ink)
 			case "select":
-				drawIcon(c, noteIcon("select", ""), r, ink, bg)
+				drawIcon(c, noteIcon("select"), r, ink, bg)
 			case "zoom out", "zoom in": // −, +: bars, as ☰'s
 				c.Fill(image.Rect(m.X-s, m.Y-1, m.X+s, m.Y+2), ink)
 				if b.id == "zoom in" {

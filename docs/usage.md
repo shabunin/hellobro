@@ -689,7 +689,8 @@ and for PDFs, drawn by MuPDF (below).
   justified and hyphenation (on / off), **Pages** (this book's own,
   kept with its place: one page, two side by side, or two if wide: two
   when the window is wider than tall, a landscape screen), and a
-  paragraph set as the books will be. With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
+  paragraph set as the books will be, and **Bar, fullscreen** (shown or
+  hidden, for all EPUBs). With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
   switch; Esc, s or "back to the book" (at the top right) leaves it. Every book takes it;
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
@@ -710,9 +711,8 @@ and for PDFs, drawn by MuPDF (below).
   flashes clean every 8 pages.
 - In fullscreen (Meta+F) the page has the whole screen: a PDF's has no
   bar then (keys, two fingers to zoom, a tap at the page's top for the
-  contents), an EPUB's keeps it. Settings, Books, **A book's bar,
-  fullscreen** chooses: **hidden for a PDF**, **hidden** for every
-  book, or **shown** (the switcher: "fullscreen books").
+  contents), an EPUB's keeps it. The style panel's **Bar, fullscreen**
+  (s or Aa) changes that, for all PDFs or all EPUBs.
 - Two pages side by side (**Pages** in the style panel) turn two at a
   time; each chapter starts on the left.
 
@@ -729,7 +729,7 @@ whole page. **s** or **Aa** has their own panel: **Fit** the whole page
 or the page's width, **Zoom** (− +, 100% to 400% of the fit; **+** and
 **-** on the page too, and − **100%** + on the bar, right of the
 select tool; each PDF its own, kept with its place), **Trim
-white margins** on or off, and **Pages**
+white margins** on or off, **Pages**
 as for EPUBs (each PDF its own): two side by side are each
 whole, meeting in the middle as a book's do, turned two at a time, the
 next two drawn while you read. A cut works on either. A page
@@ -850,8 +850,7 @@ and the last two written.
 
 Its buttons are pictures (below by their names): the pen, an eraser,
 a dotted rectangle (select), a T (text), arrows round (undo, redo), a clipboard
-(paste), a page as the paper is (squares, lines, plain), a tray with
-an arrow out (export). Under the pen, a line as it writes: its width,
+(paste), sliders (its settings), a tray with an arrow out (export). Under the pen, a line as it writes: its width,
 its gray.
 
 - The pen writes; a heavier hand, a thicker line. **eraser** (or E)
@@ -871,8 +870,11 @@ its gray.
   tool takes it with a tap (moves it, sizes it, copies, deletes it);
   the eraser leaves it, as in Xournal++, where it's a text as its own
   are (14 pt; theirs show here too, at their size) and can be edited.
-- **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y), and the paper: squares, lines or
-  plain, for the whole notebook.
+- **undo** and **redo** (Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y).
+- **settings** (the sliders) puts up the notebook's own: **Paper**,
+  squares, lines or plain, for the whole notebook (`:paper` too), and
+  **Bar, fullscreen**, shown or hidden (every notebook). A tap or Enter
+  changes one, the menu staying up; Esc puts it away.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
   last page, if it has something on it, a new page. Once a pen has
   written (or as the settings say, below), a finger swiped across the page turns it too (leftward: the
@@ -900,9 +902,9 @@ its gray.
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;
   writing on the second makes it a page.
-- Fullscreen, a notebook keeps its bar. Settings, Notebooks, **A
-  notebook's bar, fullscreen**, **hidden**, leaves the page all of the
-  screen: the pen writes, keys do the rest (the overview keeps it).
+- Fullscreen, a notebook keeps its bar. **settings**, **Bar,
+  fullscreen**, hidden, leaves the page all of the screen: the pen
+  writes, keys do the rest (the pages, small, keep it).
 - **select** (or S) takes what's written, and pictures, to change
   them; the pen and fingers both work with it. Tap a stroke or a
   picture to take it (the ink over a picture first), or draw a

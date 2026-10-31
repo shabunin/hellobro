@@ -27,16 +27,33 @@ func barHeight() int {
 	return 56
 }
 
-// barOff says w has no bar, fullscreen as it is: the settings (key)
-// leave it out of a window fullscreen, of a PDF's (pdf) or of any.
-func (a *bro) barOff(w window, key string, pdf bool) bool {
-	n := a.nodeOf(w)
-	if n == nil || !n.Fullscreen {
-		return false
+// fullBar says whether a window of kind ("pdf", "epub", "note") has
+// its bar fullscreen: as its app's own settings say (a book's style
+// panel, a notebook's menu), else a PDF's not, the rest's yes.
+func (a *bro) fullBar(kind string) bool {
+	if on, ok := a.mem.FullBar[kind]; ok {
+		return on
 	}
-	s := a.setting(key)
-	return s == "hidden" || s == "pdf" && pdf
+	return kind != "pdf"
 }
+
+// flipFullBar shows kind's bar fullscreen, or not, from now on.
+func (a *bro) flipFullBar(kind string) {
+	if a.mem.FullBar == nil {
+		a.mem.FullBar = map[string]bool{}
+	}
+	a.mem.FullBar[kind] = !a.fullBar(kind)
+	a.mem.save()
+}
+
+// barOff says w, of kind, has no bar: it's fullscreen, without.
+func (a *bro) barOff(w window, kind string) bool {
+	n := a.nodeOf(w)
+	return n != nil && n.Fullscreen && !a.fullBar(kind)
+}
+
+// fullBarWord is how the apps' settings say it.
+func fullBarWord(on bool) string { return map[bool]string{true: "shown", false: "hidden"}[on] }
 
 // barBtnWidth is b's width on bar: a picture's about square, words as
 // wide as they are.

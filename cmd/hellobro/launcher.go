@@ -563,7 +563,7 @@ func appIcon(id string) []iconPart {
 		}
 		return ps
 	case "rotate":
-		return noteIcon("turn", "")
+		return noteIcon("turn")
 	case "light":
 		ps := []iconPart{ring(12, 12, 4, 0.8)}
 		for k := range 8 {

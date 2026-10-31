@@ -473,7 +473,7 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 		cw := max(h+8, kobo.TextWidth(a.F.Small, "99 / 99")+20)
 		w.bar = image.Rect(b.Min.X, b.Min.Y, b.Min.X+cw, b.Max.Y)
 	}
-	if !w.overview && a.barOff(w, "note-bar", false) { // the pen and the keys only (the overview keeps it: its buttons are all it has)
+	if !w.overview && a.barOff(w, "note") { // the pen and the keys only (the overview keeps it: its buttons are all it has)
 		w.side, w.bar = false, image.Rect(b.Min.X, p.Body.Min.Y, b.Max.X, p.Body.Min.Y)
 	}
 	w.slotSize = w.pageSize(w.cur)
@@ -526,8 +526,34 @@ func barTools(overview bool) (tools []barBtn, drops []string) {
 		return []barBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}},
 			[]string{"undo", "copy page", "new before"}
 	}
-	return []barBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}},
-		[]string{"paper", "export", "redo", "paste"}
+	return []barBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "settings"}, {id: "export"}},
+		[]string{"settings", "export", "redo", "paste"}
+}
+
+// nextPaper turns the notebook's paper to the next kind.
+func (w *noteWin) nextPaper(a *bro) {
+	ps := strings.Fields(notePapers)
+	w.nb.paper = ps[(slices.Index(ps, w.nb.paper)+1)%len(ps)]
+	w.changed = time.Now()
+	w.place(a, w.p) // its button says another word
+	w.show(a)
+}
+
+// openMenu puts up the notebooks' own settings, over the page: this
+// one's paper, and the bar fullscreen. A tap or Enter changes one, the
+// menu staying up.
+func (w *noteWin) openMenu(a *bro) {
+	es := func() []pickEntry {
+		return []pickEntry{
+			{kind: "this one", title: "Paper", detail: w.nb.paper, stay: true, do: func() { w.nextPaper(a) }},
+			{kind: "all", title: "Bar, fullscreen", detail: fullBarWord(a.fullBar("note")), stay: true, do: func() {
+				a.flipFullBar("note")
+				w.place(a, w.p)
+				w.show(a)
+			}},
+		}
+	}
+	a.showPicker(&picker{title: "Notebook", hint: "Enter or a tap changes it · Esc closes", all: es(), entries: es})
 }
 
 // barNeed is how wide tools are along the top.
@@ -634,7 +660,7 @@ func (w *noteWin) drawBar(a *bro) {
 			b.label, on, off = "tap again", true, false
 		}
 		ink, bg := drawBarBtn(a, b, on, off, func(r image.Rectangle, ink, bg uint8) bool {
-			if icon := noteIcon(b.id, w.nb.paper); icon != nil {
+			if icon := noteIcon(b.id); icon != nil {
 				drawIcon(a.C, icon, r, ink, bg)
 				return true
 			}
@@ -893,12 +919,8 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 			}
 			w.clearUnask(a)
 			w.pageAct(a, "clear")
-		case "paper":
-			ps := strings.Fields(notePapers)
-			w.nb.paper = ps[(slices.Index(ps, w.nb.paper)+1)%len(ps)]
-			w.changed = time.Now()
-			w.place(a, w.p) // its button says another word
-			w.show(a)
+		case "settings":
+			w.openMenu(a)
 		case "paste":
 			w.paste(a)
 		case "export":

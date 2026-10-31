@@ -42,6 +42,7 @@ type remembered struct {
 	Pen         bool                 `json:"pen,omitempty"`           // a pen has written in a notebook: fingers turn its pages (notebook.go)
 	NoteWidth   string               `json:"note-width,omitempty"`    // the notebooks' pen: fine, medium, bold (notepen.go)
 	NoteInk     string               `json:"note-ink,omitempty"`      // black, gray, marker
+	FullBar     map[string]bool      `json:"full-bar,omitempty"`      // the bar fullscreen, "pdf", "epub", "note", where set otherwise than by default (toolbar.go)
 	Airplane    *radiosWere          `json:"airplane,omitempty"`      // airplane mode's on: the radios it turned off (radio.go)
 	dir         string
 }

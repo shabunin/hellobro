@@ -15,9 +15,11 @@ def note(what):
 
 KEY_O = 24
 start()
-for _ in range(2): gui("fullscreen books")           # the bar: hidden for a PDF, hidden, shown
 gui("books"); time.sleep(4)
 key(ENTER); time.sleep(6)
+key(31); time.sleep(3)                               # s: the style panel
+for _ in range(4): key(DOWN); time.sleep(0.5)
+key(ENTER); time.sleep(3); key(ESC); time.sleep(4)    # Bar, fullscreen: shown (a PDF's is hidden)
 fullscreen(); time.sleep(5)
 tap(*barbtn(3)); time.sleep(3)                       # the select tool
 half = int(min(W, H) * 0.2)

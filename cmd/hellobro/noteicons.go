@@ -66,9 +66,8 @@ var (
 	iconBin  = []iconPart{iconLine(1, 4, 6, 20, 6), iconLine(0.8, 9, 6, 9, 3, 15, 3, 15, 6), iconLine(0.8, 6, 6, 7, 21, 17, 21, 18, 6), iconLine(0.6, 10, 9, 10, 18), iconLine(0.6, 14, 9, 14, 18)}
 )
 
-// noteIcon is the picture of the button id; nil if it's words. paper
-// is the notebook's, which its button shows.
-func noteIcon(id, paper string) []iconPart {
+// noteIcon is the picture of the button id; nil if it's words.
+func noteIcon(id string) []iconPart {
 	switch id {
 	case "pen":
 		return []iconPart{iconShut(0.7, 7, 13.5, 16.5, 4, 20, 7.5, 10.5, 17), iconShut(0.7, 7, 13.5, 4, 20, 10.5, 17), iconLine(0.7, 14, 6.5, 17.5, 10)}
@@ -85,20 +84,8 @@ func noteIcon(id, paper string) []iconPart {
 		return iconMirror(iconUndo)
 	case "paste":
 		return []iconPart{iconShut(0.9, 6, 5, 18, 5, 18, 21, 6, 21), {kind: 'f', pts: []float64{9, 3, 15, 7.5}}, iconLine(0.5, 9, 12, 15, 12), iconLine(0.5, 9, 16, 15, 16)}
-	case "paper":
-		ps := []iconPart{iconShut(0.8, 6, 3, 18, 3, 18, 21, 6, 21)}
-		if paper == "plain" {
-			return append(ps, iconLine(0.5, 14, 3, 14, 7, 18, 7)) // a page, its corner turned
-		}
-		for y := 7.5; y < 21; y += 4.5 {
-			ps = append(ps, iconLine(0, 6, y, 18, y))
-		}
-		if paper == "squares" {
-			for x := 10.0; x < 18; x += 4 {
-				ps = append(ps, iconLine(0, x, 3, x, 21))
-			}
-		}
-		return ps
+	case "settings": // the launcher's Settings
+		return appIcon("settings")
 	case "export":
 		return []iconPart{iconLine(0.9, 4, 13, 4, 21, 20, 21, 20, 13), iconLine(1, 12, 17, 12, 3), iconHead(12, 3, 0, -1)}
 	case "open":
@@ -106,7 +93,7 @@ func noteIcon(id, paper string) []iconPart {
 	case "new before":
 		return []iconPart{iconShut(0.8, 11, 4, 20, 4, 20, 20, 11, 20), iconLine(1, 2, 12, 8, 12), iconLine(1, 5, 9, 5, 15)}
 	case "new after":
-		return iconMirror(noteIcon("new before", paper))
+		return iconMirror(noteIcon("new before"))
 	case "copy", "copy page":
 		return iconCopy
 	case "duplicate":
@@ -121,7 +108,7 @@ func noteIcon(id, paper string) []iconPart {
 	case "earlier":
 		return []iconPart{iconLine(1, 20, 12, 4, 12), iconHead(4, 12, -1, 0)}
 	case "later":
-		return iconMirror(noteIcon("earlier", paper))
+		return iconMirror(noteIcon("earlier"))
 	}
 	return nil
 }

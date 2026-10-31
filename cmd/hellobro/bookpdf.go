@@ -333,13 +333,14 @@ func (w *bookWin) pdfWords(n int) string {
 	return s
 }
 
-// --- its style panel: the fit, the trimming ---
+// --- its style panel: the fit, the trimming, the bar ---
 
 const (
 	pdfStyleFit = iota
 	pdfStyleZoom
 	pdfStyleTrim
 	pdfStylePages
+	pdfStyleBar
 	pdfStyleDone
 	pdfStyleN
 )
@@ -360,6 +361,9 @@ func (w *bookWin) pdfStyleStep(a *bro, i, d int) {
 	case pdfStylePages:
 		w.setPageMode(a, nextPages(w.pageMode, d))
 		return
+	case pdfStyleBar:
+		w.flipBar(a)
+		return
 	case pdfStyleDone:
 		w.closeStyle(a)
 		return
@@ -375,7 +379,7 @@ func (w *bookWin) drawPDFStyle(a *bro) {
 	head := w.styleHeader(a, &area, func() { w.pdfStyleStep(a, pdfStyleDone, 0) })
 	fit := map[bool]string{false: "whole page", true: "page width"}
 	onOff := map[bool]string{true: "on", false: "off"}
-	labels := [pdfStyleN]string{"Fit", "Zoom", "Trim white margins", "Pages", ""}
+	labels := [pdfStyleN]string{"Fit", "Zoom", "Trim white margins", "Pages", "Bar, fullscreen", ""}
 	w.sel = max(0, min(w.sel, pdfStyleN-1))
 	y, rowH, boxW := area.Min.Y+4, 72, 72
 	for i := range pdfStyleN {
@@ -408,6 +412,8 @@ func (w *bookWin) drawPDFStyle(a *bro) {
 			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), onOff[!st.pdfNoTrim], 0)
 		case pdfStylePages:
 			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), bookPageWords[w.pageMode], 0)
+		case pdfStyleBar:
+			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), fullBarWord(a.fullBar("pdf")), 0)
 		}
 	}
 	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "a page bigger than the screen is read in screenfuls, across then down; + and - zoom too; two side by side are whole", kobo.Mid, kobo.AlignLeft)

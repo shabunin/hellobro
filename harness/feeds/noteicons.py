@@ -37,7 +37,7 @@ gui("notebook"); time.sleep(3)
 fullscreen(); time.sleep(4)
 x0, x1 = W // 8, (W * 3 // 8 if W > H else W * 7 // 8)
 stroke(wave(H // 4, x0, x1), pen=True, pressure=lambda t: 2000); time.sleep(2)
-bar = buttons(0, 60)                               # ‹ All Notebooks, pen, eraser, select, text, undo, redo, paste, paper, export …
+bar = buttons(0, 60)                               # ‹ All Notebooks, pen, eraser, select, text, undo, redo, paste, settings, export …
 tap(*bar[1]); time.sleep(3)                        # the pen's choices
 ch = buttons(62, 140)
 tap(*ch[2]); time.sleep(2); tap(*ch[4]); time.sleep(2)   # bold, gray
