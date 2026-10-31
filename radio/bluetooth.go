@@ -101,13 +101,26 @@ func NewBluetooth(ui AgentUI) Bluetooth {
 type bluez struct {
 	mu      sync.Mutex
 	bus     *dbus.Conn
-	adapter dbus.ObjectPath
+	amu     sync.Mutex      // adapter's: Status runs from the poll while a job uses it
+	adapter dbus.ObjectPath // through adapterPath and setAdapterPath
 	agent   bool
 	ui      AgentUI
 	initial *bool // the power before we first changed it
 }
 
 const agentPath = dbus.ObjectPath("/hellobro/agent")
+
+func (b *bluez) adapterPath() dbus.ObjectPath {
+	b.amu.Lock()
+	defer b.amu.Unlock()
+	return b.adapter
+}
+
+func (b *bluez) setAdapterPath(p dbus.ObjectPath) {
+	b.amu.Lock()
+	b.adapter = p
+	b.amu.Unlock()
+}
 
 // conn is the system bus with BlueZ on it, connected on first use.
 func (b *bluez) conn() (*dbus.Conn, error) {
@@ -157,11 +170,11 @@ func (b *bluez) Status() (BTStatus, []BTDevice) {
 		paths = append(paths, string(p))
 	}
 	slices.Sort(paths)
-	b.adapter = "" // found again each time: it goes when the chip goes off
+	var adapter dbus.ObjectPath // found again each time: it goes when the chip goes off
 	for _, p := range paths {
 		ifs := objs[dbus.ObjectPath(p)]
-		if a, ok := ifs["org.bluez.Adapter1"]; ok && b.adapter == "" {
-			b.adapter = dbus.ObjectPath(p)
+		if a, ok := ifs["org.bluez.Adapter1"]; ok && adapter == "" {
+			adapter = dbus.ObjectPath(p)
 			st.Powered, st.Discovering = prop[bool](a, "Powered"), prop[bool](a, "Discovering")
 			st.Name, st.Addr = prop[string](a, "Alias"), prop[string](a, "Address")
 		}
@@ -175,7 +188,8 @@ func (b *bluez) Status() (BTStatus, []BTDevice) {
 			devs = append(devs, dev)
 		}
 	}
-	if b.adapter == "" { // the chip is off: Kobo leaves bluetoothd running without it
+	b.setAdapterPath(adapter) // whole: never "" for a moment, as it was
+	if adapter == "" {        // the chip is off: Kobo leaves bluetoothd running without it
 		st.Powered, st.Err = false, ""
 	}
 	sortDevices(devs)
@@ -215,10 +229,15 @@ func (b *bluez) setAdapter(name string, v any) error {
 	if err != nil {
 		return err
 	}
-	if b.adapter == "" {
+	a := b.adapterPath()
+	if a == "" {
 		b.Status()
+		a = b.adapterPath()
 	}
-	return bus.Object("org.bluez", b.adapter).Call("org.freedesktop.DBus.Properties.Set", 0, "org.bluez.Adapter1", name, dbus.MakeVariant(v)).Err
+	if a == "" {
+		return errors.New("no Bluetooth adapter: the chip's off")
+	}
+	return bus.Object("org.bluez", a).Call("org.freedesktop.DBus.Properties.Set", 0, "org.bluez.Adapter1", name, dbus.MakeVariant(v)).Err
 }
 
 func (b *bluez) SetPower(on bool) error {
@@ -229,13 +248,13 @@ func (b *bluez) SetPower(on bool) error {
 	}
 	log.Printf("bluetooth: power %v", on)
 	if !on {
-		if b.adapter != "" {
+		if b.adapterPath() != "" {
 			b.setAdapter("Powered", false)
 		}
-		b.adapter = ""
+		b.setAdapterPath("")
 		return chipOff()
 	}
-	if b.adapter == "" {
+	if b.adapterPath() == "" {
 		if err := chipOn(); err != nil {
 			return err
 		}
@@ -243,11 +262,11 @@ func (b *bluez) SetPower(on bool) error {
 			start("/libexec/bluetooth/bluetoothd", "-n")
 		}
 		end := time.Now().Add(10 * time.Second) // bluetoothd finds the new adapter
-		for b.adapter == "" && time.Now().Before(end) {
+		for b.adapterPath() == "" && time.Now().Before(end) {
 			time.Sleep(500 * time.Millisecond)
 			b.Status()
 		}
-		if b.adapter == "" {
+		if b.adapterPath() == "" {
 			return errors.New("the chip is on, but bluetoothd doesn't see it")
 		}
 		if len(pidsOf("bluealsa")) == 0 {
@@ -332,17 +351,17 @@ func (b *bluez) Discover(on bool) error {
 	if err != nil {
 		return err
 	}
-	if b.adapter == "" {
+	if b.adapterPath() == "" {
 		b.Status()
 	}
-	if b.adapter == "" {
+	if b.adapterPath() == "" {
 		return errors.New("Bluetooth is off")
 	}
 	if on {
 		b.ensureAgent()
-		return bus.Object("org.bluez", b.adapter).Call("org.bluez.Adapter1.StartDiscovery", 0).Err
+		return bus.Object("org.bluez", b.adapterPath()).Call("org.bluez.Adapter1.StartDiscovery", 0).Err
 	}
-	return bus.Object("org.bluez", b.adapter).Call("org.bluez.Adapter1.StopDiscovery", 0).Err
+	return bus.Object("org.bluez", b.adapterPath()).Call("org.bluez.Adapter1.StopDiscovery", 0).Err
 }
 
 func (b *bluez) device(d BTDevice, method string, timeout time.Duration) error {
@@ -390,7 +409,7 @@ func (b *bluez) Forget(d BTDevice) error {
 		return err
 	}
 	log.Printf("bluetooth: removing %s %s", d.Name, d.Addr)
-	return btError(bus.Object("org.bluez", b.adapter).Call("org.bluez.Adapter1.RemoveDevice", 0, d.Path).Err)
+	return btError(bus.Object("org.bluez", b.adapterPath()).Call("org.bluez.Adapter1.RemoveDevice", 0, d.Path).Err)
 }
 
 func (b *bluez) Keep() {
@@ -407,8 +426,8 @@ func (b *bluez) Restore() {
 		bus.Object("org.bluez", "/org/bluez").Call("org.bluez.AgentManager1.UnregisterAgent", 0, agentPath)
 		b.agent = false
 	}
-	if b.adapter != "" {
-		bus.Object("org.bluez", b.adapter).Call("org.bluez.Adapter1.StopDiscovery", 0)
+	if b.adapterPath() != "" {
+		bus.Object("org.bluez", b.adapterPath()).Call("org.bluez.Adapter1.StopDiscovery", 0)
 	}
 	if b.initial != nil {
 		st, _ := b.Status()
