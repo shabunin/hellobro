@@ -152,7 +152,7 @@ func (a *bro) setKeys(id string, keys []combo, reset bool) {
 	if err != nil {
 		b = []byte(defaultKeysConf())
 	}
-	if err := os.WriteFile(path, []byte(rewriteKeys(string(b), a.keys, id, keys, reset)), 0o644); err != nil {
+	if err := writeAtomic(path, []byte(rewriteKeys(string(b), a.keys, id, keys, reset))); err != nil {
 		log.Printf("keys: %v", err)
 		return
 	}

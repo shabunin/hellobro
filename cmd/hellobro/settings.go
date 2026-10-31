@@ -247,7 +247,7 @@ func (s settings) save() {
 			fmt.Fprintf(&b, "%s=%s\n", st.key, st.values[s[st.key]])
 		}
 	}
-	if err := os.WriteFile(kobo.AppFile(setTxt), []byte(b.String()), 0o644); err != nil {
+	if err := writeAtomic(kobo.AppFile(setTxt), []byte(b.String())); err != nil { // a flat battery mid-write leaves the old one
 		log.Printf("settings: %v", err)
 	}
 }

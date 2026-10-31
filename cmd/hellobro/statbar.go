@@ -43,7 +43,7 @@ func (a *bro) toggleBar() {
 	if a.BarOff {
 		state = "on"
 	}
-	os.WriteFile(kobo.AppFile(barTxt), []byte(state+"\n"), 0o644)
+	writeAtomic(kobo.AppFile(barTxt), []byte(state+"\n"))
 	a.SetBarOff(!a.BarOff)
 }
 
