@@ -13,6 +13,7 @@ package main
 import (
 	"image"
 	"log"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,8 @@ type notePDF struct {
 	drawn   map[pdfKey]*image.Gray
 	order   []pdfKey // the oldest first
 	pending map[pdfKey]bool
+	opening bool  // MuPDF has it still, away from the loop: a big one takes a while
+	waiting []int // the pages asked for meanwhile, drawn again once it's open
 }
 
 type pdfKey struct{ page, width int }
@@ -91,14 +94,37 @@ func (w *noteWin) pdfImage(a *bro, n, width int) *image.Gray {
 	}
 	if w.pdf == nil {
 		path := w.nb.pdfPath()
-		w.pdf = &notePDF{path: path, drawn: map[pdfKey]*image.Gray{}, pending: map[pdfKey]bool{}}
-		w.pdf.doc, w.pdf.err = pdf.Open(path)
-		if w.pdf.err != nil {
-			log.Printf("notebook %s: %v", w.nb.name, w.pdf.err)
-			a.Notify("the notebook's PDF: " + w.pdf.err.Error())
-		}
+		np := &notePDF{path: path, drawn: map[pdfKey]*image.Gray{}, pending: map[pdfKey]bool{}, opening: true}
+		w.pdf = np
+		go func() {
+			doc, err := pdf.Open(path)
+			a.Do(func() {
+				if w.pdf != np { // closed meanwhile
+					if doc != nil {
+						doc.Close()
+					}
+					return
+				}
+				np.doc, np.err, np.opening = doc, err, false
+				if err != nil {
+					log.Printf("notebook %s: %v", w.nb.name, err)
+					a.Notify("the notebook's PDF: " + err.Error())
+					return
+				}
+				for _, n := range np.waiting {
+					w.redraw(a, w.screenOf(n))
+				}
+				np.waiting = nil
+			})
+		}()
 	}
 	np := w.pdf
+	if np.opening {
+		if !slices.Contains(np.waiting, n) {
+			np.waiting = append(np.waiting, n)
+		}
+		return nil
+	}
 	k := pdfKey{i, width}
 	if m := np.drawn[k]; m != nil || np.err != nil {
 		return m
