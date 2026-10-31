@@ -77,8 +77,11 @@ What's in the windows shows too, as it is now, and again every few
 seconds while they're up: a terminal's output, a book's page, a
 notebook, the battery. Tap one to go there; the last tile, **+**, makes
 a new workspace (the first free number) and opens a launcher on it.
-Keys: 1…9 and 0 go to that workspace, **n** makes a new one, the arrows
-and Enter pick one, Esc closes.
+A workspace with windows has a **×** in its tile's corner: tapped, the
+tile asks for it again, and a second tap within a few seconds closes
+all its windows (what runs in them ends). Keys: 1…9 and 0 go to that
+workspace, **n** makes a new one, **x** is the × of the one the arrows
+are on, the arrows and Enter pick one, Esc closes.
 
 Meta+Shift+Minus puts the window away (i3's scratchpad), Meta+Minus
 brings it back, floating, and puts it away again.

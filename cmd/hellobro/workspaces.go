@@ -29,9 +29,50 @@ import (
 )
 
 const (
-	wsHeadH = 44  // a workspace tile's header: its name, how many windows
-	wsTop   = 100 // px down from the screen's top where two fingers swiped down put the tiles up
+	wsHeadH  = 44  // a workspace tile's header: its name, how many windows, ×
+	wsTop    = 100 // px down from the screen's top where two fingers swiped down put the tiles up
+	wsCloseW = 72  // the ×'s box at the header's right
+	wsArmed  = 4 * time.Second
 )
+
+// tileClose is where a tap on a workspace's tile is on its ×: the box
+// in the header, and a little under it, for a finger.
+func tileClose(r image.Rectangle) image.Rectangle {
+	return image.Rect(r.Max.X-wsCloseW-16, r.Min.Y, r.Max.X, r.Min.Y+wsHeadH+24)
+}
+
+// wsCloseTap closes ws's windows, what runs in them ending, on the
+// second tap on its × (or x) within wsArmed; the first asks for it in
+// the tile.
+func (a *bro) wsCloseTap(ws *wm.Node) {
+	if a.wm.wsClose != ws || time.Since(a.wm.wsCloseAt) > wsArmed {
+		a.wm.wsClose, a.wm.wsCloseAt = ws, time.Now()
+		a.redrawTiles()
+		return
+	}
+	a.wm.wsClose = nil
+	ns := a.wm.tree.Find(func(o *wm.Node) bool { return o.Leaf() && wm.WorkspaceOf(o) == ws })
+	log.Printf("workspaces: closing %s, %d windows", ws.Name, len(ns))
+	a.picker = nil // put up again over what's left, in one go
+	for _, n := range ns {
+		if w := a.wm.wins[n]; w != nil {
+			a.closeWin(w)
+		}
+	}
+	a.openWorkspaces()
+}
+
+// wsArmedFor says ws's × was tapped once, lately.
+func (a *bro) wsArmedFor(ws *wm.Node) bool {
+	return a.wm.wsClose == ws && time.Since(a.wm.wsCloseAt) <= wsArmed
+}
+
+// redrawTiles draws again the tiles that changed, now.
+func (a *bro) redrawTiles() {
+	if a.picker != nil {
+		a.repaintTiles()
+	}
+}
 
 // wsSwipe takes two fingers going down from the screen's top: the
 // tiles up, true once they are.
@@ -73,17 +114,25 @@ func (a *bro) openWorkspaces() {
 			sel = len(es)
 		}
 		count := fmt.Sprintf("%d windows", n)
-		if n == 1 {
+		switch n {
+		case 0: // the tile says empty
+			count = ""
+		case 1:
 			count = "a window"
 		}
 		var drawn uint64
-		es = append(es, pickEntry{kind: "workspace", title: "Workspace " + ws.Name, detail: count,
+		var armed bool
+		e := pickEntry{kind: "workspace", title: "Workspace " + ws.Name, detail: count,
 			paint: func(r image.Rectangle) {
-				drawn = a.wsSum(ws)
-				a.drawWorkspaceTile(r, ws, count, cur)
+				drawn, armed = a.wsSum(ws), a.wsArmedFor(ws)
+				a.drawWorkspaceTile(r, ws, count, cur, n > 0, armed)
 			},
-			changed: func() bool { return a.wsSum(ws) != drawn },
-			do:      func() { a.wmRun("workspace " + strconv.Quote(ws.Name)) }})
+			changed: func() bool { return a.wsSum(ws) != drawn || a.wsArmedFor(ws) != armed },
+			do:      func() { a.wmRun("workspace " + strconv.Quote(ws.Name)) }}
+		if n > 0 {
+			e.close = func() { a.wsCloseTap(ws) }
+		}
+		es = append(es, e)
 	}
 	es = append(es, pickEntry{kind: "workspace", title: "New workspace", detail: "+",
 		paint: func(r image.Rectangle) { a.drawNewTile(r) }, do: a.newWorkspace})
@@ -100,6 +149,10 @@ func (a *bro) openWorkspaces() {
 		case ch == "n" || ch == "+" || ch == "=":
 			a.closePicker()
 			a.newWorkspace()
+		case ch == "x": // the one the arrows are on, as its ×
+			if p.sel < len(p.shown) && p.shown[p.sel].close != nil {
+				p.shown[p.sel].close()
+			}
 		}
 	}
 	a.showPicker(p)
@@ -134,14 +187,27 @@ func freeWorkspace(names []string) string {
 }
 
 // drawWorkspaceTile draws ws in r: its name and count over its windows,
-// small, where they are; the one shown in a thicker frame.
-func (a *bro) drawWorkspaceTile(r image.Rectangle, ws *wm.Node, count string, cur bool) {
+// small, where they are; the one shown in a thicker frame. With
+// windows it has a × (closable); armed, the × was tapped once.
+func (a *bro) drawWorkspaceTile(r image.Rectangle, ws *wm.Node, count string, cur, closable, armed bool) {
 	c := a.C
 	c.Fill(r, kobo.White)
 	head := image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+wsHeadH)
 	c.Fill(head, kobo.Black)
 	c.Text(a.F.Panel, head.Inset(8), ws.Name, kobo.White, kobo.AlignLeft)
-	c.Text(a.F.Small, head.Inset(8), count, kobo.Light, kobo.AlignRight)
+	note := head.Inset(8)
+	if closable {
+		x := image.Rect(head.Max.X-wsCloseW, head.Min.Y, head.Max.X, head.Max.Y)
+		fg := uint8(kobo.White)
+		if armed { // lit: again closes
+			c.Fill(x.Inset(4), kobo.White)
+			fg = kobo.Black
+			count = "tap × again: close them all"
+		}
+		c.Text(a.F.Panel, x, "×", fg, kobo.AlignCenter)
+		note.Max.X = x.Min.X - 8
+	}
+	c.Text(a.F.Small, note, count, kobo.Light, kobo.AlignRight)
 	body := image.Rect(r.Min.X, head.Max.Y, r.Max.X, r.Max.Y)
 	k := float64(body.Dx()) / float64(max(1, a.wm.area.Dx()))
 	a.miniSplit(ws, body)

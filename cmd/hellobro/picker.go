@@ -29,6 +29,7 @@ type pickEntry struct {
 	on                  bool                    // a tile for what's on now: dark
 	stay                bool                    // picked, the menu stays (a tick)
 	hold                func()                  // a finger held on its tile: its settings, say
+	close               func()                  // its tile's × tapped (tileClose): a workspace's
 	paint               func(r image.Rectangle) // draws its tile, for one that isn't an icon's
 	changed             func() bool             // its tile would be drawn otherwise now (paint's)
 	current             bool
@@ -498,6 +499,10 @@ func (a *bro) pickerKey(code uint16, value int32) {
 // pickerTap goes to the row tapped; a tap outside closes.
 func (a *bro) pickerTap(pt image.Point) {
 	for n, r := range a.picker.rows {
+		if e := a.picker.shown[a.picker.top+n]; e.close != nil && pt.In(tileClose(r)) {
+			e.close()
+			return
+		}
 		if pt.In(r) {
 			a.pick(a.picker.top + n)
 			return
@@ -577,6 +582,12 @@ func (a *bro) pickerTick() {
 	if p.refresh != nil {
 		p.refresh()
 	}
+	a.repaintTiles()
+}
+
+// repaintTiles draws again the tiles whose paint would differ now.
+func (a *bro) repaintTiles() {
+	p := a.picker
 	for i, r := range p.rows {
 		n := p.top + i
 		if n >= len(p.shown) {
