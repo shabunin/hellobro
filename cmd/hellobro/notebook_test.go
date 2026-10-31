@@ -321,7 +321,11 @@ func TestNoteChangedOnDisk(t *testing.T) {
 		os.Chtimes(notePath("plan"), time.Now(), time.Now().Add(time.Minute))
 	}
 	pcWrite()
-	w := &noteWin{nb: nb}
+	w := &noteWin{nb: nb, typing: &noteTyping{page: 0}}
+	if w.readAgain(a) || len(w.nb.pages) != 1 { // typing: the text first
+		t.Fatalf("read again while typing: %d pages", len(w.nb.pages))
+	}
+	w.typing = nil
 	w.readAgain(a)
 	if len(w.nb.pages) != 3 {
 		t.Fatalf("not read again: %d pages", len(w.nb.pages))

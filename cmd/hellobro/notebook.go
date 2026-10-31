@@ -1441,6 +1441,9 @@ const noteLookEvery = 3 * time.Second
 // nothing unkept): written on a computer meanwhile, that's what it is
 // now. True if it did.
 func (w *noteWin) readAgain(a *bro) bool {
+	if w.typing != nil { // a text not in the notebook yet, its page maybe only ours: after it
+		return false
+	}
 	st, ok := stampOf(notePath(w.nb.name))
 	if !ok || st == w.nb.disk {
 		return false
