@@ -337,6 +337,12 @@ func TestWorkspaces(t *testing.T) {
 		{"rename", "1:splith[a*] | 3:splith[b]", func(t *Tree) { t.RenameWorkspace("3", "0") }, "0:splith[b] <1:splith[a*]>"},
 		{"focus elsewhere", "1:splith[a*] | 2:splith[b, c]", func(t *Tree) { t.Focus(w(t, "c")) }, "1:splith[a] <2:splith[b, c*]>"},
 		{"scratchpad", "1:splith[a, b*]", func(t *Tree) { t.MoveToScratchpad(t.Focused()) }, "<1:splith[a*]> __i3_scratch:splith[] float[b]"},
+		{"no swap with the scratchpad", "1:splith[a, b*]", func(t *Tree) {
+			t.MoveToScratchpad(t.Focused())
+			if t.Swap(w(t, "a"), w(t, "b")) == nil {
+				panic("swapped")
+			}
+		}, "<1:splith[a*]> __i3_scratch:splith[] float[b]"},
 		{"scratchpad show", "1:splith[a, b*]", func(t *Tree) {
 			t.MoveToScratchpad(t.Focused())
 			t.ScratchpadShow(nil)

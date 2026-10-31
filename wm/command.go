@@ -440,7 +440,7 @@ func (t *Tree) run(cmd string, crit *criteria, h Host) error {
 		if len(other) == 0 {
 			return errors.New("nothing to swap with")
 		}
-		return each(func(n *Node) error { t.Swap(n, other[0]); return nil })
+		return each(func(n *Node) error { return t.Swap(n, other[0]) })
 	case "resize":
 		return t.resizeCmd(ws, arg, each)
 	case "mark":
@@ -668,6 +668,9 @@ func (t *Tree) moveCmd(cmd string, ws []word, arg func(int) string, each func(fu
 		name, err := t.wsName(cmd, ws, arg, i+1)
 		if err != nil {
 			return err
+		}
+		if strings.HasPrefix(name, "__") {
+			return errors.New("can't move to " + strconv.Quote(name))
 		}
 		return each(func(n *Node) error { t.MoveToWorkspace(n, name); return nil })
 	case "scratchpad":

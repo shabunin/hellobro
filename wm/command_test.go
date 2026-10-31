@@ -45,6 +45,7 @@ func TestRun(t *testing.T) {
 		{"1:splith[a*, b]", `workspace "my mail"`, "1:splith[a, b] <my mail:splith[]>", nil},
 		{"1:splith[a*, b] | 3:mail:splith[c]", "workspace number 3", "1:splith[a, b] <3:mail:splith[c*]>", nil},
 		{"1:splith[a*, b]", "move container to workspace number 2", "<1:splith[b*]> 2:splith[a]", nil},
+		{"1:splith[a*, b]", "move container to workspace __x", "<1:splith[a*, b]>", nil}, // i3's, never shown
 		{"1:splith[a*, b]", "move to workspace 2, workspace 2", "1:splith[b] <2:splith[a*]>", nil},
 		{"1:splith[a*, b]", "move scratchpad; scratchpad show", "<1:splith[b] float[a*]>", nil},
 		{"1:splith[a*, b]", "rename workspace to one", "<one:splith[a*, b]>", nil},
@@ -64,7 +65,7 @@ func TestRun(t *testing.T) {
 		tr := build(t, c.in)
 		h := &host{}
 		for _, r := range tr.Run(c.cmd, h) {
-			if !r.Success && c.cmd != "swap container with mark m" && !strings.Contains(c.cmd, "'a; b',") {
+			if !r.Success && c.cmd != "swap container with mark m" && !strings.Contains(c.cmd, "__x") && !strings.Contains(c.cmd, "'a; b',") {
 				t.Errorf("%s: %+v", c.cmd, r)
 			}
 		}

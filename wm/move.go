@@ -122,7 +122,7 @@ func parentAlong(n *Node, horizontal bool) *Node {
 // its tiled windows, in a container. The focus stays on the workspace
 // shown.
 func (t *Tree) MoveToWorkspace(n *Node, name string) {
-	if name == "" || name == t.scratch.Name {
+	if name == "" || strings.HasPrefix(name, "__") { // i3's own, as the scratchpad: never gone to
 		return
 	}
 	if n.Type == Workspace {
@@ -194,10 +194,15 @@ func (t *Tree) RenameWorkspace(from, to string) error {
 }
 
 // Swap swaps a and b, two windows or containers neither in the other:
-// their places, shares, floating or not, and full screen.
-func (t *Tree) Swap(a, b *Node) {
+// their places, shares, floating or not, and full screen. One put away
+// in the scratchpad isn't swapped: the other would go there, hidden,
+// focused if it was.
+func (t *Tree) Swap(a, b *Node) error {
 	if a == b || a.Type != Con || b.Type != Con || t.within(a, b) || t.within(b, a) {
-		return
+		return nil
+	}
+	if workspaceOf(a) == t.scratch || workspaceOf(b) == t.scratch {
+		return errors.New("can't swap with the scratchpad's")
 	}
 	pa, pb := a.Parent, b.Parent
 	slot := func(p, n *Node) (*[]*Node, int) {
@@ -217,4 +222,5 @@ func (t *Tree) Swap(a, b *Node) {
 	if t.focused == a || t.focused == b {
 		t.focus(t.focused)
 	}
+	return nil
 }
