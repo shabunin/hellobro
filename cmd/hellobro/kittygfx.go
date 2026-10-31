@@ -108,8 +108,10 @@ type kgCmd struct {
 
 // feed passes p on to out, but for the graphics commands in it, which go
 // to do, the part after G. A command may come in pieces over many feeds;
-// so may its start, which is held back till it's known for one.
-func (g *kittyGfx) feed(p []byte, out func([]byte), do func([]byte)) {
+// so may its start, which is held back till it's known for one. do says
+// false when g is no longer the stream's (the session started again
+// while it decoded): the rest is dropped, and g left as it is.
+func (g *kittyGfx) feed(p []byte, out func([]byte), do func([]byte) bool) {
 	from := 0 // the next byte to pass on
 	for i := 0; i < len(p); i++ {
 		b := p[i]
@@ -172,8 +174,8 @@ func (g *kittyGfx) feed(p []byte, out func([]byte), do func([]byte)) {
 				continue
 			}
 			g.state, from = scanGround, i+1
-			if !g.over {
-				do(g.cmd)
+			if !g.over && !do(g.cmd) {
+				return
 			}
 			if cap(g.cmd) > 64<<10 {
 				g.cmd = nil // not kept for good, an image's worth
@@ -339,39 +341,60 @@ func (g *kittyGfx) cellSize() image.Point {
 	return g.cell
 }
 
-// gfxCommand does a command the output brought, and answers it.
-func (t *termSession) gfxCommand(b []byte) {
+// gfxCommand does a command the output brought for emu, and answers it.
+// It's called under t.mu, which it lets go of while an image decodes
+// (that can take a while, and the loop draws under it): false if emu
+// isn't the session's by then.
+func (t *termSession) gfxCommand(emu *vt.SafeEmulator, b []byte) bool {
 	g := &t.gfx
 	c, err := parseKgCmd(b)
 	if g.load != nil { // the next chunk: only m (and q) count
 		l := g.load
 		if len(l.data)+len(c.data) > kgMaxData {
 			g.load = nil
-			t.gfxReply(*l, "EFBIG:too much data")
-			return
+			t.gfxReply(emu, *l, "EFBIG:too much data")
+			return true
 		}
 		l.data = append(l.data, c.data...)
 		l.q = max(l.q, c.q)
 		if err == nil && c.m == 1 {
-			return
+			return true
 		}
 		g.load = nil
 		c, err = *l, nil
 	} else if err == nil && c.m == 1 {
 		c.data = append([]byte(nil), c.data...)
 		g.load = &c
-		return
+		return true
 	}
 	if err != nil {
-		t.gfxReply(c, "EINVAL:"+err.Error())
-		return
+		t.gfxReply(emu, c, "EINVAL:"+err.Error())
+		return true
 	}
-	t.gfxReply(c, t.gfxRun(&c))
+	var d *kgDecoded
+	if c.a == 'q' || c.a == 't' || c.a == 'T' {
+		t.mu.Unlock()
+		gray, w, h, err := kgDecode(&c)
+		t.mu.Lock()
+		if t.emu != emu {
+			return false
+		}
+		d = &kgDecoded{gray, w, h, err}
+	}
+	t.gfxReply(emu, c, t.gfxRun(&c, d))
+	return true
+}
+
+// kgDecoded is a command's image, decoded.
+type kgDecoded struct {
+	gray *image.Gray
+	w, h int
+	err  error
 }
 
 // gfxReply answers c with r ("OK" or "CODE:why"), if it has an id to
 // answer with and its q doesn't say not to.
-func (t *termSession) gfxReply(c kgCmd, r string) {
+func (t *termSession) gfxReply(emu *vt.SafeEmulator, c kgCmd, r string) {
 	if r == "" || c.i == 0 && c.I == 0 || c.q >= 2 || c.q == 1 && r == "OK" {
 		return
 	}
@@ -385,25 +408,25 @@ func (t *termSession) gfxReply(c kgCmd, r string) {
 		fmt.Fprintf(&b, ",p=%d", c.p)
 	}
 	b.WriteString(";" + r + "\x1b\\")
-	io.WriteString(t.emu.InputPipe(), b.String())
+	io.WriteString(emu.InputPipe(), b.String())
 }
 
-// gfxRun does c, and says how it went.
-func (t *termSession) gfxRun(c *kgCmd) string {
+// gfxRun does c, its image decoded in d for those that bring one, and
+// says how it went.
+func (t *termSession) gfxRun(c *kgCmd, d *kgDecoded) string {
 	g := &t.gfx
 	if c.i != 0 && c.I != 0 {
 		return "EINVAL:both i and I"
 	}
 	switch c.a {
 	case 'q', 't', 'T':
-		gray, w, h, err := kgDecode(c)
-		if err != nil {
-			return err.Error()
+		if d.err != nil {
+			return d.err.Error()
 		}
 		if c.a == 'q' {
 			return "OK"
 		}
-		img := g.add(c, gray, w, h)
+		img := g.add(c, d.gray, d.w, d.h)
 		if c.a == 't' {
 			return "OK"
 		}

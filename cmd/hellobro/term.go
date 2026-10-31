@@ -163,8 +163,8 @@ func (t *termSession) writeTo(emu *vt.SafeEmulator, p []byte) bool {
 	if emu == nil || t.emu != emu {
 		return false
 	}
-	t.gfx.feed(p, func(b []byte) { emu.Write(b) }, t.gfxCommand)
-	return true
+	t.gfx.feed(p, func(b []byte) { emu.Write(b) }, func(b []byte) bool { return t.gfxCommand(emu, b) })
+	return t.emu == emu
 }
 
 // touchedRows are the rows the emulator changed since the last call, and

@@ -32,7 +32,7 @@ func TestGfxFeed(t *testing.T) {
 		s := stream
 		for i := 0; len(s) > 0; i++ {
 			n := min(len(s), sizes[i%len(sizes)])
-			g.feed([]byte(s[:n]), func(b []byte) { out.Write(b) }, func(b []byte) { cmds = append(cmds, string(b)) })
+			g.feed([]byte(s[:n]), func(b []byte) { out.Write(b) }, func(b []byte) bool { cmds = append(cmds, string(b)); return true })
 			s = s[n:]
 		}
 		if out.String() != wantOut {
@@ -452,5 +452,17 @@ func TestGfxPlaceBounded(t *testing.T) {
 	ts.write([]byte("\x1b_Ga=p,i=3,x=5000\x1b\\"))
 	if r := read(); !strings.Contains(r, "EINVAL") {
 		t.Errorf("x past the image: %q", r)
+	}
+}
+
+// A command whose stream went (the session started again while it
+// decoded) drops the rest of what was read with it.
+func TestGfxFeedStops(t *testing.T) {
+	var g kittyGfx
+	var out bytes.Buffer
+	n := 0
+	g.feed([]byte("a\x1b_Gi=1;x\x1b\\b\x1b_Gi=2;y\x1b\\c"), func(b []byte) { out.Write(b) }, func([]byte) bool { n++; return false })
+	if n != 1 || out.String() != "a" {
+		t.Errorf("%d commands, %q passed on; want 1, \"a\"", n, out.String())
 	}
 }
