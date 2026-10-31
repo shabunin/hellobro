@@ -989,6 +989,10 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.exOpen(a, "")
 		return true
 	}
+	if ch == "?" && w.b != nil {
+		a.showSheet(w.Title()+": keys and commands", bookKeys(w.pdf != nil), w.exCmds(a))
+		return true
+	}
 	if w.list && w.listPages {
 		by := map[uint16]int{103: -w.listCols, 108: w.listCols, 105: -1, 106: 1, 104: -w.listN, 109: w.listN}
 		switch {

@@ -790,6 +790,9 @@ typed could be. `:help` (`:h`) shows them all in a menu, each with what
 it does: typing narrows it, Enter runs the one lit, or puts it on the
 line if it takes something (`:size `, then the size).
 
+**?** in a book or a notebook puts up a sheet of its keys and its
+commands, in columns over the page; any key or a tap takes it down.
+
 | Command | |
 |---|---|
 | `:12` | page 12: a PDF's, or of the chapter shown in an EPUB |
@@ -958,7 +961,8 @@ its gray.
 
 ### ":" commands in a notebook
 
-The same line as a book's ([":" commands in a book](#-commands-in-a-book)).
+The same line as a book's ([":" commands in a book](#-commands-in-a-book)),
+and **?** its sheet of keys and commands too.
 
 | Command | |
 |---|---|

@@ -18,9 +18,10 @@ import (
 
 type infoBox struct {
 	title         string
-	rows          [][2]string // a name and its value
+	rows          [][2]string // a name and its value; a sheet's heading: {sheetHead, the heading}
 	box           image.Rectangle
 	copyR, closeR image.Rectangle
+	sheet         bool // a cheat sheet (sheet.go): rows in columns, any key closes it
 }
 
 const infoRowH = 46
@@ -45,6 +46,10 @@ func (a *bro) drawInfo() {
 	c.Frame(q.box, 4, kobo.Black)
 	in := q.box.Inset(32)
 	c.Text(a.F.Panel, image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Min.Y+56), q.title, kobo.Black, kobo.AlignLeft)
+	if q.sheet {
+		a.drawSheet(in)
+		return
+	}
 	nameW := 0
 	for _, r := range q.rows {
 		nameW = max(nameW, kobo.TextWidth(a.F.Small, r[0]))
@@ -95,6 +100,8 @@ func (a *bro) infoKey(code uint16, value int32) {
 	}
 	ch, _ := kobo.KeyChar(code, false, false)
 	switch {
+	case a.info.sheet: // any key: read, and back to the page
+		a.closeInfo()
 	case code == kobo.KeyEnter || code == kobo.KeyEsc || ch == "q":
 		a.closeInfo()
 	case ch == "c":
@@ -105,6 +112,8 @@ func (a *bro) infoKey(code uint16, value int32) {
 func (a *bro) infoTap(p image.Point) {
 	q := a.info
 	switch {
+	case q.sheet: // anywhere
+		a.closeInfo()
 	case kobo.Hit(p, q.copyR):
 		a.copyText(infoText(q.rows), "the details")
 	case kobo.Hit(p, q.closeR), !p.In(q.box):
