@@ -313,7 +313,7 @@ func alpineInstall(out io.Writer) error {
 		{"etc/motd", alpineMotd()},
 		{alpineDone, alpineVersion + "\n"},
 	} {
-		if err := writeNew(filepath.Join(alpineRoot, f.name), f.text); err != nil {
+		if err := writeNewIn(alpineRoot, f.name, 0o644, f.text); err != nil {
 			return err
 		}
 	}
@@ -463,6 +463,52 @@ func fetchPinned(url, hash string) ([]byte, error) {
 		return nil, fmt.Errorf("%s isn't what it should be: its SHA-256 doesn't match", path.Base(url))
 	}
 	return b, nil
+}
+
+// writeNewIn writes text to rel, a new file under root (one there goes
+// first), going down to it a directory at a time and following no
+// symlink: the image's directories are the jail's to change, and a
+// symlink it put on the way (even while we're on it) would send root's
+// write out into the Kobo's files, through /.oldroot or /proc/1/root.
+func writeNewIn(root, rel string, mode uint32, text string) error {
+	dir, name := path.Split(strings.Trim(rel, "/"))
+	if name == "" || name == "." || name == ".." {
+		return fmt.Errorf("%s: not a file's name", rel)
+	}
+	const flags = syscall.O_CLOEXEC | syscall.O_NOFOLLOW
+	fd, err := syscall.Open(root, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0)
+	if err != nil {
+		return fmt.Errorf("%s: %w", root, err)
+	}
+	defer func() { syscall.Close(fd) }()
+	for _, part := range strings.Split(dir, "/") {
+		if part == "" || part == "." {
+			continue
+		}
+		if part == ".." {
+			return fmt.Errorf("%s: .. in the way", rel)
+		}
+		next, err := syscall.Openat(fd, part, syscall.O_RDONLY|syscall.O_DIRECTORY|flags, 0)
+		if err != nil {
+			if errors.Is(err, syscall.ELOOP) || errors.Is(err, syscall.ENOTDIR) {
+				return fmt.Errorf("%s: a symlink in the way", rel)
+			}
+			return fmt.Errorf("%s: %w", rel, err)
+		}
+		syscall.Close(fd)
+		fd = next
+	}
+	syscall.Unlinkat(fd, name) // a symlink there goes, not what it points to
+	f, err := syscall.Openat(fd, name, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_EXCL|flags, mode)
+	if err != nil {
+		return fmt.Errorf("%s: %w", rel, err)
+	}
+	file := os.NewFile(uintptr(f), rel)
+	_, err = file.WriteString(text)
+	if cerr := file.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 // writeNew writes a file afresh: if a symlink was there, it's replaced,

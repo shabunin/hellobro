@@ -202,3 +202,33 @@ func TestProcSession(t *testing.T) {
 		t.Errorf("our session: %d %v, want %d", got, ok, sid)
 	}
 }
+
+// TestWriteNewIn: a symlink the jail put on the way, a directory or the
+// file itself, never takes the write out of the root.
+func TestWriteNewIn(t *testing.T) {
+	root, out := t.TempDir(), t.TempDir()
+	os.Mkdir(filepath.Join(root, "etc"), 0o755)
+	os.Symlink(out, filepath.Join(root, "bin"))                          // a directory out
+	os.Symlink(filepath.Join(out, "x"), filepath.Join(root, "etc", "x")) // the file itself
+	if err := writeNewIn(root, "/bin/busybox", 0o644, "musl"); err == nil {
+		t.Error("written through a symlinked directory")
+	}
+	if err := writeNewIn(root, "/etc/x", 0o644, "here"); err != nil {
+		t.Fatal(err)
+	}
+	if st, err := os.Lstat(filepath.Join(root, "etc", "x")); err != nil || !st.Mode().IsRegular() {
+		t.Errorf("etc/x: %v, %v", st, err)
+	}
+	if err := writeNewIn(root, "etc/resolv.conf", 0o644, "nameserver 1.1.1.1\n"); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(root, "etc", "resolv.conf")); string(b) != "nameserver 1.1.1.1\n" {
+		t.Errorf("resolv.conf: %q", b)
+	}
+	if err := writeNewIn(root, "etc/../../y", 0o644, ""); err == nil {
+		t.Error("written past ..")
+	}
+	if ents, _ := os.ReadDir(out); len(ents) != 0 {
+		t.Errorf("written outside the root: %v", ents)
+	}
+}

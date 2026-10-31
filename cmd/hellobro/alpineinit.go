@@ -263,7 +263,7 @@ func alpineJail(shared bool) error {
 			return err
 		}
 		const sock = "/run/dbus/system_bus_socket"
-		if err := writeNew(sock, ""); err != nil {
+		if err := writeNewIn("/", sock, 0o644, ""); err != nil {
 			return err
 		}
 		if err := syscall.Mount("/.oldroot/var/run/dbus/system_bus_socket", sock, "", syscall.MS_BIND, ""); err != nil {
@@ -278,13 +278,12 @@ func alpineJail(shared bool) error {
 			if have, err := os.ReadFile(name); err == nil && string(have) == string(b) {
 				continue
 			}
-			if err := writeNew(name, string(b)); err != nil {
+			if err := writeNewIn("/", name, 0o755, string(b)); err != nil {
 				return err
 			}
-			os.Chmod(name, 0o755)
 		}
 		if _, err := os.Lstat("/etc/asound.conf"); err != nil && len(plugins) > 0 {
-			writeNew("/etc/asound.conf", alsaConf)
+			writeNewIn("/", "/etc/asound.conf", 0o644, alsaConf)
 		}
 	}
 	// Read-only: what runs as root outside the jail, and what of /proc
@@ -323,7 +322,7 @@ func alpineJail(shared bool) error {
 		os.Symlink(to, "/dev/"+name)
 	}
 	if len(resolv) > 0 {
-		writeNew("/etc/resolv.conf", string(resolv))
+		writeNewIn("/", "/etc/resolv.conf", 0o644, string(resolv))
 	}
 	if err := syscall.Unmount("/.oldroot", syscall.MNT_DETACH); err != nil {
 		return fmt.Errorf("leaving the Kobo's /: %w", err)
@@ -364,7 +363,7 @@ var jailIPC bool
 // the jail at path: it does there what that name says.
 func jailExe(exe, path string) error {
 	if st, err := os.Lstat(path); err != nil || !st.Mode().IsRegular() {
-		if err := writeNew(path, ""); err != nil {
+		if err := writeNewIn("/", path, 0o644, ""); err != nil {
 			return err
 		}
 	}
