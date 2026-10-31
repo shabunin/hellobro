@@ -145,7 +145,9 @@ func (w *bookWin) thumbNext(a *bro) {
 					delete(th.drawn, k)
 				}
 			}
-			if i := pg - w.top; i >= 0 && i < per && w.list && w.listPages && a.shows(w) {
+			// The tiles as they are now: fewer, if the window got shorter
+			// while the page was drawn.
+			if i := pg - w.top; i >= 0 && i < len(w.thumbTiles) && w.list && w.listPages && a.shows(w) {
 				t := w.thumbTiles[i]
 				w.drawThumb(a, pg, t)
 				a.Mark(image.Rect(t.Min.X-8, t.Min.Y-8, t.Max.X+8, t.Max.Y+thumbLab), true)
