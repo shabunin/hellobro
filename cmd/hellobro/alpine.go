@@ -46,6 +46,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"hellobro/kobo"
 )
 
@@ -535,7 +537,12 @@ func alpineExtract(r io.Reader, dir string) error {
 	if err != nil {
 		return err
 	}
-	tr, root := tar.NewReader(zr), os.Getuid() == 0
+	root, err := unix.Open(dir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(root)
+	tr, asRoot := tar.NewReader(zr), os.Getuid() == 0
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
@@ -548,59 +555,127 @@ func alpineExtract(r io.Reader, dir string) error {
 		if name == "/" {
 			continue
 		}
-		if err := noSymlinkIn(dir, filepath.Dir(name)); err != nil {
-			return err
+		// The image may have a jail on it as we go, its root free to put
+		// a symlink anywhere: each entry is made from its directory, held
+		// open, got to with no symlink followed, and its owner and mode
+		// set on what's open, never by its name again.
+		parent, err := dirIn(root, filepath.Dir(name))
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
 		}
-		p := filepath.Join(dir, name)
-		switch h.Typeflag {
-		case tar.TypeDir:
-			if st, err := os.Lstat(p); err != nil || !st.IsDir() {
-				os.Remove(p)
-				if err := os.Mkdir(p, 0o700); err != nil {
-					return err
-				}
-			}
-		case tar.TypeReg:
-			os.Remove(p)
-			f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(f, tr)
-			if cerr := f.Close(); err == nil {
-				err = cerr
-			}
-			if err != nil {
-				return err
-			}
-		case tar.TypeSymlink:
-			os.Remove(p)
-			if err := os.Symlink(h.Linkname, p); err != nil {
-				return err
-			}
-		case tar.TypeLink:
-			to := filepath.Clean("/" + h.Linkname)
-			if err := noSymlinkIn(dir, filepath.Dir(to)); err != nil {
-				return err
-			}
-			os.Remove(p)
-			if err := os.Link(filepath.Join(dir, to), p); err != nil {
-				return err
-			}
-		default: // devices, fifos: the jail makes its own /dev
-			continue
-		}
-		if root {
-			if err := os.Lchown(p, h.Uid, h.Gid); err != nil {
-				return err
-			}
-		}
-		if h.Typeflag != tar.TypeSymlink { // after chown, which clears setuid
-			if err := syscall.Chmod(p, uint32(h.Mode&0o7777)); err != nil {
-				return err
-			}
+		err = extractEntry(root, parent, filepath.Base(name), h, tr, asRoot)
+		unix.Close(parent)
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
+}
+
+// extractEntry makes h's entry, base, in the directory parent (root:
+// the image's top, for a hard link's target).
+func extractEntry(root, parent int, base string, h *tar.Header, r io.Reader, asRoot bool) error {
+	const flags = unix.O_NOFOLLOW | unix.O_CLOEXEC
+	var fd int
+	switch h.Typeflag {
+	case tar.TypeDir:
+		var st unix.Stat_t
+		if unix.Fstatat(parent, base, &st, unix.AT_SYMLINK_NOFOLLOW) != nil || st.Mode&unix.S_IFMT != unix.S_IFDIR {
+			removeAt(parent, base)
+			if err := unix.Mkdirat(parent, base, 0o700); err != nil {
+				return err
+			}
+		}
+		var err error
+		if fd, err = unix.Openat(parent, base, unix.O_RDONLY|unix.O_DIRECTORY|flags, 0); err != nil {
+			return err
+		}
+	case tar.TypeReg:
+		removeAt(parent, base)
+		f, err := unix.Openat(parent, base, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|flags, 0o600)
+		if err != nil {
+			return err
+		}
+		file := os.NewFile(uintptr(f), base)
+		defer file.Close()
+		if _, err := io.Copy(file, r); err != nil {
+			return err
+		}
+		fd = int(file.Fd())
+		return ownMode(fd, h, asRoot)
+	case tar.TypeSymlink:
+		removeAt(parent, base)
+		if err := unix.Symlinkat(h.Linkname, parent, base); err != nil {
+			return err
+		}
+		if asRoot {
+			return unix.Fchownat(parent, base, h.Uid, h.Gid, unix.AT_SYMLINK_NOFOLLOW)
+		}
+		return nil
+	case tar.TypeLink:
+		to := filepath.Clean("/" + h.Linkname)
+		from, err := dirIn(root, filepath.Dir(to))
+		if err != nil {
+			return err
+		}
+		defer unix.Close(from)
+		removeAt(parent, base)
+		if err := unix.Linkat(from, filepath.Base(to), parent, base, 0); err != nil { // a symlink there: linked itself, not followed
+			return err
+		}
+		if fd, err = unix.Openat(parent, base, unix.O_RDONLY|unix.O_NONBLOCK|flags, 0); err != nil {
+			return err // a link to a symlink: ELOOP
+		}
+	default: // devices, fifos: the jail makes its own /dev
+		return nil
+	}
+	defer unix.Close(fd)
+	return ownMode(fd, h, asRoot)
+}
+
+// ownMode gives what fd is h's owner, then its mode (chown clears setuid).
+func ownMode(fd int, h *tar.Header, asRoot bool) error {
+	if asRoot {
+		if err := unix.Fchown(fd, h.Uid, h.Gid); err != nil {
+			return err
+		}
+	}
+	return unix.Fchmod(fd, uint32(h.Mode&0o7777))
+}
+
+// removeAt takes out what's at base in dir, if anything: a file, a
+// symlink (not what it points to), an empty directory.
+func removeAt(dir int, base string) {
+	if err := unix.Unlinkat(dir, base, 0); errors.Is(err, unix.EISDIR) || errors.Is(err, unix.EPERM) {
+		unix.Unlinkat(dir, base, unix.AT_REMOVEDIR)
+	}
+}
+
+// dirIn opens rel (clean, absolute, taken as under the directory root)
+// a directory at a time, following no symlink.
+func dirIn(root int, rel string) (int, error) {
+	fd, err := unix.Openat(root, ".", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return -1, err
+	}
+	for _, part := range strings.Split(strings.Trim(rel, "/"), "/") {
+		if part == "" || part == "." {
+			continue
+		}
+		if part == ".." {
+			unix.Close(fd)
+			return -1, errors.New(".. in the way")
+		}
+		next, err := unix.Openat(fd, part, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+		unix.Close(fd)
+		if errors.Is(err, unix.ELOOP) || errors.Is(err, unix.ENOTDIR) {
+			return -1, fmt.Errorf("%s: a symlink in the way", part)
+		}
+		if err != nil {
+			return -1, err
+		}
+		fd = next
+	}
+	return fd, nil
 }
 
 // noSymlinkIn checks that no part of rel (a clean, absolute path, taken
