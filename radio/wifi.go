@@ -444,8 +444,16 @@ func (w *wpaWiFi) Connect(n Network, password string, progress func(string)) err
 	return nil
 }
 
+// wpaQuote is s as wpa_supplicant reads a string: in quotes, everything
+// up to the last quote as it is. No escapes: strconv.Quote's backslashes
+// would be in the password, which then never matched.
+func wpaQuote(s string) string { return `"` + s + `"` }
+
 // configure sets up a new network for n.
 func (w *wpaWiFi) configure(id int, n Network, password string) error {
+	if strings.ContainsFunc(password, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
+		return errors.New("a password with a control character (a new line?) in it")
+	}
 	sid := strconv.Itoa(id)
 	set := func(k, v string) error {
 		_, err := w.cli("set_network", sid, k, v)
@@ -466,20 +474,20 @@ func (w *wpaWiFi) configure(id int, n Network, password string) error {
 		if isHex(password) && (len(password) == 10 || len(password) == 26) {
 			return set("wep_key0", password)
 		}
-		return set("wep_key0", strconv.Quote(password))
-	case len(password) < 8 || len(password) > 64:
+		return set("wep_key0", wpaQuote(password))
+	case len(password) < 8 || len(password) > 64 || len(password) == 64 && !isHex(password):
 		return errors.New("a WPA password has 8 to 63 characters")
 	case n.Security == "WPA3":
 		set("key_mgmt", "SAE")
 		set("ieee80211w", "2")
-		if err := set("sae_password", strconv.Quote(password)); err != nil {
+		if err := set("sae_password", wpaQuote(password)); err != nil {
 			return errors.New("this Kobo's wpa_supplicant can't do WPA3")
 		}
 		return nil
 	case len(password) == 64 && isHex(password):
 		return set("psk", password)
 	}
-	return set("psk", strconv.Quote(password))
+	return set("psk", wpaQuote(password))
 }
 
 func isHex(s string) bool {

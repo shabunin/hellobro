@@ -83,3 +83,21 @@ func TestProcs(t *testing.T) {
 		t.Error("cmdline of no process isn't nil")
 	}
 }
+
+// A password goes to wpa_supplicant as it is, in quotes: it reads up to
+// the last one, no escapes.
+func TestWpaQuote(t *testing.T) {
+	for in, want := range map[string]string{
+		`hunter22`:     `"hunter22"`,
+		`pa"ss\word`:   `"pa"ss\word"`,
+		`пароль-bro-1`: `"пароль-bro-1"`,
+	} {
+		if got := wpaQuote(in); got != want {
+			t.Errorf("%s: %s, want %s", in, got, want)
+		}
+	}
+	w := &wpaWiFi{}
+	if err := w.configure(0, Network{SSID: "x", Security: "WPA2"}, "line\nbreak1"); err == nil || !strings.Contains(err.Error(), "control character") {
+		t.Errorf("a new line in the password: %v", err)
+	}
+}
