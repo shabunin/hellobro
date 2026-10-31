@@ -411,11 +411,17 @@ func (a *bro) drawSettings() {
 		case st.key == "keys":
 			shown = fmt.Sprintf("%d set by you (keys.conf)", len(a.keys.named))
 		}
+		label := a.settingLabel(st)
 		value := "‹ " + shown + " ›"
 		vw := kobo.TextWidth(a.F.Small, value)
+		if room := max(t.Dx()/2, t.Dx()-kobo.TextWidth(a.F.Body, label)-20); vw > room { // narrow: the value cut short, the label whole if it can be
+			marks := kobo.TextWidth(a.F.Small, "‹  ›")
+			value = "‹ " + kobo.Fit(a.F.Small, shown, max(0, room-marks)) + " ›"
+			vw = kobo.TextWidth(a.F.Small, value)
+		}
 		c.Text(a.F.Small, image.Rect(t.Max.X-vw, t.Min.Y, t.Max.X, t.Max.Y), value, dim, kobo.AlignRight)
 		t.Max.X -= vw + 20
-		c.Text(a.F.Body, t, a.settingLabel(st), fg, kobo.AlignLeft)
+		c.Text(a.F.Body, t, label, fg, kobo.AlignLeft)
 	}
 	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter)."
 	switch {

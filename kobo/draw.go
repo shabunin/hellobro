@@ -234,6 +234,9 @@ func glyph(f font.Face, dot fixed.Point26_6, ch rune) (image.Rectangle, image.Im
 	return g.dr.Add(at), g.mask, image.Point{}, advance, ok
 }
 
+// Fit is s as it fits in w px of f: cut, with an ellipsis, if it's wider.
+func Fit(f font.Face, s string, w int) string { return fit(f, s, w) }
+
 func fit(f font.Face, s string, w int) string {
 	if font.MeasureString(f, s).Ceil() <= w {
 		return s
