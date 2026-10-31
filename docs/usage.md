@@ -692,7 +692,7 @@ and for PDFs, drawn by MuPDF (below).
   **f** (Shift+F back) goes through the fonts.
 - **t**, Enter, **☰** or a tap at the top shows the contents: pick a
   chapter, or swipe up and down for more. Esc or "back to the book"
-  leaves them, "‹ All Books" goes to the shelf (on a page, Esc does too).
+  leaves them, "‹ All Books" goes to the shelf (on a page, Esc and q do too).
 - **b**, a tap on the ribbon or on the page's top right corner
   bookmarks the page (a ribbon hangs at
   its top right then), or takes its bookmark away. The contents' second
@@ -815,7 +815,7 @@ till it's renamed); the launcher has **Notebooks**, **New notebook**
 and the last two written.
 
 - **All Notebooks** (the launcher's **Notebooks**, **Notebooks** in the
-  switcher, or **‹ All Notebooks** at the left of a notebook's bar)
+  switcher, **‹ All Notebooks** at the left of a notebook's bar, or q)
   has the books' header and tabs ([Books](#books)): **Recent** (the
   last written first), **All** (by name) and **Folders** (a folder at a
   time, its folders first; the top row goes up). Opened from a

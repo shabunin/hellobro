@@ -143,6 +143,7 @@ func bookKeys(pdf bool) [][2]string {
 		{"b", "a bookmark here, or not"},
 		{":", "a command (below)"},
 		{"?", "this sheet"},
+		{"q", "the book put away: the shelf"},
 		{"Esc", "a cut, the tool put down; else the shelf"},
 	}...)
 }
@@ -161,5 +162,6 @@ func noteKeys() [][2]string {
 		{"Ctrl+E", "export: a PDF or a PNG"},
 		{":", "a command (below)"},
 		{"?", "this sheet"},
+		{"q", "the notebook put away: All Notebooks"},
 	}
 }

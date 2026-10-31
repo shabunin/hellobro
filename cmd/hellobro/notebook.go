@@ -1041,6 +1041,10 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 		w.exOpen(a, "")
 		return true
 	}
+	if ch == "q" && !m.ctrl { // the notebook put away: All Notebooks
+		a.notesFrom(w)
+		return true
+	}
 	if ch == "?" && !m.ctrl {
 		a.showSheet(w.Title()+": keys and commands", noteKeys(), w.exCmds(a))
 		return true

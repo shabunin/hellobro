@@ -989,6 +989,10 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.exOpen(a, "")
 		return true
 	}
+	if ch == "q" && w.b != nil { // the book put away: the shelf
+		w.toShelf(a)
+		return true
+	}
 	if ch == "?" && w.b != nil {
 		a.showSheet(w.Title()+": keys and commands", bookKeys(w.pdf != nil), w.exCmds(a))
 		return true
