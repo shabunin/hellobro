@@ -1,7 +1,10 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -74,6 +77,34 @@ func TestRelayLine(t *testing.T) {
 	for _, bad := range []string{"kobo@vps x", "kobo@vps 0", "kobo@vps:x"} {
 		if _, ok, err := parseRelayLine(bad); !ok || err == nil {
 			t.Errorf("%q: want an error, got %v, %v", bad, ok, err)
+		}
+	}
+}
+
+// TestLoadKeyOnce: asked for at once the first time, there's one key,
+// and its .pub is that one's.
+func TestLoadKeyOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "id_ed25519")
+	keys := make(chan string, 8)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s, err := loadKey(path)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			keys <- authorizedKey(s)
+		}()
+	}
+	wg.Wait()
+	close(keys)
+	pub, _ := os.ReadFile(path + ".pub")
+	for k := range keys {
+		if k+"\n" != string(pub) {
+			t.Errorf("a key not the .pub's: %s", k)
 		}
 	}
 }

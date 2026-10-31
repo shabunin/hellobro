@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -180,8 +181,15 @@ func parseSSHTarget(s string) (sshHost, error) {
 
 // clientKey loads id_ed25519, or makes one (plus id_ed25519.pub, to copy
 // into a server's authorized_keys).
-func clientKey() (ssh.Signer, error) {
-	path := kobo.AppFile("id_ed25519")
+func clientKey() (ssh.Signer, error) { return loadKey(kobo.AppFile("id_ed25519")) }
+
+// keyMu: the relay, the dials and the UI ask for the key at once, the
+// first time, and each would make its own.
+var keyMu sync.Mutex
+
+func loadKey(path string) (ssh.Signer, error) {
+	keyMu.Lock()
+	defer keyMu.Unlock()
 	if b, err := os.ReadFile(path); err == nil {
 		return ssh.ParsePrivateKey(b)
 	}
@@ -193,14 +201,24 @@ func clientKey() (ssh.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
-		return nil, err
-	}
 	signer, err := ssh.NewSignerFromKey(priv)
 	if err != nil {
 		return nil, err
 	}
-	os.WriteFile(path+".pub", []byte(authorizedKey(signer)+"\n"), 0o644)
+	// Each whole or not at all, the public one first: a key half written
+	// would never parse, and one with another's .pub never log in.
+	for _, f := range []struct {
+		path string
+		b    []byte
+		perm os.FileMode
+	}{{path + ".pub", []byte(authorizedKey(signer) + "\n"), 0o644}, {path, pem.EncodeToMemory(block), 0o600}} {
+		if err := os.WriteFile(f.path+".new", f.b, f.perm); err != nil {
+			return nil, err
+		}
+		if err := os.Rename(f.path+".new", f.path); err != nil {
+			return nil, err
+		}
+	}
 	return signer, nil
 }
 
