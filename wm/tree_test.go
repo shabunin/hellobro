@@ -274,6 +274,14 @@ func TestOps(t *testing.T) {
 		}, "1:splith[a, b*, c]"},
 		{"float empties split", "1:splith[a, splitv[b*]]", func(t *Tree) { t.ToggleFloating(t.Focused()) }, "1:splith[a] float[b*]"},
 		{"tile into empty", "1:splith[] float[f*]", func(t *Tree) { t.ToggleFloating(t.Focused()) }, "1:splith[f*]"},
+		{"tile one of a floating container", "1:splith[b] float[splith[a, c*]]", func(t *Tree) { t.SetFloating(w(t, "c"), false) }, "1:splith[b, c*] float[splith[a]]"},
+		{"tabbed workspace, a leaf first", "1:splith[]", func(t *Tree) {
+			t.SetLayout(t.Current(), Tabbed)
+			t.Open(win("a"))
+			t.Open(win("b"))
+			t.Move(t.Focused(), Up, 10)
+			t.Open(win("c"))
+		}, "1:splitv[b, c*, splith[tabbed[a]]]"}, // c beside b, not under it
 
 		{"fullscreen", "1:splith[a, b*]", func(t *Tree) { t.ToggleFullscreen(w(t, "a")) }, "1:splith[a*!, b]"},
 		{"fullscreen one", "1:splith[a!, b*]", func(t *Tree) { t.ToggleFullscreen(t.Focused()) }, "1:splith[a, b*!]"},
@@ -321,6 +329,11 @@ func TestWorkspaces(t *testing.T) {
 			t.MoveToWorkspace(t.Focused(), "2")
 		}, "<1:splith[]> 2:splith[c, splith[a, b]]"},
 		{"empty goes", "1:splith[a] | 2:splith[b*]", func(t *Tree) { t.Remove(w(t, "a")) }, "<2:splith[b*]>"},
+		{"float alone, elsewhere", "1:splith[a*] | 2:splith[b]", func(t *Tree) { t.SetFloating(w(t, "b"), true) }, "<1:splith[a*]> 2:splith[] float[b]"},
+		{"scratchpad stays floating", "1:splith[a, b*]", func(t *Tree) {
+			t.MoveToScratchpad(t.Focused())
+			t.SetFloating(w(t, "b"), false)
+		}, "<1:splith[a*]> __i3_scratch:splith[] float[b]"},
 		{"rename", "1:splith[a*] | 3:splith[b]", func(t *Tree) { t.RenameWorkspace("3", "0") }, "0:splith[b] <1:splith[a*]>"},
 		{"focus elsewhere", "1:splith[a*] | 2:splith[b, c]", func(t *Tree) { t.Focus(w(t, "c")) }, "1:splith[a] <2:splith[b, c*]>"},
 		{"scratchpad", "1:splith[a, b*]", func(t *Tree) { t.MoveToScratchpad(t.Focused()) }, "<1:splith[a*]> __i3_scratch:splith[] float[b]"},

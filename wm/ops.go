@@ -13,13 +13,19 @@ func (t *Tree) Open(w Window) *Node {
 	t.unFullscreen(ws)
 	p, after := t.target(t.focused)
 	if p == ws && ws.wsLayout && (ws.WSLayout == Stacked || ws.WSLayout == Tabbed) {
-		// a stacked or tabbed workspace: the windows go in its one container
-		if len(ws.Nodes) == 0 {
+		// A stacked or tabbed workspace: the windows go in its one
+		// container. Not once it's been laid out otherwise (a window moved
+		// out beside it): the first might be a window then, not one to
+		// hold another.
+		switch {
+		case len(ws.Nodes) == 0:
 			c := t.node(Con)
 			c.Layout, c.LastSplit = ws.WSLayout, ws.LastSplit
 			attach(ws, c, -1)
+			p, after = c, nil
+		case len(ws.Nodes) == 1 && !ws.Nodes[0].leaf():
+			p, after = ws.Nodes[0], focusedTiled(ws.Nodes[0])
 		}
-		p, after = ws.Nodes[0], focusedTiled(ws.Nodes[0])
 	}
 	attach(p, n, indexAfter(p, after))
 	t.focus(n)

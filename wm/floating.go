@@ -13,11 +13,13 @@ func (t *Tree) SetFloating(n *Node, on bool) {
 		return
 	}
 	ws := workspaceOf(n)
+	if ws == t.scratch { // what's put away floats, to come back floating
+		return
+	}
 	had := t.focused == n
+	old := n.Parent
 	if on {
-		old := n.Parent
 		detach(n)
-		t.tidy(old)
 		f := t.node(FloatingCon)
 		f.Parent, f.Percent, f.Layout = ws, 1, SplitH
 		f.FloatRect = n.FloatRect
@@ -33,13 +35,15 @@ func (t *Tree) SetFloating(n *Node, on bool) {
 		attach(f, n, -1)
 		n.Percent = 1
 	} else {
-		f := floatOf(n)
-		n.FloatRect = f.FloatRect
+		n.FloatRect = floatOf(n).FloatRect
 		detach(n)
-		detach(f)
 		p, after := t.target(ws)
 		attach(p, n, indexAfter(p, after))
 	}
+	// What it left goes if it's empty now (its floating container, the
+	// one holding it with others not): only now, with n in its place, so
+	// a workspace that had only n isn't taken for empty and dropped.
+	t.tidy(old)
 	if had {
 		t.focus(n)
 	}
