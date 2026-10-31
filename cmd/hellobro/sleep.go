@@ -67,6 +67,7 @@ func (a *bro) sleepWhenIdle() {
 
 func (a *bro) Sleep() func() {
 	a.slp.asleep = true
+	a.noteCut()  // a stroke under way: kept as it is, its lift won't come
 	a.noteExit() // what's written, and where each book is, kept: it may not wake
 	a.bookExit()
 	a.picker, a.Covered = nil, false // the sleep screen goes over it; waking draws the page
@@ -163,6 +164,7 @@ func (a *bro) lock() {
 		hint = ""
 	}
 	a.picker, a.Covered = nil, false // what's open stays put; the switcher would only be in the way
+	a.noteCut()                      // the lock takes the touches: a stroke under way ends here
 	a.App.Lock(hint, a.lockLines())
 	if a.Keyboard == "" || k == "" { // no key to unlock it: swipes
 		a.SetLockSwipes(a.lockSwipes())

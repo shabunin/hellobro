@@ -1262,6 +1262,19 @@ func (a *bro) noteErase(k *noteInk, p image.Point) {
 }
 
 // noteLift ends what the pen or the finger did.
+// noteCut ends a stroke whose lift won't come, and drops a selection's
+// drag: asleep or locked, the touches don't come to us. Left on, the ink
+// took no stroke after, and the notebook was never kept again.
+func (a *bro) noteCut() {
+	if k := a.nt.ink; k != nil {
+		a.noteInkDone(k)
+	}
+	if a.nt.drag != nil { // a drag cut short does nothing: the screen's drawn again after
+		a.nt.drag = nil
+		a.Ink(false)
+	}
+}
+
 func (a *bro) noteLift(g *kobo.Gesture) bool {
 	switch g.Owner {
 	case ownLeaf:
@@ -1298,10 +1311,15 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 	default:
 		return false
 	}
-	k := a.nt.ink
-	if k == nil || k.g != g {
-		return true
+	if k := a.nt.ink; k != nil && k.g == g {
+		a.noteInkDone(k)
 	}
+	return true
+}
+
+// noteInkDone ends k: its stroke goes on its page, or what it erased
+// goes from it.
+func (a *bro) noteInkDone(k *noteInk) {
 	a.nt.ink = nil
 	a.Ink(false)
 	w := k.w
@@ -1325,7 +1343,6 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		a.Mark(w.bar, true)
 	}
 	a.noteFocus(w)
-	return true
 }
 
 // noteFocus gives w the focus, if it hasn't got it.
