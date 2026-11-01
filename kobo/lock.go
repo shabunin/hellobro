@@ -129,7 +129,7 @@ func (a *App) drawLock() {
 		y += 48
 	}
 	a.blinks, a.toast = nil, nil
-	a.dirty = []dirtyRect{{b, true}}
+	a.dirty = []dirtyRect{{b, true, false}}
 	a.flush()
 }
 

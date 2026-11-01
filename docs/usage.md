@@ -1213,6 +1213,13 @@ crisp, if without smooth edges till the GL16 cleanup puts them in. (Sent
 the grays, DU left them faint, and the cleanup, sending the same pixels,
 didn't touch them.)
 
+A notebook's ink goes in the panel's pen mode (DU, sent as it's written,
+without waiting for the pieces before). The strokes' cleanup, the paper's
+grays and the smooth edges back under them, waits till the pen has
+rested a second, so a word written goes without a grayscale update
+between its letters. The log's `blits:` line says how long ink took to
+reach the panel.
+
 ## Files on the Kobo
 
 Everything hellobro keeps is next to it, in `.adds/hellobro/` on the

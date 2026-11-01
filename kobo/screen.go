@@ -60,6 +60,9 @@ type screen struct {
 	blits, pixels  int
 	total, slowest time.Duration
 	statsAt        time.Time
+	inks           int // updates with pen points in them
+	inkTotal       time.Duration
+	inkMax         time.Duration
 }
 
 // openScreen asks FBInk for the current (gyro) orientation, then locks it,
@@ -117,12 +120,25 @@ func (s *screen) blit(img *image.Gray, r image.Rectangle, waveform string, flash
 	s.total += d
 	s.slowest = max(s.slowest, d)
 	if time.Since(s.statsAt) > 10*time.Second {
-		log.Printf("blits: %d in the last %.0fs, avg %v, slowest %v, avg %d px",
+		ink := ""
+		if s.inks > 0 {
+			ink = fmt.Sprintf("; ink to the panel avg %v, max %v", (s.inkTotal / time.Duration(s.inks)).Round(time.Millisecond), s.inkMax.Round(time.Millisecond))
+		}
+		log.Printf("blits: %d in the last %.0fs, avg %v, slowest %v, avg %d px%s",
 			s.blits, time.Since(s.statsAt).Seconds(), (s.total / time.Duration(s.blits)).Round(time.Millisecond),
-			s.slowest.Round(time.Millisecond), s.pixels/s.blits)
+			s.slowest.Round(time.Millisecond), s.pixels/s.blits, ink)
 		s.blits, s.pixels, s.total, s.slowest, s.statsAt = 0, 0, 0, 0, time.Now()
+		s.inks, s.inkTotal, s.inkMax = 0, 0, 0
 	}
 	return err
+}
+
+// inkSent counts how long pen points took to go to the panel: from the
+// touch to the update's ioctl, waits for the panel included.
+func (s *screen) inkSent(d time.Duration) {
+	s.inks++
+	s.inkTotal += d
+	s.inkMax = max(s.inkMax, d)
 }
 
 func (s *screen) close() { s.be.close() }

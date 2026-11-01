@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"slices"
 	"unsafe"
 )
 
@@ -31,6 +32,7 @@ type fbinkLib struct {
 type refresh struct {
 	marker C.uint32_t
 	r      image.Rectangle
+	pen    bool
 }
 
 // maxInflight bounds the refreshes queued in the panel driver. It takes
@@ -104,7 +106,7 @@ func (l *fbinkLib) blit(img *image.Gray, r image.Rectangle, waveform string, fla
 	}
 	if pen {
 		waveform = "DU"
-		l.waitInflight(penInflight - 1)
+		l.waitPen(penInflight - 1)
 	}
 	if flash { // let everything else finish, so it doesn't spoil the full refresh
 		l.waitInflight(0)
@@ -129,7 +131,7 @@ func (l *fbinkLib) blit(img *image.Gray, r image.Rectangle, waveform string, fla
 	if rc < 0 {
 		return fmt.Errorf("fbink blit %v: %d", r, rc)
 	}
-	l.inflight = append(l.inflight, refresh{C.fbink_get_last_marker(), r})
+	l.inflight = append(l.inflight, refresh{C.fbink_get_last_marker(), r, pen})
 	return nil
 }
 
@@ -138,6 +140,28 @@ func (l *fbinkLib) waitInflight(n int) {
 	for len(l.inflight) > n {
 		C.fbink_wait_for_complete(l.fd, l.inflight[0].marker)
 		l.inflight = l.inflight[1:]
+	}
+}
+
+// waitPen waits for the oldest ink in pen mode until at most n pieces
+// of it are left, the other refreshes aside: a stroke's cleanup still on
+// the panel mustn't hold the next stroke up.
+func (l *fbinkLib) waitPen(n int) {
+	for {
+		first, count := -1, 0
+		for i, r := range l.inflight {
+			if r.pen {
+				if first < 0 {
+					first = i
+				}
+				count++
+			}
+		}
+		if count <= n {
+			return
+		}
+		C.fbink_wait_for_complete(l.fd, l.inflight[first].marker)
+		l.inflight = slices.Delete(l.inflight, first, first+1)
 	}
 }
 

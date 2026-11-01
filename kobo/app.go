@@ -124,14 +124,16 @@ type calibState struct {
 // dirtyRect is an area to send to the panel. Ink-only areas use the
 // fast black & white waveform, anything else a grayscale one.
 type dirtyRect struct {
-	r  image.Rectangle
-	ui bool
+	r   image.Rectangle
+	ui  bool
+	pen bool // ink written: it goes in pen mode, even if the pen lifted since
 }
 
 type blitJob struct {
 	img   *image.Gray
 	wf    string
 	flash bool
+	ink   time.Time // the oldest pen point in it, for the log
 }
 
 // App is the app shell; a Program embeds it, and uses what's exported.
@@ -188,7 +190,8 @@ type App struct {
 	flash      bool            // the next full-screen update should flash
 	flashR     image.Rectangle // an area whose next update should flash (GC16), to clear ghosting
 	blitting   bool
-	ink        bool // Ink's: black & white updates go in pen mode
+	ink        bool      // Ink's: black & white updates go in pen mode
+	inkSince   time.Time // the oldest pen point not yet sent to the panel
 	jobs       chan blitJob
 	done       chan error
 	quit       bool
@@ -254,6 +257,9 @@ func (a *App) Run() {
 			a.blitAt.Store(time.Now().UnixNano())
 			err := a.scr.blit(j.img, j.img.Bounds(), j.wf, j.flash)
 			a.blitAt.Store(0)
+			if !j.ink.IsZero() {
+				a.scr.inkSent(time.Since(j.ink))
+			}
 			a.done <- err
 		}
 	}()
@@ -470,6 +476,9 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 			a.lightBack()
 			a.onTouch(ev)
 			if a.ink {
+				if a.inkSince.IsZero() {
+					a.inkSince = ev.At
+				}
 				a.flush() // now, not at the next tick: ink follows the hand
 			}
 			idle.Reset(IdleTimeout)
@@ -1042,13 +1051,15 @@ func (a *App) Mark(r image.Rectangle, ui bool) {
 	if r.Empty() || a.locked { // the page is off the panel
 		return
 	}
+	pen := a.ink && !ui
 	for i, d := range a.dirty {
 		if d.ui == ui && compact(d.r, r) {
 			a.dirty[i].r = d.r.Union(r)
+			a.dirty[i].pen = d.pen || pen
 			return
 		}
 	}
-	a.dirty = append(a.dirty, dirtyRect{r, ui})
+	a.dirty = append(a.dirty, dirtyRect{r, ui, pen})
 }
 
 // MarkFlash redraws r with a flash, which clears the ghosting that
@@ -1061,7 +1072,7 @@ func (a *App) MarkFlash(r image.Rectangle) {
 func (a *App) markAll(flash bool) {
 	a.ring = image.Rectangle{} // a card, or a new layout: the Program puts it back if it's still wanted
 	a.blinks, a.toast = nil, nil
-	a.dirty = []dirtyRect{{a.C.Bounds(), true}}
+	a.dirty = []dirtyRect{{a.C.Bounds(), true, false}}
 	a.flash = a.flash || flash
 }
 
@@ -1076,12 +1087,20 @@ func (a *App) flush() {
 	if a.blitting || a.asleep || len(a.dirty) == 0 {
 		return
 	}
-	d := a.dirty[0]
+	first := 0
+	if a.ink { // ink first, before a grayscale update queued: it follows the hand
+		first = max(0, slices.IndexFunc(a.dirty, func(d dirtyRect) bool { return !d.ui }))
+	}
+	d := a.dirty[first]
 	rest := a.dirty[:0]
 	all := len(a.dirty) > 4
-	for _, o := range a.dirty[1:] {
+	for i, o := range a.dirty {
+		if i == first {
+			continue
+		}
 		if o.ui == d.ui && (all || compact(d.r, o.r)) {
 			d.r = d.r.Union(o.r)
+			d.pen = d.pen || o.pen
 		} else {
 			rest = append(rest, o)
 		}
@@ -1111,18 +1130,27 @@ func (a *App) flush() {
 		wf = "GL16"
 	default:
 		blackWhite(img)
-		if a.ink {
+		if a.ink || d.pen {
 			wf = "PEN"
 		}
 	}
-	a.jobs <- blitJob{img, wf, flash}
+	j := blitJob{img: img, wf: wf, flash: flash}
+	if wf == "PEN" {
+		j.ink, a.inkSince = a.inkSince, time.Time{}
+	}
+	a.jobs <- j
 	a.blitting = true
 }
 
 // Ink says ink is being written (or not now): the fast updates go in
 // the panel's pen mode then, for the least latency. A grayscale update
 // after (Mark's ui) ends it.
-func (a *App) Ink(on bool) { a.ink = on }
+func (a *App) Ink(on bool) {
+	a.ink = on
+	if on {
+		a.inkSince = time.Time{} // the loop sets it from the touch
+	}
+}
 
 // blackWhite rounds img's grays (text's smoothed edges) to black or
 // white, for the fast waveform. DU can't show gray: sent one, it leaves

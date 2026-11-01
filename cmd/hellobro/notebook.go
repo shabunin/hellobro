@@ -390,16 +390,18 @@ type noteWin struct {
 	settings   bool // its settings shown, over it (notesettings.go)
 	setSel     int  // the row in focus there
 	setRows    []bookRow
-	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
-	slotSize   image.Point // the page size the slots are for
-	exporting  bool        // a PDF of it being written (noteexport.go)
-	clearAsked time.Time   // "clear" tapped once: again soon, and it clears
-	overview   bool        // the pages shown small (notepages.go)
-	ovSel      int         // the page chosen there
-	ovFirst    int         // the first shown
-	undo, redo [][]noteOp  // each step's changes
-	changed    time.Time   // not kept since; zero: kept
-	keepErr    string      // the last write's error, said once
+	pdf        *notePDF        // the PDF the pages are on, open (notepdf.go)
+	slotSize   image.Point     // the page size the slots are for
+	exporting  bool            // a PDF of it being written (noteexport.go)
+	clearAsked time.Time       // "clear" tapped once: again soon, and it clears
+	overview   bool            // the pages shown small (notepages.go)
+	ovSel      int             // the page chosen there
+	ovFirst    int             // the first shown
+	undo, redo [][]noteOp      // each step's changes
+	changed    time.Time       // not kept since; zero: kept
+	keepErr    string          // the last write's error, said once
+	clean      image.Rectangle // strokes shown with the fast waveform, its grays not back yet (noteClean)
+	cleanDraw  bool            // a marker among them: drawn again in its gray first
 
 	p     kobo.Panel
 	bar   image.Rectangle // the tools' strip
@@ -433,6 +435,7 @@ type noteState struct {
 	unsaved  []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here
 	triedAt  time.Time   // when they were last tried
 	lookedAt time.Time   // when the open ones' files were last looked at
+	liftAt   time.Time   // the last stroke's end, for noteClean
 }
 
 const (
@@ -1333,16 +1336,45 @@ func (a *bro) noteInkDone(k *noteInk) {
 		}
 		w.nb.pages[k.page] = append(w.nb.pages[k.page], k.s)
 		w.edited(noteOp{page: k.page, add: []*noteStroke{k.s}})
-		if k.s.gray != kobo.Black { // in its own gray, a marker under the ink
-			w.drawPages(a, k.marked)
-		}
-		a.Mark(k.marked, true) // the cleanup: grays (the paper) back under it
+		// The cleanup (the grays, the paper, back under it) waits till the
+		// pen rests: sent after each stroke it ended pen mode, and the next
+		// stroke, a word's next letter, waited behind it.
+		w.clean = w.clean.Union(k.marked)
+		w.cleanDraw = w.cleanDraw || k.s.gray != kobo.Black // in its own gray, a marker under the ink
+		a.nt.liftAt = time.Now()
 	}
-	if a.shows(w) {
-		w.drawBar(a) // undo can now, and there may be a page more
+	if k.erase && a.shows(w) {
+		w.drawBar(a) // undo can now
 		a.Mark(w.bar, true)
 	}
 	a.noteFocus(w)
+}
+
+// noteCleanAfter is how long the pen rests before the strokes written
+// get their cleanup.
+const noteCleanAfter = time.Second
+
+// noteClean gives the strokes written since the pen last rested their
+// cleanup, and the bar its state (undo, a page more).
+func (a *bro) noteClean() {
+	if a.nt.ink != nil || a.nt.liftAt.IsZero() || time.Since(a.nt.liftAt) < noteCleanAfter {
+		return
+	}
+	a.nt.liftAt = time.Time{}
+	for _, w := range a.noteWins() {
+		if w.clean.Empty() {
+			continue
+		}
+		if a.shows(w) {
+			if w.cleanDraw {
+				w.drawPages(a, w.clean)
+			}
+			a.Mark(w.clean, true)
+			w.drawBar(a)
+			a.Mark(w.bar, true)
+		}
+		w.clean, w.cleanDraw = image.Rectangle{}, false
+	}
 }
 
 // noteFocus gives w the focus, if it hasn't got it.
@@ -1432,6 +1464,7 @@ func (a *bro) noteTick() {
 	if a.nt.ink != nil || a.nt.drag != nil {
 		return
 	}
+	a.noteClean()
 	for _, w := range a.noteWins() {
 		if !w.changed.IsZero() && time.Since(w.changed) > noteKeepAfter {
 			w.keep(a)
