@@ -1,9 +1,15 @@
 package main
 
 import (
+	"image"
 	"math"
+	"reflect"
 	"testing"
 	"time"
+
+	"golang.org/x/image/font"
+
+	"hellobro/kobo"
 )
 
 func TestParseProcStat(t *testing.T) {
@@ -102,5 +108,38 @@ func TestUsageSince(t *testing.T) {
 	}
 	if math.Abs(u.wakeups-200) > 1e-9 {
 		t.Errorf("wakeups %v", u.wakeups)
+	}
+}
+
+// TestDrawLines: the lines are drawn whole the first time, then only
+// those that changed; all again if they don't line up as before.
+func TestDrawLines(t *testing.T) {
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	a.C = kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 800, 400))}
+	r := image.Rect(10, 10, 790, 390)
+	var was []textLine
+	l := func(ss ...string) []textLine {
+		var ls []textLine
+		for i, s := range ss {
+			ls = append(ls, textLine{s, kobo.Black, i == 0})
+		}
+		return ls
+	}
+	row := func(y0, h int, f font.Face, a1, b1 string) image.Rectangle {
+		return image.Rect(10, y0, 10+max(kobo.TextWidth(f, a1), kobo.TextWidth(f, b1))+8, y0+h)
+	}
+	for _, c := range []struct {
+		lines []textLine
+		want  []image.Rectangle
+	}{
+		{l("50%", "drawing", "the gauge"), []image.Rectangle{r}},
+		{l("50%", "drawing", "the gauge"), nil},
+		{l("50%", "drawing more", "the gauge"), []image.Rectangle{row(74, 40, a.F.Small, "drawing", "drawing more")}},
+		{l("49%", "drawing more", "the gauge 2"), []image.Rectangle{row(10, 64, a.F.Panel, "50%", "49%"), row(114, 40, a.F.Small, "the gauge", "the gauge 2")}},
+		{l("49%", "drawing more"), []image.Rectangle{r}},
+	} {
+		if got := a.drawLines(r, c.lines, &was); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%v: drew %v, want %v", c.lines, got, c.want)
+		}
 	}
 }

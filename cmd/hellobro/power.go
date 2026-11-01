@@ -25,6 +25,7 @@ import (
 
 const (
 	powerEvery = 5 * time.Second
+	powerCalm  = 30 * time.Second // and this often, untouched a minute: each sample costs (powerSample)
 	histEvery  = time.Minute
 	histTxt    = "battery-history"
 	histKeep   = 48 * time.Hour
@@ -37,7 +38,11 @@ type powerView struct {
 	useFocus             bool            // the keys go to What uses it, not Battery
 	text, graph, useText image.Rectangle // inside the panels
 	procs                image.Rectangle // Battery's: what keeps the CPU busy
-	shownBat, shownUse   string
+	shownBat, shownUse   string          // what the panels were drawn whole for: their place, focus
+	statBat, statUse     string          // their title strips' status, as drawn
+	batLines, procLines  []textLine      // the lines as drawn, so only those that change are again
+	useLines             []textLine
+	graphAt              time.Time // the last sample graphed
 }
 
 type powerState struct {
@@ -439,9 +444,19 @@ func (a *bro) enterPower() {
 // powerTick samples and draws, every few seconds while the tab shows.
 func (a *bro) powerTick() {
 	a.histTick()
-	if a.showingPower() && time.Since(a.pw.at) >= powerEvery {
+	if a.showingPower() && time.Since(a.pw.at) >= a.powerEvery() {
 		a.powerSample()
 	}
+}
+
+// powerEvery is how often the windows sample: often while they're used,
+// less once nothing's been touched a minute. A sample reads some 150
+// files and draws, a good part of what hellobro does when idle.
+func (a *bro) powerEvery() time.Duration {
+	if a.IdleFor() > time.Minute {
+		return powerCalm
+	}
+	return powerEvery
 }
 
 // powerSample reads the battery and what uses it in the background: that's
@@ -496,10 +511,26 @@ type textLine struct {
 	big  bool
 }
 
-// drawLines writes lines down r, as many as fit.
-func (a *bro) drawLines(r image.Rectangle, lines []textLine) {
+// drawLines writes lines down r, as many as fit, where *was were
+// drawn: only those that changed, each cleared first, or all of r if
+// they don't line up as before (more or fewer, or a big one moved). It
+// keeps lines in *was and says where it drew: on e-ink each line
+// redrawn costs, and most of a sample is as it was.
+func (a *bro) drawLines(r image.Rectangle, lines []textLine, was *[]textLine) []image.Rectangle {
+	if r.Empty() {
+		return nil
+	}
+	same := len(lines) == len(*was)
+	for i := 0; same && i < len(lines); i++ {
+		same = lines[i].big == (*was)[i].big
+	}
+	var dirty []image.Rectangle
+	if !same {
+		a.C.Fill(r, kobo.White)
+		dirty = append(dirty, r)
+	}
 	y := r.Min.Y
-	for _, l := range lines {
+	for i, l := range lines {
 		f, h := a.F.Small, 40
 		if l.big {
 			f, h = a.F.Panel, 64
@@ -507,8 +538,26 @@ func (a *bro) drawLines(r image.Rectangle, lines []textLine) {
 		if y+h > r.Max.Y {
 			break
 		}
-		a.C.Text(f, image.Rect(r.Min.X, y, r.Max.X, y+h), l.text, l.g, kobo.AlignLeft)
+		lr := image.Rect(r.Min.X, y, r.Max.X, y+h)
+		if !same || l != (*was)[i] {
+			if same { // as wide as the text was or is, not the panel: less to refresh
+				w := max(kobo.TextWidth(f, l.text), kobo.TextWidth(f, (*was)[i].text)) + 8
+				cl := image.Rect(lr.Min.X, lr.Min.Y, min(lr.Max.X, lr.Min.X+w), lr.Max.Y)
+				a.C.Fill(cl, kobo.White)
+				dirty = append(dirty, cl)
+			}
+			a.C.Text(f, lr, l.text, l.g, kobo.AlignLeft)
+		}
 		y += h
+	}
+	*was = slices.Clone(lines)
+	return dirty
+}
+
+// markAll marks rs on the panel.
+func (a *bro) markAll(rs []image.Rectangle) {
+	for _, r := range rs {
+		a.Mark(r, true)
 	}
 }
 
@@ -529,7 +578,7 @@ func (a *bro) drawBattery() {
 		if b.charging() {
 			word = strings.ToLower(b.status)
 		}
-		status = fmt.Sprintf("%d%% · %d mA", b.pct, b.ma)
+		status = fmt.Sprintf("%d%%", b.pct) // the current is below: here it'd change the strip each time
 		lines = append(lines, textLine{fmt.Sprintf("%d%% · %s", b.pct, word), kobo.Black, true})
 		flow := "drawing"
 		if b.charging() {
@@ -567,17 +616,37 @@ func (a *bro) drawBattery() {
 			procs = append(procs, textLine{"nothing busy", kobo.Mid, false})
 		}
 	}
+	// Drawn whole once (placed, focused or not), then only what changed:
+	// the strip's status, a line, the graph once a minute with a sample.
 	focused := a.guiFocused("battery")
-	key := fmt.Sprint(status, lines, procs, len(ps.hist), focused)
-	if key == v.shownBat {
+	pn := a.winPanel(v.batP, focused)
+	var graphAt time.Time
+	if len(ps.hist) > 0 {
+		graphAt = ps.hist[len(ps.hist)-1].at
+	}
+	if key := fmt.Sprint(v.batP, focused); key != v.shownBat {
+		v.shownBat, v.statBat, v.batLines, v.procLines = key, status, nil, nil
+		a.DrawPanel(pn, status)
+		a.drawLines(v.text, lines, &v.batLines)
+		a.drawLines(v.procs, procs, &v.procLines)
+		a.drawGraph(v.graph, ps.hist)
+		v.graphAt = graphAt
+		a.Mark(v.batP.Outer, true)
 		return
 	}
-	v.shownBat = key
-	a.DrawPanel(a.winPanel(v.batP, focused), status)
-	a.drawLines(v.text, lines)
-	a.drawLines(v.procs, procs)
-	a.drawGraph(v.graph, ps.hist)
-	a.Mark(v.batP.Outer, true)
+	if status != v.statBat {
+		v.statBat = status
+		a.DrawPanelTitle(pn, status)
+		a.Mark(pn.Title, true)
+	}
+	a.markAll(a.drawLines(v.text, lines, &v.batLines))
+	a.markAll(a.drawLines(v.procs, procs, &v.procLines))
+	if !graphAt.Equal(v.graphAt) && !v.graph.Empty() {
+		v.graphAt = graphAt
+		a.C.Fill(v.graph, kobo.White)
+		a.drawGraph(v.graph, ps.hist)
+		a.Mark(v.graph, true)
+	}
 }
 
 // drawGraph draws the battery's last hours in r: percent up, time along.
@@ -639,7 +708,7 @@ func (a *bro) drawUsage() {
 		lines = append(lines, textLine{fmt.Sprintf(format, args...), g, false})
 	}
 	if !u.ok {
-		add(kobo.Mid, "looking… (a sample every %d s)", int(powerEvery.Seconds()))
+		add(kobo.Mid, "looking… (a sample every %d s)", int(a.powerEvery().Seconds()))
 	} else {
 		cores := u.cores
 		if cores == "0" {
@@ -662,14 +731,21 @@ func (a *bro) drawUsage() {
 		}
 	}
 	focused := a.guiFocused("usage")
-	key := fmt.Sprint(lines, focused)
-	if key == v.shownUse {
+	pn := a.winPanel(v.useP, focused)
+	status := fmt.Sprintf("every %d s", int(a.powerEvery().Seconds()))
+	if key := fmt.Sprint(v.useP, focused); key != v.shownUse {
+		v.shownUse, v.statUse, v.useLines = key, status, nil
+		a.DrawPanel(pn, status)
+		a.drawLines(v.useText, lines, &v.useLines)
+		a.Mark(v.useP.Outer, true)
 		return
 	}
-	v.shownUse = key
-	a.DrawPanel(a.winPanel(v.useP, focused), fmt.Sprintf("every %d s", int(powerEvery.Seconds())))
-	a.drawLines(v.useText, lines)
-	a.Mark(v.useP.Outer, true)
+	if status != v.statUse {
+		v.statUse = status
+		a.DrawPanelTitle(pn, status)
+		a.Mark(pn.Title, true)
+	}
+	a.markAll(a.drawLines(v.useText, lines, &v.useLines))
 }
 
 // powerDevices are the things that draw besides the CPU: the radios and

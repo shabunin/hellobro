@@ -42,6 +42,11 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     whose; Wi-Fi, Bluetooth, the light, sharing and the relay; and the
     processes that keep the CPU busy (percent of one core).
 
+    Both sample every 5 s while you use them, every 30 s once nothing's
+    been touched for a minute, and redraw only the lines that changed:
+    a sample reads some 150 files and an update powers the panel, and
+    left open they were most of what hellobro did when idle.
+
 A window's title strip has its name (white on black when it has the
 focus), a **+** for a launcher next to it, and at its end **float**
 (floats it over the others; floating, it's **tile**, which puts it
