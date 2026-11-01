@@ -27,7 +27,7 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     and devices (scan, pair, connect, disconnect, forget);
   - **Sharing** with a computer over SFTP and SSH (how to reach the
     Kobo, pairing, who's connected and sending what);
-  - **Settings**, hellobro's own, in groups: Light; Sleep; Keyboard
+  - **Settings**, hellobro's own, in groups: Light; Power; Keyboard
     (the Bluetooth window when it's gone); Touch (touch marks, how
     workspaces turn by touch); At start (Nickel, the radios); Sharing (file sharing, the relay, mDNS,
     CPU profiles); Terminal (notifications, the bar); Alpine;
@@ -35,7 +35,8 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
   - **Battery**: the charge, the current it gives (mA, W), the gauge's
     time left, temperature, how fast it went down lately (measured from
     its history, a sample a minute while hellobro runs, kept in
-    `battery-history`), the processes that keep the CPU busy (percent
+    `battery-history`: time, percent, mA, `c` or `d`, mV; the percent
+    can drift a long way, the voltage is there to check it by), the processes that keep the CPU busy (percent
     of one core, the busiest five), and the last 12 hours on a graph;
   - **What uses it**, a powertop of sorts, every 5 s: how busy the CPU
     is, at which speeds and how deep it sleeps; the wakeups a second and

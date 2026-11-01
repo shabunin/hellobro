@@ -42,12 +42,15 @@ Err:          0
 }
 
 func TestParseHistory(t *testing.T) {
-	h := parseHistory("100 50 270 d\nbad line\n200 49 280 d\n300 48 500 c\n", time.Unix(150, 0))
-	if len(h) != 2 || h[0].pct != 49 || h[0].ma != 280 || h[0].charging || !h[1].charging {
+	h := parseHistory("100 50 270 d\nbad line\n200 49 280 d\n300 48 500 c 4012\n", time.Unix(150, 0))
+	if len(h) != 2 || h[0].pct != 49 || h[0].ma != 280 || h[0].charging || !h[1].charging || h[0].mv != 0 || h[1].mv != 4012 {
 		t.Errorf("got %+v", h)
 	}
-	if got := h[0].String(); got != "200 49 280 d" {
+	if got := h[1].String(); got != "300 48 500 c 4012" {
 		t.Errorf("String: %q", got)
+	}
+	if got := parseHistory(h[0].String(), time.Unix(0, 0)); len(got) != 1 || got[0] != h[0] {
+		t.Errorf("again: %+v", got)
 	}
 }
 

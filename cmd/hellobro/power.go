@@ -101,9 +101,9 @@ func (b battery) charging() bool { return b.status == "Charging" || b.status == 
 // --- the history ---
 
 type batSample struct {
-	at       time.Time
-	pct, ma  int
-	charging bool
+	at          time.Time
+	pct, ma, mv int // mv: 0 if not known (older lines)
+	charging    bool
 }
 
 func (s batSample) String() string {
@@ -111,16 +111,18 @@ func (s batSample) String() string {
 	if s.charging {
 		c = "c"
 	}
-	return fmt.Sprintf("%d %d %d %s", s.at.Unix(), s.pct, s.ma, c)
+	return fmt.Sprintf("%d %d %d %s %d", s.at.Unix(), s.pct, s.ma, c, s.mv)
 }
 
-// parseHistory reads battery-history: "unix pct mA c|d" a line, the
-// ones since after kept.
+// parseHistory reads battery-history: "unix pct mA c|d mV" a line, the
+// ones since after kept. The voltage is there to check the percent by:
+// the gauge's percent drifts (it once said 12% of a battery near full),
+// the voltage doesn't. Older lines have no voltage.
 func parseHistory(s string, after time.Time) []batSample {
 	var h []batSample
 	for _, line := range strings.Split(s, "\n") {
 		f := strings.Fields(line)
-		if len(f) != 4 {
+		if len(f) != 4 && len(f) != 5 {
 			continue
 		}
 		t, err1 := strconv.ParseInt(f[0], 10, 64)
@@ -129,7 +131,11 @@ func parseHistory(s string, after time.Time) []batSample {
 		if err1 != nil || err2 != nil || err3 != nil || time.Unix(t, 0).Before(after) {
 			continue
 		}
-		h = append(h, batSample{time.Unix(t, 0), pct, ma, f[3] == "c"})
+		s := batSample{at: time.Unix(t, 0), pct: pct, ma: ma, charging: f[3] == "c"}
+		if len(f) == 5 {
+			s.mv, _ = strconv.Atoi(f[4])
+		}
+		h = append(h, s)
 	}
 	return h
 }
@@ -171,7 +177,7 @@ func (a *bro) histTick() {
 	if !b.ok {
 		return
 	}
-	s := batSample{time.Now(), b.pct, b.ma, b.charging()}
+	s := batSample{at: time.Now(), pct: b.pct, ma: b.ma, mv: b.mv, charging: b.charging()}
 	ps.plugged = s.charging
 	a.batteryCheck(b.pct, s.charging)
 	ps.hist = append(ps.hist, s)
