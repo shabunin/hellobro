@@ -323,3 +323,26 @@ func BenchmarkRenderTerm(b *testing.B) {
 		})
 	}
 }
+
+// TestTermCalm: a terminal not typed into a while is calm, by the
+// setting; the one in focus also waits for touches (none here, as the
+// App's never had input). A key just now keeps it lively.
+func TestTermCalm(t *testing.T) {
+	for _, c := range []struct {
+		set   string
+		key   time.Duration // since its last key
+		focus bool
+		want  time.Duration
+	}{
+		{"2", time.Minute, false, 2 * time.Second},
+		{"10", time.Minute, true, 10 * time.Second},
+		{"2", time.Second, false, 0},
+		{"off", time.Minute, false, 0},
+	} {
+		a := &bro{App: &kobo.App{}, set: settings{"term-calm": indexOf([]string{"2", "5", "10", "off"}, c.set)}}
+		ts := &termSession{keyAt: time.Now().Add(-c.key)}
+		if got := a.termCalm(ts, c.focus); got != c.want {
+			t.Errorf("%s, key %v ago, focus %v: %v, want %v", c.set, c.key, c.focus, got, c.want)
+		}
+	}
+}

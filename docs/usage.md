@@ -399,7 +399,7 @@ button's GPIO instead (`/sys/kernel/debug/gpio`); the presses still queue
 up for Nickel, which may see them when hellobro quits (and go to sleep
 once).
 
-It also sleeps by itself after a while untouched (Settings, Sleep): on
+It also sleeps by itself after a while untouched (Settings, Power): on
 battery after 30 minutes by default, plugged in never, each one 5 min to
 2 hours or never. Whatever runs goes down with it: SSH sessions, the
 relay, a copy to or from the Kobo. A toast says so a minute before, and
@@ -1230,6 +1230,17 @@ holding up the next. While the pen writes, other grayscale updates
 finger or a key comes. The log's `blits:` line says how long ink took to
 reach the panel; a slow update says where its time went (`fbink: …
 took`).
+
+Each update powers the panel, and the battery goes as fast as they
+come: a terminal left to change by itself (a spinner while a program
+works, output read rather than typed into) kept the panel at it a few
+times a second, and took a fifth of the battery an hour. So once a
+terminal hasn't been typed into for 5 s (nor, the one in focus,
+anything touched), it goes on screen every 2 s, in grayscale at once
+so no cleanup follows; a key brings it back at once. Settings, Power,
+**A terminal changing by itself**: every 2, 5 or 10 s, or at once
+always. The fast updates' cleanup waits till the output stops, not
+every 4 s while it doesn't (**… its quick updates cleaned up**).
 
 ## Files on the Kobo
 

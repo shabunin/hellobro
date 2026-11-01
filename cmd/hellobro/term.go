@@ -16,6 +16,7 @@ import (
 	"io"
 	"log"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -50,6 +51,7 @@ const (
 	termTyping    = time.Second            // after a key, a pane not in focus waits
 	termUnseen    = 250 * time.Millisecond // a session off screen reads a trickle of output this often
 	termFullEvery = 3 * time.Second        // and this often we compare all the cells, not only the touched rows
+	termCalmAfter = 5 * time.Second        // untouched this long, a terminal changing by itself calms (term-calm)
 )
 
 // The terminal's font size in pixels: Ctrl+= and Ctrl+- step it, Ctrl+0
@@ -195,6 +197,7 @@ type termView struct {
 	drawnAt time.Time
 	churn   int       // pixels changed since the last flash
 	bigAt   time.Time // the last change of more than a few rows
+	calm    bool      // the frame being drawn is a calm one (termCalm): grayscale, no cleanup after
 
 	mods   termMods
 	faces  map[int]*termFace // the font, by size: the terminals' sizes
@@ -568,13 +571,14 @@ func (a *bro) renderTerm(t *termSession) {
 		r := image.Rect(pn.grid.Min.X+c.from*f.cw, pn.grid.Min.Y+c.y*f.ch, pn.grid.Min.X+(c.to+1)*f.cw, pn.grid.Min.Y+(c.y+1)*f.ch)
 		r = r.Inset(-1).Intersect(pn.grid)
 		v.churn += kobo.Area(r)
-		if !c.gray && !big {
+		fast := !c.gray && !big && !v.calm
+		if fast {
 			if pn.fastArea.Empty() {
 				pn.fastAt = time.Now()
 			}
 			pn.fastArea = pn.fastArea.Union(r)
 		}
-		a.Mark(r, c.gray || big)
+		a.Mark(r, !fast)
 	}
 }
 
@@ -1156,20 +1160,28 @@ func (a *bro) termTick() {
 			if t != focus && (typing || time.Since(t.pane.drawnAt) < termBackFrame) {
 				continue
 			}
+			calm := a.termCalm(t, t == focus)
+			if calm > 0 && time.Since(t.pane.drawnAt) < calm {
+				continue
+			}
 			t.pane.drawnAt = time.Now()
+			v.calm = calm > 0
 			a.renderTerm(t)
+			v.calm = false
 		}
 	}
 	if a.Blitting() {
 		return
 	}
 	// Clean up after the fast waveform once a pane's output pauses, or
-	// every few seconds if it doesn't (a spinner never stops while its app
-	// works): each pane its own, as one area for two would cover what's
-	// between them.
+	// (term-clean) every few seconds if it doesn't, as a spinner doesn't
+	// while its app works: each pane its own, as one area for two would
+	// cover what's between them. Left to the pause, a spinner's cell is
+	// cleaned once it calms (termCalm), between its frames.
+	every := a.setting("term-clean") == "4"
 	for _, t := range ts {
 		pn := &t.pane
-		if !pn.fastArea.Empty() && (time.Since(pn.drawnAt) > 1200*time.Millisecond || time.Since(pn.fastAt) > 4*time.Second) {
+		if !pn.fastArea.Empty() && (time.Since(pn.drawnAt) > 1200*time.Millisecond || every && time.Since(pn.fastAt) > 4*time.Second) {
 			a.Mark(pn.fastArea, true)
 			pn.fastArea = image.Rectangle{}
 			break // one a tick: each is an update of its own
@@ -1185,6 +1197,21 @@ func (a *bro) termTick() {
 		}
 		a.MarkFlash(a.wm.area)
 	}
+}
+
+// termCalm is how often t, changing by itself, goes on screen
+// (term-calm), once it's not been typed into a while (nor, in focus,
+// anything touched: it may be scrolled or chosen from); 0: as often as
+// it changes. Each update powers the panel, and a spinner, or output
+// read rather than typed into, would keep it at it all the while:
+// drawn in grayscale at once, a calm frame needs no cleanup after
+// either. A pen writing in a notebook beside it doesn't count.
+func (a *bro) termCalm(t *termSession, focus bool) time.Duration {
+	n, err := strconv.Atoi(a.setting("term-calm"))
+	if err != nil || n <= 0 || time.Since(t.keyAt) < termCalmAfter || focus && a.IdleFor() < termCalmAfter {
+		return 0
+	}
+	return time.Duration(n) * time.Second
 }
 
 // --- input ---
