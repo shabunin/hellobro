@@ -882,6 +882,12 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		w.overviewOn(a, !w.overview)
 		return
 	}
+	// The pages, small, by the screen's edge: a finger there is left to
+	// the edge's swipes (noteTouch), so a tap on them comes here.
+	if w.overview && p.In(w.paperArea()) {
+		w.ovTap(a, p)
+		return
+	}
 	for _, b := range w.btns {
 		if !kobo.Hit(p, b.r) {
 			continue
