@@ -42,7 +42,7 @@ type powerView struct {
 	statBat, statUse     string          // their title strips' status, as drawn
 	batLines, procLines  []textLine      // the lines as drawn, so only those that change are again
 	useLines             []textLine
-	graphAt              time.Time // the last sample graphed
+	graphAt, graphDrawn  time.Time // the last sample graphed, and when
 }
 
 type powerState struct {
@@ -630,7 +630,7 @@ func (a *bro) drawBattery() {
 		a.drawLines(v.text, lines, &v.batLines)
 		a.drawLines(v.procs, procs, &v.procLines)
 		a.drawGraph(v.graph, ps.hist)
-		v.graphAt = graphAt
+		v.graphAt, v.graphDrawn = graphAt, time.Now()
 		a.Mark(v.batP.Outer, true)
 		return
 	}
@@ -641,8 +641,14 @@ func (a *bro) drawBattery() {
 	}
 	a.markAll(a.drawLines(v.text, lines, &v.batLines))
 	a.markAll(a.drawLines(v.procs, procs, &v.procLines))
-	if !graphAt.Equal(v.graphAt) && !v.graph.Empty() {
-		v.graphAt = graphAt
+	// A new sample a minute moves the line a pixel or two, and the graph
+	// is most of the window: untouched, it's drawn again every 5 min.
+	every := time.Minute
+	if a.IdleFor() > time.Minute {
+		every = 5 * time.Minute
+	}
+	if !graphAt.Equal(v.graphAt) && !v.graph.Empty() && time.Since(v.graphDrawn) >= every {
+		v.graphAt, v.graphDrawn = graphAt, time.Now()
 		a.C.Fill(v.graph, kobo.White)
 		a.drawGraph(v.graph, ps.hist)
 		a.Mark(v.graph, true)

@@ -43,7 +43,8 @@ tabbed or stacked, or floating over them, on workspaces. A window is:
     processes that keep the CPU busy (percent of one core).
 
     Both sample every 5 s while you use them, every 30 s once nothing's
-    been touched for a minute, and redraw only the lines that changed:
+    been touched for a minute (the graph every 5 min), and redraw only
+    the lines that changed:
     a sample reads some 150 files and an update powers the panel, and
     left open they were most of what hellobro did when idle.
 
