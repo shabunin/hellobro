@@ -19,6 +19,7 @@ import (
 	"image"
 	"log"
 	"slices"
+	"time"
 	"unsafe"
 )
 
@@ -97,15 +98,17 @@ func (l *fbinkLib) blit(img *image.Gray, r image.Rectangle, waveform string, fla
 	// without waiting for them; ink only adds black, so they can't mix
 	// up. The next other update ends it: left on, an eink kernel thread
 	// spins.
+	start := time.Now()
+	var toggled, waited time.Duration
 	pen := waveform == "PEN"
 	if pen != l.pen {
 		if rc := C.fbink_sunxi_toggle_ntx_pen_mode(l.fd, C.bool(pen)); rc < 0 {
 			log.Printf("fbink pen mode %v: %d", pen, rc)
 		}
 		l.pen = pen
+		toggled = time.Since(start)
 	}
 	if pen {
-		waveform = "DU"
 		l.waitPen(penInflight - 1)
 	}
 	if flash { // let everything else finish, so it doesn't spoil the full refresh
@@ -123,8 +126,12 @@ func (l *fbinkLib) blit(img *image.Gray, r image.Rectangle, waveform string, fla
 	if !pen {
 		l.waitInflight(maxInflight - 1)
 	}
+	waited = time.Since(start) - toggled
 	cfg := l.cfg
 	cfg.wfm_mode = waveforms[waveform]
+	if pen {
+		cfg.wfm_mode = C.WFM_DU
+	}
 	cfg.is_flashing = C.bool(flash)
 	rc := C.fbink_print_raw_data(l.fd, (*C.uchar)(unsafe.Pointer(&pix[0])), C.int(r.Dx()), C.int(r.Dy()),
 		C.size_t(len(pix)), C.short(r.Min.X), C.short(r.Min.Y), &cfg)
@@ -132,6 +139,11 @@ func (l *fbinkLib) blit(img *image.Gray, r image.Rectangle, waveform string, fla
 		return fmt.Errorf("fbink blit %v: %d", r, rc)
 	}
 	l.inflight = append(l.inflight, refresh{C.fbink_get_last_marker(), r, pen})
+	if d := time.Since(start); d > 150*time.Millisecond { // a freeze, for ink: where it went
+		log.Printf("fbink: %s %dx%d took %v: pen mode %v, waits %v, the update %v; %d in flight",
+			waveform, r.Dx(), r.Dy(), d.Round(time.Millisecond), toggled.Round(time.Millisecond),
+			waited.Round(time.Millisecond), (d - toggled - waited).Round(time.Millisecond), len(l.inflight))
+	}
 	return nil
 }
 

@@ -446,3 +446,27 @@ func TestPenButton(t *testing.T) {
 		}
 	}
 }
+
+// The strokes' cleanup waits for the pen to rest, and to go from the air
+// over the page, which says it's about to write; a long rest has it anyway.
+func TestNoteCleanWaits(t *testing.T) {
+	a := &bro{}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
+	now := time.Now()
+	for _, c := range []struct {
+		name          string
+		lifted, hover time.Duration // ago
+		clean         bool
+	}{
+		{"just lifted", 200 * time.Millisecond, time.Hour, false},
+		{"rested, pen gone", 1500 * time.Millisecond, time.Second, true},
+		{"rested, pen in the air", 1500 * time.Millisecond, 50 * time.Millisecond, false},
+		{"a long rest, pen in the air", 5 * time.Second, 50 * time.Millisecond, true},
+	} {
+		a.nt.liftAt, a.nt.hoverAt = now.Add(-c.lifted), now.Add(-c.hover)
+		a.noteClean()
+		if done := a.nt.liftAt.IsZero(); done != c.clean {
+			t.Errorf("%s: cleaned %v, want %v", c.name, done, c.clean)
+		}
+	}
+}

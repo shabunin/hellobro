@@ -284,7 +284,10 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		a.wmSettle(true) // the windows where they are now, before the touch finds one
 	}
 	switch {
-	case g == nil:
+	case g == nil: // the pen in the air
+		if ev.Kind == kobo.TouchHover {
+			a.nt.hoverAt = time.Now()
+		}
 	case ev.Kind == kobo.TouchDown:
 		if a.vkTouch(p, g) {
 			return

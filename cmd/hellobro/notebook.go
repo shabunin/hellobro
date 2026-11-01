@@ -437,6 +437,7 @@ type noteState struct {
 	triedAt  time.Time   // when they were last tried
 	lookedAt time.Time   // when the open ones' files were last looked at
 	liftAt   time.Time   // the last stroke's end, for noteClean
+	hoverAt  time.Time   // the pen last seen in the air, over the screen
 }
 
 const (
@@ -1355,14 +1356,24 @@ func (a *bro) noteInkDone(k *noteInk) {
 	a.noteFocus(w)
 }
 
-// noteCleanAfter is how long the pen rests before the strokes written
-// get their cleanup.
-const noteCleanAfter = time.Second
+// The strokes written get their cleanup once the pen has rested
+// noteCleanAfter and been away noteHoverGone: a pen in the air over the
+// page is about to write, and the cleanup, a grayscale update, would
+// hold its ink up till it's done (half a second for a few lines). After
+// noteCleanAnyway they get it anyway.
+const (
+	noteCleanAfter  = time.Second
+	noteHoverGone   = 400 * time.Millisecond
+	noteCleanAnyway = 4 * time.Second
+)
 
 // noteClean gives the strokes written since the pen last rested their
 // cleanup, and the bar its state (undo, a page more).
 func (a *bro) noteClean() {
 	if a.nt.ink != nil || a.nt.liftAt.IsZero() || time.Since(a.nt.liftAt) < noteCleanAfter {
+		return
+	}
+	if time.Since(a.nt.hoverAt) < noteHoverGone && time.Since(a.nt.liftAt) < noteCleanAnyway {
 		return
 	}
 	a.nt.liftAt = time.Time{}
