@@ -42,3 +42,39 @@ func TestFlushInkFirst(t *testing.T) {
 		t.Errorf("fast but not ink %s, want DU", j.wf)
 	}
 }
+
+// While the pen writes, grayscale updates wait; a finger lets them go.
+func TestFlushHoldsUI(t *testing.T) {
+	scr := image.Rect(0, 0, 400, 400)
+	a := &App{C: Canvas{image.NewGray(scr)}, jobs: make(chan blitJob, 4)}
+	sent := func() string {
+		a.flush()
+		a.blitting = false
+		select {
+		case j := <-a.jobs:
+			return j.wf
+		default:
+			return ""
+		}
+	}
+	a.inkAt, a.holdUntil = time.Now(), time.Now().Add(holdAfterInk) // as a pen point leaves them
+	a.Mark(image.Rect(0, 0, 100, 20), true)                          // the bar's stats
+	if wf := sent(); wf != "" {
+		t.Errorf("sent %s while the pen writes", wf)
+	}
+	a.holdUI(TouchEv{Kind: TouchHover, Pen: true})
+	if wf := sent(); wf != "" {
+		t.Errorf("sent %s with the pen in the air just after", wf)
+	}
+	a.holdUI(TouchEv{Kind: TouchDown})
+	if wf := sent(); wf != "GL16" {
+		t.Errorf("after a finger: %q, want the GL16", wf)
+	}
+	a.inkAt = time.Now().Add(-hoverWrites - time.Second) // long ago: the pen in the air isn't writing
+	a.holdUntil = time.Time{}
+	a.holdUI(TouchEv{Kind: TouchHover, Pen: true})
+	a.Mark(image.Rect(0, 0, 100, 20), true)
+	if wf := sent(); wf != "GL16" {
+		t.Errorf("the pen hovering long after: %q, want the GL16", wf)
+	}
+}

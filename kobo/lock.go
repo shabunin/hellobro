@@ -130,6 +130,7 @@ func (a *App) drawLock() {
 	}
 	a.blinks, a.toast = nil, nil
 	a.dirty = []dirtyRect{{b, true, false}}
+	a.holdUntil = time.Time{}
 	a.flush()
 }
 

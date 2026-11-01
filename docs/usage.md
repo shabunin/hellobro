@@ -1223,7 +1223,9 @@ without waiting for the pieces before). The strokes' cleanup, the paper's
 grays and the smooth edges back under them, waits till the pen has
 rested a second and left the air over the page (4 s at most), so a word
 written goes without a grayscale update between its letters, nor one
-holding up the next. The log's `blits:` line says how long ink took to
+holding up the next. While the pen writes, other grayscale updates
+(the bar's stats, the clock) wait too, till it rests a moment or a
+finger or a key comes. The log's `blits:` line says how long ink took to
 reach the panel; a slow update says where its time went (`fbink: …
 took`).
 

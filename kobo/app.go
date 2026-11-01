@@ -192,6 +192,8 @@ type App struct {
 	blitting   bool
 	ink        bool      // Ink's: black & white updates go in pen mode
 	inkSince   time.Time // the oldest pen point not yet sent to the panel
+	inkAt      time.Time // the last pen point written
+	holdUntil  time.Time // grayscale updates wait till then: the pen's writing (holdUI)
 	jobs       chan blitJob
 	done       chan error
 	quit       bool
@@ -474,11 +476,13 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 				continue
 			}
 			a.lightBack()
+			a.holdUI(ev)
 			a.onTouch(ev)
 			if a.ink {
 				if a.inkSince.IsZero() {
 					a.inkSince = ev.At
 				}
+				a.inkAt, a.holdUntil = time.Now(), time.Now().Add(holdAfterInk)
 				a.flush() // now, not at the next tick: ink follows the hand
 			}
 			idle.Reset(IdleTimeout)
@@ -489,6 +493,9 @@ func (a *App) loop(touches <-chan TouchEv, keys <-chan KeyMsg) {
 				a.stats.event("keyboard", 0) // a keyboard came or went
 			} else {
 				a.stats.event("key", time.Since(m.at))
+			}
+			if key {
+				a.holdUntil = time.Time{} // not writing: what waited goes now
 			}
 			locked := a.locked
 			if key && !locked {
@@ -1074,6 +1081,7 @@ func (a *App) markAll(flash bool) {
 	a.blinks, a.toast = nil, nil
 	a.dirty = []dirtyRect{{a.C.Bounds(), true, false}}
 	a.flash = a.flash || flash
+	a.holdUntil = time.Time{} // sleep, a lock, a new layout: they go at once
 }
 
 // flush sends the oldest pending area, with those of its kind close
@@ -1088,8 +1096,12 @@ func (a *App) flush() {
 		return
 	}
 	first := 0
-	if a.ink { // ink first, before a grayscale update queued: it follows the hand
-		first = max(0, slices.IndexFunc(a.dirty, func(d dirtyRect) bool { return !d.ui }))
+	if a.ink || time.Now().Before(a.holdUntil) { // ink first, before a grayscale update queued: it follows the hand
+		first = slices.IndexFunc(a.dirty, func(d dirtyRect) bool { return !d.ui })
+		if first < 0 && time.Now().Before(a.holdUntil) {
+			return // grayscale updates only: they wait till the pen rests
+		}
+		first = max(0, first)
 	}
 	d := a.dirty[first]
 	rest := a.dirty[:0]
@@ -1140,6 +1152,31 @@ func (a *App) flush() {
 	}
 	a.jobs <- j
 	a.blitting = true
+}
+
+// While the pen writes, grayscale updates (the bar's stats every few
+// seconds, the clock, a stroke's cleanup) wait: each ends the panel's pen
+// mode, which takes a quarter of a second, and the ink after it waits
+// till it's drawn, a third more. They go once the pen has rested
+// holdAfterInk, or the pen in the air just after writing holdHover
+// more; a finger or a key lets them go at once.
+const (
+	holdAfterInk = 1200 * time.Millisecond
+	holdHover    = time.Second
+	hoverWrites  = 3 * time.Second // the pen in the air this soon after ink is still writing
+)
+
+// holdUI keeps the grayscale updates waiting while ev says the pen's
+// writing, or lets them go if a finger came.
+func (a *App) holdUI(ev TouchEv) {
+	switch {
+	case ev.Kind == TouchDown && !ev.Pen:
+		a.holdUntil = time.Time{}
+	case ev.Kind == TouchHover && time.Since(a.inkAt) < hoverWrites:
+		if t := time.Now().Add(holdHover); t.After(a.holdUntil) {
+			a.holdUntil = t
+		}
+	}
 }
 
 // Ink says ink is being written (or not now): the fast updates go in
