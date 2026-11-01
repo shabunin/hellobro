@@ -36,6 +36,7 @@ func ownShown(key string) func(a *bro) string {
 
 var noteSettings = []noteSet{
 	{"A finger", ownShown("note-finger"), stepOwn("note-finger")},
+	{"Pen buttons", ownShown("pen-buttons"), stepOwn("pen-buttons")},
 	{"Export", ownShown("note-export"), stepOwn("note-export")},
 	{"Bar, fullscreen", func(a *bro) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ int) { a.flipFullBar("note") }},
 }

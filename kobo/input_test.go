@@ -45,3 +45,26 @@ func TestTouchDropped(t *testing.T) {
 		t.Errorf("events %v, want down then up", kinds)
 	}
 }
+
+// More than one held: the eraser end counts, then the second button.
+func TestPenButtons(t *testing.T) {
+	var b penButtons
+	if b.held() != PenNoButton {
+		t.Error("none held")
+	}
+	b = b.set(btnStylus, true)
+	if b.held() != PenButton1 {
+		t.Errorf("first: %d", b.held())
+	}
+	b = b.set(btnStylus2, true)
+	if b.held() != PenButton2 {
+		t.Errorf("both: %d, want the second", b.held())
+	}
+	b = b.set(btnToolRubber, true).set(btnStylus2, false)
+	if b.held() != PenRubber {
+		t.Errorf("rubber: %d", b.held())
+	}
+	if b = b.set(btnToolRubber, false).set(btnStylus, false); b != 0 {
+		t.Errorf("all let go: %b", b)
+	}
+}

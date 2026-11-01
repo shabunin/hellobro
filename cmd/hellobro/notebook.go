@@ -421,6 +421,7 @@ type noteInk struct {
 	w      *noteWin
 	g      *kobo.Gesture
 	erase  bool
+	ink    string          // penInk's, or the marker a pen's button gives
 	page   int             // the page it's on
 	at     image.Rectangle // and where that is on screen
 	s      *noteStroke     // what's written
@@ -1152,13 +1153,17 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		return false
 	}
 	g.Owner = ownInk
-	k := &noteInk{w: w, g: g, erase: w.erasing || ev.Button, page: w.cur + slot, at: w.slots[slot], last: p}
+	button := a.penButton(ev.Button)
+	k := &noteInk{w: w, g: g, erase: button == "eraser" || w.erasing && button == "", ink: a.penInk(), page: w.cur + slot, at: w.slots[slot], last: p}
+	if button == "marker" {
+		k.ink = "marker"
+	}
 	a.nt.ink = k
 	if k.erase {
 		a.noteErase(k, p)
 		return true
 	}
-	k.s = a.newStroke()
+	k.s = newStroke(k.ink)
 	a.Ink(true)
 	a.noteInkTo(k, p, a.notePressure(ev))
 	return true
@@ -1223,7 +1228,7 @@ func (a *bro) noteInkTo(k *noteInk, p image.Point, pressure int32) {
 	w := k.w
 	pp := w.toPage(p, k.at)
 	frac := math.Min(1, float64(pressure)/float64(a.PressureMax()))
-	pt := notePt{int16(pp.X), int16(pp.Y), a.penRadius(frac)}
+	pt := notePt{int16(pp.X), int16(pp.Y), a.penRadius(k.ink, frac)}
 	k.s.pts = append(k.s.pts, pt)
 	r := w.radius(pt)
 	from := k.last

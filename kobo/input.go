@@ -153,8 +153,49 @@ type TouchEv struct {
 	x, y     int32 // raw panel units
 	Pen      bool
 	Pressure int32
-	Button   bool // a button on the pen is held (or its eraser end is down)
+	Button   PenButton // a button on the pen held (or its eraser end down)
 	At       time.Time
+}
+
+// PenButton is which of the pen's buttons is held: the first, the
+// second (BTN_STYLUS, BTN_STYLUS2), or its eraser end (BTN_TOOL_RUBBER).
+type PenButton uint8
+
+const (
+	PenNoButton PenButton = iota
+	PenButton1
+	PenButton2
+	PenRubber
+)
+
+// penButtons are the pen's buttons held, as a bit each.
+type penButtons uint8
+
+func (b penButtons) set(code uint16, down bool) penButtons {
+	bit := penButtons(0)
+	switch code {
+	case btnStylus:
+		bit = 1 << PenButton1
+	case btnStylus2:
+		bit = 1 << PenButton2
+	case btnToolRubber:
+		bit = 1 << PenRubber
+	}
+	if down {
+		return b | bit
+	}
+	return b &^ bit
+}
+
+// held is the one that counts, if more are held: the eraser end, then
+// the second, then the first.
+func (b penButtons) held() PenButton {
+	for _, k := range []PenButton{PenRubber, PenButton2, PenButton1} {
+		if b&(1<<k) != 0 {
+			return k
+		}
+	}
+	return PenNoButton
 }
 
 type absRange struct{ min, max int32 }
@@ -223,15 +264,15 @@ func keysDown(f *os.File) ([0x300 / 8]byte, error) {
 
 // resync reads the contacts as the kernel has them, after events were
 // lost: a lift among them would have left a finger down for good. It
-// gives the slot now current, and whether a pen button is held. If the
+// gives the slot now current, and the pen's buttons held. If the
 // panel can't say, every contact is taken as lifted.
-func (t *touchDevice) resync(slots map[int32]*contact, cur int32, button bool) (int32, bool) {
-	lift := func(err error) (int32, bool) {
+func (t *touchDevice) resync(slots map[int32]*contact, cur int32, buttons penButtons) (int32, penButtons) {
+	lift := func(err error) (int32, penButtons) {
 		log.Printf("touch: resync: %v: all lifted", err)
 		for _, c := range slots {
 			c.id, c.pressure = -1, 0
 		}
-		return cur, false
+		return cur, 0
 	}
 	info, err := absQuery(t.f, absMTSlot)
 	if err != nil {
@@ -265,10 +306,13 @@ func (t *touchDevice) resync(slots map[int32]*contact, cur int32, button bool) (
 		c.tool, c.pressure = vals[absMTToolType][i], vals[absMTPressure][i]
 	}
 	if keys, err := keysDown(t.f); err == nil {
-		held := func(k int) bool { return keys[k/8]&(1<<(k%8)) != 0 }
-		button = held(btnStylus) || held(btnStylus2) || held(btnToolRubber)
+		held := func(k uint16) bool { return keys[k/8]&(1<<(k%8)) != 0 }
+		buttons = 0
+		for _, k := range []uint16{btnStylus, btnStylus2, btnToolRubber} {
+			buttons = buttons.set(k, held(k))
+		}
 	}
-	return info[0], button
+	return info[0], buttons
 }
 
 type contact struct {
@@ -298,7 +342,7 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 	prev := map[int32]contact{} // slot states as of the previous frame
 	cur := int32(0)
 	dropping, drops := false, 0
-	button := false
+	var buttons penButtons
 	seen := map[[2]uint16]bool{} // for the log: what the panel sends, each kind once (a pen, its buttons)
 
 	err := readEvents(t.f, func(typ, code uint16, val int32) {
@@ -307,7 +351,7 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 				return
 			}
 			dropping = false // and take the contacts from the kernel: the frame is as they are
-			cur, button = t.resync(slots, cur, button)
+			cur, buttons = t.resync(slots, cur, buttons)
 		}
 		if k := [2]uint16{typ, code}; typ != evSyn && !seen[k] {
 			seen[k] = true
@@ -316,7 +360,10 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 		switch {
 		case typ == evKey:
 			if code == btnStylus || code == btnStylus2 || code == btnToolRubber {
-				button = val != 0
+				buttons = buttons.set(code, val != 0)
+				if val == 1 {
+					log.Printf("touch: pen button %#x down", code) // which is which, for the settings
+				}
 			}
 		case typ == evAbs && code == absMTSlot:
 			cur = val
@@ -360,7 +407,11 @@ func (t *touchDevice) run(out chan<- TouchEv) {
 				}
 				if kind >= 0 {
 					pen := c.tool == mtToolPen || (kind == TouchUp && p.tool == mtToolPen)
-					out <- TouchEv{Kind: kind, slot: n, x: c.x, y: c.y, Pen: pen, Pressure: c.pressure, Button: pen && button, At: now}
+					b := PenNoButton
+					if pen {
+						b = buttons.held()
+					}
+					out <- TouchEv{Kind: kind, slot: n, x: c.x, y: c.y, Pen: pen, Pressure: c.pressure, Button: b, At: now}
 				}
 				prev[n] = *c
 			}

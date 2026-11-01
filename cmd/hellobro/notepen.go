@@ -59,11 +59,11 @@ func (w *noteWin) drawPenSample(a *bro, r image.Rectangle, ink, bg uint8) {
 	drawIcon(a.C, []iconPart{iconLine(half, 4, 23, 20, 23)}, r, g, bg)
 }
 
-// newStroke is a stroke as the pen writes it now.
-func (a *bro) newStroke() *noteStroke {
+// newStroke is a stroke in ink, as penInk says or a pen's button.
+func newStroke(ink string) *noteStroke {
 	s := &noteStroke{}
 	at := func(n, v string) xml.Attr { return xml.Attr{Name: xml.Name{Local: n}, Value: v} }
-	switch a.penInk() {
+	switch ink {
 	case "gray":
 		s.gray = noteGray
 		s.attrs = []xml.Attr{at("tool", "pen"), at("color", "#808080ff"), at("capStyle", "round")}
@@ -74,14 +74,32 @@ func (a *bro) newStroke() *noteStroke {
 	return s
 }
 
-// penRadius is the pen's radius (tenths of a unit) pressing frac of its
-// hardest; a marker's doesn't change with it.
-func (a *bro) penRadius(frac float64) int16 {
+// penRadius is the pen's radius (tenths of a unit) in ink, pressing
+// frac of its hardest; a marker's doesn't change with it.
+func (a *bro) penRadius(ink string, frac float64) int16 {
 	k := noteWidthK[a.penWidth()]
-	if a.penInk() == "marker" {
+	if ink == "marker" {
 		return int16(noteMarkR * k)
 	}
 	return int16(max(5, (15+25*frac)*k)) // 1.5 to 4 units, medium
+}
+
+// penButton is what the pen's button b does, as the settings say:
+// "marker", "eraser", or "" (none held). Its eraser end erases.
+func (a *bro) penButton(b kobo.PenButton) string {
+	switch {
+	case b == kobo.PenRubber:
+		return "eraser"
+	case b == kobo.PenNoButton:
+		return ""
+	case a.setting("pen-buttons") == "both":
+		return "eraser"
+	}
+	first := b == kobo.PenButton1
+	if a.setting("pen-buttons") == "eraser" {
+		first = !first
+	}
+	return map[bool]string{true: "marker", false: "eraser"}[first]
 }
 
 // colorGray is the gray a .xopp's color (#rrggbbaa) is drawn in: a pen's

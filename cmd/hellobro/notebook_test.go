@@ -421,3 +421,28 @@ func TestNoteBarFits(t *testing.T) {
 		}
 	}
 }
+
+// The pen's buttons: a marker and an eraser, as the settings say; its
+// eraser end always erases.
+func TestPenButton(t *testing.T) {
+	for _, c := range []struct {
+		set  string
+		b    kobo.PenButton
+		want string
+	}{
+		{"marker", kobo.PenNoButton, ""},
+		{"marker", kobo.PenButton1, "marker"},
+		{"marker", kobo.PenButton2, "eraser"},
+		{"eraser", kobo.PenButton1, "eraser"},
+		{"eraser", kobo.PenButton2, "marker"},
+		{"both", kobo.PenButton1, "eraser"},
+		{"both", kobo.PenButton2, "eraser"},
+		{"eraser", kobo.PenRubber, "eraser"},
+	} {
+		st := settingList[settingIndex("pen-buttons")]
+		a := &bro{set: settings{"pen-buttons": slices.Index(st.values, c.set)}}
+		if got := a.penButton(c.b); got != c.want {
+			t.Errorf("%s, button %d: %q, want %q", c.set, c.b, got, c.want)
+		}
+	}
+}

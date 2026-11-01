@@ -857,7 +857,11 @@ width, its gray.
 
 - The pen writes; a heavier hand, a thicker line. **eraser** (or E)
   takes off each stroke the pen goes over; **pen** (or P) is back to
-  writing. Holding a button on the pen erases too.
+  writing. The pen's buttons, held: the first draws a marker, the
+  second erases (or the other way round, or both erase: **Pen
+  buttons** in the settings); its eraser end erases. Which button is
+  first is the pen's: the log says `pen button 0x14b` (the first) or
+  `0x14c` (the second) as one goes down.
 - Tap **pen** while it's in hand for its choices, under it: **fine**,
   **medium**, **bold**; **black**, **gray**, or **marker** (a
   highlighter: wide, light gray, under the ink, yellow in Xournal++).
@@ -884,7 +888,8 @@ width, its gray.
 - **settings** (the sliders, or `:settings`) shows the notebooks'
   settings over the window, with the books' header: ‹ All Notebooks,
   **Settings**, **back to the notebook** (or Esc, q). **A finger**
-  (below), **Export** (below), **Bar, fullscreen** (below): a tap on a
+  (below), **Pen buttons** (above), **Export** (below), **Bar,
+  fullscreen** (below): a tap on a
   value, or ↑ ↓ and Enter, ← →, steps it. They're the notebooks' own:
   the app's Settings don't have them.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
