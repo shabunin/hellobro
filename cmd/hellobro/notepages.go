@@ -5,8 +5,9 @@ package main
 // swiped across, for more), and a tile after the last for a new one.
 // Tap a page to choose it, again to open it. The strip then has: open,
 // new before, new after, copy page, clear page (asking first), delete,
-// earlier and later (moving it). Each is a change to undo, as strokes
-// are.
+// earlier and later (moving it). Each page has a × too, in its corner:
+// tapped, it asks, and tapped again soon it deletes the page, as
+// workspaces' tiles close. Each is a change to undo, as strokes are.
 
 import (
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"log"
 	"math"
 	"slices"
+	"time"
 
 	"hellobro/kobo"
 )
@@ -23,6 +25,7 @@ const (
 	noteThumbW   = 260 // px a page is at least, small
 	noteThumbGap = 24
 	noteThumbLab = 36 // px under it for its number
+	noteThumbX   = 52 // the ×'s box, in a page's corner
 )
 
 // What a noteOp does: to a page's strokes, or a page put in or taken out.
@@ -161,6 +164,20 @@ func (w *noteWin) drawOverview(a *bro, clip image.Rectangle) {
 		if n == w.ovSel {
 			num = fmt.Sprintf("page %d: tap again to open", n+1)
 		}
+		if w.ovDelOK(n) {
+			x := ovCloseBox(t)
+			fg, bg := uint8(kobo.White), uint8(kobo.Black)
+			c.Fill(x.Intersect(clip), kobo.Black)
+			if w.ovDelArmed(n) { // lit: again deletes
+				c.Fill(x.Inset(3).Intersect(clip), kobo.White)
+				fg, bg = kobo.Black, kobo.White
+				num = "tap × again: delete it"
+				if len(w.nb.pages) == 1 {
+					num = "tap × again: clear it"
+				}
+			}
+			drawIcon(c, iconCross, x, fg, bg)
+		}
 		c.Text(a.F.Small, lab, num, kobo.Black, kobo.AlignCenter)
 	}
 }
@@ -174,7 +191,26 @@ func (w *noteWin) ovTap(a *bro, p image.Point) {
 		if n > len(w.nb.pages) || !p.In(t.Inset(-noteThumbGap/2).Union(t.Add(image.Pt(0, noteThumbLab)))) {
 			continue
 		}
+		armed := w.ovDelArmed(n)
+		w.ovDelAt = time.Time{}
 		switch {
+		case n < len(w.nb.pages) && w.ovDelOK(n) && p.In(ovCloseTap(t)):
+			w.ovSel = n
+			if armed {
+				w.pageAct(a, "delete")
+				break
+			}
+			w.ovDel, w.ovDelAt = n, time.Now()
+			at := w.ovDelAt
+			time.AfterFunc(noteClearAsk, func() {
+				a.Do(func() {
+					if w.ovDelAt == at && w.overview {
+						w.ovDelAt = time.Time{}
+						w.show(a)
+					}
+				})
+			})
+			w.show(a)
 		case n == len(w.nb.pages):
 			w.ovSel = n - 1
 			w.pageAct(a, "new after")
@@ -186,6 +222,30 @@ func (w *noteWin) ovTap(a *bro, p image.Point) {
 		}
 		return
 	}
+}
+
+// iconCross is a page's ×.
+var iconCross = []iconPart{iconLine(1.6, 6, 6, 18, 18), iconLine(1.6, 18, 6, 6, 18)}
+
+// ovCloseBox is where a page's × is drawn, in its corner at t's top
+// right; ovCloseTap where a tap is on it, a finger's more.
+func ovCloseBox(t image.Rectangle) image.Rectangle {
+	return image.Rect(t.Max.X-noteThumbX, t.Min.Y, t.Max.X, t.Min.Y+noteThumbX)
+}
+
+func ovCloseTap(t image.Rectangle) image.Rectangle {
+	return image.Rect(t.Max.X-noteThumbX-24, t.Min.Y-noteThumbGap/2, t.Max.X+noteThumbGap/2, t.Min.Y+noteThumbX+24)
+}
+
+// ovDelOK is whether page n has a ×: all have but a lone blank one,
+// which deleting wouldn't change.
+func (w *noteWin) ovDelOK(n int) bool {
+	return n < len(w.nb.pages) && (len(w.nb.pages) > 1 || len(w.nb.pages[n]) > 0)
+}
+
+// ovDelArmed is whether page n's × was tapped once, lately.
+func (w *noteWin) ovDelArmed(n int) bool {
+	return w.ovDel == n && time.Since(w.ovDelAt) < noteClearAsk
 }
 
 // ovOff is whether an overview's button can't do anything now.
@@ -247,6 +307,7 @@ func (w *noteWin) ovKey(a *bro, code uint16) bool {
 
 // pageAct does what an overview's button says, to the page chosen.
 func (w *noteWin) pageAct(a *bro, id string) {
+	w.ovDelAt = time.Time{}
 	if id == "open" {
 		w.openPage(a, w.ovSel)
 		return

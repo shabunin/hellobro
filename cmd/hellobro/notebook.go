@@ -390,13 +390,15 @@ type noteWin struct {
 	settings   bool // its settings shown, over it (notesettings.go)
 	setSel     int  // the row in focus there
 	setRows    []bookRow
-	pdf        *notePDF        // the PDF the pages are on, open (notepdf.go)
-	slotSize   image.Point     // the page size the slots are for
-	exporting  bool            // a PDF of it being written (noteexport.go)
-	clearAsked time.Time       // "clear" tapped once: again soon, and it clears
-	overview   bool            // the pages shown small (notepages.go)
-	ovSel      int             // the page chosen there
-	ovFirst    int             // the first shown
+	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
+	slotSize   image.Point // the page size the slots are for
+	exporting  bool        // a PDF of it being written (noteexport.go)
+	clearAsked time.Time   // "clear" tapped once: again soon, and it clears
+	overview   bool        // the pages shown small (notepages.go)
+	ovSel      int         // the page chosen there
+	ovFirst    int         // the first shown
+	ovDel      int         // the page whose × was tapped once, at ovDelAt: again soon, and it goes
+	ovDelAt    time.Time
 	undo, redo [][]noteOp      // each step's changes
 	changed    time.Time       // not kept since; zero: kept
 	keepErr    string          // the last write's error, said once
@@ -887,6 +889,7 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		if b.id != "clear" {
 			w.clearUnask(a)
 		}
+		w.ovDelAt = time.Time{} // a page's × asking: the strip's buttons go on as if not
 		switch b.id {
 		case "all":
 			a.notesFrom(w)

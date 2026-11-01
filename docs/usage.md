@@ -905,8 +905,10 @@ width, its gray.
   after it; two pages), **clear page** (words: it asks, tap it again
   within a few seconds; it says "tap again"), **delete** (a bin, or
   Delete; the only page is cleared instead), **earlier** and **later** (arrows: moving it), and
-  **undo**: each is undone like a stroke. The counter again,
-  or O, goes back to the page.
+  **undo**: each is undone like a stroke. Each page has a **×** in
+  its corner as well: tapped, it asks ("tap × again"), and tapped
+  again within a few seconds it deletes that page, undone as delete
+  is. The counter again, or O, goes back to the page.
 - Till then fingers write: a stylus without a battery (or a Kobo Stylus
   with a flat one) is a finger to the screen. A pen seen once is
   remembered (`pen` in `hellobro.json`). The notebook's settings, **A

@@ -3,7 +3,8 @@
 # Left twice, the first chosen; "later" (it's second now); "copy page"
 # (a copy after it, chosen); Delete (the copy gone); "new after" (a blank
 # one); Ctrl+Z (gone again); Enter opens the page chosen; O again, the
-# first tile tapped twice: chosen, then opened. Finds the strip's buttons
+# first tile tapped twice: chosen, then opened; O, the second page's ×
+# tapped twice (it asks, then deletes it), Ctrl+Z. Finds the strip's buttons
 # on the screen (OUT/screen/screen.raw).
 # app: hellobro
 import os, sys
@@ -35,7 +36,22 @@ def strip():
     return best
 def button(i):
     tap(*strip()[i]); time.sleep(4)
-OPEN, NEW_BEFORE, NEW_AFTER, COPY, DELETE, EARLIER, LATER = range(7)
+OPEN, NEW_BEFORE, NEW_AFTER, COPY, CLEAR, DELETE, EARLIER, LATER = range(1, 9) # 0: All Notebooks
+def closes():
+    # the pages' ×: black boxes in their corners, the first row of them under the strip
+    d = os.path.join(OUT, "screen")
+    w, h = map(int, open(os.path.join(d, "dims")).read().split("x"))
+    raw = open(os.path.join(d, "screen.raw"), "rb").read()
+    for y in range(90, h // 2):
+        row, runs, x = raw[y * w:(y + 1) * w], [], 0
+        while x < w:
+            if row[x] < 0x40:
+                s = x
+                while x < w and row[x] < 0x40: x += 1
+                if 44 < x - s < 60: runs.append(((s + x) // 2, y + 26))
+            x += 1
+        if runs: return runs
+    return []
 
 start(); time.sleep(3)
 gui("notebook"); time.sleep(3)
@@ -61,5 +77,11 @@ key(ENTER); time.sleep(5)                          # open it
 key(24); time.sleep(5)
 tap(180, 300); time.sleep(3)                       # the first tile: chosen
 tap(180, 300); time.sleep(5)                       # again: opened
+key(24); time.sleep(5)
+x = closes()[1]                                    # the second page's ×
+tap(*x); time.sleep(3)                             # it asks
+tap(*x); time.sleep(4)                             # deleted
+key(44, ctrl=True); time.sleep(4)                  # Ctrl+Z: back
+key(24); time.sleep(4)
 fullscreen(); time.sleep(3)
 exit_app()

@@ -1,9 +1,13 @@
 package main
 
 import (
+	"image"
 	"slices"
 	"strings"
 	"testing"
+
+	"hellobro/kobo"
+	"hellobro/wm"
 )
 
 func TestNotePages(t *testing.T) {
@@ -78,5 +82,42 @@ func TestNotePagesPastEnd(t *testing.T) {
 		if w.pageEdit(id) || len(w.nb.pages) != 2 {
 			t.Errorf("%s past the end: did it, %d pages", id, len(w.nb.pages))
 		}
+	}
+}
+
+// TestNotePageClose: a page's × asks first, and the second tap deletes
+// that page (not the one chosen before); a tap elsewhere in between
+// takes the ask back. A lone blank page has none.
+func TestNotePageClose(t *testing.T) {
+	a := &bro{App: &kobo.App{F: kobo.LoadFonts()}}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
+	a.wm.wins = map[*wm.Node]window{}
+	s := func(x int16) []*noteStroke { return []*noteStroke{{pts: []notePt{{x, x, 10}}}} }
+	nb := &notebook{pages: [][]*noteStroke{s(1), s(2), s(3)}}
+	w := &noteWin{nb: nb, overview: true}
+	w.p.Body = image.Rect(0, 0, 1400, 1800)
+	w.bar = image.Rect(0, 0, 1400, 70)
+	tiles, _ := w.ovLayout()
+	x := func(n int) image.Point { b := ovCloseBox(tiles[n]); return b.Min.Add(b.Max).Div(2) }
+	w.ovTap(a, x(1))
+	if len(nb.pages) != 3 || !w.ovDelArmed(1) || w.ovSel != 1 {
+		t.Fatalf("one tap: %d pages, armed %v, chosen %d", len(nb.pages), w.ovDelArmed(1), w.ovSel)
+	}
+	w.ovTap(a, tiles[0].Min.Add(image.Pt(20, tiles[0].Dy()/2))) // the first page: chosen, the ask gone
+	w.ovTap(a, x(1))
+	if len(nb.pages) != 3 || !w.ovDelArmed(1) {
+		t.Fatalf("asked again: %d pages", len(nb.pages))
+	}
+	w.ovTap(a, x(1))
+	if len(nb.pages) != 2 || nb.pages[1][0].pts[0].x != 3 || w.ovDelArmed(1) || len(w.undo) != 1 {
+		t.Fatalf("deleted: %d pages, %d undos", len(nb.pages), len(w.undo))
+	}
+	one := &noteWin{nb: &notebook{pages: [][]*noteStroke{nil, s(1)}}}
+	if !one.ovDelOK(0) || !one.ovDelOK(1) || one.ovDelOK(2) {
+		t.Error("a page's × where it shouldn't be")
+	}
+	one.nb.pages = one.nb.pages[:1]
+	if one.ovDelOK(0) {
+		t.Error("a lone blank page has a ×")
 	}
 }
