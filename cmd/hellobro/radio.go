@@ -476,7 +476,21 @@ func (a *bro) btPower() {
 		a.airplaneOver()
 	}
 	what := map[bool]string{true: "turning Bluetooth on…", false: "turning Bluetooth off…"}[on]
-	a.radioRun(panelBT, what, func(func(string)) error { return a.rs.bt.SetPower(on) })
+	r := &a.rs
+	wifi, bt := r.wifi, r.bt
+	a.radioRun(panelBT, what, func(func(string)) error {
+		if err := bt.SetPower(on); err != nil || on {
+			return err
+		}
+		// Wi-Fi off while Bluetooth was on kept the chip powered for it
+		// (Down): now neither needs it, so it goes off, driver and all.
+		r.wJob.Lock() // after a Wi-Fi job going on, which may turn it on
+		defer r.wJob.Unlock()
+		if !wifi.Status().On {
+			return wifi.SetPower(false, func(s string) { log.Printf("wifi: %s", s) })
+		}
+		return nil
+	})
 }
 
 func (a *bro) btScan() {

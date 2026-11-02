@@ -186,6 +186,12 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   read-only so nothing in the jail can put a symlink where hellobro
   mounts. hellobro must never read a mount itself (a quiet host hangs
   the reader). go-fuse 2.12 doesn't build for 32-bit ARM: stay on 2.11.
+- The 8821cs driver must not be loaded through a suspend (`mem` or
+  `freeze`): after it, `ifconfig wlan0 up` fails ("Operation not
+  permitted"), wpa_supplicant exits 255, and quitting to Nickel doesn't
+  help; a restart does. Wi-Fi off with Bluetooth on (`Down`) leaves it
+  loaded, so Sleep powers Wi-Fi off whatever it was. With radios off,
+  `mem` wakes by the RTC alarm and the power button, not a tap.
 - `launch.sh` may be running while it's replaced: write a new file and
   `mv` it over the old one, never write into it.
 

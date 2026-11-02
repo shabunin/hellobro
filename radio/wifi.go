@@ -687,6 +687,14 @@ func (w *wpaWiFi) powerOn(progress func(string), kept bool) error {
 	if kept && loaded(c.module) {
 		return w.start(c, progress)
 	}
+	if err := w.load(c, progress); err != nil {
+		return err
+	}
+	return w.start(c, progress)
+}
+
+// load powers the chip and loads its driver.
+func (w *wpaWiFi) load(c chip, progress func(string)) error {
 	progress("powering the chip…")
 	switch {
 	case c.power == "ntx_io":
@@ -733,13 +741,43 @@ func (w *wpaWiFi) powerOn(progress func(string), kept bool) error {
 	} else {
 		time.Sleep(time.Second)
 	}
-	return w.start(c, progress)
+	return nil
+}
+
+// up brings the interface up. The 8821cs taken through a suspend loaded
+// is left stuck: the interface won't come up ("Operation not
+// permitted"), and nothing but loading the driver again might help, the
+// chip's power cycled between if Bluetooth isn't using it. If that
+// doesn't, only a restart does.
+func (w *wpaWiFi) up(c chip, progress func(string)) error {
+	err := run("ifconfig", w.iface, "up")
+	if err == nil || c.module != "8821cs" {
+		return nil // as it was: wpa_supplicant says if it's wrong
+	}
+	progress("the driver is stuck: loading it again…")
+	log.Printf("wifi: %v; loading %s again", err, c.module)
+	if err := run("rmmod", c.module); err != nil {
+		return errors.New("Wi-Fi's driver is stuck: restart the Kobo (hold the power button)")
+	}
+	if !exists(hci0) { // Bluetooth isn't on it: the chip can go off a moment
+		ntxIO(208, 0)
+		time.Sleep(time.Second)
+	}
+	if err := w.load(c, progress); err != nil {
+		return err
+	}
+	if err := run("ifconfig", w.iface, "up"); err != nil {
+		return errors.New("Wi-Fi's driver is stuck: restart the Kobo (hold the power button)")
+	}
+	return nil
 }
 
 // start brings the interface up, starts wpa_supplicant and waits for a
 // network and an address.
 func (w *wpaWiFi) start(c chip, progress func(string)) error {
-	run("ifconfig", w.iface, "up")
+	if err := w.up(c, progress); err != nil {
+		return err
+	}
 	if c.module == "dhd" {
 		run("wlarm_le", "-i", w.iface, "up")
 	}

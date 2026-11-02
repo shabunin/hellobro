@@ -96,10 +96,11 @@ func (a *bro) Sleep() func() {
 				log.Printf("sleep: bluetooth off: %v", err)
 			}
 		}
-		if s.wifiWas {
-			if err := wifi.SetPower(false, func(p string) { log.Printf("sleep: wifi: %s", p) }); err != nil {
-				log.Printf("sleep: wifi off: %v", err)
-			}
+		// Off even if it was: off with Bluetooth on (Down) leaves the
+		// driver loaded, and the 8821cs doesn't come through a suspend
+		// loaded (Wi-Fi won't come up again till a restart).
+		if err := wifi.SetPower(false, func(p string) { log.Printf("sleep: wifi: %s", p) }); err != nil {
+			log.Printf("sleep: wifi off: %v", err)
 		}
 		log.Printf("sleep: radios off (wifi was on %v, bluetooth %v)", s.wifiWas, s.btWas)
 	}
