@@ -38,6 +38,7 @@ var noteSettings = []noteSet{
 	{"A finger", ownShown("note-finger"), stepOwn("note-finger")},
 	{"Pen buttons", ownShown("pen-buttons"), stepOwn("pen-buttons")},
 	{"Export", ownShown("note-export"), stepOwn("note-export")},
+	{"Light by the left edge", ownShown("note-light"), stepOwn("note-light")},
 	{"Bar, fullscreen", func(a *bro) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ int) { a.flipFullBar("note") }},
 }
 

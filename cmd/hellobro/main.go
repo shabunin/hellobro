@@ -111,6 +111,7 @@ func main() {
 	radio.StateDir = kobo.AppFile("")
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true, Bar: true}, a)
 	a.loadBar() // the App's, before it's up
+	a.App.LightAt = a.lightAt
 	profileOn.Store(a.setting("profile") == "on")
 	alpineBus.Store(a.setting("alpine-bus") == "on")
 	a.applyLightIdle()
@@ -319,6 +320,16 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	case g.Owner == ownPair:
 		a.pairMove()
 	}
+}
+
+// lightAt says if a finger down at p, by the left edge, may set the
+// light by swiping: anywhere, full screen too, but in a notebook only if
+// its settings say so (a finger by the edge may be writing).
+func (a *bro) lightAt(p image.Point) bool {
+	if _, ok := a.windowAt(p).(*noteWin); ok {
+		return a.setting("note-light") != "off"
+	}
+	return true
 }
 
 // edgeSwipe takes a swipe from an edge, once it's gone far enough: up

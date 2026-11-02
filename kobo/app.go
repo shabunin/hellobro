@@ -142,14 +142,15 @@ type App struct {
 	F          Fonts
 	L          Layout
 	Tab        int
-	Full       bool           // the page has the whole screen
-	Covered    bool           // the Program has something over the whole screen, the bar too: it's not drawn
-	BarOff     bool           // Config.Bar's bar hidden (SetBarOff): the page has the screen
-	Keyboard   string         // the keyboard connected, if any
-	kbds       map[string]int // the keyboards connected, by name: how many of each
-	LightIdle  time.Duration  // the light goes off after this long untouched (0: never)
-	LightStart *int           // the light's level at start; nil: Nickel's
-	LightKept  func(int)      // the reader set the light to this
+	Full       bool                   // the page has the whole screen
+	Covered    bool                   // the Program has something over the whole screen, the bar too: it's not drawn
+	BarOff     bool                   // Config.Bar's bar hidden (SetBarOff): the page has the screen
+	Keyboard   string                 // the keyboard connected, if any
+	kbds       map[string]int         // the keyboards connected, by name: how many of each
+	LightIdle  time.Duration          // the light goes off after this long untouched (0: never)
+	LightStart *int                   // the light's level at start; nil: Nickel's
+	LightKept  func(int)              // the reader set the light to this
+	LightAt    func(image.Point) bool // a finger down here, by the left edge, may set the light; nil: unless full screen
 
 	prog  Program
 	cfg   Config
@@ -750,6 +751,14 @@ func (a *App) SetBarOff(off bool) {
 	a.relayout()
 }
 
+// lightAt is LightAt, or not full screen.
+func (a *App) lightAt(p image.Point) bool {
+	if a.LightAt != nil {
+		return a.LightAt(p)
+	}
+	return !a.Full
+}
+
 func (a *App) SetFull(on bool) {
 	if on == a.Full {
 		return
@@ -783,13 +792,13 @@ func (a *App) onTouch(ev TouchEv) {
 		}
 		a.addMark(p, false)
 		a.prog.Touch(ev, p, g)
-		// Full screen, the edges are the page's: the light stays as it is,
-		// and a swipe down from the top is the one way out by touch (no
-		// fullscreen key without a keyboard).
-		g.lightZone = a.light != nil && !a.Full && !ev.Pen && p.X < EdgeWidth && g.Owner == 0
+		// Full screen, a swipe down from the top is the one way out by
+		// touch (no fullscreen key without a keyboard): it goes before
+		// the light, even from the left edge's top.
 		if a.Full && !ev.Pen && g.Owner == 0 && p.Y < unfullEdge {
 			g.unfull = 1
 		}
+		g.lightZone = a.light != nil && !ev.Pen && p.X < EdgeWidth && g.Owner == 0 && g.unfull == 0 && a.lightAt(p)
 
 	case TouchMove:
 		g := a.gestures[ev.slot]

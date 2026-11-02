@@ -1124,7 +1124,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		w.clearUnask(a)
 	}
 	if w.overview { // the pages, small: a tap or a swipe
-		if !p.In(w.paperArea()) || !ev.Pen && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
+		if !p.In(w.paperArea()) || !ev.Pen && a.noteEdge(p) {
 			return false
 		}
 		g.Owner = ownNoteOv
@@ -1142,7 +1142,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		a.mem.Pen = true
 		a.mem.save()
 	}
-	if !ev.Pen && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) { // the edges' swipes (none full screen)
+	if !ev.Pen && a.noteEdge(p) { // the edges' swipes
 		return false
 	}
 	if !ev.Pen && !a.vk.on && p.Y >= a.C.Bounds().Max.Y-vkFoot { // the foot's: two fingers there bring the keyboard
@@ -1546,4 +1546,13 @@ func (a *bro) noteExit() {
 		w.keep(a)
 	}
 	a.keepUnsaved()
+}
+
+// noteEdge says if a finger down at p in a notebook is left to the
+// edges' swipes: by the left edge, the light's (if the notebook's
+// settings say so, full screen too); out of full screen, the
+// workspaces' and the menu's by both.
+func (a *bro) noteEdge(p image.Point) bool {
+	left, right := p.X < kobo.EdgeWidth, p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth
+	return left && (!a.Full || a.setting("note-light") != "off") || right && !a.Full
 }

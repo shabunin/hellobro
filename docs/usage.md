@@ -55,9 +55,9 @@ focus), a **+** for a launcher next to it, and at its end **float**
 back), **fullscreen**, and **close** (a terminal's shell or connection
 ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
 one that has it. Full screen, a swipe down from the top edge of the
-screen, or Mod+F, puts it back. It's the only swipe there: the edges
-are the window's, so no light or menu by swiping, and no workspace
-swipes.
+screen, or Mod+F, puts it back. The edges are the window's there, so no
+menu by swiping and no workspace swipes; the light's swipe up or down
+the left edge still works (in a notebook, if its settings say so).
 
 New windows open next to the one in focus, along its container: side
 by side, or one above another after Mod+V (split vertically; Mod+B,
@@ -381,7 +381,9 @@ itself (root), the socket is `/tmp/hellobro-ipc/ipc.sock`.
 
 ## The light
 
-A swipe up or down the left edge sets it (and keys: see `keys.conf`).
+A swipe up or down the left edge sets it, full screen too (and keys:
+see `keys.conf`). A notebook's settings, **Light by the left edge**,
+can turn it off there, so a finger by the edge is the page's.
 When nothing's touched or typed for 30 s, the light goes off by itself,
 and the next touch or key brings it back as it was; that touch or key
 does what it does as well. The terminal's output doesn't count, only
@@ -895,7 +897,9 @@ width, its gray.
 - **settings** (the sliders, or `:settings`) shows the notebooks'
   settings over the window, with the books' header: ‹ All Notebooks,
   **Settings**, **back to the notebook** (or Esc, q). **A finger**
-  (below), **Pen buttons** (above), **Export** (below), **Bar,
+  (below), **Pen buttons** (above), **Export** (below), **Light by
+  the left edge** (on: a finger up or down it sets the light, full
+  screen too; off: full screen, a finger there is the page's), **Bar,
   fullscreen** (below): a tap on a
   value, or ↑ ↓ and Enter, ← →, steps it. They're the notebooks' own:
   the app's Settings don't have them.
@@ -923,7 +927,9 @@ width, its gray.
   the pen does) or **turns** (fingers only turn pages, so a hand resting
   on the screen writes nothing; only the pen writes). Near the left and
   right edges a finger writes nothing: those are the light's and the
-  workspaces' swipes (full screen, the edges are the page's too).
+  workspaces' swipes. Full screen, the right edge is the page's too,
+  and the left edge is the light's unless the settings' **Light by the
+  left edge** is off.
 - A page is the screen's shape, upright, fitted into the window. Where
   two side by side are nearly as big as one alone would be (landscape,
   fullscreen; a wide, short window) two show, and turn two at a time;

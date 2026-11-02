@@ -470,3 +470,27 @@ func TestNoteCleanWaits(t *testing.T) {
 		}
 	}
 }
+
+func TestNoteEdge(t *testing.T) {
+	a := &bro{App: &kobo.App{C: kobo.Canvas{Gray: image.NewGray(image.Rect(0, 0, 1000, 1400))}}, set: settings{}}
+	left, mid, right := image.Pt(50, 700), image.Pt(500, 700), image.Pt(950, 700)
+	for _, c := range []struct {
+		full, lightOff bool
+		p              image.Point
+		want           bool
+	}{
+		{false, false, left, true}, // the light's, or a workspace swipe
+		{false, false, right, true},
+		{false, false, mid, false},
+		{true, false, left, true}, // full screen: the light still
+		{true, false, right, false},
+		{true, true, left, false}, // the light off: the page's
+		{false, true, left, true}, // out of full screen, still the workspaces'
+	} {
+		a.Full = c.full
+		a.set["note-light"] = map[bool]int{false: 0, true: 1}[c.lightOff]
+		if got := a.noteEdge(c.p); got != c.want {
+			t.Errorf("full %v, light off %v, at %v: %v, want %v", c.full, c.lightOff, c.p, got, c.want)
+		}
+	}
+}
