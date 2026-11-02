@@ -109,10 +109,18 @@ type Gesture struct {
 	unfulled  bool // it did
 }
 
+// Unfulling says it may yet leave fullscreen: it started on the top
+// edge and has gone down, not sideways, so far. A Program that would
+// take a finger as it moves (a page that pans) leaves this one be.
+func (g *Gesture) Unfulling(p image.Point) bool {
+	dy, dx := p.Y-g.Start.Y, Abs(p.X-g.Start.X)
+	return g.unfull != 0 && !g.unfulled && dy > 0 && dy >= dx
+}
+
 const (
 	EdgeWidth  = 110 // px from the left (light) or right edge where edge swipes start
 	SwipeStart = 40  // px of vertical travel before an edge swipe counts
-	unfullEdge = 80  // px from the top where a swipe down leaves fullscreen
+	unfullEdge = 120 // px from the top where a swipe down leaves fullscreen
 	unfullMove = 150 // px it takes
 )
 

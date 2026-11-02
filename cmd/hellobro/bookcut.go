@@ -157,7 +157,7 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 		case g.Owner != 0:
 			a.bk.cut = nil
 			return
-		case !g.Pen && !w.selecting && g.Moved > selStill && time.Since(g.At) < selHold && w.canPan(): // moving from the start: the page moves
+		case !g.Pen && !w.selecting && g.Moved > selStill && time.Since(g.At) < selHold && w.canPan() && !g.Unfulling(p): // moving from the start: the page moves (down from the top, full screen, it leaves that)
 			s.pan, s.panFrom, s.to, g.Owner = true, s.v.sp, p, ownPan
 			w.dropCut()
 			log.Print("pdf: panning")

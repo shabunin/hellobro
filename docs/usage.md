@@ -55,7 +55,8 @@ focus), a **+** for a launcher next to it, and at its end **float**
 back), **fullscreen**, and **close** (a terminal's shell or connection
 ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
 one that has it. Full screen, a swipe down from the top edge of the
-screen, or Mod+F, puts it back. The edges are the window's there, so no
+screen (even over a PDF page that's bigger than the screen and pans),
+or Mod+F, puts it back. The edges are the window's there, so no
 menu by swiping and no workspace swipes from an edge; two fingers
 swiped across still go to the next workspace or the one before, and
 the light's swipe up or down the left edge still works (in a notebook,
