@@ -56,8 +56,10 @@ back), **fullscreen**, and **close** (a terminal's shell or connection
 ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
 one that has it. Full screen, a swipe down from the top edge of the
 screen, or Mod+F, puts it back. The edges are the window's there, so no
-menu by swiping and no workspace swipes; the light's swipe up or down
-the left edge still works (in a notebook, if its settings say so).
+menu by swiping and no workspace swipes from an edge; two fingers
+swiped across still go to the next workspace or the one before, and
+the light's swipe up or down the left edge still works (in a notebook,
+if its settings say so).
 
 New windows open next to the one in focus, along its container: side
 by side, or one above another after Mod+V (split vertically; Mod+B,

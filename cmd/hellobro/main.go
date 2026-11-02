@@ -376,7 +376,9 @@ func (a *bro) pairUp(g *kobo.Gesture) bool {
 	if first == g {
 		first = fs[1]
 	}
-	if first.Owner != 0 || first.Pen {
+	// A notebook's finger on its page (or its pages, small) does nothing
+	// till it lifts: a second finger may make it half of a pair.
+	if first.Pen || first.Owner != 0 && first.Owner != ownLeaf && first.Owner != ownNoteOv {
 		return false
 	}
 	if a.tv.sel != nil && a.tv.sel.g == first {
@@ -401,10 +403,7 @@ func (a *bro) pairSwipe() {
 		a.pair = [2]*kobo.Gesture{}
 		return
 	}
-	if a.Full { // full screen, only a swipe from the top leaves it (and the keyboard's)
-		return
-	}
-	dir := pairDir(f) + pairDir(g)
+	dir := pairDir(f) + pairDir(g) // full screen too: two fingers aren't the page's
 	if dir != -2 && dir != 2 {
 		return
 	}
