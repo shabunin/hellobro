@@ -618,13 +618,22 @@ func (w *bookWin) shelfItems() []libItem {
 		if err != nil {
 			rel = filepath.Base(b.path)
 		}
-		e := libEntry{key: b.path, rel: filepath.ToSlash(rel), name: b.name, at: b.read}
-		if b.read > 0 {
-			e.note = fmt.Sprintf("%d%%", b.pct)
-		}
-		es = append(es, e)
+		es = append(es, libEntry{key: b.path, rel: filepath.ToSlash(rel), name: b.name, at: b.read, note: shelfNote(b)})
 	}
 	return libView(es, nil, w.shelfTab, w.shelfDir)
+}
+
+// shelfNote is what a shelf's row says beside the name: the book's type,
+// and how far in if it was read.
+func shelfNote(b shelfBook) string {
+	kind := "epub"
+	if isPDF(b.path) {
+		kind = "pdf"
+	}
+	if b.read > 0 {
+		return fmt.Sprintf("%s · %d%%", kind, b.pct)
+	}
+	return kind
 }
 
 // shelfGo shows the shelf's tab, in folder dir; the choice at the top.

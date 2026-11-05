@@ -42,6 +42,23 @@ func TestLibView(t *testing.T) {
 	}
 }
 
+func TestShelfNote(t *testing.T) {
+	for _, c := range []struct {
+		b    shelfBook
+		want string
+	}{
+		{shelfBook{path: "/b/Dune.epub"}, "epub"},
+		{shelfBook{path: "/b/a.kepub.epub"}, "epub"},
+		{shelfBook{path: "/b/Paper.PDF"}, "pdf"},
+		{shelfBook{path: "/b/Dune.epub", read: 1, pct: 45}, "epub · 45%"},
+		{shelfBook{path: "/b/Paper.pdf", read: 1}, "pdf · 0%"},
+	} {
+		if got := shelfNote(c.b); got != c.want {
+			t.Errorf("%s: %q, want %q", c.b.path, got, c.want)
+		}
+	}
+}
+
 func TestShelfName(t *testing.T) {
 	for in, want := range map[string]string{"Dune.epub": "Dune", "Dune.EPUB": "Dune", "a.kepub.epub": "a", "Paper.PDF": "Paper", "notes.txt": "notes.txt"} {
 		if got := shelfName(in); got != want {

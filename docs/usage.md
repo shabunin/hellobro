@@ -671,7 +671,8 @@ and for PDFs, drawn by MuPDF (below).
   folder at a time: its folders first, each with how many books are in
   it, then its books; the top row goes up a folder). Tab goes to the
   next tab, Backspace up a folder; the tab and the folder are kept.
-  Beside a book read is how far in you are.
+  Beside each book is its type, epub or pdf, and how far in you are if
+  you've read it.
 - Tap a book, or pick it with ↑ ↓ and Enter. It opens where you left it.
 - **rename** on a book's row (or F2) types its name in the row, as in
   All Notebooks: Enter or **ok** keeps it. Its file is renamed beside
