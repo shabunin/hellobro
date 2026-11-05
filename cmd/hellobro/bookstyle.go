@@ -3,8 +3,8 @@ package main
 // The reader's style panel, in the book's window over its page: the
 // fonts, each shown in itself; the size, the lines' spacing, the
 // margins, justified or not, hyphens or not; the pages, this book's
-// (one, two side by side, or two if the window's wide); and a paragraph
-// set as the books will be; the bar, fullscreen. s or Aa on the bar
+// (one, two side by side, or two if the window's wide); the book's own
+// text, from its page, set as it will be; the bar, fullscreen. s or Aa on the bar
 // opens it, Esc or Done goes back to the page. It's the reader's own:
 // the app's Settings don't have it.
 
@@ -37,7 +37,7 @@ const (
 
 var styleLabels = [styleN]string{"Size", "Line spacing", "Margins", "Justified", "Hyphenation", "Pages", "Bar, fullscreen", ""}
 
-// bookSample is what the panel sets as the books will be.
+// bookSample is what the panel sets after the book's text, if there's room.
 var bookSample = &book.Chapter{Blocks: []book.Block{
 	{First: 1.5, Spans: []book.Span{
 		{Text: "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, “and what is the use of a book,” thought Alice, “without pictures or ", Scale: 1},
@@ -87,25 +87,34 @@ func (w *bookWin) tileFace(a *bro, f bookFamily) font.Face {
 	return w.ownTile
 }
 
-// sample is the paragraph to show: in what most of the chapter would be
-// set in, if that's a font of the book's.
-func (w *bookWin) sample() *book.Chapter {
+// bookSampleMax is how much of a book the panel sets, in bytes: more than
+// its room ever holds, as it's set on the main loop.
+const bookSampleMax = 8000
+
+// sample is the text to show the style by, and its language: the book's
+// from the page it's open at, then Alice, for what room a short page
+// leaves (or a page with no text, a cover). She's in what most of the
+// chapter would be set in, if that's a font of the book's.
+func (w *bookWin) sample() (*book.Chapter, string) {
+	var blocks []book.Block
+	lang := "en"
+	if w.ch != nil && w.pagesFor.spine == w.spine {
+		if blocks = w.ch.From(w.at, bookSampleMax); len(blocks) > 0 {
+			lang = w.b.Lang
+		}
+	}
 	fam := 0
 	if !w.noOwn {
 		fam = mainFamily(w.ch)
 	}
-	if fam == 0 {
-		return bookSample
-	}
-	ch := &book.Chapter{Blocks: slices.Clone(bookSample.Blocks)}
-	for i := range ch.Blocks {
-		spans := slices.Clone(ch.Blocks[i].Spans)
-		for k := range spans {
-			spans[k].Style = spans[k].Style.InFamily(fam)
+	for _, b := range bookSample.Blocks {
+		b.Spans = slices.Clone(b.Spans)
+		for k := range b.Spans {
+			b.Spans[k].Style = b.Spans[k].Style.InFamily(fam)
 		}
-		ch.Blocks[i].Spans = spans
+		blocks = append(blocks, b)
 	}
-	return ch
+	return &book.Chapter{Blocks: blocks}, lang
 }
 
 func (w *bookWin) openStyle(a *bro) {
@@ -310,7 +319,8 @@ func (w *bookWin) drawStyle(a *bro) {
 	}
 	pv := image.Rect(w.area.Min.X, y+8, w.area.Max.X, area.Max.Y)
 	c.Fill(image.Rect(area.Min.X, y, area.Max.X, y+2), kobo.Light)
-	pages := book.Layout(w.sample(), st.settings(pv.Size(), "en"), faces, nil)
+	sample, lang := w.sample()
+	pages := book.Layout(sample, st.settings(pv.Size(), lang), faces, nil)
 	for _, it := range pages[0].Items {
 		if it.Kind == book.ItemText {
 			c.TextAt(faces.Face(it.Style, it.Px), pv.Min.X+it.X, pv.Min.Y+it.Y, it.Text, kobo.Black, pv)

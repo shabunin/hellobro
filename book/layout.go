@@ -8,6 +8,7 @@ package book
 
 import (
 	"image"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -56,6 +57,58 @@ type Pos struct{ Block, Off int }
 
 // Before is whether p comes before q in the chapter.
 func (p Pos) Before(q Pos) bool { return p.Block < q.Block || p.Block == q.Block && p.Off < q.Off }
+
+// From is the chapter's text from pos on, n bytes of it at most: no
+// pictures or rules, and the block pos is in only from there on.
+func (c *Chapter) From(pos Pos, n int) []Block {
+	var out []Block
+	for i := max(0, pos.Block); i < len(c.Blocks) && n > 0; i++ {
+		b := c.Blocks[i]
+		if b.Kind != Text {
+			continue
+		}
+		b.Spans = slices.Clone(b.Spans)
+		if i == pos.Block && pos.Off > 0 {
+			b = b.after(pos.Off)
+		}
+		for k := range b.Spans {
+			t := b.Spans[k].Text
+			if n <= 0 {
+				b.Spans = b.Spans[:k]
+				break
+			}
+			if len(t) > n {
+				for n > 0 && !utf8.RuneStart(t[n]) {
+					n--
+				}
+				b.Spans[k].Text = t[:n]
+				n = 0
+				continue
+			}
+			n -= len(t)
+		}
+		if len(b.Spans) > 0 {
+			out = append(out, b)
+		}
+	}
+	return out
+}
+
+// after is the block from a byte of its text on, which starts no line
+// of its own: no indent, no bullet. b's spans are its to change.
+func (b Block) after(off int) Block {
+	b.First, b.Bullet = 0, ""
+	for k := range b.Spans {
+		if off < len(b.Spans[k].Text) {
+			b.Spans = b.Spans[k:]
+			b.Spans[0].Text = b.Spans[0].Text[off:]
+			return b
+		}
+		off -= len(b.Spans[k].Text)
+	}
+	b.Spans = nil
+	return b
+}
 
 // Page is what's on one page, and where it starts.
 type Page struct {

@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -275,5 +276,63 @@ func TestLayoutSoftOffsets(t *testing.T) {
 	}
 	if n == 0 {
 		t.Error("no line after the first")
+	}
+}
+
+func TestChapterFrom(t *testing.T) {
+	sp := func(ss ...string) []Span {
+		var out []Span
+		for _, s := range ss {
+			out = append(out, Span{Text: s, Scale: 1})
+		}
+		return out
+	}
+	ch := &Chapter{Blocks: []Block{
+		{Spans: sp("one ", "two"), First: 1.5, Bullet: "•"},
+		{Kind: Picture, Src: "p.png"},
+		{Kind: Rule},
+		{Spans: sp("αβγ")},
+		{Spans: sp("end")},
+	}}
+	texts := func(bs []Block) []string {
+		var out []string
+		for _, b := range bs {
+			s := ""
+			for _, sp := range b.Spans {
+				s += sp.Text
+			}
+			out = append(out, s)
+		}
+		return out
+	}
+	for _, c := range []struct {
+		name string
+		pos  Pos
+		n    int
+		want []string
+	}{
+		{"all", Pos{}, 100, []string{"one two", "αβγ", "end"}},
+		{"mid span", Pos{0, 2}, 100, []string{"e two", "αβγ", "end"}},
+		{"second span", Pos{0, 4}, 100, []string{"two", "αβγ", "end"}},
+		{"past the block", Pos{0, 99}, 100, []string{"αβγ", "end"}},
+		{"from a picture", Pos{1, 0}, 100, []string{"αβγ", "end"}},
+		{"the limit, between spans", Pos{}, 4, []string{"one "}},
+		{"the limit, in a span", Pos{}, 6, []string{"one tw"}},
+		{"the limit, in a letter", Pos{3, 0}, 3, []string{"α"}},
+		{"past the end", Pos{9, 0}, 100, nil},
+		{"none wanted", Pos{}, 0, nil},
+	} {
+		if got := texts(ch.From(c.pos, c.n)); !slices.Equal(got, c.want) {
+			t.Errorf("%s: %q, want %q", c.name, got, c.want)
+		}
+	}
+	if b := ch.From(Pos{0, 2}, 100)[0]; b.First != 0 || b.Bullet != "" {
+		t.Errorf("cut: first %v, bullet %q", b.First, b.Bullet)
+	}
+	if b := ch.From(Pos{}, 100)[0]; b.First != 1.5 || b.Bullet != "•" {
+		t.Errorf("whole: first %v, bullet %q", b.First, b.Bullet)
+	}
+	if got := ch.Blocks[0].Spans[0].Text; got != "one " { // the chapter stays as it was
+		t.Errorf("chapter changed: %q", got)
 	}
 }

@@ -702,9 +702,10 @@ and centred text; and for PDFs, drawn by MuPDF (below).
   (tap one), the size, the lines' spacing, the margins (± each),
   justified and hyphenation (on / off), **Pages** (this book's own,
   kept with its place: one page, two side by side, or two if wide: two
-  when the window is wider than tall, a landscape screen), and a
-  paragraph set as the books will be, and **Bar, fullscreen** (shown or
-  hidden, for all EPUBs). With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
+  when the window is wider than tall, a landscape screen), **Bar,
+  fullscreen** (shown or hidden, for all EPUBs), and under them the
+  book's own text, from the page it's open at, set as the choices have
+  it (a page with little or no text is followed by a bit of Alice). With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
   switch; Esc, s or "back to the book" (at the top right) leaves it. Every book takes it;
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
