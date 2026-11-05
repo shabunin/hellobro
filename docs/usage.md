@@ -708,9 +708,9 @@ and centred text; and for PDFs, drawn by MuPDF (below).
   it (a page with little or no text is followed by a bit of Alice). With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
   switch; Esc, s or "back to the book" (at the top right) leaves it. Every book takes it;
   it's kept in `hellobro.json`.
-- **Hold a word** on an EPUB's page, a finger or the pen, a moment, and
-  lift: what the dictionaries say of it shows in a box, at the foot of
-  the page, or at its top if the word's down there (a line under the word
+- **Hold a word** on an EPUB's page, a finger or the pen, a moment:
+  without lifting, what the dictionaries say of it shows in a box, at
+  the foot of the page, or at its top if the word's down there (a line under the word
   shows which). A tap elsewhere (or Esc) closes it; **next** (or Enter,
   Space) goes on if there's more. The dictionaries are StarDict's (`.ifo`,
   `.idx`, `.dict` or `.dict.dz`, `.syn`), in `Dictionaries/` on the Kobo's

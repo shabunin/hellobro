@@ -31,6 +31,7 @@ import (
 
 const (
 	holdSlop     = 24                     // px a finger holding a word may wander
+	ownHold      = 12                     // a finger that held a word: its lift is nothing
 	dictPerDict  = 4                      // articles from a dictionary
 	dictWaitShow = 400 * time.Millisecond // longer than this, the box says it's looking
 )
@@ -312,6 +313,39 @@ func (w *bookWin) wordAt(a *bro, p image.Point) (string, image.Rectangle, bool) 
 		}
 	}
 	return "", image.Rectangle{}, false
+}
+
+// holdStart notes a finger or the pen coming down on a book: it may be
+// holding a word.
+func (a *bro) holdStart(p image.Point, g *kobo.Gesture) {
+	if _, ok := a.windowAt(p).(*bookWin); ok {
+		a.bk.hold = g
+	}
+}
+
+// holdTick looks the word up as soon as it's been held long enough, with
+// the finger still down: the box says it worked, so there's no waiting to
+// lift. It's only asked once: a finger with no word under it stays what
+// it was, so a slow tap still turns the page and a swipe still does.
+func (a *bro) holdTick() {
+	g := a.bk.hold
+	switch {
+	case g == nil:
+		return
+	case g.Owner != 0 || g.Moved >= holdSlop: // something else, or moving
+		a.bk.hold = nil
+		return
+	case time.Since(g.At) < selHold:
+		return
+	}
+	a.bk.hold = nil
+	if a.overlay() {
+		return
+	}
+	if w, ok := a.windowAt(g.Start).(*bookWin); ok && w.holdWord(a, g.Start) {
+		g.Owner = ownHold
+		g.NoLight()
+	}
 }
 
 // holdWord looks up the word held at p, if there's one: true if so.

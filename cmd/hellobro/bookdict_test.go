@@ -5,9 +5,11 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"hellobro/book"
 	"hellobro/dict"
+	"hellobro/kobo"
 )
 
 func TestWordsIn(t *testing.T) {
@@ -140,4 +142,27 @@ func dictNamed(t *testing.T, dir, name string) *dict.Dict {
 		t.Fatal(err)
 	}
 	return d
+}
+
+func TestHoldTick(t *testing.T) {
+	long := time.Now().Add(-time.Second)
+	for _, tt := range []struct {
+		name string
+		g    kobo.Gesture
+		kept bool
+	}{
+		{"not long enough yet", kobo.Gesture{At: time.Now()}, true},
+		{"moved off", kobo.Gesture{At: long, Moved: holdSlop}, false},
+		{"another's", kobo.Gesture{At: long, Owner: ownPair}, false},
+	} {
+		a := &bro{}
+		a.bk.hold = &tt.g
+		a.holdTick()
+		if (a.bk.hold != nil) != tt.kept {
+			t.Errorf("%s: kept %v, want %v", tt.name, a.bk.hold != nil, tt.kept)
+		}
+		if tt.g.Owner == ownHold {
+			t.Errorf("%s: took the finger", tt.name)
+		}
+	}
 }

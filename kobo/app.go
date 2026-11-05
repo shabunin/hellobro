@@ -117,6 +117,10 @@ func (g *Gesture) Unfulling(p image.Point) bool {
 	return g.unfull != 0 && !g.unfulled && dy > 0 && dy >= dx
 }
 
+// NoLight says it's the Program's for good: moving on, by the left
+// edge, it won't set the light.
+func (g *Gesture) NoLight() { g.lightZone = false }
+
 const (
 	EdgeWidth  = 110 // px from the left (light) or right edge where edge swipes start
 	SwipeStart = 40  // px of vertical travel before an edge swipe counts

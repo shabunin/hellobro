@@ -194,6 +194,7 @@ func (a *bro) Tick() {
 	a.trialTick()
 	a.ipcTick()
 	a.noteTick()
+	a.holdTick()
 	a.wmSettle(false)
 	a.wmKeep(false)
 	a.updateRing()
@@ -297,6 +298,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			return
 		}
 		a.focusTouched(p)
+		a.holdStart(p, g)
 		if !ev.Pen && !a.overlay() && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
 			a.edge = g
 		}
@@ -430,6 +432,9 @@ func pairDir(g *kobo.Gesture) int {
 }
 
 func (a *bro) Lift(g *kobo.Gesture) {
+	if a.bk.hold == g {
+		a.bk.hold = nil
+	}
 	if a.vkLift(g) || a.selLift(g) || a.cutLift(g) || a.wmDragLift(g) || a.noteLift(g) {
 		return
 	}
@@ -442,13 +447,8 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		}
 		a.pair = [2]*kobo.Gesture{}
 	}
-	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge || g.Owner == ownKey {
+	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge || g.Owner == ownKey || g.Owner == ownHold {
 		return
-	}
-	if !g.Tap && g.Moved < holdSlop && !a.overlay() { // held still: a word to look up
-		if w, ok := a.windowAt(g.Start).(*bookWin); ok && w.holdWord(a, g.Start) {
-			return
-		}
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {
 		switch w := a.windowAt(g.Start).(type) {

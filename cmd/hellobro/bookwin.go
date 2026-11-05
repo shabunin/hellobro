@@ -128,6 +128,7 @@ type bookState struct {
 	fams  []bookFamily
 	faces *bookFaces
 	names map[string]font.Face // each family's regular, to show it by (bookstyle.go)
+	hold  *kobo.Gesture        // a finger still on a book, maybe holding a word (bookdict.go)
 	cut   *bookCut             // a gesture cutting a part of a PDF's page out (bookcut.go)
 }
 
