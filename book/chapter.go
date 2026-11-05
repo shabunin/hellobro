@@ -12,8 +12,10 @@ import (
 	"strings"
 )
 
-// Style is a span's font: bold, italic, monospace, raised, lowered.
-type Style uint8
+// Style is a span's font: bold, italic, monospace, raised, lowered; and
+// over those a family of the book's own (fonts.go), 0 if it's the
+// reader's.
+type Style uint16
 
 const (
 	Bold Style = 1 << iota
@@ -22,6 +24,19 @@ const (
 	Sup
 	Sub
 )
+
+const (
+	familyShift = 8
+	maxFamily   = 1<<(16-familyShift) - 1
+)
+
+// Family is the book's own font the style has, from 1; 0 for the reader's.
+func (s Style) Family() int { return int(s >> familyShift) }
+
+// InFamily is s in the book's own font family.
+func (s Style) InFamily(family int) Style {
+	return s&(1<<familyShift-1) | Style(family)<<familyShift
+}
 
 // Span is text in one style. "\n" alone is a line break.
 type Span struct {
@@ -264,7 +279,7 @@ func (p *parser) start(t xml.StartElement) {
 		p.css.Reset()
 		return
 	case "link":
-		if strings.Contains(attr(t, "rel"), "stylesheet") {
+		if strings.Contains(strings.ToLower(attr(t, "rel")), "stylesheet") {
 			p.addSheet(attr(t, "href"))
 		}
 		return
@@ -387,7 +402,9 @@ func (p *parser) end(tag string) {
 	}
 	if tag == "style" && p.style {
 		p.style = false
-		p.sheets = append(p.sheets, parseCSS(p.css.String()))
+		s := parseCSS(p.css.String())
+		p.b.addFaces(p.name, s)
+		p.sheets = append(p.sheets, s)
 		return
 	}
 	// pop to the element that ends (tags left open end with it)
@@ -417,6 +434,7 @@ func (p *parser) addSheet(href string) {
 		}
 		s = parseCSS(string(data))
 		p.b.css[name] = s
+		p.b.addFaces(name, s)
 	}
 	p.sheets = append(p.sheets, s)
 }
@@ -478,7 +496,14 @@ func (p *parser) applyCSS(t xml.StartElement, tag string, f *frame, above *float
 				st.style &^= Bold
 			}
 		case "font-family":
-			if strings.Contains(d.val, "mono") || strings.Contains(d.val, "courier") {
+			if d.val == "inherit" {
+				break
+			}
+			fam := p.b.familyOf(d.val)
+			st.style = st.style.InFamily(fam)
+			if fam > 0 {
+				st.style &^= Mono
+			} else if strings.Contains(d.val, "mono") || strings.Contains(d.val, "courier") {
 				st.style |= Mono
 			}
 		case "font-size":

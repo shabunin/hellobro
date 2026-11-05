@@ -661,8 +661,8 @@ Kobo's own `/bin/sh`, as root.)
 
 hellobro has a reader of its own for EPUBs, set in the Kobo's fonts
 (Georgia, Caecilia, Malabar, Kobo Nickel…, each with its bold and
-italics), with the book's pictures, headings, italics and centred text;
-and for PDFs, drawn by MuPDF (below).
+italics) or the book's own, with the book's pictures, headings, italics
+and centred text; and for PDFs, drawn by MuPDF (below).
 
 - Open the shelf, **All Books**, from a new window (the **Books** tile)
   or the switcher (**Books**). It has the EPUBs and PDFs anywhere on
@@ -709,6 +709,13 @@ and for PDFs, drawn by MuPDF (below).
   it's kept in `hellobro.json`.
 - Without the panel, **+** and **-** make the text bigger and smaller,
   **f** (Shift+F back) goes through the fonts.
+- A book with fonts of its own (`@font-face` in its CSS) is set in them
+  where its CSS asks for them, and the panel's fonts start with **Book's
+  own**. Picking one of the Kobo's fonts (in the panel, with **f** or
+  `:font`) turns them off for that book, and it's kept with its place;
+  **Book's own** turns them back on. TTF, OTF, WOFF and obfuscated fonts
+  are read; a WOFF2 isn't, and a font that can't be read leaves its text
+  in the font chosen, as do the letters a font hasn't got.
 - **t**, Enter, **☰** or a tap at the page's top shows the contents: pick a
   chapter, or swipe up and down for more. Esc or "back to the book"
   leaves them, "‹ All Books" goes to the shelf (on a page, Esc and q do too).

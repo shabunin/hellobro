@@ -57,7 +57,7 @@ func (w *bookWin) exCmds(a *bro) []exCmd {
 		}},
 		{"font", "name", "the font, the one that matches best", func(arg string) error {
 			best, score := "", -1
-			for _, f := range a.bk.fams {
+			for _, f := range w.fontNames(a) {
 				if s := fuzzy(arg, f.name); s > score {
 					best, score = f.name, s
 				}
@@ -65,7 +65,7 @@ func (w *bookWin) exCmds(a *bro) []exCmd {
 			if best == "" {
 				return fmt.Errorf("no font like %q", arg)
 			}
-			a.restyle(a.bookPx(), best)
+			w.restyleFont(a, best)
 			return nil
 		}},
 		{"zoom z", "%", "a PDF's zoom", func(arg string) error {

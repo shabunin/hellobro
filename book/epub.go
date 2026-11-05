@@ -31,6 +31,12 @@ type Book struct {
 	files         map[string]*zip.File
 	css           map[string]*sheet // stylesheets read so far
 	mu            sync.Mutex        // Chapter's: the stylesheets read, from more than one goroutine
+
+	ids      []string          // its identifiers, the book's own first: fonts' keys
+	hidden   map[string]string // the fonts obfuscated, by file: how
+	fontMu   sync.Mutex        // the book's own fonts (fonts.go), asked for by what draws while a chapter's read
+	families []string          // lower-cased; a Style's family is an index in it, from 1
+	faces    []bookFace
 }
 
 // TOCEntry is a line of the contents: where it goes, how deep it is.
@@ -111,10 +117,15 @@ func (b *Book) readOPF() error {
 		return err
 	}
 	var p struct {
+		Unique  string   `xml:"unique-identifier,attr"`
 		Title   []string `xml:"metadata>title"`
 		Creator []string `xml:"metadata>creator"`
 		Lang    []string `xml:"metadata>language"`
-		Items   []struct {
+		IDs     []struct {
+			ID    string `xml:"id,attr"`
+			Value string `xml:",chardata"`
+		} `xml:"metadata>identifier"`
+		Items []struct {
 			ID    string `xml:"id,attr"`
 			Href  string `xml:"href,attr"`
 			Type  string `xml:"media-type,attr"`
@@ -140,6 +151,14 @@ func (b *Book) readOPF() error {
 	if len(p.Creator) > 0 {
 		b.Author = strings.TrimSpace(p.Creator[0])
 	}
+	for _, id := range p.IDs {
+		if id.ID == p.Unique {
+			b.ids = append([]string{id.Value}, b.ids...)
+		} else {
+			b.ids = append(b.ids, id.Value)
+		}
+	}
+	b.readEncryption()
 	byID := map[string]string{}
 	var nav, ncx string
 	for _, it := range p.Items {

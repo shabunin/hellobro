@@ -111,7 +111,7 @@ func (w *bookWin) noteRead(a *bro, link string, bs []book.Block, err error) {
 		w.goThere(a, link)
 		return
 	}
-	pages := book.Layout(&book.Chapter{Blocks: text}, st.settings(room, w.b.Lang), a.bookFaces(), nil)
+	pages := book.Layout(&book.Chapter{Blocks: text}, st.settings(room, w.b.Lang), w.bookFaces(a), nil)
 	pg := &pages[0]
 	h := 0
 	for _, it := range pg.Items {
@@ -141,7 +141,7 @@ func (w *bookWin) drawNote(a *bro) {
 	c.Fill(image.Rect(n.box.Min.X, n.box.Min.Y, n.box.Max.X, n.box.Min.Y+3), kobo.Black)
 	c.Frame(n.box, 1, kobo.Dark)
 	in := n.box.Inset(24)
-	faces := a.bookFaces()
+	faces := w.bookFaces(a)
 	for _, it := range n.page.Items {
 		switch it.Kind {
 		case book.ItemText:

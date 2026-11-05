@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"slices"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
@@ -72,6 +73,41 @@ func (a *bro) familyFace(fam bookFamily) font.Face {
 	return f
 }
 
+// tileFace is what the font's name is shown in, on its tile: itself.
+func (w *bookWin) tileFace(a *bro, f bookFamily) font.Face {
+	if f.name != bookOwnFont {
+		return a.familyFace(f)
+	}
+	if w.ownTile == nil {
+		if w.own == nil {
+			w.own = newOwnFonts(w.b)
+		}
+		w.ownTile = newReaderFaces(a.bookFaces(), w.own).Face(book.Style(0).InFamily(max(1, mainFamily(w.ch))), 32)
+	}
+	return w.ownTile
+}
+
+// sample is the paragraph to show: in what most of the chapter would be
+// set in, if that's a font of the book's.
+func (w *bookWin) sample() *book.Chapter {
+	fam := 0
+	if !w.noOwn {
+		fam = mainFamily(w.ch)
+	}
+	if fam == 0 {
+		return bookSample
+	}
+	ch := &book.Chapter{Blocks: slices.Clone(bookSample.Blocks)}
+	for i := range ch.Blocks {
+		spans := slices.Clone(ch.Blocks[i].Spans)
+		for k := range spans {
+			spans[k].Style = spans[k].Style.InFamily(fam)
+		}
+		ch.Blocks[i].Spans = spans
+	}
+	return ch
+}
+
 func (w *bookWin) openStyle(a *bro) {
 	w.styling, w.list = true, false
 	if w.pdf != nil {
@@ -79,10 +115,9 @@ func (w *bookWin) openStyle(a *bro) {
 		w.draw(a)
 		return
 	}
-	cur := a.bookFaces().fam.name
 	w.sel = 0
-	for i, f := range a.bk.fams {
-		if f.name == cur {
+	for i, f := range w.fontNames(a) {
+		if w.fontPicked(a, f) {
 			w.sel = i
 		}
 	}
@@ -97,15 +132,14 @@ func (w *bookWin) closeStyle(a *bro) {
 // styleStep changes control i: d -1 or 1 a step down or up, 0 picks it
 // (a font, a switch, Done).
 func (w *bookWin) styleStep(a *bro, i, d int) {
-	fams := a.bk.fams
+	fams := w.fontNames(a)
 	st := a.bookStyle()
 	if i < len(fams) {
 		if d != 0 {
 			i = (i + d + len(fams)) % len(fams)
 			w.sel = i
 		}
-		st.font = fams[i].name
-		a.setBookStyle(st)
+		w.pickFont(a, fams[i].name)
 		return
 	}
 	switch i - len(fams) {
@@ -136,7 +170,7 @@ func (w *bookWin) styleKey(a *bro, code uint16, ch string) bool {
 	if w.pdf != nil {
 		return w.pdfStyleKey(a, code, ch)
 	}
-	n := len(a.bk.fams) + styleN
+	n := len(w.fontNames(a)) + styleN
 	switch {
 	case code == 103 || ch == "k": // up
 		w.sel = (w.sel - 1 + n) % n
@@ -151,9 +185,9 @@ func (w *bookWin) styleKey(a *bro, code uint16, ch string) bool {
 	case code == kobo.KeyEnter || code == kobo.KeySpace:
 		w.styleStep(a, w.sel, 0)
 	case ch == "+" || ch == "=":
-		w.styleStep(a, len(a.bk.fams)+styleSize, 1)
+		w.styleStep(a, len(w.fontNames(a))+styleSize, 1)
 	case ch == "-":
-		w.styleStep(a, len(a.bk.fams)+styleSize, -1)
+		w.styleStep(a, len(w.fontNames(a))+styleSize, -1)
 	case code == kobo.KeyEsc || ch == "s" || ch == "q":
 		w.closeStyle(a)
 	default:
@@ -198,8 +232,8 @@ func (w *bookWin) drawStyle(a *bro) {
 		w.drawPDFStyle(a)
 		return
 	}
-	faces := a.bookFaces()
-	fams := a.bk.fams
+	faces := w.bookFaces(a)
+	fams := w.fontNames(a)
 	st := a.bookStyle()
 	area := w.p.Body.Inset(kobo.Pad)
 	c := a.C
@@ -222,14 +256,14 @@ func (w *bookWin) drawStyle(a *bro) {
 		col, row := i%cols, i/cols
 		r := image.Rect(area.Min.X+col*colW+6, y+row*nameH, area.Min.X+(col+1)*colW-6, y+(row+1)*nameH-6)
 		ink := uint8(kobo.Black)
-		if f.name == st.font {
+		if w.fontPicked(a, f) {
 			c.Fill(r, kobo.Black)
 			ink = kobo.White
 		} else {
 			c.Frame(r, 2, kobo.Black)
 		}
 		focus(i, r)
-		c.Text(a.familyFace(f), r.Inset(12), f.name, ink, kobo.AlignLeft)
+		c.Text(w.tileFace(a, f), r.Inset(12), f.name, ink, kobo.AlignLeft)
 		w.rows = append(w.rows, bookRow{r, func() { w.sel = i; w.styleStep(a, i, 0) }})
 	}
 	y += (len(fams)+cols-1)/cols*nameH + 14
@@ -271,12 +305,12 @@ func (w *bookWin) drawStyle(a *bro) {
 		box(image.Rect(vr.Min.X-boxW, r.Min.Y, vr.Min.X, r.Max.Y), "−", func() { w.styleStep(a, i, -1) })
 	}
 	// a paragraph as the books will be, in the page's own margins
-	pv := image.Rect(w.area.Min.X, y+8, w.area.Max.X, area.Max.Y)
-	if pv.Dy() < 2*st.px {
+	if y+8+2*st.px > area.Max.Y { // no room: image.Rect would turn it round
 		return
 	}
+	pv := image.Rect(w.area.Min.X, y+8, w.area.Max.X, area.Max.Y)
 	c.Fill(image.Rect(area.Min.X, y, area.Max.X, y+2), kobo.Light)
-	pages := book.Layout(bookSample, st.settings(pv.Size(), "en"), faces, nil)
+	pages := book.Layout(w.sample(), st.settings(pv.Size(), "en"), faces, nil)
 	for _, it := range pages[0].Items {
 		if it.Kind == book.ItemText {
 			c.TextAt(faces.Face(it.Style, it.Px), pv.Min.X+it.X, pv.Min.Y+it.Y, it.Text, kobo.Black, pv)

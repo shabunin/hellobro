@@ -119,6 +119,8 @@ type bookPlace struct {
 	Marks []bookMark `json:"marks,omitempty"` // bookmarks.go
 	Pages string     `json:"pages,omitempty"` // how its pages show: bookPageModes; "" one
 	Zoom  int        `json:"zoom,omitempty"`  // a PDF's, % of the fit (bookzoom.go)
+
+	NoOwnFonts bool `json:"no-own-fonts,omitempty"` // its own fonts turned off (bookfonts.go)
 }
 
 // bookState is what the readers share: the fonts, the size.
@@ -133,6 +135,7 @@ type bookLaid struct {
 	w, h int // a page's: half the window's width, less the gutter, if two show
 	st   bookStyle
 	two  bool // two pages side by side
+	own  bool // in the book's own fonts, where it has them
 }
 
 type bookRow struct {
@@ -178,7 +181,11 @@ type bookWin struct {
 	laid      bookLaid // what the pages are laid out for
 	pageMode  string   // its pages: one, two, auto (bookPageModes)
 	zoom      int      // a PDF's, % of the fit (bookzoom.go)
-	panned    bool     // its page moved by a finger: shown from w.at, not a screenful's start
+	noOwn     bool     // its own fonts turned off
+	own       *ownFonts
+	faces     *readerFaces // the main loop's (bookFaces, for a chapter laid out aside, its clone)
+	ownTile   font.Face    // the style panel's name for its own fonts, in them
+	panned    bool         // its page moved by a finger: shown from w.at, not a screenful's start
 
 	p       kobo.Panel
 	area    image.Rectangle // the text's, in the body
@@ -285,6 +292,7 @@ func (w *bookWin) opened(a *bro, o bookOpened) {
 		b := o.b
 		w.b, w.pdf = b, o.pdf
 		w.loadPageMode(a)
+		w.noOwn = a.mem.Books[w.path].NoOwnFonts
 		if w.pdf != nil {
 			w.loadZoom(a)
 		}
@@ -317,6 +325,69 @@ func (w *bookWin) setPageMode(a *bro, mode string) {
 	w.laid = bookLaid{} // laid out again
 	w.save(a)
 	w.draw(a)
+}
+
+// bookFaces are what the window's book is set in: the reader's fonts as
+// chosen, and the book's own unless turned off.
+func (w *bookWin) bookFaces(a *bro) *readerFaces {
+	base := a.bookFaces()
+	want := w.b != nil && w.pdf == nil && !w.noOwn
+	if w.faces == nil || w.faces.base != base || (w.faces.own != nil) != want {
+		var own *ownFonts
+		if want {
+			if w.own == nil {
+				w.own = newOwnFonts(w.b)
+			}
+			own = w.own
+		}
+		w.faces = newReaderFaces(base, own)
+	}
+	return w.faces
+}
+
+// hasOwnFonts says if the book's chapters read so far ask for fonts it has.
+func (w *bookWin) hasOwnFonts() bool {
+	return w.b != nil && w.pdf == nil && w.b.FontFamilies() > 0
+}
+
+// fontNames are the fonts to pick from: the book's own first, if it has any.
+func (w *bookWin) fontNames(a *bro) []bookFamily {
+	a.bookFaces() // the families, looked for
+	if w.hasOwnFonts() {
+		return append([]bookFamily{{name: bookOwnFont}}, a.bk.fams...)
+	}
+	return a.bk.fams
+}
+
+// fontPicked says if f is the font the book shows in.
+func (w *bookWin) fontPicked(a *bro, f bookFamily) bool {
+	if w.hasOwnFonts() && !w.noOwn {
+		return f.name == bookOwnFont
+	}
+	return f.name == a.bookFaces().fam.name
+}
+
+// pickFont sets the book in the font called name. A font of the reader's
+// wouldn't show over the book's own, so it turns those off, in this book;
+// the other books keep theirs.
+func (w *bookWin) pickFont(a *bro, name string) {
+	if w.hasOwnFonts() {
+		w.noOwn = name != bookOwnFont
+		w.save(a)
+	}
+	if name == bookOwnFont {
+		w.draw(a)
+		return
+	}
+	st := a.bookStyle()
+	st.font = name
+	a.setBookStyle(st)
+}
+
+// restyleFont is pickFont from a key: the note says which.
+func (w *bookWin) restyleFont(a *bro, name string) {
+	w.pickFont(a, name)
+	a.Notify(fmt.Sprintf("%s · %d px", name, a.bookPx()))
 }
 
 // faces are the reader's fonts, as chosen.
@@ -401,8 +472,8 @@ func (w *bookWin) layout(a *bro) {
 	if w.b == nil || w.area.Empty() {
 		return
 	}
-	faces := a.bookFaces()
-	laid := bookLaid{w: w.area.Dx(), h: w.area.Dy(), st: a.bookStyle()}
+	faces := w.bookFaces(a)
+	laid := bookLaid{w: w.area.Dx(), h: w.area.Dy(), st: a.bookStyle(), own: faces.own != nil}
 	if mode := w.pageMode; mode == "two" || mode == "auto" && w.area.Dx() > w.area.Dy() {
 		laid.two, laid.w = true, (w.area.Dx()-bookGutter)/2
 		laid.st.pdfWidth, laid.st.pdfZoom = false, 100 // a PDF's pages whole, each
@@ -559,7 +630,7 @@ func (w *bookWin) drawPage(a *bro) {
 // drawLaid draws page n of the chapter with its top left at at; the
 // pictures drawn go in pics.
 func (w *bookWin) drawLaid(a *bro, n int, at image.Point, pics map[string]*image.Gray) {
-	faces := a.bookFaces()
+	faces := w.bookFaces(a)
 	for _, it := range w.pages[n].Items {
 		switch it.Kind {
 		case book.ItemText:
@@ -952,7 +1023,7 @@ func (w *bookWin) save(a *bro) {
 	if len(w.pages) == 0 { // its chapter's being laid out: as far as it was
 		pct = a.mem.Books[w.path].Pct
 	}
-	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Name: w.named, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: pct, Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode, Zoom: w.zoom}
+	a.mem.Books[w.path] = bookPlace{Title: w.b.Title, Name: w.named, Spine: w.spine, Block: w.at.Block, Off: w.at.Off, Pct: pct, Read: time.Now().Unix(), Marks: w.marks, Pages: w.pageMode, Zoom: w.zoom, NoOwnFonts: w.noOwn}
 	a.mem.save()
 	w.savedAt = time.Now()
 }
@@ -1125,13 +1196,13 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 	case ch == "-":
 		a.restyle(max(bookPxMin, a.bookPx()-bookPxStep), a.bookFaces().fam.name)
 	case ch == "f" || ch == "F":
-		fams, cur := a.bk.fams, a.bookFaces().fam.name
-		i := slices.IndexFunc(fams, func(f bookFamily) bool { return f.name == cur })
+		fams := w.fontNames(a)
+		i := slices.IndexFunc(fams, func(f bookFamily) bool { return w.fontPicked(a, f) })
 		d := 1
 		if ch == "F" {
 			d = len(fams) - 1
 		}
-		a.restyle(a.bookPx(), fams[(i+d)%len(fams)].name)
+		w.restyleFont(a, fams[(i+d)%len(fams)].name)
 	case ch == "t" || code == kobo.KeyEnter:
 		w.openContents(a)
 	case ch == "s" && w.b != nil:

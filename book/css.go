@@ -11,8 +11,12 @@ import (
 
 type decl struct{ prop, val string }
 
-// sheet is a stylesheet's rules, by selector: "p", ".c", "p.c".
-type sheet struct{ rules map[string][]decl }
+// sheet is a stylesheet's rules, by selector: "p", ".c", "p.c"; and its
+// @font-face rules.
+type sheet struct {
+	rules map[string][]decl
+	faces []fontFace
+}
 
 // stripComments is src without its comments, each a space: in one pass
 // (a sheet of many, cut out one by one, was copied whole for each).
@@ -69,6 +73,9 @@ func parseCSS(src string) *sheet {
 		body := src[open+1 : end]
 		src = src[end+1:]
 		if strings.HasPrefix(sel, "@") {
+			if strings.EqualFold(sel, "@font-face") {
+				s.faces = append(s.faces, parseFontFace(body))
+			}
 			continue
 		}
 		ds := parseDecls(body)

@@ -9,12 +9,14 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"errors"
+	"image"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"unicode"
 
 	"golang.org/x/image/font"
@@ -24,6 +26,8 @@ import (
 	"golang.org/x/image/font/gofont/gomono"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/font/sfnt"
+	"golang.org/x/image/math/fixed"
 
 	"hellobro/book"
 )
@@ -182,4 +186,161 @@ func (f *bookFaces) Face(s book.Style, px int) font.Face {
 	}
 	f.faces[k] = fc
 	return fc
+}
+
+// bookOwnFont is the style panel's name for the book's own fonts, over
+// the reader's: the book's text in what its CSS asks for, the rest in
+// the font chosen.
+const bookOwnFont = "Book's own"
+
+// ownFonts are a book's own fonts as parsed, by file; nil for one that
+// can't be. Shared by a window's faces, in whichever goroutine: a parsed
+// font is read only.
+type ownFonts struct {
+	b     *book.Book
+	mu    sync.Mutex
+	fonts map[string]*opentype.Font
+}
+
+func newOwnFonts(b *book.Book) *ownFonts {
+	return &ownFonts{b: b, fonts: map[string]*opentype.Font{}}
+}
+
+// font is the file and the font for family's face nearest s. The file's
+// read and parsed outside the lock: the main loop asks too, and it mustn't
+// wait for another font being parsed aside.
+func (o *ownFonts) font(family int, s book.Style) (string, *opentype.Font) {
+	file := o.b.FontFile(family, s)
+	if file == "" {
+		return "", nil
+	}
+	o.mu.Lock()
+	f, ok := o.fonts[file]
+	o.mu.Unlock()
+	if ok {
+		return file, f
+	}
+	data, err := o.b.FontData(file)
+	if err == nil {
+		f, err = parseFont(data)
+	}
+	if err != nil {
+		log.Printf("book: its font: %s: %v", file, err)
+		f = nil
+	}
+	o.mu.Lock()
+	o.fonts[file] = f
+	o.mu.Unlock()
+	return file, f
+}
+
+// ownFace is one of a book's fonts, with what it lacks in the reader's
+// (a book's fonts are often cut down to the letters it uses, or a
+// heading's has no Greek): no tofu boxes.
+type ownFace struct {
+	font.Face
+	f    *opentype.Font
+	buf  sfnt.Buffer
+	base font.Face
+}
+
+func (o *ownFace) has(r rune) bool {
+	x, err := o.f.GlyphIndex(&o.buf, r)
+	return err == nil && x != 0
+}
+
+func (o *ownFace) Glyph(dot fixed.Point26_6, r rune) (image.Rectangle, image.Image, image.Point, fixed.Int26_6, bool) {
+	if !o.has(r) {
+		return o.base.Glyph(dot, r)
+	}
+	return o.Face.Glyph(dot, r)
+}
+
+func (o *ownFace) GlyphBounds(r rune) (fixed.Rectangle26_6, fixed.Int26_6, bool) {
+	if !o.has(r) {
+		return o.base.GlyphBounds(r)
+	}
+	return o.Face.GlyphBounds(r)
+}
+
+func (o *ownFace) GlyphAdvance(r rune) (fixed.Int26_6, bool) {
+	if !o.has(r) {
+		return o.base.GlyphAdvance(r)
+	}
+	return o.Face.GlyphAdvance(r)
+}
+
+func (o *ownFace) Kern(r0, r1 rune) fixed.Int26_6 {
+	if !o.has(r0) || !o.has(r1) {
+		return 0
+	}
+	return o.Face.Kern(r0, r1)
+}
+
+// readerFaces are what a book's text is set in: the reader's font, or
+// where a span says so and own isn't nil, the book's.
+type readerFaces struct {
+	base  *bookFaces
+	own   *ownFonts
+	faces map[ownFaceKey]font.Face
+}
+
+type ownFaceKey struct {
+	file  string
+	style book.Style // of what the reader's font fills in with
+	px    int
+}
+
+func newReaderFaces(base *bookFaces, own *ownFonts) *readerFaces {
+	return &readerFaces{base: base, own: own, faces: map[ownFaceKey]font.Face{}}
+}
+
+// clone is f for another goroutine, as bookFaces' is.
+func (f *readerFaces) clone() *readerFaces { return newReaderFaces(f.base.clone(), f.own) }
+
+// Face is the font for style s, px pixels. A code span in a family stays
+// code: it's Mono only if it didn't ask for one of the book's fonts.
+func (f *readerFaces) Face(s book.Style, px int) font.Face {
+	fam := s.Family()
+	if f.own == nil || fam == 0 || s&book.Mono != 0 {
+		return f.base.Face(s, px)
+	}
+	file, o := f.own.font(fam, s)
+	if o == nil {
+		return f.base.Face(s, px)
+	}
+	k := ownFaceKey{file, s & (book.Bold | book.Italic), px}
+	if fc := f.faces[k]; fc != nil {
+		return fc
+	}
+	fc, err := opentype.NewFace(o, &opentype.FaceOptions{Size: float64(px), DPI: 72, Hinting: font.HintingFull})
+	if err != nil {
+		return f.base.Face(s, px)
+	}
+	if len(f.faces) > 32 {
+		clear(f.faces)
+	}
+	own := &ownFace{Face: fc, f: o, base: f.base.Face(s, px)}
+	f.faces[k] = own
+	return own
+}
+
+// mainFamily is the family most of ch's text is in: 0, the reader's font.
+func mainFamily(ch *book.Chapter) int {
+	if ch == nil {
+		return 0
+	}
+	n := map[int]int{}
+	for _, b := range ch.Blocks {
+		for _, sp := range b.Spans {
+			n[sp.Style.Family()] += len(sp.Text)
+		}
+	}
+	best := 0
+	for fam, c := range n {
+		if c > n[best] || c == n[best] && fam < best {
+			best = fam
+		}
+	}
+	return best
 }
