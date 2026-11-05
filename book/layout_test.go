@@ -336,3 +336,22 @@ func TestChapterFrom(t *testing.T) {
 		t.Errorf("chapter changed: %q", got)
 	}
 }
+
+func TestParseHTML(t *testing.T) {
+	bs := ParseHTML(`<b>λόγος</b> m<ol><li>word</li><li>a &amp; b <i>c</i><br>d</li></ol><img src="x.png"/><p class="c" style="color:red">π &lt; ρ`)
+	var got []string
+	for _, b := range bs {
+		s := ""
+		for _, sp := range b.Spans {
+			s += sp.Text
+		}
+		got = append(got, s)
+	}
+	want := []string{"λόγος m", "word", "a & b c\nd", "π < ρ"}
+	if !slices.Equal(got, want) {
+		t.Errorf("%q, want %q", got, want)
+	}
+	if bs[0].Spans[0].Style != Bold {
+		t.Errorf("style %#x", bs[0].Spans[0].Style)
+	}
+}

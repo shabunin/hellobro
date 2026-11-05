@@ -8,20 +8,28 @@ package main
 // end notes), and a long one: it's read aside.
 
 import (
+	"fmt"
 	"image"
 	"log"
+	"slices"
 	"strings"
 
 	"hellobro/book"
 	"hellobro/kobo"
 )
 
-// bookNote is a link's target, shown in a box over the page.
+// bookNote is a link's target, or a word looked up (bookdict.go), shown in
+// a box over the page.
 type bookNote struct {
 	link  string
 	page  *book.Page // laid out for the box; nil while it's read
 	box   image.Rectangle
-	there image.Rectangle // "go there"
+	there image.Rectangle // "go there", or for a word "next", if there's more
+
+	word  string          // the word, not a link
+	pages []book.Page     // the box's pages; page is one of them
+	under image.Rectangle // a line under the word on the page
+	top   bool            // the box at the top: the word's at the foot
 }
 
 // bookFrom is where a link was followed from, to go back to.
@@ -104,17 +112,38 @@ func (w *bookWin) noteRead(a *bro, link string, bs []book.Block, err error) {
 	}
 	st := a.bookStyle()
 	st.px = max(bookPxMin, st.px*85/100)
-	pad, rowH := 24, a.libRowH()
-	room := image.Pt(w.area.Dx()-2*pad, w.area.Dy()*3/5-2*pad-rowH)
-	if len(text) == 0 || room.X < 100 || room.Y < 2*st.px {
+	if !w.noteBox(a, w.note, text, st) {
 		w.note = nil
 		w.goThere(a, link)
 		return
 	}
-	pages := book.Layout(&book.Chapter{Blocks: text}, st.settings(room, w.b.Lang), w.bookFaces(a), nil)
-	pg := &pages[0]
+	if a.shows(w) {
+		w.draw(a)
+	}
+}
+
+// noteBox lays text out for the box as high as it needs, three fifths of
+// the page at most; false if there's no room for it.
+func (w *bookWin) noteBox(a *bro, n *bookNote, text []book.Block, st bookStyle) bool {
+	rowH := a.libRowH()
+	room := image.Pt(w.area.Dx()-2*noteBoxPad, w.area.Dy()*3/5-2*noteBoxPad-rowH)
+	if len(text) == 0 || room.X < 100 || room.Y < 2*st.px {
+		return false
+	}
+	n.pages = book.Layout(&book.Chapter{Blocks: text}, st.settings(room, w.b.Lang), w.bookFaces(a), nil)
+	n.show(0, w.area, rowH)
+	return true
+}
+
+const noteBoxPad = 24
+
+// show puts the box's page i in it: as high as that page needs, at the
+// page's foot, or its top if the word's at the foot.
+func (n *bookNote) show(i int, area image.Rectangle, rowH int) {
+	pad := noteBoxPad
+	n.page = &n.pages[i]
 	h := 0
-	for _, it := range pg.Items {
+	for _, it := range n.page.Items {
 		switch it.Kind {
 		case book.ItemText:
 			h = max(h, it.Y+it.Px/3)
@@ -122,12 +151,30 @@ func (w *bookWin) noteRead(a *bro, link string, bs []book.Block, err error) {
 			h = max(h, it.Y+it.H)
 		}
 	}
-	box := image.Rect(w.area.Min.X, w.area.Max.Y-min(room.Y, h)-2*pad-rowH, w.area.Max.X, w.area.Max.Y)
-	there := image.Rect(box.Max.X-pad-220, box.Max.Y-pad/2-rowH, box.Max.X-pad, box.Max.Y-pad/2).Inset(4)
-	w.note.page, w.note.box, w.note.there = pg, box, there
-	if a.shows(w) {
-		w.draw(a)
+	h += 2*pad + rowH
+	n.box = image.Rect(area.Min.X, area.Max.Y-h, area.Max.X, area.Max.Y)
+	if n.top {
+		n.box = image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+h)
 	}
+	n.there = image.Rect(n.box.Max.X-pad-220, n.box.Max.Y-pad/2-rowH, n.box.Max.X-pad, n.box.Max.Y-pad/2).Inset(4)
+}
+
+// at is which of the box's pages shows.
+func (n *bookNote) at() int {
+	return slices.IndexFunc(n.pages, func(p book.Page) bool { return p.Start == n.page.Start })
+}
+
+// noteNext shows the word's next page of what was found, round to the
+// first; false if there's only one.
+func (w *bookWin) noteNext(a *bro) bool {
+	n := w.note
+	if n == nil || len(n.pages) < 2 {
+		return false
+	}
+	i := (n.at() + 1) % len(n.pages)
+	n.show(i, w.area, a.libRowH())
+	w.draw(a)
+	return true
 }
 
 // drawNote draws the note's box over the page.
@@ -150,16 +197,31 @@ func (w *bookWin) drawNote(a *bro) {
 			c.Fill(image.Rect(it.X, it.Y, it.X+it.W, it.Y+it.H).Add(in.Min).Intersect(in), kobo.Dark)
 		}
 	}
-	c.Frame(n.there, 2, kobo.Black)
-	c.Text(a.F.Panel, n.there, "go there", kobo.Black, kobo.AlignCenter)
+	if !n.under.Empty() && !n.under.Overlaps(n.box) {
+		c.Fill(n.under, kobo.Black)
+	}
+	label := "go there"
+	if n.word != "" {
+		label = ""
+		if len(n.pages) > 1 {
+			label = fmt.Sprintf("next · %d/%d", n.at()+1, len(n.pages))
+		}
+	}
+	if label != "" {
+		c.Frame(n.there, 2, kobo.Black)
+		c.Text(a.F.Panel, n.there, label, kobo.Black, kobo.AlignCenter)
+	}
 	c.Text(a.F.Small, image.Rect(in.Min.X, n.there.Min.Y, n.there.Min.X-16, n.there.Max.Y), "a tap elsewhere closes it", kobo.Mid, kobo.AlignLeft)
 }
 
 // noteTap takes a tap while a note shows: go there, or it goes.
 func (w *bookWin) noteTap(a *bro, p image.Point) {
 	n := w.note
+	if n.word != "" && n.page != nil && p.In(n.there) && w.noteNext(a) {
+		return
+	}
 	w.note = nil
-	if n.page != nil && p.In(n.there) {
+	if n.page != nil && p.In(n.there) && n.word == "" {
 		w.goThere(a, n.link)
 		return
 	}

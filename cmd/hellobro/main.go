@@ -445,6 +445,11 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge || g.Owner == ownKey {
 		return
 	}
+	if !g.Tap && g.Moved < holdSlop && !a.overlay() { // held still: a word to look up
+		if w, ok := a.windowAt(g.Start).(*bookWin); ok && w.holdWord(a, g.Start) {
+			return
+		}
+	}
 	if !g.Tap && !g.Pen && !a.overlay() {
 		switch w := a.windowAt(g.Start).(type) {
 		case *bookWin:

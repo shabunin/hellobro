@@ -15,6 +15,9 @@ run they freeze Nickel and draw an e-ink UI through FBInk.
 - `book/`: EPUBs read and laid out for the reader (`bookwin.go`);
   `pdf/`: PDFs, through MuPDF (cgo; `build-mupdf.sh` builds it once
   into `third_party/mupdf/`, not in git; `make` does when it's missing)
+- `dict/`: StarDict dictionaries, for a word held in the reader
+  (`bookdict.go`); `cmd/dictconv` makes them on the PC, of Wiktionary's
+  ([docs/dictionaries.md](docs/dictionaries.md))
 - `wm/`: the window manager's tree and i3's commands, IPC views and
   saving: no drawing, tested on its own
 - `cmd/brotools/`: diagnostics, only installed when asked for

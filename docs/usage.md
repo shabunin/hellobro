@@ -708,6 +708,18 @@ and centred text; and for PDFs, drawn by MuPDF (below).
   it (a page with little or no text is followed by a bit of Alice). With keys: ↑ ↓ to a row, ← → to change it, Enter to pick or
   switch; Esc, s or "back to the book" (at the top right) leaves it. Every book takes it;
   it's kept in `hellobro.json`.
+- **Hold a word** on an EPUB's page, a finger or the pen, a moment, and
+  lift: what the dictionaries say of it shows in a box, at the foot of
+  the page, or at its top if the word's down there (a line under the word
+  shows which). A tap elsewhere (or Esc) closes it; **next** (or Enter,
+  Space) goes on if there's more. The dictionaries are StarDict's (`.ifo`,
+  `.idx`, `.dict` or `.dict.dz`, `.syn`), in `Dictionaries/` on the Kobo's
+  storage, and all of them are asked, those named for the book's language
+  first (`grc-en` for `grc`). Copy one in over file sharing: no restart.
+  A word's found in any case and with any accents, whichever way the
+  book writes them, and by its other forms, if the dictionary lists them;
+  a word cut short (`l’homme`) by what's left. `cmd/dictconv` makes one of
+  [Wiktionary's](https://kaikki.org): see [docs/dictionaries.md](dictionaries.md).
 - Without the panel, **+** and **-** make the text bigger and smaller,
   **f** (Shift+F back) goes through the fonts.
 - A book with fonts of its own (`@font-face` in its CSS) is set in them

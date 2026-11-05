@@ -52,7 +52,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   bring it. Typing in Russian, Ukrainian, German or Greek too, on it and on a
   keyboard (Ctrl+Alt+Space).
 - **Books**: a reader for EPUBs, in the Kobo's own fonts, with the
-  books' pictures and styles, a page at a time, with bookmarks; and
+  books' pictures, styles and fonts, a page at a time, with bookmarks,
+  and offline dictionaries for a word held (Ancient Greek too); and
   PDFs, drawn by MuPDF, their margins trimmed, pinched to zoom.
 - **Shell**: Alpine Linux in a jail, with `apk` for tools, or the same
   terminal on the Kobo itself.

@@ -1154,9 +1154,15 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		w.draw(a)
 		return true
 	}
-	if n := w.note; n != nil { // Enter goes there, Esc closes it, another key too and goes on
+	if n := w.note; n != nil { // Enter goes there (a word's: its next page), Esc closes it, another key too and goes on
+		if n.word != "" && (code == kobo.KeyEnter || code == kobo.KeySpace) && n.page != nil && w.noteNext(a) {
+			return true
+		}
 		w.note = nil
 		switch {
+		case code == kobo.KeyEnter && n.page != nil && n.word != "":
+			w.draw(a)
+			return true
 		case code == kobo.KeyEnter && n.page != nil:
 			w.goThere(a, n.link)
 			return true

@@ -646,3 +646,11 @@ func (p *parser) add(b Block) {
 	p.gap = 0
 	p.ch.Blocks = append(p.ch.Blocks, b)
 }
+
+// ParseHTML is a bit of HTML as blocks, as a chapter's would be: a
+// dictionary's article, say. It stands alone: no sheets, no pictures.
+func ParseHTML(html string) []Block {
+	p := &parser{b: &Book{}, ch: &Chapter{IDs: map[string]int{}}}
+	p.parse([]byte("<html><body>" + html + "</body></html>"))
+	return slices.DeleteFunc(p.ch.Blocks, func(b Block) bool { return b.Kind == Picture })
+}

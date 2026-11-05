@@ -29,6 +29,7 @@
 #      HELLOBRO_BOOKS, HELLOBRO_FONTS (the books and bookstyle feeds': a directory of EPUBs;
 #      one of fonts named as the Kobo's, Name-Regular/-Bold/-Italic/-BoldItalic;
 #      BOOK_FONTS, bookstyle's: how many families that makes, with Go)
+#      HELLOBRO_DICTS (the bookdict feed's: a directory of StarDict dictionaries)
 #
 # The ssh, fullscreen, stress, connect, flash and zoom feeds want
 # the server running: (cd server && go run .); the relay feed wants

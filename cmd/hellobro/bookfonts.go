@@ -30,6 +30,7 @@ import (
 	"golang.org/x/image/math/fixed"
 
 	"hellobro/book"
+	"hellobro/third_party/fonts/gentium"
 )
 
 const koboFonts = "/usr/local/Trolltech/QtEmbedded-4.6.2-arm/lib/fonts"
@@ -100,6 +101,37 @@ type bookFaces struct {
 	fam   bookFamily
 	fonts [5]*opentype.Font // the four styles, then mono
 	faces map[[2]int]font.Face
+	last  map[int]font.Face // for what they lack (lastFont), by px
+}
+
+// lastFont is what the letters the reader's fonts lack are drawn in:
+// polytonic Greek, mostly.
+var lastFont = sync.OnceValue(func() *opentype.Font {
+	o, err := opentype.Parse(gentium.TTF)
+	if err != nil {
+		log.Printf("book: %v", err) // it's ours: never
+	}
+	return o
+})
+
+// lastFace is lastFont at px; nil if there's none.
+func (f *bookFaces) lastFace(px int) font.Face {
+	if fc := f.last[px]; fc != nil {
+		return fc
+	}
+	o := lastFont()
+	if o == nil {
+		return nil
+	}
+	fc, err := opentype.NewFace(o, &opentype.FaceOptions{Size: float64(px), DPI: 72, Hinting: font.HintingFull})
+	if err != nil {
+		return nil
+	}
+	if f.last == nil || len(f.last) > 16 {
+		f.last = map[int]font.Face{}
+	}
+	f.last[px] = fc
+	return fc
 }
 
 func newBookFaces(fam bookFamily) *bookFaces {
@@ -177,9 +209,14 @@ func (f *bookFaces) Face(s book.Style, px int) font.Face {
 	if fc := f.faces[k]; fc != nil {
 		return fc
 	}
-	fc, err := opentype.NewFace(f.fonts[i], &opentype.FaceOptions{Size: float64(px), DPI: 72, Hinting: font.HintingFull})
+	o := f.fonts[i]
+	fc, err := opentype.NewFace(o, &opentype.FaceOptions{Size: float64(px), DPI: 72, Hinting: font.HintingFull})
 	if err != nil {
-		fc, _ = opentype.NewFace(f.fonts[0], &opentype.FaceOptions{Size: float64(px), DPI: 72, Hinting: font.HintingFull})
+		o = f.fonts[0]
+		fc, _ = opentype.NewFace(o, &opentype.FaceOptions{Size: float64(px), DPI: 72, Hinting: font.HintingFull})
+	}
+	if last := f.lastFace(px); last != nil {
+		fc = &ownFace{Face: fc, f: o, base: last}
 	}
 	if len(f.faces) > 32 {
 		clear(f.faces)
@@ -234,9 +271,9 @@ func (o *ownFonts) font(family int, s book.Style) (string, *opentype.Font) {
 	return file, f
 }
 
-// ownFace is one of a book's fonts, with what it lacks in the reader's
-// (a book's fonts are often cut down to the letters it uses, or a
-// heading's has no Greek): no tofu boxes.
+// ownFace is a font with what it lacks from another: one of a book's
+// (often cut down to the letters it uses, or a heading's has no Greek)
+// over the reader's, the reader's over lastFont: no tofu boxes.
 type ownFace struct {
 	font.Face
 	f    *opentype.Font
