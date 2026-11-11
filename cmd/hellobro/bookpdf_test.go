@@ -12,6 +12,9 @@ func TestPDFSteps(t *testing.T) {
 	}{
 		{800, 1000, []int{0}},
 		{1000, 1000, []int{0}},
+		{1001, 1000, []int{0}}, // a px over, rounding: one, not a second a px on
+		{1004, 1000, []int{0}},
+		{1005, 1000, []int{0, 5}},
 		{1500, 1000, []int{0, 500}},             // the last one flush with the end
 		{3000, 1000, []int{0, 950, 1900, 2000}}, // a 20th shows again
 	} {

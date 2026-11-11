@@ -31,6 +31,7 @@ const (
 	pdfInkPx   = 300 // a page is drawn this wide first, to find its ink
 	pdfOverlap = 20  // of a page in screenfuls, 1/n of a screenful shows again on the next
 	pdfKept    = 3   // pages kept drawn: the one shown, the one before, the one ahead
+	pdfSlop    = 4   // px a page may be over the window and still be one screenful
 )
 
 // pdfZooms are the zoom's steps, % of the fit (a pinch goes between).
@@ -129,7 +130,10 @@ func pdfDraw(d *pdf.Doc, spine int, laid bookLaid) (pdfShown, error) {
 	if z == 0 {
 		return pdfShown{}, errors.New("no room to draw the page")
 	}
-	clip := image.Rect(int(x0*z), int(y0*z), int(x1*z+0.5), int(y1*z+0.5))
+	// as big as the ink drawn: its start rounded down and its end up, it
+	// was a px over the window now and then, and the page two screenfuls
+	cx, cy := int(x0*z), int(y0*z)
+	clip := image.Rect(cx, cy, cx+int((x1-x0)*z+0.5), cy+int((y1-y0)*z+0.5))
 	img, err := d.Render(spine, z, clip)
 	return pdfShown{spine, laid, img, z}, err
 }
@@ -207,7 +211,7 @@ func (w *bookWin) layoutPDF(a *bro, laid bookLaid) {
 // pdfSteps are where the screenfuls start along n px, screen px a
 // screenful, a little of each showing again on the next.
 func pdfSteps(n, screen int) []int {
-	if n <= screen {
+	if n <= screen+pdfSlop { // a few px over: cut off, not a screenful a few px on (a turn that seems to do nothing)
 		return []int{0}
 	}
 	step := screen - screen/pdfOverlap
