@@ -42,9 +42,10 @@ func (a *bro) ask(title, text, yes string, do func()) {
 func (a *bro) choose(title, text string, opts ...askOpt) {
 	b := a.screenFree()
 	w := min(1000, b.Dx()-80)
-	h := 330
+	h, step := 330, 84
 	if len(opts) > 2 {
-		h = 200 + len(opts)*84
+		step = max(52, min(84, (b.Dy()-240)/len(opts))) // a long list: closer, to fit
+		h = 200 + len(opts)*step
 	}
 	top := b.Min.Y + (b.Dy()-h)/2
 	q := &askBox{title: title, text: text, opts: opts}
@@ -56,8 +57,8 @@ func (a *bro) choose(title, text string, opts ...askOpt) {
 	} else {
 		y := q.box.Min.Y + 160
 		for range opts {
-			q.optR = append(q.optR, image.Rect(q.box.Min.X+32, y, q.box.Max.X-32, y+68))
-			y += 84
+			q.optR = append(q.optR, image.Rect(q.box.Min.X+32, y, q.box.Max.X-32, y+step-16))
+			y += step
 		}
 	}
 	a.asking = q

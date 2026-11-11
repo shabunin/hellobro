@@ -142,19 +142,16 @@ type Hand struct {
 	k     float64 // a capital's height, in the fonts' units
 }
 
-// Styles are the hands there are: Latin in a script, a bolder script
-// (the complex, its strokes doubled) or print; Cyrillic and Greek in
-// what the Hershey fonts have, slanted to go with a script.
-var Styles = []string{"script", "calligraphy", "print"}
+// Styles are the hands there are: Latin in a script; Cyrillic and Greek
+// in what the Hershey fonts have, the Cyrillic slanted to go with it.
+var Styles = []string{"script"}
 
 // styleFonts are a style's fonts, and the slant of its Cyrillic.
 var styleFonts = map[string]struct {
 	latin, greek string
 	slant        float64
 }{
-	"script":      {"scripts.jhf", "greeks.jhf", 0.2},
-	"calligraphy": {"scriptc.jhf", "greekc.jhf", 0.2},
-	"print":       {"futural.jhf", "greeks.jhf", 0},
+	"script": {"scripts.jhf", "greeks.jhf", 0.2},
 }
 
 var (

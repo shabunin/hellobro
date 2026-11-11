@@ -13,6 +13,7 @@ import (
 	"encoding/xml"
 	"image"
 	"log"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 
 	"hellobro/kobo"
@@ -44,29 +46,85 @@ type noteTyping struct {
 	pos  int // the cursor: a byte in the text
 }
 
-// noteTextFaces are the text's font at each size it's drawn (px). An
-// export draws in its own goroutine while the loop draws pages: the map
-// is locked, and so is each face, as opentype's keep a buffer of their
-// own for measuring.
+// noteTextFaces are the texts' fonts at each size they're drawn (px),
+// by family. An export draws in its own goroutine while the loop draws
+// pages: the map is locked, and so is each face, as opentype's keep a
+// buffer of their own for measuring.
 var noteTextFaces struct {
 	sync.Mutex
-	m map[int]font.Face
+	m     map[noteFaceKey]font.Face
+	fonts map[string]*opentype.Font // a family's regular, read
 }
 
-func noteTextFace(px int) font.Face {
+type noteFaceKey struct {
+	fam string
+	px  int
+}
+
+// noteTextFace is Go's regular at px.
+func noteTextFace(px int) font.Face { return noteFontFace("", px) }
+
+// noteFontFace is the family fam's regular at px: one of the reader's
+// fonts, by its name (bookFamilies); Go's, if it's none of them (a
+// .xopp's "Sans", say).
+func noteFontFace(fam string, px int) font.Face {
 	px = max(4, px)
+	fam = noteFamily(fam)
 	noteTextFaces.Lock()
 	defer noteTextFaces.Unlock()
-	f, ok := noteTextFaces.m[px]
+	k := noteFaceKey{fam, px}
+	f, ok := noteTextFaces.m[k]
 	if !ok {
 		if noteTextFaces.m == nil {
-			noteTextFaces.m = map[int]font.Face{}
+			noteTextFaces.m, noteTextFaces.fonts = map[noteFaceKey]font.Face{}, map[string]*opentype.Font{}
 		}
 		f = &lockedFace{f: kobo.Face(goregular.TTF, float64(px))}
-		noteTextFaces.m[px] = f
+		if o := noteFont(fam); o != nil {
+			if fc, err := opentype.NewFace(o, &opentype.FaceOptions{Size: float64(px), DPI: 72, Hinting: font.HintingFull}); err == nil {
+				f = &lockedFace{f: fc}
+			}
+		}
+		noteTextFaces.m[k] = f
 	}
 	return f
 }
+
+// noteFont is fam's regular, read once (noteTextFaces locked); nil for
+// Go's.
+func noteFont(fam string) *opentype.Font {
+	if o, ok := noteTextFaces.fonts[fam]; ok {
+		return o
+	}
+	var o *opentype.Font
+	for _, bf := range noteFamilies() {
+		if bf.name == fam && bf.files[0] != "" {
+			if data, err := os.ReadFile(bf.files[0]); err == nil {
+				if o, err = parseFont(data); err != nil {
+					log.Printf("notebook: font %s: %v", fam, err)
+				}
+			}
+		}
+	}
+	noteTextFaces.fonts[fam] = o
+	return o
+}
+
+// noteFamilies are the reader's fonts, looked for once.
+var noteFamilies = sync.OnceValue(bookFamilies)
+
+// noteFamily is the family a text's font names, as the reader has it
+// ("" for Go's).
+func noteFamily(name string) string {
+	for _, f := range noteFamilies() {
+		if f.files[0] != "" && strings.EqualFold(f.name, name) {
+			return f.name
+		}
+	}
+	return ""
+}
+
+// family is the font t's in, as its file says.
+func (t *noteText) family() string { return attr(t.attrs, "font") }
 
 // lockedFace is a face for more than one goroutine. Glyph's mask is the
 // face's own, drawn over by its next: kobo's glyph cache copies it, under
@@ -117,7 +175,7 @@ func (t *noteText) px() float64 { return t.size / notePt72 }
 // textBox is how much room t takes from at (page units): its widest line
 // by its lines (a cursor's width, empty).
 func (t *noteText) box(at image.Point) image.Rectangle {
-	f := noteTextFace(int(t.px() + 0.5))
+	f := noteFontFace(t.family(), int(t.px()+0.5))
 	lines := strings.Split(t.s, "\n")
 	wd := 2
 	for _, l := range lines {
@@ -130,7 +188,7 @@ func (t *noteText) box(at image.Point) image.Rectangle {
 // unit from org; the cursor at pos, if it's >= 0.
 func drawNoteText(c kobo.Canvas, s *noteStroke, org image.Point, k float64, pos int, clip image.Rectangle) {
 	t := s.txt
-	f := noteTextFace(int(t.px()*k + 0.5))
+	f := noteFontFace(t.family(), int(t.px()*k+0.5))
 	m := f.Metrics()
 	lh := m.Height.Ceil()
 	x := org.X + int(float64(s.box.Min.X)*k+0.5)

@@ -40,7 +40,7 @@ func TestDiaryLay(t *testing.T) {
 	after := lineAt(200, false)
 	w := &noteWin{nb: &notebook{pages: [][]*noteStroke{{q}, {after}}}, diary: &noteDiary{}}
 	w.nb.padMeta()
-	w.diaryLay(0, q.box, diaryReply{Status: "answer", Question: "a story?", Answer: strings.Repeat("It was a dark and stormy night, and the diary answered. ", 6), Prompt: "call me Harry"}, 1, "script", 46)
+	w.diaryLay(0, q.box, diaryReply{Status: "answer", Question: "a story?", Answer: strings.Repeat("It was a dark and stormy night, and the diary answered. ", 6), Prompt: "call me Harry"}, 1, "Go", 15)
 	pages := map[int]bool{}
 	for _, wd := range w.diary.writing {
 		pages[wd.page] = true
@@ -138,7 +138,7 @@ func TestDiaryCut(t *testing.T) {
 	q := lineAt(200, false)
 	w := &noteWin{nb: &notebook{pages: [][]*noteStroke{{q}}}, diary: &noteDiary{}}
 	w.nb.padMeta()
-	w.diaryLay(0, q.box, diaryReply{Status: "answer", Answer: "one two three four five six"}, 1, "calligraphy", 46)
+	w.diaryLay(0, q.box, diaryReply{Status: "answer", Answer: "one two three four five six"}, 1, "handwriting", 15)
 	a := &bro{}
 	for range 3 {
 		w.diaryWriteWord(a)
@@ -150,5 +150,54 @@ func TestDiaryCut(t *testing.T) {
 	w.doUndoOps()
 	if !slices.Equal(w.nb.pages[0], []*noteStroke{q}) {
 		t.Errorf("undone: %d strokes", len(w.nb.pages[0]))
+	}
+}
+
+func TestSuperscripts(t *testing.T) {
+	f := noteTextFace(40)
+	for in, want := range map[string]string{
+		"x^2 + y^2 = r^2": "x² + y² = r²",
+		"2^{10}, e^(-n)":  "2¹⁰, e⁽⁻ⁿ⁾",
+		"10^-3":           "10⁻³",
+		"a^b stays":       "a^b stays",
+		"caret ^ alone":   "caret ^ alone",
+	} {
+		if got := superscripts(in, f); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestDiaryLayText: an answer in a font is lines of text, on the page,
+// under the question, each word a step longer.
+func TestDiaryLayText(t *testing.T) {
+	q := lineAt(300, false)
+	w := &noteWin{nb: &notebook{pages: [][]*noteStroke{{q}}}, diary: &noteDiary{}}
+	w.nb.padMeta()
+	w.diaryLay(0, q.box, diaryReply{Status: "answer", Question: "q?", Answer: strings.Repeat("words and more words ", 30) + "\n\nx^2 the end."}, 1, "Go", 15)
+	lines := map[*noteStroke]string{}
+	for _, wd := range w.diary.writing {
+		if wd.line == nil || wd.first != (lines[wd.line] == "") {
+			t.Fatalf("a word not on a line, or its line's first not first: %+v", wd)
+		}
+		lines[wd.line] = wd.text
+	}
+	if len(lines) < 4 {
+		t.Fatalf("%d lines", len(lines))
+	}
+	a := &bro{}
+	for len(w.diary.writing) > 0 {
+		w.diaryWriteWord(a)
+	}
+	for l, text := range lines {
+		if l.txt.s != text || !isDiary(l) || !l.box.In(image.Rect(0, q.box.Max.Y, notePageW, notePageH)) {
+			t.Errorf("a line %q at %v", l.txt.s, l.box)
+		}
+	}
+	if talk, _ := diaryTalk(w.nb); len(talk) != 2 {
+		t.Errorf("the talk: %+v", talk)
+	}
+	if !strings.Contains(w.nb.pages[0][len(w.nb.pages[0])-1].txt.s, "x² the end.") {
+		t.Errorf("the last line: %q", w.nb.pages[0][len(w.nb.pages[0])-1].txt.s)
 	}
 }

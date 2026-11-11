@@ -693,6 +693,7 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 			c.Fill(image.Rect(pg.Max.X, pg.Min.Y, pg.Max.X+2, pg.Max.Y).Intersect(area), kobo.Mid)
 		}
 	}
+	w.drawThinking(a, clip) // the diary at work (notediary.go)
 	w.drawSel(a, clip)
 	w.drawOpts(a, clip)
 }
@@ -1397,7 +1398,7 @@ func (a *bro) noteInkDone(k *noteInk) {
 		w.clean = w.clean.Union(k.marked)
 		w.cleanDraw = w.cleanDraw || k.s.gray != kobo.Black // in its own gray, a marker under the ink
 		a.nt.liftAt = time.Now()
-		w.diaryWrote(k.page)
+		w.diaryWrote(a, k.page)
 	}
 	if k.erase && a.shows(w) {
 		w.drawBar(a) // undo can now

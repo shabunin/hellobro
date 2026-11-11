@@ -35,33 +35,42 @@ func ownShown(key string) func(a *bro, w *noteWin) string {
 	}
 }
 
-var noteSettings = []noteSet{
-	{"A finger", ownShown("note-finger"), stepOwn("note-finger")},
-	{"Pen buttons", ownShown("pen-buttons"), stepOwn("pen-buttons")},
-	{"Export", ownShown("note-export"), stepOwn("note-export")},
-	{"Light by the left edge", ownShown("note-light"), stepOwn("note-light")},
-	{"Bar, fullscreen", func(a *bro, _ *noteWin) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ *noteWin, _ int) { a.flipFullBar("note") }},
-	{"AI diary (this notebook)", func(a *bro, w *noteWin) string { return onOff(w.nb.diaryOn()) }, func(a *bro, w *noteWin, _ int) { w.flipDiary(a) }},
-	{"AI voice (this notebook)", func(a *bro, w *noteWin) string { return diaryVoices[w.nb.diaryVoice()].label }, func(a *bro, w *noteWin, d int) { w.stepVoice(d) }},
-	{"AI instructions (written)", func(a *bro, w *noteWin) string {
-		if _, ps := diaryTalk(w.nb); len(ps) > 0 {
-			return strings.Join(ps, "; ")
-		}
-		return "none: write one, as “from now on, …”"
-	}, func(*bro, *noteWin, int) {}},
-	{"AI model", func(a *bro, _ *noteWin) string {
-		m := diaryModelOf(a.setting("ai-model"))
-		if m.id == "conf" {
-			return "as ai.conf says: " + a.diaryModelNow()
-		}
-		if m.note == "" {
+// noteSettings are the rows; set at init, as their steps draw them.
+var noteSettings []noteSet
+
+func init() { noteSettings = noteSetRows() }
+
+func noteSetRows() []noteSet {
+	return []noteSet{
+		{"A finger", ownShown("note-finger"), stepOwn("note-finger")},
+		{"Pen buttons", ownShown("pen-buttons"), stepOwn("pen-buttons")},
+		{"Export", ownShown("note-export"), stepOwn("note-export")},
+		{"Light by the left edge", ownShown("note-light"), stepOwn("note-light")},
+		{"Bar, fullscreen", func(a *bro, _ *noteWin) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ *noteWin, _ int) { a.flipFullBar("note") }},
+		{"AI diary (this notebook)", func(a *bro, w *noteWin) string { return onOff(w.nb.diaryOn()) }, func(a *bro, w *noteWin, _ int) { w.flipDiary(a) }},
+		{"AI voice (this notebook)", func(a *bro, w *noteWin) string { return diaryVoices[w.nb.diaryVoice()].label }, func(a *bro, w *noteWin, d int) { w.stepVoice(d) }},
+		{"AI instructions (written)", func(a *bro, w *noteWin) string {
+			if _, ps := diaryTalk(w.nb); len(ps) > 0 {
+				return strings.Join(ps, "; ")
+			}
+			return "none: write one, as “from now on, …”"
+		}, func(*bro, *noteWin, int) {}},
+		{"AI model", func(a *bro, _ *noteWin) string {
+			m := diaryModelOf(a.setting("ai-model"))
+			if m.id == "conf" {
+				return "as ai.conf says: " + a.diaryModelNow()
+			}
 			return m.id
-		}
-		return m.id + ": " + m.note
-	}, stepOwn("ai-model")},
-	{"AI handwriting", ownShown("ai-hand"), stepOwn("ai-hand")},
-	{"AI handwriting size", ownShown("ai-size"), stepOwn("ai-size")},
-	{"AI usage", func(a *bro, _ *noteWin) string { return a.usageShown() }, func(*bro, *noteWin, int) {}},
+		}, func(a *bro, w *noteWin, _ int) { w.chooseModel(a) }},
+		{"AI font (this notebook)", func(a *bro, w *noteWin) string {
+			if f := w.nb.diaryFont(); f != diaryHand {
+				return f
+			}
+			return "handwriting (the Hershey script)"
+		}, func(a *bro, w *noteWin, _ int) { w.chooseFont(a) }},
+		{"AI letters' size", ownShown("ai-size"), stepOwn("ai-size")},
+		{"AI usage", func(a *bro, _ *noteWin) string { return a.usageShown() }, func(*bro, *noteWin, int) {}},
+	}
 }
 
 // settingsOn shows the settings, or the page again.
@@ -111,6 +120,9 @@ func (w *noteWin) setStep(a *bro, d int) {
 		return
 	}
 	noteSettings[w.setSel].step(a, w, d)
+	if a.asking != nil { // a list to choose from, over them: drawn when it's down
+		return
+	}
 	w.drawSettings(a)
 	a.Mark(w.p.Body, true)
 }

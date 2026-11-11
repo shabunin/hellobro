@@ -24,10 +24,14 @@ import (
 	"log"
 	"math"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	"golang.org/x/image/font"
 
 	"hellobro/ai"
 	"hellobro/hand"
@@ -55,21 +59,55 @@ const (
 type diaryModel struct {
 	id, note string
 	limit    float64
+	tried    string // what a question cost, and took, when it was tried
 }
 
 var diaryModels = []diaryModel{
-	{"conf", "as ai.conf says", 0},
-	{"claude-haiku-5-5", "reads well, quick", 15},
-	{"glm-5.3-flash", "cheapest, quick", 60},
-	{"minimax-m3", "quick, cheap", 60},
-	{"qwen3.8-flash", "cheap", 30},
-	{"mimo-v2.6-flash", "cheap, slower", 60},
-	{"qwen3.7-plus", "slower", 60},
-	{"longcat-2.0", "slower", 60},
-	{"kimi-k2.7-code", "for code", 60},
-	{"mimo-v2.6-pro", "", 15},
-	{"qwen3.8-max", "strong, slow", 15},
-	{"kimi-k3", "strong, dear", 15},
+	{"conf", "as ai.conf says", 0, ""},
+	{"claude-haiku-5-5", "reads well", 15, "$0.0008, 2 s"},
+	{"glm-5.3-flash", "cheapest", 60, "$0.0001, 2 s"},
+	{"minimax-m3", "quick", 60, "$0.0002, 1 s"},
+	{"qwen3.8-flash", "", 30, "$0.0003, 4 s"},
+	{"mimo-v2.6-flash", "", 60, "$0.0001, 7 s"},
+	{"qwen3.7-plus", "", 60, "$0.0008, 8 s"},
+	{"longcat-2.0", "", 60, "$0.0004, 7 s"},
+	{"kimi-k2.7-code", "for code", 60, "$0.0012, 5 s"},
+	{"mimo-v2.6-pro", "", 15, "$0.0016, 5 s"},
+	{"qwen3.8-max", "strong", 15, "$0.0095, 8 s"},
+	{"kimi-k3", "strong", 15, "$0.025, 4 s"},
+}
+
+// label is how the model's listed: its name, what it's good for, what a
+// question cost.
+func (m diaryModel) label(conf string) string {
+	l := m.id
+	if m.id == "conf" {
+		return "as ai.conf says: " + conf
+	}
+	if m.note != "" {
+		l += ", " + m.note
+	}
+	if m.tried != "" {
+		l += " · " + m.tried
+	}
+	return l
+}
+
+// chooseModel lists the models to choose from, the one asked now first
+// in focus.
+func (w *noteWin) chooseModel(a *bro) {
+	c, _ := ai.Load(kobo.AppFile("ai.conf"))
+	cur, sel := a.setting("ai-model"), 0
+	var opts []askOpt
+	for i, m := range diaryModels {
+		if m.id == cur {
+			sel = i
+		}
+		opts = append(opts, askOpt{m.label(c.Model), "", func() { a.setSettingTo("ai-model", m.id); w.show(a) }})
+	}
+	a.choose("The AI diary's model", "those that read handwriting on OpenCode Go; a question cost, and took, when tried", append(opts, askOpt{"cancel", "", nil})...)
+	a.asking.sel = sel
+	a.drawAsk()
 }
 
 func diaryModelIDs() []string {
@@ -99,9 +137,58 @@ func (a *bro) diaryConf() (ai.Config, error) {
 	return c, err
 }
 
-// diarySizes are the answer's capitals, page units, as "ai-size" has
-// them (medium: about 5 mm).
-var diarySizes = map[string]float64{"s": 34, "m": 46, "l": 60, "xl": 76}
+// diarySizes are the answer's letters, points, as "ai-size" has them.
+var diarySizes = map[string]float64{"s": 12, "m": 15, "l": 19, "xl": 24}
+
+// The answer's font is the notebook's own: one of the reader's (Go's
+// first), or the Hershey script's hand.
+const (
+	diaryFontAttr = "hellobro-diary-font"
+	diaryHand     = "handwriting"
+)
+
+// diaryFonts are the fonts an answer can be in.
+func diaryFonts() []string {
+	fs := []string{"Go"}
+	for _, f := range noteFamilies() {
+		if f.files[0] != "" {
+			fs = append(fs, f.name)
+		}
+	}
+	return append(fs, diaryHand)
+}
+
+// diaryFont is nb's answers' font.
+func (nb *notebook) diaryFont() string {
+	if f := attr(nb.attrs, diaryFontAttr); f != "" {
+		return f
+	}
+	return "Go"
+}
+
+// chooseFont lists the fonts to choose from.
+func (w *noteWin) chooseFont(a *bro) {
+	cur, sel := w.nb.diaryFont(), 0
+	var opts []askOpt
+	for i, f := range diaryFonts() {
+		if f == cur {
+			sel = i
+		}
+		label := f
+		if f == diaryHand {
+			label = "handwriting (the Hershey script)"
+		}
+		opts = append(opts, askOpt{label, "", func() {
+			w.nb.attrs = slices.DeleteFunc(w.nb.attrs, func(a xml.Attr) bool { return a.Name.Local == diaryFontAttr })
+			w.nb.attrs = append(w.nb.attrs, xml.Attr{Name: xml.Name{Local: diaryFontAttr}, Value: f})
+			w.changed = time.Now()
+			w.show(a)
+		}})
+	}
+	a.choose("The AI diary's font", "this notebook's answers: the reader's fonts, or a hand", append(opts, askOpt{"cancel", "", nil})...)
+	a.asking.sel = sel
+	a.drawAsk()
+}
 
 // noteDiary is a notebook's diary at work.
 type noteDiary struct {
@@ -113,7 +200,16 @@ type noteDiary struct {
 	wrote   []noteOp    // what it wrote: one step to undo
 	box     image.Rectangle
 	nextAt  time.Time
+
+	// While it's asked, dots where the answer will go, one more at a
+	// time: it's at work. On screen only.
+	think     image.Rectangle // page units; empty: none
+	thinkPage int
+	dots      int
+	dotAt     time.Time
 }
+
+const diaryDotEvery = 700 * time.Millisecond
 
 // diaryTaps are a finger's taps on a page, the last few: three quick
 // ones ask the diary at once.
@@ -125,7 +221,10 @@ type diaryTapper struct {
 // diaryWord is a word of an answer: its strokes, on its page.
 type diaryWord struct {
 	page    int
-	strokes []*noteStroke
+	strokes []*noteStroke // the hand's
+	line    *noteStroke   // or a font's: the line it's on, its text that far
+	text    string
+	first   bool // the line's first word: it goes on the page
 }
 
 func (nb *notebook) diaryOn() bool { return attr(nb.attrs, diaryOnAttr) == "on" }
@@ -139,7 +238,15 @@ func (nb *notebook) setDiary(on bool) {
 
 func onOff(on bool) string { return map[bool]string{true: "on", false: "off"}[on] }
 
-func isDiary(s *noteStroke) bool { return attr(s.attrs, diaryAttr) == "diary" }
+func isDiary(s *noteStroke) bool { return attr(strokeAttrs(s), diaryAttr) == "diary" }
+
+// strokeAttrs are s's attributes in the file: a text's are its own.
+func strokeAttrs(s *noteStroke) []xml.Attr {
+	if s.txt != nil {
+		return s.txt.attrs
+	}
+	return s.attrs
+}
 
 // flipDiary turns w's diary on or off.
 func (w *noteWin) flipDiary(a *bro) {
@@ -147,7 +254,7 @@ func (w *noteWin) flipDiary(a *bro) {
 	w.nb.setDiary(on)
 	w.changed = time.Now()
 	if !on {
-		w.diaryStop()
+		w.diaryStop(a)
 		return
 	}
 	if _, err := a.diaryConf(); err != nil {
@@ -164,7 +271,7 @@ func diaryConfErr(err error) string {
 
 // diaryStop forgets a question out, and an answer being written (what's
 // written of it stays, a step to undo).
-func (w *noteWin) diaryStop() {
+func (w *noteWin) diaryStop(a *bro) {
 	d := w.diary
 	if d == nil {
 		return
@@ -172,6 +279,7 @@ func (w *noteWin) diaryStop() {
 	if d.cancel != nil {
 		d.cancel()
 	}
+	w.diaryUnthink(a)
 	d.asked, d.cancel, d.wroteAt = 0, nil, time.Time{}
 	if len(d.wrote) > 0 {
 		w.diaryDone(nil)
@@ -181,7 +289,7 @@ func (w *noteWin) diaryStop() {
 
 // diaryWrote notes a stroke written on page: once the pen rests, it's
 // asked; a question out is asked again, with it.
-func (w *noteWin) diaryWrote(page int) {
+func (w *noteWin) diaryWrote(a *bro, page int) {
 	if !w.nb.diaryOn() {
 		return
 	}
@@ -192,6 +300,7 @@ func (w *noteWin) diaryWrote(page int) {
 	if d.cancel != nil {
 		d.cancel()
 		d.asked, d.cancel = 0, nil
+		w.diaryUnthink(a)
 	}
 	d.page, d.wroteAt = page, time.Now()
 }
@@ -206,6 +315,11 @@ func (a *bro) diaryTick() {
 		case len(d.writing) > 0:
 			if time.Now().After(d.nextAt) {
 				w.diaryWriteWord(a)
+			}
+		case d.asked != 0:
+			if !d.think.Empty() && time.Since(d.dotAt) >= diaryDotEvery {
+				d.dots, d.dotAt = d.dots%3+1, time.Now()
+				w.diaryShowDots(a, false)
 			}
 		case d.asked == 0 && !d.wroteAt.IsZero() && time.Since(d.wroteAt) >= diaryPause &&
 			time.Since(a.nt.hoverAt) >= noteHoverGone && w.typing == nil:
@@ -265,7 +379,13 @@ Reply with a JSON object only, nothing around it.
 - Otherwise reply {"status":"answer","question":"<what they wrote, word for word>","answer":"<your answer>"}.
 - If the writing tells you how to answer from now on (a role, a manner, a language, what to call them...), add "prompt":"<that, as a standing instruction to you>" to your answer, and say in it, briefly, that you will.
 
-Your answer is written back into the notebook by hand, so: answer in the language they wrote in, unless told otherwise; plain text, no markdown, no LaTeX (write formulas plainly, as x^2 + 1, sqrt(2)); short, a few sentences, unless they ask for more; new lines only between paragraphs. If you can't read a word, ask about it.`
+Your answer is written back into the notebook, so: answer in the language they wrote in, unless told otherwise; plain text, no markdown, no LaTeX (FORMULAS); short, a few sentences, unless they ask for more; new lines only between paragraphs. If you can't read a word, ask about it.`
+
+// diaryFormulas is how formulas are to be written, in the hand or a font.
+var diaryFormulas = map[bool]string{
+	true:  "write formulas plainly, as x^2 + 1, sqrt(2)",
+	false: "write formulas plainly, with Unicode's signs where they help: x² + 1, √2, π, ≤, →",
+}
 
 // diaryVoices are the manners it can answer in, by name: a notebook's
 // own (its settings).
@@ -312,15 +432,16 @@ const (
 func diaryTalk(nb *notebook) (msgs []ai.Msg, prompts []string) {
 	for _, pg := range nb.pages {
 		for _, s := range pg {
-			ans := attr(s.attrs, diaryAAttr)
+			as := strokeAttrs(s)
+			ans := attr(as, diaryAAttr)
 			if ans == "" {
 				continue
 			}
-			q := attr(s.attrs, diaryQAttr)
+			q := attr(as, diaryQAttr)
 			if q == "" {
 				q = "(not read)"
 			}
-			p := attr(s.attrs, diaryPromptAttr)
+			p := attr(as, diaryPromptAttr)
 			said, _ := json.Marshal(diaryReply{Status: "answer", Question: q, Answer: ans, Prompt: p})
 			msgs = append(msgs, ai.Msg{Role: "user", Parts: []ai.Part{{Text: "Written (read): " + q}}},
 				ai.Msg{Role: "assistant", Parts: []ai.Part{{Text: string(said)}}})
@@ -336,7 +457,7 @@ func diaryTalk(nb *notebook) (msgs []ai.Msg, prompts []string) {
 // writer's instructions.
 func diarySystem(nb *notebook, prompts []string) string {
 	var b strings.Builder
-	b.WriteString(diaryVoices[nb.diaryVoice()].text + "\n\n" + diaryRules)
+	b.WriteString(diaryVoices[nb.diaryVoice()].text + "\n\n" + strings.Replace(diaryRules, "FORMULAS", diaryFormulas[nb.diaryFont() == diaryHand], 1))
 	if len(prompts) > 0 {
 		b.WriteString("\n\nThe writer's standing instructions (follow them; a later one wins over an earlier):")
 		for _, p := range prompts {
@@ -381,6 +502,7 @@ func (a *bro) diaryTap(w *noteWin, page int, p image.Point) {
 	if d.cancel != nil {
 		d.cancel()
 		d.asked, d.cancel = 0, nil
+		w.diaryUnthink(a)
 	}
 	if page >= len(w.nb.pages) || len(diaryQuestion(w.nb.pages[page])) == 0 { // tapped by a page with nothing new: the one written on
 		page = d.page
@@ -426,12 +548,13 @@ func (w *noteWin) diaryAsk(a *bro, now bool) {
 	system := diarySystem(w.nb, prompts)
 	msgs := append(talk[max(0, len(talk)-diaryHistory):],
 		ai.Msg{Role: "user", Parts: []ai.Part{{Text: say}, {PNG: pic}}})
-	style, size := a.setting("ai-hand"), diarySizes[a.setting("ai-size")]
+	style, size := w.nb.diaryFont(), diarySizes[a.setting("ai-size")]
 	ctx, cancel := context.WithCancel(context.Background())
 	d.asked++
 	n, page, below := d.asked, d.page, boxOf(q)
 	d.cancel = cancel
 	log.Printf("diary %s: asking %s (%d strokes, a %d byte picture)", w.nb.name, cfg.Model, len(q), len(pic))
+	w.diaryThink(a, page, below, size/notePt72*0.7)
 	go func() {
 		out, err := cfg.Ask(ctx, system, msgs)
 		if err == nil {
@@ -443,6 +566,7 @@ func (w *noteWin) diaryAsk(a *bro, now bool) {
 			}
 			d.asked, d.cancel = 0, nil
 			cancel()
+			w.diaryUnthink(a)
 			w.diaryAnswer(a, page, below, out.Text, err, style, size)
 		})
 	}()
@@ -474,20 +598,101 @@ func (w *noteWin) diaryAnswer(a *bro, page int, below image.Rectangle, out strin
 
 // diaryLay lays the answer out under below on page, to be written: on
 // the next page where it's full (a page put in after it, unless the
-// next is empty).
-func (w *noteWin) diaryLay(page int, below image.Rectangle, r diaryReply, seed int64, style string, diarySize float64) {
+// next is empty). In fam, a font (Go's, or the reader's), a line of
+// text at a time; or the hand.
+func (w *noteWin) diaryLay(page int, below image.Rectangle, r diaryReply, seed int64, fam string, pt float64) {
+	if pt == 0 {
+		pt = diarySizes["m"]
+	}
+	if fam == diaryHand {
+		w.diaryLayHand(page, below, r, seed, pt/notePt72)
+		return
+	}
+	d := w.diary
+	f := noteFontFace(fam, int(pt/notePt72+0.5))
+	lineH := f.Metrics().Height.Ceil()
+	size := w.pageSize(page)
+	left := diaryLeft(below, size)
+	width := size.X - diaryMargin - left
+	y := below.Max.Y + lineH/2
+	if below.Empty() {
+		y = diaryMargin
+	}
+	first := true
+	for para := range strings.SplitSeq(strings.ReplaceAll(superscripts(r.Answer, f), "\r", ""), "\n") {
+		words := strings.Fields(para)
+		if len(words) == 0 {
+			y += lineH / 2
+			continue
+		}
+		for len(words) > 0 {
+			n := 1 // the words on this line
+			for n < len(words) && font.MeasureString(f, strings.Join(words[:n+1], " ")).Ceil() <= width {
+				n++
+			}
+			if y+lineH > size.Y-diaryMargin/2 {
+				page = w.diaryPage(page)
+				size, y = w.pageSize(page), diaryMargin
+			}
+			as := []xml.Attr{{Name: xml.Name{Local: "font"}, Value: fam}, {Name: xml.Name{Local: "color"}, Value: "#000000ff"},
+				{Name: xml.Name{Local: diaryAttr}, Value: "diary"}}
+			if first {
+				as, first = append(as, talkAttrs(r)...), false
+			}
+			line := textStroke(&noteText{size: pt, attrs: as}, image.Pt(left, y))
+			for j := 1; j <= n; j++ {
+				d.writing = append(d.writing, diaryWord{page: page, line: line, text: strings.Join(words[:j], " "), first: j == 1})
+			}
+			words, y = words[n:], y+lineH
+		}
+	}
+}
+
+// talkAttrs are what an answer's first stroke keeps of it, for the
+// talk.
+func talkAttrs(r diaryReply) []xml.Attr {
+	as := []xml.Attr{{Name: xml.Name{Local: diaryQAttr}, Value: r.Question}, {Name: xml.Name{Local: diaryAAttr}, Value: r.Answer}}
+	if r.Prompt != "" {
+		as = append(as, xml.Attr{Name: xml.Name{Local: diaryPromptAttr}, Value: r.Prompt})
+	}
+	return as
+}
+
+// supers are the signs with a superscript of their own.
+var supers = map[rune]rune{'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+	'+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', 'n': 'ⁿ', 'i': 'ⁱ'}
+
+var supRE = regexp.MustCompile(`\^(\{[^{}]*\}|\([^()]*\)|[-+]?[0-9]+|[ni])`)
+
+// superscripts writes x^2, 2^{10}, e^(-n) as x², 2¹⁰, e⁽⁻ⁿ⁾, where f has
+// the signs; what it can't stays as it is.
+func superscripts(s string, f font.Face) string {
+	return supRE.ReplaceAllStringFunc(s, func(m string) string {
+		in := strings.TrimSuffix(strings.TrimPrefix(m[1:], "{"), "}")
+		var b strings.Builder
+		for _, r := range in {
+			sr, ok := supers[r]
+			if _, has := f.GlyphAdvance(sr); !ok || !has {
+				return m
+			}
+			b.WriteRune(sr)
+		}
+		return b.String()
+	})
+}
+
+// diaryLayHand lays the answer out in the hand, capitals size high
+// (page units).
+func (w *noteWin) diaryLayHand(page int, below image.Rectangle, r diaryReply, seed int64, diarySize float64) {
 	text := r.Answer
 	d := w.diary
-	if diarySize == 0 {
-		diarySize = diarySizes["m"]
-	}
-	h, err := hand.Style(style)
+	h, err := hand.Script()
 	if err != nil {
 		log.Printf("diary: %v", err)
 		return
 	}
 	size := w.pageSize(page)
-	left := max(diaryMargin, min(below.Min.X, size.X/4))
+	left := diaryLeft(below, size)
 	wr := h.Write(text, diarySize, float64(size.X-diaryMargin-left), seed)
 	lineH := hand.LineHeight(diarySize)
 	dx, dy := float64(left), float64(below.Max.Y)+lineH*0.5 // the first line's top
@@ -514,12 +719,7 @@ func (w *noteWin) diaryLay(page int, below image.Rectangle, r diaryReply, seed i
 			}
 			s.bound()
 			if first { // what it said, for the talk
-				first = false
-				s.attrs = append(s.attrs, xml.Attr{Name: xml.Name{Local: diaryQAttr}, Value: r.Question},
-					xml.Attr{Name: xml.Name{Local: diaryAAttr}, Value: r.Answer})
-				if r.Prompt != "" {
-					s.attrs = append(s.attrs, xml.Attr{Name: xml.Name{Local: diaryPromptAttr}, Value: r.Prompt})
-				}
+				s.attrs, first = append(s.attrs, talkAttrs(r)...), false
 			}
 			dw.strokes = append(dw.strokes, s)
 		}
@@ -557,14 +757,26 @@ func (w *noteWin) diaryWriteWord(a *bro) {
 	for len(w.nb.pages) <= wd.page {
 		w.nb.pages = append(w.nb.pages, nil)
 	}
-	w.nb.pages[wd.page] = append(w.nb.pages[wd.page], wd.strokes...)
-	if n := len(d.wrote); n > 0 && d.wrote[n-1].kind == pageStrokes && d.wrote[n-1].page == wd.page {
-		d.wrote[n-1].add = append(d.wrote[n-1].add, wd.strokes...)
-	} else {
-		d.wrote = append(d.wrote, noteOp{page: wd.page, add: slices.Clone(wd.strokes)})
+	add, long := wd.strokes, len(wd.strokes)
+	var was image.Rectangle // a line's, before its word
+	if wd.line != nil {
+		was = wd.line.box
+		wd.line.txt.s = wd.text
+		wd.line.bound()
+		add, long = nil, utf8.RuneCountInString(wd.text[strings.LastIndex(wd.text, " ")+1:])
+		if wd.first {
+			add = []*noteStroke{wd.line}
+		}
 	}
-	d.nextAt = time.Now().Add(diaryWordTime + time.Duration(min(len(wd.strokes), 8))*diaryStrokeTime) // as long a word, whatever the hand
-	w.changed = time.Now() // kept, should the window close before it's done
+	w.nb.pages[wd.page] = append(w.nb.pages[wd.page], add...)
+	if len(add) == 0 {
+	} else if n := len(d.wrote); n > 0 && d.wrote[n-1].kind == pageStrokes && d.wrote[n-1].page == wd.page {
+		d.wrote[n-1].add = append(d.wrote[n-1].add, add...)
+	} else {
+		d.wrote = append(d.wrote, noteOp{page: wd.page, add: slices.Clone(add)})
+	}
+	d.nextAt = time.Now().Add(diaryWordTime + time.Duration(min(long, 8))*diaryStrokeTime) // as long a word, whatever the hand
+	w.changed = time.Now()                                                                 // kept, should the window close before it's done
 	if !w.p.Outer.Empty() && a.shows(w) && !w.overview && !w.settings {
 		if wd.page == w.cur+w.shown() && a.nt.ink == nil && a.nt.drag == nil && w.typing == nil {
 			w.cur = wd.page
@@ -574,6 +786,10 @@ func (w *noteWin) diaryWriteWord(a *bro) {
 		if i := wd.page - w.cur; i >= 0 && i < len(w.slots) {
 			at, clip := w.slots[i], w.paperArea()
 			var box image.Rectangle
+			if wd.line != nil { // the line again, its word on
+				box = w.toScreenRect(was.Union(wd.line.box), at).Intersect(clip)
+				w.drawPages(a, box)
+			}
 			for _, s := range wd.strokes {
 				w.drawStroke(a, s, at, clip)
 				box = box.Union(w.toScreenRect(s.box, at))
@@ -610,6 +826,77 @@ func (w *noteWin) diaryDone(a *bro) {
 		a.Mark(w.bar, true)
 	}
 	d.box = image.Rectangle{}
+}
+
+// diaryLeft is where an answer's lines start on a page size wide,
+// under what's in below.
+func diaryLeft(below image.Rectangle, size image.Point) int {
+	return max(diaryMargin, min(below.Min.X, size.X/4))
+}
+
+// diaryThink puts the dots up, under below on page, where the answer's
+// to go, for letters size high.
+func (w *noteWin) diaryThink(a *bro, page int, below image.Rectangle, size float64) {
+	if size == 0 {
+		size = diarySizes["m"]
+	}
+	d := w.diary
+	x, y := float64(diaryLeft(below, w.pageSize(page))), float64(below.Max.Y)+hand.LineHeight(size)*0.5+size*0.75
+	r, gap := size*0.09, size*0.55
+	d.think = image.Rect(int(x-r), int(y-r), int(x+2*gap+r)+1, int(y+r)+1)
+	d.thinkPage, d.dots, d.dotAt = page, 1, time.Now()
+	w.diaryShowDots(a, false)
+}
+
+// diaryUnthink takes the dots down.
+func (w *noteWin) diaryUnthink(a *bro) {
+	if d := w.diary; d != nil && !d.think.Empty() {
+		w.diaryShowDots(a, true)
+		d.think = image.Rectangle{}
+	}
+}
+
+// thinkRect is where the dots are on screen; empty if their page
+// doesn't show.
+func (w *noteWin) thinkRect() image.Rectangle {
+	d := w.diary
+	if d == nil || d.think.Empty() || w.overview || w.settings {
+		return image.Rectangle{}
+	}
+	i := d.thinkPage - w.cur
+	if i < 0 || i >= len(w.slots) {
+		return image.Rectangle{}
+	}
+	return w.toScreenRect(d.think, w.slots[i]).Intersect(w.paperArea())
+}
+
+// diaryShowDots draws the dots again where they are (gone, if they're
+// to go), quick: and with the page's grays when they go.
+func (w *noteWin) diaryShowDots(a *bro, gone bool) {
+	r := w.thinkRect()
+	if r.Empty() || a == nil || w.p.Outer.Empty() || !a.shows(w) {
+		return
+	}
+	if gone {
+		w.diary.think = image.Rectangle{}
+	}
+	w.drawPages(a, r)
+	a.Mark(r, gone)
+}
+
+// drawThinking draws the dots, if they're up, where they're in clip.
+func (w *noteWin) drawThinking(a *bro, clip image.Rectangle) {
+	r := w.thinkRect()
+	if r.Empty() || !r.Overlaps(clip) {
+		return
+	}
+	d := w.diary
+	at := w.slots[d.thinkPage-w.cur]
+	rad := max(2, d.think.Dy()/2)
+	for i := range d.dots {
+		c := image.Pt(d.think.Min.X+rad+i*(d.think.Dx()-2*rad)/2, d.think.Min.Y+rad)
+		a.C.Disc(w.toScreen(notePt{int16(c.X), int16(c.Y), 0}, at), max(2, int(float64(rad)*w.scale+0.5)), kobo.Black, clip)
+	}
 }
 
 // --- what it's cost ---

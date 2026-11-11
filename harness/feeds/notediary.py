@@ -1,6 +1,6 @@
 # The notebook's AI diary (notediary.go), against a stand-in model
 # (ai.conf in APP_EXTRA, its base the stand-in's): turned on in the
-# settings, its hand calligraphy; a line written, ending in a question
+# settings, its model's list looked at, its font the one after Go's; a line written, ending in a question
 # mark: answered under it, by hand. A second line, unfinished: the model
 # waits. Three taps of a finger: asked at once; the answer's long, and
 # goes on on a page put in after. Undone (Ctrl+Z): gone from the talk
@@ -27,7 +27,10 @@ fullscreen(); time.sleep(4)
 keys(":settings\n"); time.sleep(3)
 for i in range(5): keys("j"); time.sleep(0.3)
 key(28); time.sleep(3)                               # Enter: the diary on
-keys("jjjj"); time.sleep(1); key(28); time.sleep(3)  # its hand: calligraphy
+keys("jjj"); time.sleep(1); key(28); time.sleep(4)   # its model: the list
+key(1); time.sleep(3)                                # Esc: as it was
+keys("j"); time.sleep(1); key(28); time.sleep(4)     # its font: the list
+key(108); time.sleep(1); key(28); time.sleep(3)      # ↓ Enter: the next (HELLOBRO_FONTS' first)
 key(1); time.sleep(3)                                # Esc: back to the page
 line(W // 8, H // 8, words=3); time.sleep(16)        # asked after 3 s; answered, written
 line(W // 8, H // 8 + 400, words=2, ask=False); time.sleep(8)   # it waits

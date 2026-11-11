@@ -9,11 +9,11 @@ import (
 	"image"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"hellobro/hand"
 	"hellobro/kobo"
 )
 
@@ -88,8 +88,6 @@ var settingList = []setting{
 		shown:  []string{"a finger up or down the left edge sets it", "off: a finger there is the page's (full screen)"}},
 	{key: "ai-model", app: "notebook", label: "The AI diary's model",
 		values: diaryModelIDs(), shown: diaryModelIDs()},
-	{key: "ai-hand", app: "notebook", label: "The AI diary's hand",
-		values: hand.Styles, shown: []string{"script", "calligraphy: a bolder script", "print"}},
 	{key: "ai-size", app: "notebook", label: "The AI diary's letters",
 		values: []string{"m", "s", "l", "xl"}, shown: []string{"medium", "small", "large", "huge"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
@@ -545,4 +543,13 @@ func (a *bro) applyMod() {
 	a.tv.mods = termMods{caps: a.tv.mods.caps} // what was held meant the other
 	a.applyFooter()
 	a.wm.names = nil // the bar's hints again
+}
+
+// setSettingTo sets key to the value val, and keeps it.
+func (a *bro) setSettingTo(key, val string) {
+	st := settingList[settingIndex(key)]
+	if i := slices.Index(st.values, val); i >= 0 {
+		a.set[key] = i
+		a.set.save()
+	}
 }
