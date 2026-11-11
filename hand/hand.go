@@ -117,6 +117,24 @@ func cyrillicRunes() []rune {
 	return rs
 }
 
+// greekRunes is the Greek fonts' letters: on ASCII's A to X and a to
+// x, in the Greek alphabet's order.
+func greekRunes() []rune {
+	rs := ascii()
+	up, low := []rune("ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ"), []rune("αβγδεζηθικλμνξοπρστυφχψω")
+	for i := range rs {
+		switch c := rune(32 + i); {
+		case c >= 'A' && c <= 'X':
+			rs[i] = up[c-'A']
+		case c >= 'a' && c <= 'x':
+			rs[i] = low[c-'a']
+		case c >= 'A' && c <= 'z':
+			rs[i] = 0
+		}
+	}
+	return rs
+}
+
 // Hand is the fonts a text is written in: a letter in the first that
 // has it.
 type Hand struct {
@@ -124,35 +142,114 @@ type Hand struct {
 	k     float64 // a capital's height, in the fonts' units
 }
 
+// Styles are the hands there are: Latin in a script, a bolder script
+// (the complex, its strokes doubled) or print; Cyrillic and Greek in
+// what the Hershey fonts have, slanted to go with a script.
+var Styles = []string{"script", "calligraphy", "print"}
+
+// styleFonts are a style's fonts, and the slant of its Cyrillic.
+var styleFonts = map[string]struct {
+	latin, greek string
+	slant        float64
+}{
+	"script":      {"scripts.jhf", "greeks.jhf", 0.2},
+	"calligraphy": {"scriptc.jhf", "greekc.jhf", 0.2},
+	"print":       {"futural.jhf", "greeks.jhf", 0},
+}
+
 var (
-	scriptOnce sync.Once
-	script     *Hand
-	scriptErr  error
+	stylesMu sync.Mutex
+	styles   = map[string]*Hand{}
 )
 
-// Script is the script hand, Cyrillic after it.
-func Script() (*Hand, error) {
-	scriptOnce.Do(func() {
-		load := func(name string, runes []rune) font {
-			if scriptErr != nil {
-				return nil
+// Script is the script hand.
+func Script() (*Hand, error) { return Style("script") }
+
+// Style is the hand of that name (Styles), the script if there's none.
+func Style(name string) (*Hand, error) {
+	stylesMu.Lock()
+	defer stylesMu.Unlock()
+	if _, ok := styleFonts[name]; !ok {
+		name = "script"
+	}
+	if h := styles[name]; h != nil {
+		return h, nil
+	}
+	st := styleFonts[name]
+	lat, err := loadFont(st.latin, ascii(), 0)
+	if err != nil {
+		return nil, err
+	}
+	cyr, err := loadFont("cyrillic.jhf", cyrillicRunes(), st.slant)
+	if err != nil {
+		return nil, err
+	}
+	gr, err := loadFont(st.greek, greekRunes(), 0)
+	if err != nil {
+		return nil, err
+	}
+	delete(cyr, ' ')
+	delete(gr, ' ')
+	h := &Hand{fonts: []font{lat, cyr, gr}, k: 21}
+	styles[name] = h
+	return h, nil
+}
+
+// loadFont reads a font of ours, its glyphs for runes, slanted (x
+// across for each unit up).
+func loadFont(name string, runes []rune, slant float64) (font, error) {
+	data, err := fontFS.ReadFile("fonts/" + name)
+	if err != nil {
+		return nil, err
+	}
+	f, err := parseJHF(data, runes)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", name, err)
+	}
+	if name == "cyrillic.jhf" {
+		lowerE(f)
+	}
+	if slant != 0 {
+		for r, g := range f {
+			for _, st := range g.strokes {
+				for i := range st {
+					st[i].X -= (st[i].Y - 9) * slant
+				}
 			}
-			data, err := fontFS.ReadFile("fonts/" + name)
-			if err != nil {
-				scriptErr = err
-				return nil
-			}
-			f, err := parseJHF(data, runes)
-			if err != nil {
-				scriptErr = fmt.Errorf("%s: %v", name, err)
-			}
-			return f
+			f[r] = g
 		}
-		lat, cyr := load("scripts.jhf", ascii()), load("cyrillic.jhf", cyrillicRunes())
-		delete(cyr, ' ')
-		script = &Hand{fonts: []font{lat, cyr}, k: 21}
-	})
-	return script, scriptErr
+	}
+	delete(f, 0)
+	return f, nil
+}
+
+// lowerE makes the Cyrillic font's э a small letter: it has a capital
+// there. It's the capital as tall as о is.
+func lowerE(f font) {
+	top := func(g glyph) float64 {
+		t := 9.0
+		for _, st := range g.strokes {
+			for _, p := range st {
+				t = min(t, p.Y)
+			}
+		}
+		return 9 - t
+	}
+	e, o, O := f['э'], f['о'], f['О']
+	if top(O) == 0 || top(e) == 0 {
+		return
+	}
+	k := top(o) / top(O)
+	var strokes [][]Pt
+	for _, st := range e.strokes {
+		l := make([]Pt, len(st))
+		for i, p := range st {
+			l[i] = Pt{float64(e.left) + (p.X-float64(e.left))*0.85, 9 - (9-p.Y)*k}
+		}
+		strokes = append(strokes, l)
+	}
+	right := e.left + int(float64(e.right-e.left)*0.85+0.5)
+	f['э'] = glyph{left: e.left, right: right, strokes: strokes}
 }
 
 // glyph is r's, or what stands for it: a letter without its accent, a
@@ -176,7 +273,7 @@ func (h *Hand) glyph(r rune) (glyph, bool) {
 var plain = map[rune]rune{
 	'‘': '\'', '’': '\'', '‚': ',', '“': '"', '”': '"', '„': '"', '«': '"', '»': '"',
 	'–': '-', '—': '-', '−': '-', '‐': '-', '•': '*', '·': '.', '×': 'x', '÷': '/',
-	' ': ' ', 'Ё': 'Е', 'ё': 'е', 'Й': 'И', 'ʼ': '\'',
+	' ': ' ', 'Ё': 'Е', 'ё': 'е', 'Й': 'И', 'ʼ': '\'', 'ς': 'σ', 'ϑ': 'θ', 'ϕ': 'φ', 'µ': 'μ',
 }
 
 // Word is a word written: its strokes, in the order they're written, its

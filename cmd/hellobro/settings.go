@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"hellobro/hand"
 	"hellobro/kobo"
 )
 
@@ -85,6 +86,12 @@ var settingList = []setting{
 	{key: "note-light", app: "notebook", label: "The light by the left edge, in a notebook",
 		values: []string{"on", "off"},
 		shown:  []string{"a finger up or down the left edge sets it", "off: a finger there is the page's (full screen)"}},
+	{key: "ai-model", app: "notebook", label: "The AI diary's model",
+		values: diaryModelIDs(), shown: diaryModelIDs()},
+	{key: "ai-hand", app: "notebook", label: "The AI diary's hand",
+		values: hand.Styles, shown: []string{"script", "calligraphy: a bolder script", "print"}},
+	{key: "ai-size", app: "notebook", label: "The AI diary's letters",
+		values: []string{"m", "s", "l", "xl"}, shown: []string{"medium", "small", "large", "huge"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
 		values: []string{"frozen", "closed"},
 		shown:  []string{"frozen: back to it at once", "closed, as KOReader does (from the next start)"}},

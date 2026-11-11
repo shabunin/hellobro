@@ -206,7 +206,7 @@ func fmtPt(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }
 func (nb *notebook) xoppText() []byte {
 	doc := xoppDoc{Attrs: nb.attrs, Title: "Xournal++ document - see https://xournalpp.github.io/"}
 	if attr(doc.Attrs, "creator") == "" {
-		doc.Attrs = []xml.Attr{{Name: xml.Name{Local: "creator"}, Value: "hellobro"}, {Name: xml.Name{Local: "fileversion"}, Value: "4"}}
+		doc.Attrs = append([]xml.Attr{{Name: xml.Name{Local: "creator"}, Value: "hellobro"}, {Name: xml.Name{Local: "fileversion"}, Value: "4"}}, doc.Attrs...) // ours (the diary's) kept
 	}
 	blank := func(i int) bool { // nothing on it, a PDF's page or a picture under it neither
 		if len(nb.pages[i]) > 0 || i >= len(nb.meta) {

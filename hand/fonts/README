@@ -1,6 +1,8 @@
 The Hershey fonts, in the format of their Usenet distribution (.jhf),
 from https://github.com/kamalmostafa/hershey-fonts (its hershey-fonts/):
-scripts.jhf (script simplex) and cyrillic.jhf (Cyrillic complex). The
+scripts.jhf (script simplex), scriptc.jhf (script complex), futural.jhf
+(sans simplex), cyrillic.jhf (Cyrillic complex), greeks.jhf and
+greekc.jhf (Greek simplex and complex). The
 notice that came with them, from its hershey.txt:
 
 USE RESTRICTION:

@@ -54,7 +54,7 @@ func server(t *testing.T) *httptest.Server {
 			if r.Header.Get("x-api-key") != "sk-test" || req["system"] != "be a diary" || !hasPic || !strings.Contains(string(body), `"media_type":"image/png"`) {
 				t.Errorf("anthropic: %s", body)
 			}
-			io.WriteString(w, `{"content":[{"type":"text","text":"{\"status\":"},{"type":"text","text":"\"wait\"}"}]}`)
+			io.WriteString(w, `{"content":[{"type":"text","text":"{\"status\":"},{"type":"text","text":"\"wait\"}"}],"usage":{"input_tokens":11,"output_tokens":14,"opencode":{"list_cost":0.0000081,"allowance":0.0000324}}}`)
 		case "/openai/v1/chat/completions":
 			if !hasPic || !strings.Contains(string(body), `"role":"system"`) || !strings.Contains(string(body), "data:image/png;base64,") {
 				t.Errorf("openai: %s", body)
@@ -79,7 +79,10 @@ func TestAsk(t *testing.T) {
 			t.Fatalf("%s: %v", model, err)
 		}
 		var v struct{ Status, Answer string }
-		if err := JSON(out, &v); err != nil {
+		if model != "kimi-k3" && (out.In != 11 || out.Out != 14 || out.Cost != 0.0000324) {
+			t.Errorf("%s: usage %+v", model, out)
+		}
+		if err := JSON(out.Text, &v); err != nil {
 			t.Fatalf("%s: %v", model, err)
 		}
 		if model == "kimi-k3" && (v.Status != "answer" || v.Answer != "Yes.") || model != "kimi-k3" && v.Status != "wait" {

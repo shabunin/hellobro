@@ -442,6 +442,7 @@ type noteState struct {
 	lookedAt time.Time   // when the open ones' files were last looked at
 	liftAt   time.Time   // the last stroke's end, for noteClean
 	hoverAt  time.Time   // the pen last seen in the air, over the screen
+	taps     diaryTapper // a finger's taps on a page, for the diary (notediary.go)
 }
 
 const (
@@ -781,6 +782,22 @@ func (w *noteWin) edited(ops ...noteOp) {
 	w.changed = time.Now()
 }
 
+// opsArea is where ops' strokes are on screen, if they're all strokes
+// on the pages shown; empty if not (a page put in or taken out, say).
+func (w *noteWin) opsArea(ops []noteOp) image.Rectangle {
+	var area image.Rectangle
+	for _, op := range ops {
+		i := op.page - w.cur
+		if op.kind != pageStrokes || i < 0 || i >= len(w.slots) {
+			return image.Rectangle{}
+		}
+		for _, s := range append(slices.Clone(op.add), op.del...) {
+			area = area.Union(w.toScreenRect(s.box.Inset(-2), w.slots[i]))
+		}
+	}
+	return area.Intersect(w.paperArea())
+}
+
 // turnTo is the page to show first, the pages turned by (on, or back if
 // negative); -1 if they can't be. On goes as far as one page past the
 // last that's written on: a new one.
@@ -817,6 +834,9 @@ func (w *noteWin) turn(a *bro, by int) {
 
 func (w *noteWin) doUndo(a *bro, undo bool) {
 	w.endTyping(a)
+	if undo {
+		w.diaryCut(a) // an answer being written: undo takes it back
+	}
 	from, to := &w.undo, &w.redo
 	if !undo {
 		from, to = to, from
@@ -834,6 +854,16 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 		} else {
 			w.nb.apply(ops[i], false)
 		}
+	}
+	if area := w.opsArea(ops); !area.Empty() && !w.overview && !w.settings && a.shows(w) { // only what changed, quick: its grays once the pen rests (noteClean)
+		w.changed = time.Now()
+		w.drawPages(a, area)
+		a.Mark(area, false)
+		w.clean, w.cleanDraw = w.clean.Union(area), true
+		a.nt.liftAt = time.Now()
+		w.drawBar(a)
+		a.Mark(w.bar, true)
+		return
 	}
 	if pg := min(ops[0].page, len(w.nb.pages)-1); w.overview { // where it was: in sight
 		w.ovSel = pg
@@ -1306,8 +1336,11 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		if w, ok := a.windowAt(g.Start).(*noteWin); ok {
 			a.noteFocus(w)
 			dx, dy := g.Last.X-g.Start.X, g.Last.Y-g.Start.Y
-			if i := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return g.Start.In(r) }); w.texting && i >= 0 && kobo.Abs(dx) < noteSwipe && kobo.Abs(dy) < noteSwipe {
+			i := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return g.Start.In(r) })
+			if tap := i >= 0 && kobo.Abs(dx) < noteSwipe && kobo.Abs(dy) < noteSwipe; tap && w.texting {
 				w.textAt(a, w.cur+i, w.toPage(g.Start, w.slots[i]))
+			} else if tap {
+				a.diaryTap(w, w.cur+i, g.Start)
 			} else if kobo.Abs(dx) > noteSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) {
 				by := 1 // leftward: the next, as pages turn
 				if dx > 0 {

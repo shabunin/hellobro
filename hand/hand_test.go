@@ -14,7 +14,7 @@ func TestScriptLoads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, r := range "AZaz09?!.,Жжщ" {
+	for _, r := range "AZaz09?!.,ЖжщΩωσ" {
 		if _, ok := h.glyph(r); !ok {
 			t.Errorf("no glyph for %q", r)
 		}
@@ -150,5 +150,27 @@ func TestSuperscripts(t *testing.T) {
 	}
 	if n := len(h.letters("2^{10}")); n != 3 {
 		t.Errorf("2^{10}: %d letters, the braces in", n)
+	}
+}
+
+func TestStyles(t *testing.T) {
+	for _, name := range Styles {
+		h, err := Style(name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for _, r := range "Hello Привет Καλημέρα ς2?" {
+			if _, ok := h.glyph(r); !ok && r != ' ' {
+				t.Errorf("%s: no %q", name, r)
+			}
+		}
+		a, _ := h.glyph('a')
+		alpha, _ := h.glyph('α')
+		if len(a.strokes) == len(alpha.strokes) && a.right == alpha.right {
+			t.Errorf("%s: α is written as a", name)
+		}
+	}
+	if h, _ := Style("nonesuch"); h == nil {
+		t.Error("no hand for an unknown style")
 	}
 }

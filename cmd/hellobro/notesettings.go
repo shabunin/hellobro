@@ -9,6 +9,7 @@ package main
 
 import (
 	"image"
+	"strings"
 
 	"hellobro/kobo"
 )
@@ -41,6 +42,26 @@ var noteSettings = []noteSet{
 	{"Light by the left edge", ownShown("note-light"), stepOwn("note-light")},
 	{"Bar, fullscreen", func(a *bro, _ *noteWin) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ *noteWin, _ int) { a.flipFullBar("note") }},
 	{"AI diary (this notebook)", func(a *bro, w *noteWin) string { return onOff(w.nb.diaryOn()) }, func(a *bro, w *noteWin, _ int) { w.flipDiary(a) }},
+	{"AI voice (this notebook)", func(a *bro, w *noteWin) string { return diaryVoices[w.nb.diaryVoice()].label }, func(a *bro, w *noteWin, d int) { w.stepVoice(d) }},
+	{"AI instructions (written)", func(a *bro, w *noteWin) string {
+		if _, ps := diaryTalk(w.nb); len(ps) > 0 {
+			return strings.Join(ps, "; ")
+		}
+		return "none: write one, as “from now on, …”"
+	}, func(*bro, *noteWin, int) {}},
+	{"AI model", func(a *bro, _ *noteWin) string {
+		m := diaryModelOf(a.setting("ai-model"))
+		if m.id == "conf" {
+			return "as ai.conf says: " + a.diaryModelNow()
+		}
+		if m.note == "" {
+			return m.id
+		}
+		return m.id + ": " + m.note
+	}, stepOwn("ai-model")},
+	{"AI handwriting", ownShown("ai-hand"), stepOwn("ai-hand")},
+	{"AI handwriting size", ownShown("ai-size"), stepOwn("ai-size")},
+	{"AI usage", func(a *bro, _ *noteWin) string { return a.usageShown() }, func(*bro, *noteWin, int) {}},
 }
 
 // settingsOn shows the settings, or the page again.
@@ -80,6 +101,7 @@ func (w *noteWin) drawSettings(a *bro) {
 		w.setRows = append(w.setRows, bookRow{b, func() { w.setSel = i; w.setStep(a, 1) }})
 	}
 	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "the pen always writes; the paper is a tool on the bar, each notebook its own", kobo.Mid, kobo.AlignLeft)
+	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+48, area.Max.X, y+88), kobo.Fit(a.F.Small, a.usageNote(), area.Dx()-36), kobo.Mid, kobo.AlignLeft)
 }
 
 // setStep steps the row in focus d on, and shows it.

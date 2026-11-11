@@ -1042,16 +1042,46 @@ width, its gray.
 A notebook can answer what's written in it, as Tom Riddle's diary did.
 Turn **AI diary (this notebook)** on in its settings (each notebook
 its own; it's kept in the file). Write, and rest the pen: after about
-3 seconds what's been written since the diary's last answer goes to a
-language model as a picture. If it reads as finished (it ends with a
-question mark, a full stop or an exclamation mark) the answer is
-written under it by hand, a word at a time; if not, it waits for
-more, and writing on sends it all again. A full page goes on on the
-next one if it's empty, else on one put in after it, and the pages
-turn with it. The answer is one step to undo. Its strokes are marked
-as the diary's in the `.xopp`: what's under its last answer on a page
-is what's asked next. It remembers the talk while the notebook is
-open. `x^2`, `e^(i pi)`, `2^{10}` are written as powers.
+3 seconds what's been written since the diary's last answer on that
+page goes to a language model as a picture: the handwriting, typed
+text, and pictures pasted there (a book's cut, say: sent as sharp as
+the screen shows it). If it reads as finished (it ends with a question
+mark, a full stop or an exclamation mark) the answer is written under
+it by hand, a word at a time; if not, it waits for more, and writing
+on sends it all again. Three quick taps of a finger on the page (once
+a pen has written, when a finger turns pages) ask at once, finished or
+not. A full page goes on on the next one if it's empty, else on one put
+in after it, and the pages turn with it. `x^2`, `e^(i pi)`, `2^{10}`
+are written as powers.
+
+What it's sent: the picture, and the talk so far as text: each
+question as it read it and its answer, the last six, from all the
+notebook's pages. The talk is kept on the answers' strokes in the
+`.xopp`, so it's there when the notebook is opened again, and an
+answer undone (one step; undo while it's still writing stops it, and
+takes back what it wrote) or erased is gone from it too. Nothing else
+of the notebook goes.
+
+Its settings, under the notebook's:
+
+- **AI voice (this notebook)**: how it answers: **a diary, as Tom
+  Riddle's**, **a tutor** (works problems step by step, checks yours),
+  **a helper** (plain), **brief** (a line at most).
+- **AI instructions (written)**: write one to it, by hand: "from now
+  on, answer in French", "call me Harry", "be my Latin teacher". It
+  says it will, and keeps it on that answer: shown here, and gone if
+  that answer's undone or erased.
+- **AI model**: the models that read handwriting on OpenCode Go (tried
+  on 2026-11-11), or **as ai.conf says**.
+- **AI handwriting**: **script**, **calligraphy** (a bolder script),
+  **print**; Cyrillic and Greek in each (the Hershey fonts': Cyrillic
+  print, slanted with a script; Greek without its accents).
+- **AI handwriting size**: medium, small, large, huge.
+- **AI usage**: what this Kobo's questions to the model cost, over 5
+  hours, a week and 30 days, as a share of the Go plan's limits for it
+  (a fifth of the month's in 5 hours, half in a week); the line under
+  the settings says it in dollars. OpenCode counts it with each answer;
+  each is a line in `ai-usage.tsv` in the app's folder.
 
 The model is reached over [OpenCode Go](https://opencode.ai)'s API
 with your key, from `ai.conf` in the app's folder
@@ -1059,13 +1089,14 @@ with your key, from `ai.conf` in the app's folder
 
 ```
 key = YOUR_KEY
-model = claude-haiku-5-5   # the default; one that reads pictures
+model = claude-haiku-5-5   # for "as ai.conf says"
 ```
 
 `base = URL` points it at another API that speaks Anthropic's messages
 or OpenAI's chat completions (models whose names start with `claude-`,
-`qwen3.` or `minimax-m3` go by Anthropic's, the rest by OpenAI's).
-Without Wi-Fi it says why, and waits for the next thing written.
+`qwen3.` or `minimax-m3` go by Anthropic's, the rest by OpenAI's;
+`protocol = anthropic` or `openai` says which). Without Wi-Fi it says
+why, and waits for the next thing written.
 
 ### ":" commands in a notebook
 

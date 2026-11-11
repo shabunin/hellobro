@@ -36,6 +36,7 @@ type Config struct {
 	Agent   string // the User-Agent: the app's, as OpenCode asks
 	Session string // a stable id for the session header
 	MaxOut  int    // tokens an answer may have
+	Proto   string // "anthropic" or "openai": how the model's reached; "" as OpenCode Go's table has it
 }
 
 // Load reads path's config; os.ErrNotExist if there's none.
@@ -68,6 +69,8 @@ func Load(path string) (Config, error) {
 			if n, err := strconv.Atoi(val); err == nil && n > 0 {
 				c.MaxOut = n
 			}
+		case "protocol":
+			c.Proto = val
 		}
 	}
 	if c.Key == "" {
@@ -88,18 +91,55 @@ type Msg struct {
 	Parts []Part
 }
 
-// anthropic says whether model is reached by Anthropic's messages, not
-// OpenAI's chat completions (OpenCode Go's table).
-func anthropic(model string) bool {
-	return strings.HasPrefix(model, "claude-") || strings.HasPrefix(model, "qwen3.") || model == "minimax-m3"
+// anthropic says whether the model is reached by Anthropic's messages,
+// not OpenAI's chat completions (OpenCode Go's table, unless c says).
+func (c Config) anthropic() bool {
+	if c.Proto != "" {
+		return c.Proto == "anthropic"
+	}
+	m := c.Model
+	return strings.HasPrefix(m, "claude-") || strings.HasPrefix(m, "qwen3.") || m == "minimax-m3"
+}
+
+// Answer is what a model said, and what it cost.
+type Answer struct {
+	Text    string
+	In, Out int     // tokens
+	Cost    float64 // dollars counted against OpenCode Go's limits (its allowance), else the list price
+}
+
+// usage is an answer's usage, as both APIs (and OpenCode, in it) say it.
+type usage struct {
+	Usage struct {
+		InputTokens      int `json:"input_tokens"`
+		OutputTokens     int `json:"output_tokens"`
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		OpenCode         struct {
+			ListCost  float64 `json:"list_cost"`
+			Allowance float64 `json:"allowance"`
+		} `json:"opencode"`
+	} `json:"usage"`
+}
+
+func usageOf(body []byte, a *Answer) {
+	var u usage
+	if json.Unmarshal(body, &u) != nil {
+		return
+	}
+	a.In, a.Out = u.Usage.InputTokens+u.Usage.PromptTokens, u.Usage.OutputTokens+u.Usage.CompletionTokens
+	a.Cost = u.Usage.OpenCode.Allowance
+	if a.Cost == 0 {
+		a.Cost = u.Usage.OpenCode.ListCost
+	}
 }
 
 // Ask asks the model: system's instructions, then msgs; its answer.
-func (c Config) Ask(ctx context.Context, system string, msgs []Msg) (string, error) {
+func (c Config) Ask(ctx context.Context, system string, msgs []Msg) (Answer, error) {
 	var url string
 	var body any
 	hdr := http.Header{}
-	if anthropic(c.Model) {
+	if c.anthropic() {
 		url, body = c.Base+"/anthropic/v1/messages", anthropicBody(c, system, msgs)
 		hdr.Set("x-api-key", c.Key)
 		hdr.Set("anthropic-version", "2023-06-01")
@@ -109,11 +149,11 @@ func (c Config) Ask(ctx context.Context, system string, msgs []Msg) (string, err
 	hdr.Set("Authorization", "Bearer "+c.Key)
 	data, err := json.Marshal(body)
 	if err != nil {
-		return "", err
+		return Answer{}, err
 	}
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 	if err != nil {
-		return "", err
+		return Answer{}, err
 	}
 	req.Header = hdr
 	req.Header.Set("Content-Type", "application/json")
@@ -125,20 +165,24 @@ func (c Config) Ask(ctx context.Context, system string, msgs []Msg) (string, err
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return Answer{}, err
 	}
 	defer resp.Body.Close()
 	out, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
-		return "", err
+		return Answer{}, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%s: %s", resp.Status, errorText(out))
+		return Answer{}, fmt.Errorf("%s: %s", resp.Status, errorText(out))
 	}
-	if anthropic(c.Model) {
-		return anthropicText(out)
+	var a Answer
+	if c.anthropic() {
+		a.Text, err = anthropicText(out)
+	} else {
+		a.Text, err = openaiText(out)
 	}
-	return openaiText(out)
+	usageOf(out, &a)
+	return a, err
 }
 
 var client = &http.Client{Timeout: 3 * time.Minute}
