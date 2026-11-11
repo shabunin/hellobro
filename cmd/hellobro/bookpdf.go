@@ -55,7 +55,8 @@ type pdfAhead struct {
 }
 
 // pdfView is where a page shown is on the screen: its part from sp
-// at dst, zoom px a point.
+// at dst, zoom px a point. An EPUB's (bookwin.go's drawPage) has only
+// dst, and spine is its page in the chapter.
 type pdfView struct {
 	dst   image.Rectangle
 	sp    image.Point
@@ -248,6 +249,15 @@ func (w *bookWin) drawPDF(a *bro) {
 			w.drawPDFIn(a, w.spine, area, tile, 0)
 		}
 	}
+	w.pickView()
+	w.drawCut(a)
+	w.drawPageMark(a)
+	w.drawBar(a)
+	w.drawAhead(a)
+}
+
+// pickView is the page a cut's on, as drawn now; else the first shown.
+func (w *bookWin) pickView() {
 	if (!w.cut.Empty() || w.corner != nil) && slices.ContainsFunc(w.views, func(v pdfView) bool { return v.spine == w.view.spine }) {
 		for _, v := range w.views { // a cut's page: where it is now
 			if v.spine == w.view.spine {
@@ -259,10 +269,6 @@ func (w *bookWin) drawPDF(a *bro) {
 	} else {
 		w.view = pdfView{}
 	}
-	w.drawCut(a)
-	w.drawPageMark(a)
-	w.drawBar(a)
-	w.drawAhead(a)
 }
 
 // drawPDFIn draws the screenful at tile of page spine in r: in the

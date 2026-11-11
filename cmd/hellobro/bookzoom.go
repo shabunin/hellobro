@@ -301,6 +301,10 @@ func (w *bookWin) pinchZone(z int, p image.Point) image.Rectangle {
 
 // pageUnder draws the page shown again in r, white off it.
 func (w *bookWin) pageUnder(a *bro, r image.Rectangle) {
+	if w.pdf == nil { // an EPUB's, drawn aside, its margins too
+		kobo.CopyGray(a.C.Gray, r.Intersect(w.p.Body), w.epubShot(a), r.Intersect(w.p.Body).Min)
+		return
+	}
 	r = r.Intersect(w.area)
 	if r.Empty() {
 		return

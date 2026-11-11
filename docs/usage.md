@@ -54,9 +54,10 @@ focus), a **+** for a launcher next to it, and at its end **float**
 (floats it over the others; floating, it's **tile**, which puts it
 back), **fullscreen**, and **close** (a terminal's shell or connection
 ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
-one that has it. Full screen, a swipe down from the top edge of the
-screen (even over a PDF page that's bigger than the screen and pans),
-or Mod+F, puts it back. The edges are the window's there, so no
+one that has it. Full screen, two fingers swiped down from the top of
+the screen, a finger swiped down from its top edge (even over a PDF
+page that's bigger than the screen and pans; over a book, that shows
+or hides its bar instead), or Mod+F, puts it back. The edges are the window's there, so no
 menu by swiping and no workspace swipes from an edge; two fingers
 swiped across still go to the next workspace or the one before, and
 the light's swipe up or down the left edge still works (in a notebook,
@@ -80,7 +81,7 @@ one, and a tap on one goes there. An empty workspace lists the keys (as
 they are, keys.conf's too), and a tap on it opens a window.
 
 A tap on the bar away from the workspaces, or two fingers swiped down
-from the screen's top (full screen too), or Mod+O, or the menu's
+from the screen's top (full screen, they leave it first), or Mod+O, or the menu's
 **Workspaces**, shows them all as tiles over the whole screen, each a
 small drawing of its windows as they're laid out, the one shown framed.
 What's in the windows shows too, as it is now, and again every few
@@ -296,7 +297,7 @@ keys.conf says mod (meta, as an older hellobro wrote it, works too).
 | Mod+B, Mod+V | split: the next window beside, below |
 | Mod+Shift+B | hide the bar, show it again |
 | Mod+E, Mod+W, Mod+S | side by side ⇄ one above another, tabbed, stacked |
-| Mod+F | fullscreen (or its strip's fullscreen; a swipe in from the top edge leaves it) |
+| Mod+F | fullscreen (or its strip's fullscreen; two fingers swiped down from the top leave it, one too but over a book: its bar) |
 | Mod+Shift+Space | floating |
 | Mod+A | focus the container around |
 | Mod+Shift+Minus, Mod+Minus | put the window away, bring it back |
@@ -745,8 +746,10 @@ and centred text; and for PDFs, drawn by MuPDF (below).
   flashes clean every 8 pages.
 - In fullscreen (Mod+F) the page has the whole screen: a PDF's has no
   bar then (keys, two fingers to zoom, a tap at the page's top for the
-  contents), an EPUB's keeps it. The style panel's **Bar, fullscreen**
-  (s or Aa) changes that, for all PDFs or all EPUBs.
+  contents), an EPUB's keeps it. A finger swiped down from the screen's
+  top edge shows the bar, or hides it, as the style panel's **Bar,
+  fullscreen** (s or Aa) does, for all PDFs or all EPUBs; two fingers
+  swiped down from the top leave fullscreen.
 - Two pages side by side (**Pages** in the style panel) turn two at a
   time; each chapter starts on the left.
 
@@ -786,10 +789,11 @@ aside, those showing first, then the next screenful's). Tap one to read
 it, or move the frame with the arrows and Enter; a finger swiped up or
 down, or PgUp and PgDn, goes a screenful.
 
-To cut a part of a PDF's page out, draw a rectangle across it with the
-pen, or hold a finger still on the page a moment, then move it (as to
-select in a terminal). Or take the select tool, the rectangle with
-dots at its corners on the bar over the page (PDFs only; black
+To cut a part of a page out, draw a rectangle across it with the
+pen, or, on a PDF's, hold a finger still on the page a moment, then
+move it (as to select in a terminal; on an EPUB's that looks a word
+up). Or take the select tool, the rectangle with
+dots at its corners on the bar over the page (black
 while it's in hand): drag a finger across the page, and the rectangle
 follows it at once; or tap one corner, then the opposite one. Each
 corner then has a dot. Drag a dot to move that corner, a side to move
@@ -797,18 +801,18 @@ that side, or the inside to move the whole rectangle; a drag anywhere
 else draws a new one. Or tap a dot (it fills in black) and tap where
 it should be, the corner across staying where it is. Tap the tool
 again, or Esc, to put it down; full screen without the bar puts it
-down too, so taps turn pages there and a swipe down from the top, or
-two fingers, still get out. Under the rectangle:
+down too, so taps turn pages there. Under the rectangle:
 
 - **copy**: its words (whole ones, line by line) into the clipboard,
   which the terminals paste (Ctrl+Shift+V), and its picture, which a
   notebook pastes ([Notebooks](#notebooks));
-- **save**: a picture of it at 300 dpi, and its text, in `Clips/` on
+- **save**: a picture of it at 300 dpi (an EPUB's as the screen has
+  it), and its text, in `Clips/` on
   the Kobo's storage (`/mnt/onboard/Clips` in Alpine), named after the
-  book and the page, and as `Clips/latest.png` and `latest.txt` too: a
+  book and the page (an EPUB's, how far in), and as `Clips/latest.png` and `latest.txt` too: a
   program in Alpine (an LLM's, say) can take the last cut from there;
 - **zoom**: the page zoomed so the rectangle fills the screen, as far
-  as 400% goes, in its middle (one page at a time only);
+  as 400% goes, in its middle (a PDF's, one page at a time only);
 - **×**, a tap elsewhere or Esc takes it away, as does turning the page.
 
 A button tapped goes black till it's done, so a slow copy or save
@@ -1225,7 +1229,8 @@ It's only installed when asked for: `make install-tools`.
 In both: swipe the left edge for the frontlight (in hellobro also
 Mod+] / Mod+[, and Mod+\ for on/off; in brotools Ctrl+Alt+Up/Down
 and Ctrl+Alt+L). Fullscreen (Mod+F in
-hellobro): swipe down from the top edge to leave it; the left edge's
+hellobro): swipe down from the top edge to leave it (hellobro: two
+fingers, or one but over a book, where it shows or hides the bar); the left edge's
 light and the right edge's menu wait till then. The exit
 button leaves, and so does Esc in brotools, Mod+Shift+E in hellobro (where Esc
 is the terminal's, or closes what's open);

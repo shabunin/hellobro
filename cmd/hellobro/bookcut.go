@@ -14,6 +14,11 @@ package main
 // text, in Clips/ on the Kobo's storage, and as Clips/latest.png and
 // latest.txt too, for a program in Alpine to take: an LLM's, say), or
 // ×. A tap elsewhere or Esc takes it away, as does turning the page.
+//
+// An EPUB's page is cut the same way, by the pen or the select tool (a
+// finger held there looks a word up: bookdict.go): its picture is the
+// page as the screen has it, its text the words in the rectangle. No
+// zoom.
 
 import (
 	"bytes"
@@ -27,7 +32,12 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
+	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
+
+	"hellobro/book"
 	"hellobro/kobo"
 	"hellobro/pdf"
 )
@@ -69,7 +79,7 @@ type bookCut struct {
 // cutStart notes a contact on a PDF's page: it may become a cut.
 func (a *bro) cutStart(p image.Point, g *kobo.Gesture) bool {
 	w, ok := a.windowAt(p).(*bookWin)
-	if !ok || w.pdf == nil || w.list || w.styling {
+	if !ok || w.list || w.styling || w.b == nil || w.pdf == nil && !w.selecting && !g.Pen {
 		return false
 	}
 	v, on := w.viewAt(p)
@@ -157,12 +167,12 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 		case g.Owner != 0:
 			a.bk.cut = nil
 			return
-		case !g.Pen && !w.selecting && g.Moved > selStill && time.Since(g.At) < selHold && w.canPan() && !g.Unfulling(p): // moving from the start: the page moves (down from the top, full screen, it leaves that)
+		case !g.Pen && !w.selecting && g.Moved > selStill && time.Since(g.At) < selHold && w.canPan() && !g.Unfulling(p): // moving from the start: the page moves (down from the top, full screen, the bar's: topSwipe)
 			s.pan, s.panFrom, s.to, g.Owner = true, s.v.sp, p, ownPan
 			w.dropCut()
 			log.Print("pdf: panning")
 			return
-		case !g.Pen && w.selecting && g.Unfulling(p): // down from the top, full screen: it may leave that yet
+		case !g.Pen && w.selecting && g.Unfulling(p): // down from the top, full screen: it may be the bar's yet (topSwipe)
 			return
 		case (g.Pen || w.selecting) && g.Moved > selStill: // the select tool's finger draws at once, as the pen
 		case g.Pen || w.selecting:
@@ -181,9 +191,9 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 		}
 		w.view = s.v
 		if s.resize != 0 {
-			log.Printf("pdf: the cut dragged (%d)", s.resize)
+			log.Printf("book: the cut dragged (%d)", s.resize)
 		} else {
-			log.Print("pdf: cutting")
+			log.Print("book: cutting")
 		}
 	}
 	s.to = p
@@ -192,9 +202,8 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 	}
 	s.drawn = time.Now()
 	r := s.rect()
-	if sh, err := w.pdfPage(w.view.spine, w.laid); err == nil && !s.shown.Empty() { // the page back under the old frame
-		old := s.shown.Intersect(w.view.dst)
-		kobo.CopyGray(a.C.Gray, old, sh.img, old.Min.Sub(w.view.dst.Min).Add(w.view.sp))
+	if !s.shown.Empty() { // the page back under the old frame
+		w.pageUnder(a, s.shown.Intersect(w.view.dst))
 	}
 	a.C.Frame(r, 3, kobo.Black)
 	a.Mark(r.Union(s.shown), false)
@@ -310,7 +319,7 @@ func (w *bookWin) selectTap(a *bro, p image.Point) {
 	w.corner = nil
 	if r.Dx() >= cutMin && r.Dy() >= cutMin {
 		w.cut = r
-		log.Print("pdf: cut by taps")
+		log.Print("book: cut by taps")
 	}
 	w.draw(a)
 }
@@ -408,6 +417,20 @@ func (w *bookWin) cutRect() pdf.Rect {
 // cutCopy copies the cut: its text, for a terminal, and its picture,
 // for a notebook.
 func (w *bookWin) cutCopy(a *bro) {
+	if w.pdf == nil {
+		m, text := w.epubCut(a)
+		if err := copyPicture(m); err != nil {
+			log.Printf("book: copying a cut's picture: %v", err)
+			a.Notify("can't copy its picture: " + err.Error())
+			return
+		}
+		if strings.TrimSpace(text) == "" { // a picture's
+			a.Notify("copied its picture: paste it in a notebook")
+			return
+		}
+		a.copyText(text, "its text and picture")
+		return
+	}
 	r := w.cutRect()
 	text, err := w.pdf.TextIn(w.view.spine, r)
 	if err != nil {
@@ -434,19 +457,29 @@ func (w *bookWin) cutCopy(a *bro) {
 // cutSave saves the cut, a picture and its text, away from the main
 // loop: drawn big, it takes a moment.
 func (w *bookWin) cutSave(a *bro) {
-	d, spine, r := w.pdf, w.view.spine, w.cutRect()
 	dir := filepath.Join(booksRoot(), "Clips")
-	name := fmt.Sprintf("%s, p%d, %s", fileName(w.Title(), 40), spine+1, time.Now().Format("2006-01-02 150405"))
+	stamp := time.Now().Format("2006-01-02 150405")
+	var name string
+	var save func() error
+	if w.pdf == nil { // as the screen has it: there's nothing to draw bigger
+		m, text := w.epubCut(a)
+		name = fmt.Sprintf("%s, %d%%, %s", fileName(w.Title(), 40), w.pct(), stamp)
+		save = func() error { return writeClip(dir, name, m, text) }
+	} else {
+		d, spine, r := w.pdf, w.view.spine, w.cutRect()
+		name = fmt.Sprintf("%s, p%d, %s", fileName(w.Title(), 40), spine+1, stamp)
+		save = func() error { return saveCut(d, spine, r, dir, name) }
+	}
 	a.Notify("saving…")
 	go func() {
-		err := saveCut(d, spine, r, dir, name)
+		err := save()
 		a.Do(func() {
 			if err != nil {
-				log.Printf("pdf: saving a cut: %v", err)
+				log.Printf("book: saving a cut: %v", err)
 				a.Notify("can't save it: " + err.Error())
 				return
 			}
-			log.Printf("pdf: saved %s", name)
+			log.Printf("book: saved %s", name)
 			a.Notify("saved: Clips/" + name + ".png")
 		})
 	}()
@@ -458,11 +491,16 @@ func saveCut(d *pdf.Doc, spine int, r pdf.Rect, dir, name string) error {
 	if err != nil {
 		return err
 	}
+	text, _ := d.TextIn(spine, r)
+	return writeClip(dir, name, m, text)
+}
+
+// writeClip writes a cut's picture and text, as name and as latest.
+func writeClip(dir, name string, m image.Image, text string) error {
 	var pic bytes.Buffer
 	if err := png.Encode(&pic, m); err != nil {
 		return err
 	}
-	text, _ := d.TextIn(spine, r)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -502,4 +540,115 @@ func fileName(s string, n int) string {
 		k++
 	}
 	return strings.Join(strings.Fields(b.String()), " ")
+}
+
+// --- an EPUB's ---
+
+// bookShotOf is what an EPUB's shot is of: the pages, as laid out, where.
+type bookShotOf struct {
+	ch   *book.Chapter
+	page int
+	laid bookLaid
+	body image.Rectangle
+}
+
+// epubShot is the EPUB's pages shown, drawn again aside: what a cut
+// takes, without its frame and dots, a note's box or the bar.
+func (w *bookWin) epubShot(a *bro) *image.Gray {
+	of := bookShotOf{w.ch, w.page, w.laid, w.p.Body}
+	if w.shot != nil && w.shotOf == of {
+		return w.shot
+	}
+	m := image.NewGray(w.p.Body)
+	c := kobo.Canvas{Gray: m}
+	c.Fill(m.Rect, kobo.White)
+	pics := map[string]*image.Gray{}
+	for _, s := range w.shownPages() {
+		w.drawLaid(a, c, s.n, s.at, pics)
+	}
+	w.shot, w.shotOf = m, of
+	return m
+}
+
+// epubCut is the cut of an EPUB's page: its picture, as the screen has
+// it, and its text.
+func (w *bookWin) epubCut(a *bro) (*image.Gray, string) {
+	r := w.cut.Intersect(w.p.Body)
+	m := image.NewGray(image.Rectangle{Max: r.Size()})
+	kobo.CopyGray(m, m.Rect, w.epubShot(a), r.Min)
+	return m, w.epubText(a, r)
+}
+
+// epubText is the text of the pages shown in r: of each line the letters
+// whose middles are in it, a line a line, a word broken by a hyphen at a
+// line's end joined again.
+func (w *bookWin) epubText(a *bro, r image.Rectangle) string {
+	faces := w.bookFaces(a)
+	var b strings.Builder
+	line, end := -1, 0 // the line the last bit was on (its baseline), and where it ended
+	for _, s := range w.shownPages() {
+		if line >= 0 {
+			line = -1 // the next page: a line of its own
+			b.WriteString("\n")
+		}
+		for _, it := range w.pages[s.n].Items {
+			if it.Kind != book.ItemText || it.Text == "" {
+				continue
+			}
+			base := s.at.Y + it.Y
+			if mid := base - it.Px/3; mid < r.Min.Y || mid >= r.Max.Y {
+				continue
+			}
+			from, to, x0, x1 := lettersIn(it.Text, faces.Face(it.Style, it.Px), r.Min.X-s.at.X-it.X, r.Max.X-s.at.X-it.X)
+			if from >= to {
+				continue
+			}
+			bit := it.Text[from:to]
+			switch {
+			case line < 0:
+			case kobo.Abs(base-line) < it.Px/2: // the same line: a space if they don't touch
+				if x0+s.at.X+it.X-end > it.Px/6 && !strings.HasSuffix(b.String(), " ") && !strings.HasPrefix(bit, " ") {
+					b.WriteByte(' ')
+				}
+			default: // the next line: a word broken at its end joined again
+				t := strings.TrimRight(b.String(), " ")
+				if cut, ok := trimHyphen(t); ok {
+					t = cut
+				} else {
+					t += "\n"
+				}
+				b.Reset()
+				b.WriteString(t)
+			}
+			b.WriteString(bit)
+			line, end = base, s.at.X+it.X+x1
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// lettersIn is which of text's letters, drawn in f from 0, have their
+// middles between px lo and hi: bytes [from, to), from x0 to x1 px.
+func lettersIn(text string, f font.Face, lo, hi int) (from, to, x0, x1 int) {
+	from = -1
+	var x fixed.Int26_6
+	prev := rune(-1)
+	for i, r := range text {
+		if prev >= 0 {
+			x += f.Kern(prev, r)
+		}
+		adv, _ := f.GlyphAdvance(r)
+		if mid := (x + adv/2).Round(); mid >= lo && mid < hi {
+			if from < 0 {
+				from, x0 = i, x.Round()
+			}
+			to, x1 = i+utf8.RuneLen(r), (x + adv).Round()
+		}
+		x += adv
+		prev = r
+	}
+	if from < 0 {
+		return 0, 0, 0, 0
+	}
+	return
 }

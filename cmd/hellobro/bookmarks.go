@@ -160,21 +160,20 @@ func (w *bookWin) deleteMark(a *bro, i int) {
 // --- the bar along the top (toolbar.go) ---
 
 // barTools are the bar's: All Books, back from a link, the contents,
-// the style, a bookmark; a PDF's select tool (bookcut.go) and zoom
+// the style, a bookmark, the select tool (bookcut.go); a PDF's zoom
 // (one page at a time). Then those that go first where there's no room.
 func (w *bookWin) barTools() (tools []barBtn, drops []string) {
 	tools = []barBtn{{id: "all", label: "‹ All Books"}}
 	if w.from != nil {
 		tools = append(tools, barBtn{id: "back", label: "‹ back"})
 	}
-	tools = append(tools, barBtn{id: "toc"}, barBtn{id: "style"}, barBtn{id: "mark"})
+	tools = append(tools, barBtn{id: "toc"}, barBtn{id: "style"}, barBtn{id: "mark"}, barBtn{id: "select"})
 	if w.pdf != nil {
-		tools = append(tools, barBtn{id: "select"})
 		if !w.laid.two {
 			tools = append(tools, barBtn{id: "zoom out"}, barBtn{id: "fit", label: "100%"}, barBtn{id: "zoom in"})
 		}
 	}
-	return tools, []string{"fit", "style", "zoom out", "zoom in"}
+	return tools, []string{"fit", "style", "zoom out", "zoom in", "select"}
 }
 
 // barKind is the book's, for its bar fullscreen (fullBar).
@@ -304,7 +303,7 @@ func (w *bookWin) barTap(a *bro, p image.Point) bool {
 		case "select":
 			w.selecting = !w.selecting
 			w.dropCut()
-			log.Printf("pdf: select tool %v", w.selecting)
+			log.Printf("book: select tool %v", w.selecting)
 			w.draw(a)
 		case "zoom out":
 			w.zoomStep(a, -1)

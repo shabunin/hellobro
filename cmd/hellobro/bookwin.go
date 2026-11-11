@@ -167,6 +167,8 @@ type bookWin struct {
 	selecting bool         // the select tool: taps place the cut's corners
 	corner    *image.Point // the first corner, placed
 	grab      int          // a corner of the cut picked, to be moved: 1–4; 0 none
+	shot      *image.Gray  // an EPUB's pages shown, drawn aside: what's under a cut (bookcut.go)
+	shotOf    bookShotOf   // what shot is of
 	err       string
 	opening   bool           // the book's being opened (newBookWin)
 	laying    *bookLayingOut // an EPUB's chapter being laid out, aside
@@ -439,7 +441,7 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 		w.bar = image.Rect(in.Min.X, body.Min.Y, in.Max.X, body.Min.Y)
 		if w.selecting { // its button's gone with the bar: in hand, taps and swipes would only cut, never turn
 			w.selecting = false
-			log.Print("pdf: select tool false (no bar)")
+			log.Print("book: select tool false (no bar)")
 		}
 	}
 	w.area = image.Rect(body.Min.X+mx, w.bar.Max.Y+my, body.Max.X-mx, body.Max.Y-my)
@@ -622,26 +624,58 @@ func (w *bookWin) drawPage(a *bro) {
 		return
 	}
 	pics := map[string]*image.Gray{}
-	w.drawLaid(a, w.page, w.area.Min, pics)
-	if w.laid.two && w.page+1 < len(w.pages) {
-		w.drawLaid(a, w.page+1, w.area.Min.Add(image.Pt(w.laid.w+bookGutter, 0)), pics)
+	w.views = nil
+	for _, s := range w.shownPages() {
+		w.drawLaid(a, a.C, s.n, s.at, pics)
+		w.views = append(w.views, pdfView{dst: s.r, spine: s.n}) // where a cut may be (bookcut.go): an EPUB's page, not its chapter
 	}
 	w.pics = pics // only these pages' are kept
+	w.pickView()
+	w.drawCut(a)
 	w.drawPageMark(a)
 	w.drawBar(a)
 	w.drawNote(a)
 }
 
-// drawLaid draws page n of the chapter with its top left at at; the
-// pictures drawn go in pics.
-func (w *bookWin) drawLaid(a *bro, n int, at image.Point, pics map[string]*image.Gray) {
+// bookShown is a page of the chapter shown: n, its top left at at, and
+// r, where a cut on it may be: its margins too, so a finger's drag from
+// one cuts.
+type bookShown struct {
+	n  int
+	at image.Point
+	r  image.Rectangle
+}
+
+// shownPages are the chapter's pages on the screen: one, or two side by
+// side.
+func (w *bookWin) shownPages() []bookShown {
+	if w.page >= len(w.pages) {
+		return nil
+	}
+	body := w.p.Body
+	r := image.Rect(body.Min.X, w.bar.Max.Y, body.Max.X, body.Max.Y)
+	if !w.laid.two {
+		return []bookShown{{w.page, w.area.Min, r}}
+	}
+	at := w.area.Min.Add(image.Pt(w.laid.w+bookGutter, 0))
+	mid := at.X - bookGutter/2
+	ps := []bookShown{{w.page, w.area.Min, image.Rect(r.Min.X, r.Min.Y, mid, r.Max.Y)}}
+	if w.page+1 < len(w.pages) {
+		ps = append(ps, bookShown{w.page + 1, at, image.Rect(mid, r.Min.Y, r.Max.X, r.Max.Y)})
+	}
+	return ps
+}
+
+// drawLaid draws page n of the chapter on c with its top left at at;
+// the pictures drawn go in pics.
+func (w *bookWin) drawLaid(a *bro, c kobo.Canvas, n int, at image.Point, pics map[string]*image.Gray) {
 	faces := w.bookFaces(a)
 	for _, it := range w.pages[n].Items {
 		switch it.Kind {
 		case book.ItemText:
-			a.C.TextAt(faces.Face(it.Style, it.Px), at.X+it.X, at.Y+it.Y, it.Text, kobo.Black, w.p.Body)
+			c.TextAt(faces.Face(it.Style, it.Px), at.X+it.X, at.Y+it.Y, it.Text, kobo.Black, w.p.Body)
 		case book.ItemRule:
-			a.C.Fill(image.Rect(it.X, it.Y, it.X+it.W, it.Y+it.H).Add(at), kobo.Dark)
+			c.Fill(image.Rect(it.X, it.Y, it.X+it.W, it.Y+it.H).Add(at), kobo.Dark)
 		case book.ItemPicture:
 			r := image.Rect(it.X, it.Y, it.X+it.W, it.Y+it.H).Add(at)
 			key := fmt.Sprintf("%s@%dx%d", it.Text, it.W, it.H)
@@ -651,7 +685,7 @@ func (w *bookWin) drawLaid(a *bro, n int, at image.Point, pics map[string]*image
 			}
 			if g != nil {
 				pics[key] = g
-				kobo.CopyGray(a.C.Gray, r.Intersect(w.p.Body), g, image.Point{})
+				kobo.CopyGray(c.Gray, r.Intersect(w.p.Body), g, image.Point{})
 			}
 		}
 	}
@@ -1261,7 +1295,7 @@ func (w *bookWin) tap(a *bro, p image.Point) {
 		}
 		return
 	}
-	if w.selecting && w.pdf != nil {
+	if w.selecting {
 		if !(p.In(w.bar) && w.barTap(a, p)) {
 			w.selectTap(a, p)
 		}
