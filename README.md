@@ -142,7 +142,7 @@ make dist            # a release's files, in dist/
 | Mod+1…0, with Shift | go to a workspace, send the window there |
 | Mod+B, Mod+V | split: the next window beside, below |
 | Mod+E, Mod+W, Mod+S | side by side ⇄ one above another, tabbed, stacked |
-| Mod+F | fullscreen, or a window's fullscreen (swipe in from the top or bottom edge to leave) |
+| Mod+F | fullscreen, or a window's fullscreen (two fingers swiped down from the top leave it) |
 | Mod+Shift+Space | floating, or a window's float (tile puts it back) |
 | Mod+R | resize: the arrows, then Esc |
 | Mod+Shift+Q | close the window |

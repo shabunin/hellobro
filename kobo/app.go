@@ -163,6 +163,9 @@ type App struct {
 	LightStart *int                   // the light's level at start; nil: Nickel's
 	LightKept  func(int)              // the reader set the light to this
 	LightAt    func(image.Point) bool // a finger down here, by the left edge, may set the light; nil: unless full screen
+	// TopSwipe is a finger swiped down from the top, full screen, that
+	// started at p: true if the Program took it; else it leaves full screen.
+	TopSwipe func(p image.Point) bool
 
 	prog  Program
 	cfg   Config
@@ -826,8 +829,10 @@ func (a *App) onTouch(ev TouchEv) {
 		}
 		if dy := (p.Y - g.Start.Y) * g.unfull; g.unfull != 0 && g.Owner == 0 && !g.unfulled && dy > unfullMove && dy > 2*Abs(p.X-g.Start.X) { // a finger of the Program's (two together, say) isn't this
 			g.unfulled = true
-			log.Print("fullscreen: swiped down from the top")
-			a.SetFull(false)
+			if a.TopSwipe == nil || !a.TopSwipe(g.Start) {
+				log.Print("fullscreen: swiped down from the top")
+				a.SetFull(false)
+			}
 		}
 		if g.unfulled {
 			g.Last = p

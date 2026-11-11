@@ -112,6 +112,7 @@ func main() {
 	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true, Bar: true}, a)
 	a.loadBar() // the App's, before it's up
 	a.App.LightAt = a.lightAt
+	a.App.TopSwipe = a.topSwipe
 	profileOn.Store(a.setting("profile") == "on")
 	alpineBus.Store(a.setting("alpine-bus") == "on")
 	a.applyLightIdle()
@@ -322,6 +323,20 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	case g.Owner == ownPair:
 		a.pairMove()
 	}
+}
+
+// topSwipe takes a finger swiped down from the top, full screen, over a
+// book: its bar shown, or hidden (for books of its kind, as the style
+// panel's row). Two fingers leave full screen (wsSwipe); elsewhere one
+// does too.
+func (a *bro) topSwipe(p image.Point) bool {
+	w, ok := a.windowAt(p).(*bookWin)
+	if !ok || a.overlay() {
+		return false
+	}
+	w.flipBar(a)
+	log.Printf("book: swiped down from the top: the bar %s full screen", fullBarWord(a.fullBar(w.barKind())))
+	return true
 }
 
 // lightAt says if a finger down at p, by the left edge, may set the

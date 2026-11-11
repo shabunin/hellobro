@@ -74,7 +74,8 @@ func (a *bro) redrawTiles() {
 }
 
 // wsSwipe takes two fingers going down from the screen's top: the
-// tiles up, true once they are.
+// tiles up, true once they are; full screen, out of it (one finger
+// there may be a book's, its bar: topSwipe).
 func (a *bro) wsSwipe(f, g *kobo.Gesture) bool {
 	top := a.C.Bounds().Min.Y + wsTop
 	if a.Locked() || a.picker != nil || f.Start.Y >= top || g.Start.Y >= top {
@@ -86,6 +87,11 @@ func (a *bro) wsSwipe(f, g *kobo.Gesture) bool {
 	}
 	if !down(f) || !down(g) {
 		return false
+	}
+	if a.Full {
+		log.Print("two-finger swipe: out of full screen")
+		a.SetFull(false)
+		return true
 	}
 	log.Print("two-finger swipe: the workspaces")
 	a.openWorkspaces()
