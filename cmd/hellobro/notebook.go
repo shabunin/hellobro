@@ -55,8 +55,9 @@ const (
 	noteOldExt           = ".hbnote"
 	noteDepth            = 4 // folders in folders, at most
 
-	ownInk  = 7 // the pen writing or erasing in a notebook
-	ownLeaf = 8 // a finger on a notebook's page: maybe turning it
+	ownInk  = 7  // the pen writing or erasing in a notebook
+	ownLeaf = 8  // a finger on a notebook's page: maybe turning it
+	ownTop  = 13 // a finger that swiped down from the top, full screen: its lift is nothing
 )
 
 // notePt is a point of a stroke: where, in page units, and the pen's
@@ -1205,7 +1206,12 @@ func (a *bro) notePressure(ev kobo.TouchEv) int32 {
 func (a *bro) noteMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	k := a.nt.ink
 	switch g.Owner {
-	case ownLeaf, ownNoteOv:
+	case ownLeaf:
+		if d := p.Sub(g.Start); a.Full && g.Start.Y < kobo.TopEdge && d.Y > kobo.TopMove && d.Y > 2*kobo.Abs(d.X) && a.topSwipe(g.Start) {
+			g.Owner = ownTop // down from the top, full screen: the bar (kobo's own doesn't see a finger we took)
+		}
+		return true
+	case ownNoteOv:
 		return true
 	case ownNoteSel:
 		a.noteDragTo(p, g)

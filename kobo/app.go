@@ -124,8 +124,8 @@ func (g *Gesture) NoLight() { g.lightZone = false }
 const (
 	EdgeWidth  = 110 // px from the left (light) or right edge where edge swipes start
 	SwipeStart = 40  // px of vertical travel before an edge swipe counts
-	unfullEdge = 120 // px from the top where a swipe down leaves fullscreen
-	unfullMove = 100 // px it takes (a flick is about 120)
+	TopEdge    = 120 // px from the top where a swipe down leaves fullscreen (or is the Program's: TopSwipe)
+	TopMove    = 100 // px it takes (a flick is about 120)
 )
 
 type calibState struct {
@@ -810,7 +810,7 @@ func (a *App) onTouch(ev TouchEv) {
 		// Full screen, a swipe down from the top is the one way out by
 		// touch (no fullscreen key without a keyboard): it goes before
 		// the light, even from the left edge's top.
-		if a.Full && !ev.Pen && g.Owner == 0 && p.Y < unfullEdge {
+		if a.Full && !ev.Pen && g.Owner == 0 && p.Y < TopEdge {
 			g.unfull = 1
 		}
 		g.lightZone = a.light != nil && !ev.Pen && p.X < EdgeWidth && g.Owner == 0 && g.unfull == 0 && a.lightAt(p)
@@ -827,7 +827,7 @@ func (a *App) onTouch(ev TouchEv) {
 			g.light, g.lightFrom = true, a.light.level
 			log.Printf("light swipe from %d%%", g.lightFrom)
 		}
-		if dy := (p.Y - g.Start.Y) * g.unfull; g.unfull != 0 && g.Owner == 0 && !g.unfulled && dy > unfullMove && dy > 2*Abs(p.X-g.Start.X) { // a finger of the Program's (two together, say) isn't this
+		if dy := (p.Y - g.Start.Y) * g.unfull; g.unfull != 0 && g.Owner == 0 && !g.unfulled && dy > TopMove && dy > 2*Abs(p.X-g.Start.X) { // a finger of the Program's (two together, say) isn't this
 			g.unfulled = true
 			if a.TopSwipe == nil || !a.TopSwipe(g.Start) {
 				log.Print("fullscreen: swiped down from the top")

@@ -326,17 +326,29 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 }
 
 // topSwipe takes a finger swiped down from the top, full screen, over a
-// book: its bar shown, or hidden (for books of its kind, as the style
-// panel's row). Two fingers leave full screen (wsSwipe); elsewhere one
-// does too.
+// book or a notebook: its bar shown, or hidden (for all of its kind, as
+// the style panel's or the settings' row). Two fingers leave full screen
+// (wsSwipe); elsewhere one does too.
 func (a *bro) topSwipe(p image.Point) bool {
-	w, ok := a.windowAt(p).(*bookWin)
-	if !ok || a.overlay() {
+	if a.overlay() {
 		return false
 	}
-	w.flipBar(a)
-	log.Printf("book: swiped down from the top: the bar %s full screen", fullBarWord(a.fullBar(w.barKind())))
-	return true
+	switch w := a.windowAt(p).(type) {
+	case *bookWin:
+		w.flipBar(a)
+		log.Printf("book: swiped down from the top: the bar %s full screen", fullBarWord(a.fullBar(w.barKind())))
+		return true
+	case *noteWin:
+		if w.overview || w.settings { // its buttons are all the overview has; the settings, a page of their own
+			return false
+		}
+		a.flipFullBar("note")
+		w.place(a, w.p)
+		w.draw(a)
+		log.Printf("notebook: swiped down from the top: the bar %s full screen", fullBarWord(a.fullBar("note")))
+		return true
+	}
+	return false
 }
 
 // lightAt says if a finger down at p, by the left edge, may set the
@@ -467,7 +479,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		}
 		a.pair = [2]*kobo.Gesture{}
 	}
-	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge || g.Owner == ownKey || g.Owner == ownHold {
+	if g.Owner == ownMenu || g.Owner == ownPair || g.Owner == ownEdge || g.Owner == ownKey || g.Owner == ownHold || g.Owner == ownTop {
 		return
 	}
 	if !g.Tap && !g.Pen && !a.overlay() {

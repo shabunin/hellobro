@@ -56,8 +56,8 @@ back), **fullscreen**, and **close** (a terminal's shell or connection
 ends with it). In a narrow window they're only their icons. A tap on a window gives it the focus; the keys go to the
 one that has it. Full screen, two fingers swiped down from the top of
 the screen, a finger swiped down from its top edge (even over a PDF
-page that's bigger than the screen and pans; over a book, that shows
-or hides its bar instead), or Mod+F, puts it back. The edges are the window's there, so no
+page that's bigger than the screen and pans; over a book or a
+notebook, that shows or hides its bar instead), or Mod+F, puts it back. The edges are the window's there, so no
 menu by swiping and no workspace swipes from an edge; two fingers
 swiped across still go to the next workspace or the one before, and
 the light's swipe up or down the left edge still works (in a notebook,
@@ -297,7 +297,7 @@ keys.conf says mod (meta, as an older hellobro wrote it, works too).
 | Mod+B, Mod+V | split: the next window beside, below |
 | Mod+Shift+B | hide the bar, show it again |
 | Mod+E, Mod+W, Mod+S | side by side ⇄ one above another, tabbed, stacked |
-| Mod+F | fullscreen (or its strip's fullscreen; two fingers swiped down from the top leave it, one too but over a book: its bar) |
+| Mod+F | fullscreen (or its strip's fullscreen; two fingers swiped down from the top leave it, one too but over a book or a notebook: its bar) |
 | Mod+Shift+Space | floating |
 | Mod+A | focus the container around |
 | Mod+Shift+Minus, Mod+Minus | put the window away, bring it back |
@@ -966,7 +966,10 @@ width, its gray.
   writing on the second makes it a page.
 - Fullscreen, a notebook keeps its bar. Its settings' **Bar,
   fullscreen**, hidden, leaves the page all of the screen: the pen
-  writes, keys do the rest (the pages, small, keep it).
+  writes, keys do the rest (the pages, small, keep it). A finger
+  swiped down from the screen's top edge hides the bar, or shows it,
+  as that row does (not the pen: it writes there); two fingers leave
+  fullscreen.
 - **select** (or S) takes what's written, and pictures, to change
   them; the pen and fingers both work with it. Tap a stroke or a
   picture to take it (the ink over a picture first), or draw a
@@ -1230,7 +1233,8 @@ In both: swipe the left edge for the frontlight (in hellobro also
 Mod+] / Mod+[, and Mod+\ for on/off; in brotools Ctrl+Alt+Up/Down
 and Ctrl+Alt+L). Fullscreen (Mod+F in
 hellobro): swipe down from the top edge to leave it (hellobro: two
-fingers, or one but over a book, where it shows or hides the bar); the left edge's
+fingers, or one but over a book or a notebook, where it shows or hides
+the bar); the left edge's
 light and the right edge's menu wait till then. The exit
 button leaves, and so does Esc in brotools, Mod+Shift+E in hellobro (where Esc
 is the terminal's, or closes what's open);
