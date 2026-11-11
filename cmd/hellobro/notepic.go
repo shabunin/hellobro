@@ -32,6 +32,7 @@ type notePic struct {
 	png    []byte
 	gray   *image.Gray
 	scaled *image.Gray
+	ink    bool // only its ink drawn, the paper showing through (a formula)
 }
 
 // notePicMax is the most pixels a picture is decoded with: a phone's
@@ -51,9 +52,10 @@ func newNotePic(data []byte) (*notePic, error) {
 		return nil, err
 	}
 	g, ok := m.(*image.Gray)
-	if !ok {
+	if !ok { // on white, where it's transparent
 		g = image.NewGray(m.Bounds())
-		draw.Draw(g, g.Bounds(), m, m.Bounds().Min, draw.Src)
+		draw.Draw(g, g.Bounds(), image.White, image.Point{}, draw.Src)
+		draw.Draw(g, g.Bounds(), m, m.Bounds().Min, draw.Over)
 	}
 	return &notePic{png: data, gray: g}, nil
 }
@@ -73,7 +75,27 @@ func (w *noteWin) drawPic(a *bro, s *noteStroke, at, clip image.Rectangle) {
 		xdraw.ApproxBiLinear.Scale(p.scaled, p.scaled.Bounds(), p.gray, p.gray.Bounds(), xdraw.Src, nil)
 	}
 	cl := r.Intersect(clip)
+	if p.ink {
+		darken(a.C.Gray, cl, p.scaled, cl.Min.Sub(r.Min))
+		return
+	}
 	kobo.CopyGray(a.C.Gray, cl, p.scaled, cl.Min.Sub(r.Min))
+}
+
+// darken draws src's ink (from sp) in r of dst: each pixel the darker
+// of the two.
+func darken(dst *image.Gray, r image.Rectangle, src *image.Gray, sp image.Point) {
+	off := sp.Sub(r.Min) // a pixel of dst's, in src
+	r = r.Intersect(dst.Rect).Intersect(src.Rect.Sub(off))
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		d := dst.Pix[dst.PixOffset(r.Min.X, y):]
+		s := src.Pix[src.PixOffset(r.Min.X+off.X, y+off.Y):]
+		for x := range r.Dx() {
+			if s[x] < d[x] {
+				d[x] = s[x]
+			}
+		}
+	}
 }
 
 // copyPicture puts a picture in the clipboard (a PNG), for a notebook to
@@ -171,16 +193,23 @@ func xoppToPic(xi xoppImage) (*noteStroke, error) {
 	if err != nil {
 		return nil, err
 	}
-	return picStroke(p, image.Rect(at[0], at[1], at[2], at[3])), nil
+	s := picStroke(p, image.Rect(at[0], at[1], at[2], at[3]))
+	for _, a := range xi.Attrs { // its own: a diary's, a formula's source
+		if n := a.Name.Local; n != "left" && n != "top" && n != "right" && n != "bottom" {
+			s.attrs = append(s.attrs, a)
+		}
+	}
+	p.ink = attr(s.attrs, texAttr) != ""
+	return s, nil
 }
 
 // xoppImage is s's picture as a .xopp's image.
 func (s *noteStroke) xoppImage() xoppImage {
 	b := s.box
-	return xoppImage{Attrs: []xml.Attr{
+	return xoppImage{Attrs: append([]xml.Attr{
 		{Name: xml.Name{Local: "left"}, Value: fmtPt(float64(b.Min.X) * notePt72)},
 		{Name: xml.Name{Local: "top"}, Value: fmtPt(float64(b.Min.Y) * notePt72)},
 		{Name: xml.Name{Local: "right"}, Value: fmtPt(float64(b.Max.X) * notePt72)},
 		{Name: xml.Name{Local: "bottom"}, Value: fmtPt(float64(b.Max.Y) * notePt72)},
-	}, Data: base64.StdEncoding.EncodeToString(s.pic.png)}
+	}, s.attrs...), Data: base64.StdEncoding.EncodeToString(s.pic.png)}
 }

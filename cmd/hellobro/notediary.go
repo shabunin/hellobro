@@ -140,8 +140,9 @@ func (a *bro) diaryConf() (ai.Config, error) {
 // diarySizes are the answer's letters, points, as "ai-size" has them.
 var diarySizes = map[string]float64{"s": 12, "m": 15, "l": 19, "xl": 24}
 
-// The answer's font is the notebook's own: one of the reader's (Go's
-// first), or the Hershey script's hand.
+// The answer's font is the notebook's own: Gentium Book (Latin, Greek
+// and Cyrillic whole), Go's, one of the reader's; or the Hershey
+// script's hand.
 const (
 	diaryFontAttr = "hellobro-diary-font"
 	diaryHand     = "handwriting"
@@ -149,9 +150,9 @@ const (
 
 // diaryFonts are the fonts an answer can be in.
 func diaryFonts() []string {
-	fs := []string{"Go"}
+	fs := []string{famGentium, famGo}
 	for _, f := range noteFamilies() {
-		if f.files[0] != "" {
+		if f.files[0] != "" && !slices.Contains(fs, f.name) {
 			fs = append(fs, f.name)
 		}
 	}
@@ -163,7 +164,7 @@ func (nb *notebook) diaryFont() string {
 	if f := attr(nb.attrs, diaryFontAttr); f != "" {
 		return f
 	}
-	return "Go"
+	return famGentium
 }
 
 // chooseFont lists the fonts to choose from.
@@ -379,12 +380,15 @@ Reply with a JSON object only, nothing around it.
 - Otherwise reply {"status":"answer","question":"<what they wrote, word for word>","answer":"<your answer>"}.
 - If the writing tells you how to answer from now on (a role, a manner, a language, what to call them...), add "prompt":"<that, as a standing instruction to you>" to your answer, and say in it, briefly, that you will.
 
-Your answer is written back into the notebook, so: answer in the language they wrote in, unless told otherwise; plain text, no markdown, no LaTeX (FORMULAS); short, a few sentences, unless they ask for more; new lines only between paragraphs. If you can't read a word, ask about it.`
+Your answer is written back into the notebook, so: answer in the language they wrote in, unless told otherwise; short, a few sentences, unless they ask for more; FORMAT. If you can't read a word, ask about it.`
 
-// diaryFormulas is how formulas are to be written, in the hand or a font.
-var diaryFormulas = map[bool]string{
-	true:  "write formulas plainly, as x^2 + 1, sqrt(2)",
-	false: "write formulas plainly, with Unicode's signs where they help: x² + 1, √2, π, ≤, →",
+// diaryFormats are how an answer's to be written: in the hand, in a
+// font as plain text, in Markdown.
+var diaryFormats = map[string]string{
+	"hand":  "plain text, no Markdown, no LaTeX: write formulas plainly, as x^2 + 1, sqrt(2); new lines only between paragraphs",
+	"plain": "plain text, no Markdown, no LaTeX: write formulas plainly, with Unicode's signs where they help: x² + 1, √2, π, ≤, →; new lines only between paragraphs",
+	"md": "Markdown where it helps: **bold**, *italic*, lists, tables, `code` and fenced code blocks (```), a heading only in a long answer; " +
+		"formulas in LaTeX, $...$ in a line and $$...$$ on a line of their own. In the JSON, escape each backslash (\\\\frac, \\\\alpha) and write new lines as \\n",
 }
 
 // diaryVoices are the manners it can answer in, by name: a notebook's
@@ -453,11 +457,23 @@ func diaryTalk(nb *notebook) (msgs []ai.Msg, prompts []string) {
 	return
 }
 
+// diaryFormat is how nb's answers are written: "hand", "plain" text,
+// "md" (Markdown).
+func (a *bro) diaryFormat(nb *notebook) string {
+	switch {
+	case nb.diaryFont() == diaryHand:
+		return "hand"
+	case a.setting("ai-format") == "plain":
+		return "plain"
+	}
+	return "md"
+}
+
 // diarySystem is what the model's told for nb: the rules, its voice, the
 // writer's instructions.
-func diarySystem(nb *notebook, prompts []string) string {
+func diarySystem(nb *notebook, prompts []string, format string) string {
 	var b strings.Builder
-	b.WriteString(diaryVoices[nb.diaryVoice()].text + "\n\n" + strings.Replace(diaryRules, "FORMULAS", diaryFormulas[nb.diaryFont() == diaryHand], 1))
+	b.WriteString(diaryVoices[nb.diaryVoice()].text + "\n\n" + strings.Replace(diaryRules, "FORMAT", diaryFormats[format], 1))
 	if len(prompts) > 0 {
 		b.WriteString("\n\nThe writer's standing instructions (follow them; a later one wins over an earlier):")
 		for _, p := range prompts {
@@ -545,7 +561,8 @@ func (w *noteWin) diaryAsk(a *bro, now bool) {
 		a.Notify("diary: asking " + cfg.Model + "…")
 	}
 	talk, prompts := diaryTalk(w.nb)
-	system := diarySystem(w.nb, prompts)
+	format := a.diaryFormat(w.nb)
+	system := diarySystem(w.nb, prompts, format)
 	msgs := append(talk[max(0, len(talk)-diaryHistory):],
 		ai.Msg{Role: "user", Parts: []ai.Part{{Text: say}, {PNG: pic}}})
 	style, size := w.nb.diaryFont(), diarySizes[a.setting("ai-size")]
@@ -567,13 +584,13 @@ func (w *noteWin) diaryAsk(a *bro, now bool) {
 			d.asked, d.cancel = 0, nil
 			cancel()
 			w.diaryUnthink(a)
-			w.diaryAnswer(a, page, below, out.Text, err, style, size)
+			w.diaryAnswer(a, page, below, out.Text, err, style, size, format == "md")
 		})
 	}()
 }
 
 // diaryAnswer takes the model's answer to what's in below on page.
-func (w *noteWin) diaryAnswer(a *bro, page int, below image.Rectangle, out string, err error, style string, size float64) {
+func (w *noteWin) diaryAnswer(a *bro, page int, below image.Rectangle, out string, err error, style string, size float64, md bool) {
 	if err != nil {
 		log.Printf("diary %s: %v", w.nb.name, err)
 		a.Notify("diary: " + err.Error())
@@ -592,7 +609,11 @@ func (w *noteWin) diaryAnswer(a *bro, page int, below image.Rectangle, out strin
 	if r.Prompt != "" {
 		log.Printf("diary %s: an instruction: %q", w.nb.name, r.Prompt)
 	}
-	w.diaryLay(page, below, r, time.Now().UnixNano(), style, size)
+	if md {
+		w.diaryLayMD(page, below, r, style, size)
+	} else {
+		w.diaryLay(page, below, r, time.Now().UnixNano(), style, size)
+	}
 	w.diary.nextAt = time.Now()
 }
 
@@ -787,7 +808,9 @@ func (w *noteWin) diaryWriteWord(a *bro) {
 			at, clip := w.slots[i], w.paperArea()
 			var box image.Rectangle
 			if wd.line != nil { // the line again, its word on
-				box = w.toScreenRect(was.Union(wd.line.box), at).Intersect(clip)
+				box = w.toScreenRect(was.Union(wd.line.box), at)
+				box.Max.X += box.Dy() // drawn smaller, the letters may come out a little wider than measured
+				box = box.Intersect(clip)
 				w.drawPages(a, box)
 			}
 			for _, s := range wd.strokes {

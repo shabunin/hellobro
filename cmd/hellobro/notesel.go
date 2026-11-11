@@ -616,7 +616,9 @@ func (s *noteStroke) transformed(f func(x, y float64) (float64, float64), k floa
 		for range quarters {
 			p = p.turned()
 		}
-		return picStroke(p, box)
+		m := picStroke(p, box)
+		m.attrs = s.attrs
+		return m
 	}
 	m := &noteStroke{attrs: s.attrs, gray: s.gray, marker: s.marker, pts: make([]notePt, len(s.pts))}
 	for i, p := range s.pts {

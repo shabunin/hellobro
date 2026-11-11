@@ -88,6 +88,8 @@ var settingList = []setting{
 		shown:  []string{"a finger up or down the left edge sets it", "off: a finger there is the page's (full screen)"}},
 	{key: "ai-model", app: "notebook", label: "The AI diary's model",
 		values: diaryModelIDs(), shown: diaryModelIDs()},
+	{key: "ai-format", app: "notebook", label: "The AI diary's answers",
+		values: []string{"md", "plain"}, shown: []string{"Markdown: code, formulas, tables", "plain text"}},
 	{key: "ai-size", app: "notebook", label: "The AI diary's letters",
 		values: []string{"m", "s", "l", "xl"}, shown: []string{"medium", "small", "large", "huge"}},
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",

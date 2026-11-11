@@ -1,11 +1,12 @@
 # The notebook's AI diary (notediary.go), against a stand-in model
 # (ai.conf in APP_EXTRA, its base the stand-in's): turned on in the
-# settings, its model's list looked at, its font the one after Go's; a line written, ending in a question
-# mark: answered under it, by hand. A second line, unfinished: the model
-# waits. Three taps of a finger: asked at once; the answer's long, and
-# goes on on a page put in after. Undone (Ctrl+Z): gone from the talk
-# too, so a line written then is asked with the first answer only. The
-# settings again: its usage.
+# settings, its model's list and its fonts' looked at; a line written,
+# ending in a question mark: answered under it. A second line,
+# unfinished: the model waits. Three taps of a finger: asked at once;
+# the answer's Markdown (formulas, code, a table), long, and goes on on
+# a page put in after. Undone (Ctrl+Z): gone from the talk too, so a
+# line written then is asked with the first answer only. The settings
+# again: its usage.
 # app: hellobro
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,7 +31,7 @@ key(28); time.sleep(3)                               # Enter: the diary on
 keys("jjj"); time.sleep(1); key(28); time.sleep(4)   # its model: the list
 key(1); time.sleep(3)                                # Esc: as it was
 keys("j"); time.sleep(1); key(28); time.sleep(4)     # its font: the list
-key(108); time.sleep(1); key(28); time.sleep(3)      # ↓ Enter: the next (HELLOBRO_FONTS' first)
+key(1); time.sleep(3)                                # Esc: as it was (Gentium Book)
 key(1); time.sleep(3)                                # Esc: back to the page
 line(W // 8, H // 8, words=3); time.sleep(16)        # asked after 3 s; answered, written
 line(W // 8, H // 8 + 400, words=2, ask=False); time.sleep(8)   # it waits

@@ -94,3 +94,17 @@ func TestAsk(t *testing.T) {
 		t.Errorf("an error's text: %v", err)
 	}
 }
+
+func TestTeXEscapes(t *testing.T) {
+	var v struct{ Answer string }
+	for in, want := range map[string]string{
+		`{"answer":"$\frac{a}{b}$, \theta, \alpha, \nabla"}`: `$\frac{a}{b}$, \theta, \alpha, \nabla`,
+		`{"answer":"line\nnext\tTab \"q\" é \\frac"}`:        "line\nnext\tTab \"q\" é \\frac",
+		`{"answer":"\neq vs\nnot\nevery \( x \)"}`:           `\neq vs` + "\n" + `not` + "\n" + `every \( x \)`,
+	} {
+		v.Answer = ""
+		if err := JSON(in, &v); err != nil || v.Answer != want {
+			t.Errorf("%s: %q, %v; want %q", in, v.Answer, err, want)
+		}
+	}
+}

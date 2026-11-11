@@ -284,7 +284,13 @@ func renderNotePage(pg exportPage, paper string, doc *pdf.Doc, dpi float64) (*im
 				drawNoteText(c, s, image.Point{}, k, -1, m.Bounds())
 			case s.pic != nil:
 				r := image.Rect(int(float64(s.box.Min.X)*k), int(float64(s.box.Min.Y)*k), int(float64(s.box.Max.X)*k), int(float64(s.box.Max.Y)*k))
-				xdraw.ApproxBiLinear.Scale(m, r, s.pic.gray, s.pic.gray.Bounds(), xdraw.Src, nil)
+				if s.pic.ink { // its ink on the page
+					sc := image.NewGray(image.Rectangle{Max: r.Size()})
+					xdraw.ApproxBiLinear.Scale(sc, sc.Bounds(), s.pic.gray, s.pic.gray.Bounds(), xdraw.Src, nil)
+					darken(m, r, sc, image.Point{})
+				} else {
+					xdraw.ApproxBiLinear.Scale(m, r, s.pic.gray, s.pic.gray.Bounds(), xdraw.Src, nil)
+				}
 			default:
 				radius := func(p notePt) int { return max(1, int(float64(p.r)/10*k+0.5)) }
 				prev := at(s.pts[0].x, s.pts[0].y)

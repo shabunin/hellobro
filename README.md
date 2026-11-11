@@ -77,7 +77,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   lists them (recent, all, in folders) to open, rename and delete. Kept as
   Xournal++ files, to go on with on a computer. An AI diary, if you
   like: write a question, rest the pen, and the answer comes back
-  under it (a language model, over your OpenCode Go key).
+  under it, formulas, code and tables laid out (a language model, over
+  your OpenCode Go key).
 - **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
   what's using it, powertop style.
 - **From afar**: a relay through a VPS, so the Kobo and your PC reach
@@ -180,7 +181,10 @@ system), lives here too. It's only installed on request:
 [GPL-3.0-or-later](LICENSE). hellobro links in
 [FBInk](https://github.com/NiLuJe/FBInk) by NiLuJe, also GPL-3.0-or-later.
 Its prebuilt files and their source are described in
-[third_party/fbink](third_party/fbink/README.md).
+[third_party/fbink](third_party/fbink/README.md). It carries two fonts
+under the SIL Open Font License 1.1, unchanged: Gentium Book (SIL
+Global) and STIX Two Math (the STIX Fonts Project), in
+[third_party/fonts](third_party/fonts), each with its license.
 
 <sub>The screenshots come from the test harness on a PC (`harness/`),
 with the app's own rendering.</sub>

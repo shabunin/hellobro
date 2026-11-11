@@ -67,7 +67,7 @@ func TestDiaryLay(t *testing.T) {
 	if len(talk) != 2 || !strings.Contains(talk[0].Parts[0].Text, "a story?") || !strings.Contains(talk[1].Parts[0].Text, "stormy") || !slices.Equal(prompts, []string{"call me Harry"}) {
 		t.Errorf("the talk: %+v, %q", talk, prompts)
 	}
-	if sys := diarySystem(w.nb, prompts); !strings.Contains(sys, "Tom Riddle") || !strings.Contains(sys, "- call me Harry") {
+	if sys := diarySystem(w.nb, prompts, "md"); !strings.Contains(sys, "Tom Riddle") || !strings.Contains(sys, "- call me Harry") {
 		t.Errorf("the system prompt: %s", sys)
 	}
 	w.doUndoOps()

@@ -7,7 +7,7 @@ all: $(APPS)
 
 # What every app is made of: the kobo package, and FBInk.
 KOBO_SRC = $(wildcard kobo/*.go) go.mod go.sum
-hellobro: $(wildcard cmd/hellobro/*.go book/*.go pdf/*.go dict/*.go wm/*.go hand/*.go hand/fonts/* ai/*.go) third_party/mupdf/libmupdf.a
+hellobro: $(wildcard cmd/hellobro/*.go book/*.go pdf/*.go dict/*.go wm/*.go hand/*.go hand/fonts/* ai/*.go md/*.go tex/*.go third_party/fonts/*/*) third_party/mupdf/libmupdf.a
 brotools: $(wildcard cmd/brotools/*.go)
 
 # The build's version: the commit, and when it was built (hellobro --version).

@@ -1047,13 +1047,25 @@ page goes to a language model as a picture: the handwriting, typed
 text, and pictures pasted there (a book's cut, say: sent as sharp as
 the screen shows it). If it reads as finished (it ends with a question
 mark, a full stop or an exclamation mark) the answer is written under
-it, a word at a time, as typed text in the notebook's font (or by hand:
-**AI font**, below); if not, it waits for more, and writing on sends
-it all again. While it thinks, three dots under the question say so. Three quick taps of a finger on the page (once
-a pen has written, when a finger turns pages) ask at once, finished or
-not. A full page goes on on the next one if it's empty, else on one put
-in after it, and the pages turn with it. `x^2`, `e^(-n)`, `2^{10}`
-are written as powers (x², e⁽⁻ⁿ⁾, 2¹⁰).
+it, a word at a time; if not, it waits for more, and writing on sends
+it all again. While it thinks, three dots under the question say so.
+Three quick taps of a finger on the page (once a pen has written, when
+a finger turns pages) ask at once, finished or not. A full page goes
+on on the next one if it's empty, else on one put in after it, and the
+pages turn with it.
+
+It answers in Markdown (**AI answers**, below), laid out as it says:
+headings, **bold** and *italic*, lists, quotes with a bar, tables in
+columns, code in Go Mono in a frame, and formulas in LaTeX (`$...$` in
+a line, `$$...$$` on their own) drawn as TeX would: fractions, roots,
+powers and indices, sums and integrals with their limits, brackets as
+tall as what they hold, matrices, cases, aligned equations, accents,
+Greek, in STIX Two Math. A formula is a picture on the page, its LaTeX
+kept with it in the `.xopp` (`hellobro-tex`). The text is in the
+notebook's font (**AI font**); a letter it hasn't is drawn in Gentium
+Book, then Go, so Cyrillic and Greek always show, as in any text in a
+notebook. In plain text, `x^2` and `2^{10}` are written as powers (x²,
+2¹⁰).
 
 What it's sent: the picture, and the talk so far as text: each
 question as it read it and its answer, the last six, from all the
@@ -1077,10 +1089,13 @@ Its settings, under the notebook's:
 - **AI model**: a tap lists them: the models that read handwriting on
   OpenCode Go, each with what a question cost and how long it took
   when tried (on 2026-11-11), or **as ai.conf says**.
-- **AI font (this notebook)**: a tap lists them: Go, the fonts the
-  books are read in (the Kobo's own: Georgia, Amasis and the rest), or
-  **handwriting** (the Hershey script, drawn as strokes; Cyrillic and
-  Greek too).
+- **AI font (this notebook)**: a tap lists them: **Gentium Book**
+  (first: Latin, Cyrillic and Greek, polytonic too, in all four
+  styles; it comes with hellobro), Go, the fonts the books are read in
+  (the Kobo's own: Georgia, Amasis and the rest), or **handwriting**
+  (the Hershey script, drawn as strokes; plain text only).
+- **AI answers**: **Markdown** (code, formulas, tables, as above) or
+  **plain text**.
 - **AI letters' size**: medium (15 pt), small, large, huge.
 - **AI usage**: what this Kobo's questions to the model cost, over 5
   hours, a week and 30 days, as a share of the Go plan's limits for it

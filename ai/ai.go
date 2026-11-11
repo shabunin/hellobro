@@ -307,10 +307,80 @@ func JSON(answer string, v any) error {
 	if i < 0 || j < i {
 		return fmt.Errorf("no JSON in %q", short(answer))
 	}
-	if err := json.Unmarshal([]byte(answer[i:j+1]), v); err != nil {
+	if err := json.Unmarshal([]byte(texEscapes(answer[i:j+1])), v); err != nil {
 		return fmt.Errorf("%v in %q", err, short(answer))
 	}
 	return nil
+}
+
+// texEscapes mends the TeX a model writes in a JSON string as it would
+// anywhere else: \alpha (no JSON escape: an error), \frac (a form feed
+// and "rac"), \theta (a tab). A backslash before what JSON
+// doesn't escape, or before a TeX command that begins with one of
+// JSON's escapes, is doubled: TeX's.
+func texEscapes(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c != '\\' {
+			b.WriteByte(c)
+			continue
+		}
+		if i+1 >= len(s) {
+			b.WriteString(`\\`)
+			continue
+		}
+		n := s[i+1]
+		switch {
+		case n == '\\' || n == '"' || n == '/':
+			b.WriteByte(c)
+			b.WriteByte(n)
+			i++
+		case n == 'u' && i+6 <= len(s) && isHex(s[i+2:i+6]):
+			b.WriteString(s[i : i+6])
+			i += 5
+		case strings.IndexByte("bfnrt", n) >= 0 && !texCommands[word(s[i+1:])]:
+			b.WriteByte(c)
+			b.WriteByte(n)
+			i++
+		default:
+			b.WriteString(`\\`) // and what's after it, as it is
+		}
+	}
+	return b.String()
+}
+
+// texCommands are TeX's commands that begin with one of JSON's escapes
+// (b f n r t).
+var texCommands = func() map[string]bool {
+	m := map[string]bool{}
+	for _, c := range strings.Fields(`frac forall flat frown fbox beta bar bf big bigg bigl bigr biggl biggr bigm binom
+		begin boldsymbol bullet bot bowtie bmod boxed breve backslash because bigcup bigcap bigoplus bigotimes bm
+		nabla neq ne nu not notin neg nexists newline nmid nparallel nsubseteq ncong nsim nleq ngeq nless ngtr
+		nolimits nonumber natural nearrow nwarrow ni right rho rangle rceil rfloor rightarrow rbrace rbrack rvert
+		rVert rm rule rightleftharpoons rightharpoonup theta tau times text textbf textit textrm tfrac tilde to top
+		triangle tan tanh tag therefore textstyle texttt thinspace triangleq tbinom tbinom textsf textnormal`) {
+		m[c] = true
+	}
+	return m
+}()
+
+// word is the letters s begins with.
+func word(s string) string {
+	n := 0
+	for n < len(s) && (s[n] >= 'a' && s[n] <= 'z' || s[n] >= 'A' && s[n] <= 'Z') {
+		n++
+	}
+	return s[:n]
+}
+
+func isHex(s string) bool {
+	for _, c := range s {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
+			return false
+		}
+	}
+	return true
 }
 
 func short(s string) string {

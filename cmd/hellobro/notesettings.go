@@ -68,6 +68,7 @@ func noteSetRows() []noteSet {
 			}
 			return "handwriting (the Hershey script)"
 		}, func(a *bro, w *noteWin, _ int) { w.chooseFont(a) }},
+		{"AI answers", ownShown("ai-format"), stepOwn("ai-format")},
 		{"AI letters' size", ownShown("ai-size"), stepOwn("ai-size")},
 		{"AI usage", func(a *bro, _ *noteWin) string { return a.usageShown() }, func(*bro, *noteWin, int) {}},
 	}
