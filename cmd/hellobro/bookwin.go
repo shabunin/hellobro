@@ -437,6 +437,10 @@ func (w *bookWin) place(a *bro, p kobo.Panel) {
 	w.bar = image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Min.Y+barHeight())
 	if a.barOff(w, w.barKind()) { // the page has all of it: keys, pinches and the page's top for the rest
 		w.bar = image.Rect(in.Min.X, body.Min.Y, in.Max.X, body.Min.Y)
+		if w.selecting { // its button's gone with the bar: in hand, taps and swipes would only cut, never turn
+			w.selecting = false
+			log.Print("pdf: select tool false (no bar)")
+		}
 	}
 	w.area = image.Rect(body.Min.X+mx, w.bar.Max.Y+my, body.Max.X-mx, body.Max.Y-my)
 }

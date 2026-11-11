@@ -796,7 +796,9 @@ corner then has a dot. Drag a dot to move that corner, a side to move
 that side, or the inside to move the whole rectangle; a drag anywhere
 else draws a new one. Or tap a dot (it fills in black) and tap where
 it should be, the corner across staying where it is. Tap the tool
-again, or Esc, to put it down. Under the rectangle:
+again, or Esc, to put it down; full screen without the bar puts it
+down too, so taps turn pages there and a swipe down from the top, or
+two fingers, still get out. Under the rectangle:
 
 - **copy**: its words (whole ones, line by line) into the clipboard,
   which the terminals paste (Ctrl+Shift+V), and its picture, which a

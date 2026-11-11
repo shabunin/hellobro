@@ -380,7 +380,12 @@ func (a *bro) pairUp(g *kobo.Gesture) bool {
 	}
 	// A notebook's finger on its page (or its pages, small) does nothing
 	// till it lifts: a second finger may make it half of a pair.
-	if first.Pen || first.Owner != 0 && first.Owner != ownLeaf && first.Owner != ownNoteOv {
+	if first.Pen {
+		return false
+	}
+	// A PDF's finger that has begun a cut, or moved the page, a moment
+	// before the second came down (the select tool's draws at once) lets go.
+	if first.Owner != 0 && first.Owner != ownLeaf && first.Owner != ownNoteOv && !a.cutLetGo(first) {
 		return false
 	}
 	if a.tv.sel != nil && a.tv.sel.g == first {

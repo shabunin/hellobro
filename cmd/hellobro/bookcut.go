@@ -162,6 +162,8 @@ func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 			w.dropCut()
 			log.Print("pdf: panning")
 			return
+		case !g.Pen && w.selecting && g.Unfulling(p): // down from the top, full screen: it may leave that yet
+			return
 		case (g.Pen || w.selecting) && g.Moved > selStill: // the select tool's finger draws at once, as the pen
 		case g.Pen || w.selecting:
 			return
@@ -221,6 +223,27 @@ func (a *bro) cutLift(g *kobo.Gesture) bool {
 		w.cut = s.orig
 	}
 	w.draw(a)
+	return true
+}
+
+// cutLetGo gives up g, a finger cutting or moving the page, as a second
+// finger makes it half of a pair: the page as it was before it.
+func (a *bro) cutLetGo(g *kobo.Gesture) bool {
+	s := a.bk.cut
+	if s == nil || s.g != g {
+		return false
+	}
+	a.bk.cut = nil
+	w := s.w
+	switch {
+	case s.pan:
+		w.panTo(a, s.panFrom, true)
+	case s.on:
+		if s.resize != 0 {
+			w.cut = s.orig
+		}
+		w.draw(a) // its frame away
+	}
 	return true
 }
 

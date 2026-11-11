@@ -125,7 +125,7 @@ const (
 	EdgeWidth  = 110 // px from the left (light) or right edge where edge swipes start
 	SwipeStart = 40  // px of vertical travel before an edge swipe counts
 	unfullEdge = 120 // px from the top where a swipe down leaves fullscreen
-	unfullMove = 150 // px it takes
+	unfullMove = 100 // px it takes (a flick is about 120)
 )
 
 type calibState struct {
