@@ -405,6 +405,7 @@ type noteWin struct {
 	keepErr    string          // the last write's error, said once
 	clean      image.Rectangle // strokes shown with the fast waveform, its grays not back yet (noteClean)
 	cleanDraw  bool            // a marker among them: drawn again in its gray first
+	diary      *noteDiary      // its diary at work, if it's on (notediary.go)
 
 	p     kobo.Panel
 	bar   image.Rectangle // the tools' strip
@@ -1363,6 +1364,7 @@ func (a *bro) noteInkDone(k *noteInk) {
 		w.clean = w.clean.Union(k.marked)
 		w.cleanDraw = w.cleanDraw || k.s.gray != kobo.Black // in its own gray, a marker under the ink
 		a.nt.liftAt = time.Now()
+		w.diaryWrote(k.page)
 	}
 	if k.erase && a.shows(w) {
 		w.drawBar(a) // undo can now
@@ -1496,6 +1498,7 @@ func (a *bro) noteTick() {
 		return
 	}
 	a.noteClean()
+	a.diaryTick()
 	for _, w := range a.noteWins() {
 		if !w.changed.IsZero() && time.Since(w.changed) > noteKeepAfter {
 			w.keep(a)

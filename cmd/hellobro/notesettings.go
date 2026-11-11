@@ -16,19 +16,19 @@ import (
 // noteSet is one of its rows: what it says, and a step on.
 type noteSet struct {
 	label string
-	value func(a *bro) string
-	step  func(a *bro, d int)
+	value func(a *bro, w *noteWin) string
+	step  func(a *bro, w *noteWin, d int)
 }
 
 // stepOwn steps a notebook's setting kept with the app's (settings.go),
 // d on.
-func stepOwn(key string) func(a *bro, d int) {
-	return func(a *bro, d int) { a.stepSetting(settingIndex(key), d) }
+func stepOwn(key string) func(a *bro, w *noteWin, d int) {
+	return func(a *bro, _ *noteWin, d int) { a.stepSetting(settingIndex(key), d) }
 }
 
 // ownShown is how setting key says its value.
-func ownShown(key string) func(a *bro) string {
-	return func(a *bro) string {
+func ownShown(key string) func(a *bro, w *noteWin) string {
+	return func(a *bro, _ *noteWin) string {
 		st := settingList[settingIndex(key)]
 		return st.shown[a.set[key]]
 	}
@@ -39,7 +39,8 @@ var noteSettings = []noteSet{
 	{"Pen buttons", ownShown("pen-buttons"), stepOwn("pen-buttons")},
 	{"Export", ownShown("note-export"), stepOwn("note-export")},
 	{"Light by the left edge", ownShown("note-light"), stepOwn("note-light")},
-	{"Bar, fullscreen", func(a *bro) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ int) { a.flipFullBar("note") }},
+	{"Bar, fullscreen", func(a *bro, _ *noteWin) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ *noteWin, _ int) { a.flipFullBar("note") }},
+	{"AI diary (this notebook)", func(a *bro, w *noteWin) string { return onOff(w.nb.diaryOn()) }, func(a *bro, w *noteWin, _ int) { w.flipDiary(a) }},
 }
 
 // settingsOn shows the settings, or the page again.
@@ -75,7 +76,7 @@ func (w *noteWin) drawSettings(a *bro) {
 		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X-boxW, r.Max.Y), s.label, kobo.Black, kobo.AlignLeft)
 		b := image.Rect(r.Max.X-boxW, r.Min.Y, r.Max.X, r.Max.Y)
 		c.Frame(b, 2, kobo.Black)
-		c.Text(a.F.Small, b.Inset(8), kobo.Fit(a.F.Small, s.value(a), b.Dx()-16), kobo.Black, kobo.AlignCenter)
+		c.Text(a.F.Small, b.Inset(8), kobo.Fit(a.F.Small, s.value(a, w), b.Dx()-16), kobo.Black, kobo.AlignCenter)
 		w.setRows = append(w.setRows, bookRow{b, func() { w.setSel = i; w.setStep(a, 1) }})
 	}
 	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "the pen always writes; the paper is a tool on the bar, each notebook its own", kobo.Mid, kobo.AlignLeft)
@@ -87,7 +88,7 @@ func (w *noteWin) setStep(a *bro, d int) {
 		w.settingsOn(a, false)
 		return
 	}
-	noteSettings[w.setSel].step(a, d)
+	noteSettings[w.setSel].step(a, w, d)
 	w.drawSettings(a)
 	a.Mark(w.p.Body, true)
 }

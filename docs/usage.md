@@ -930,7 +930,7 @@ width, its gray.
   (below), **Pen buttons** (above), **Export** (below), **Light by
   the left edge** (on: a finger up or down it sets the light, full
   screen too; off: full screen, a finger there is the page's), **Bar,
-  fullscreen** (below): a tap on a
+  fullscreen** (below), **AI diary (this notebook)** (below): a tap on a
   value, or ↑ ↓ and Enter, ← →, steps it. They're the notebooks' own:
   the app's Settings don't have them.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
@@ -1036,6 +1036,36 @@ width, its gray.
   here; if it has, the computer's file is left be and this one is kept
   beside it as `NAME (Kobo).xopp`, to be put together there. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
+
+### The AI diary
+
+A notebook can answer what's written in it, as Tom Riddle's diary did.
+Turn **AI diary (this notebook)** on in its settings (each notebook
+its own; it's kept in the file). Write, and rest the pen: after about
+3 seconds what's been written since the diary's last answer goes to a
+language model as a picture. If it reads as finished (it ends with a
+question mark, a full stop or an exclamation mark) the answer is
+written under it by hand, a word at a time; if not, it waits for
+more, and writing on sends it all again. A full page goes on on the
+next one if it's empty, else on one put in after it, and the pages
+turn with it. The answer is one step to undo. Its strokes are marked
+as the diary's in the `.xopp`: what's under its last answer on a page
+is what's asked next. It remembers the talk while the notebook is
+open. `x^2`, `e^(i pi)`, `2^{10}` are written as powers.
+
+The model is reached over [OpenCode Go](https://opencode.ai)'s API
+with your key, from `ai.conf` in the app's folder
+(`/mnt/onboard/.adds/hellobro/`), read on each question:
+
+```
+key = YOUR_KEY
+model = claude-haiku-5-5   # the default; one that reads pictures
+```
+
+`base = URL` points it at another API that speaks Anthropic's messages
+or OpenAI's chat completions (models whose names start with `claude-`,
+`qwen3.` or `minimax-m3` go by Anthropic's, the rest by OpenAI's).
+Without Wi-Fi it says why, and waits for the next thing written.
 
 ### ":" commands in a notebook
 
