@@ -29,6 +29,7 @@ type Mail struct {
 	read    layout.Scroll
 	cur     int  // the message read; -1: none
 	reading bool // narrow: the message shows, not the list
+	narrow  bool // as last laid out
 
 	back, reply, flag, archive, del, compose widget.Clickable
 
@@ -120,7 +121,7 @@ func (m *Mail) Esc() bool {
 	switch {
 	case m.composing:
 		m.composing = false
-	case m.reading:
+	case m.reading && m.narrow:
 		m.reading = false
 	default:
 		return false
@@ -129,7 +130,7 @@ func (m *Mail) Esc() bool {
 }
 
 func (m *Mail) scroller() layout.Scroller {
-	if m.reading {
+	if m.reading && m.narrow {
 		return &m.read
 	}
 	return &m.list
@@ -251,6 +252,7 @@ func (m *Mail) Layout(gtx ink.Ctx, g *Gallery) ink.Dims {
 	}
 	w := gtx.Constraints.Max.X
 	wide, narrow := w >= gtx.Dp(1100), w < gtx.Dp(700)
+	m.narrow = narrow
 	rule := func(gtx ink.Ctx) ink.Dims {
 		h := gtx.Constraints.Max.Y
 		ink.Fill(gtx.Ops, image.Rect(0, 0, max(gtx.Dp(th.Border), 1), h), th.Fg)

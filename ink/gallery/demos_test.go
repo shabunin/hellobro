@@ -91,6 +91,10 @@ func TestMail(t *testing.T) {
 				t.Errorf("found %v", is)
 			}
 			save(t, it, name+"-mail-search")
+			it.Key("Esc", 0) // the search's
+			if !it.Key("Esc", 0) || !g.Quit {
+				t.Error("Esc didn't quit")
+			}
 		})
 	}
 }

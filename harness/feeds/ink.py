@@ -34,7 +34,7 @@ tap(1074, Y + 439); time.sleep(2)                      # Page size: open
 tap(1074, Y + 681); time.sleep(2)                      # an option
 tab(4); time.sleep(2)                                  # Scroll
 drag((700, Y + 700), (700, Y + 300)); time.sleep(1)    # the text up, slowly
-stroke([(900 - 40 * i, Y + 1300 - 25 * i) for i in range(10)]); time.sleep(3)  # the map flicked: it coasts
+stroke([(900 - 40 * i, Y + 1000 - 25 * i) for i in range(10)]); time.sleep(3)  # the map flicked: it coasts
 tab(3); time.sleep(2)                                  # Lists: under the finger
 drag((700, Y + 1300), (700, Y + 500)); time.sleep(1)
 tab(8); time.sleep(2)                                  # Draw
