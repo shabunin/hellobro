@@ -147,7 +147,7 @@ func (u *launchUI) grid(gtx ink.Ctx, gs []launchGroup, ns []int, tiles []launchT
 			cg.Constraints = ink.Exact(r.Size())
 			tl, clk := tiles[i], &u.tiles[i]
 			clk.Layout(cg, func(gtx ink.Ctx) ink.Dims {
-				return u.tile(gtx, tl, i == m.lit || clk.Pressed(), compact)
+				return inkTile(gtx, th, tl, i == m.lit || clk.Pressed(), compact)
 			})
 			st.Pop()
 		}
@@ -155,10 +155,9 @@ func (u *launchUI) grid(gtx ink.Ctx, gs []launchGroup, ns []int, tiles []launchT
 	})
 }
 
-// tile is one, as big as it's given: its icon, its name, a word on it,
-// its number; lit, black.
-func (u *launchUI) tile(gtx ink.Ctx, tl launchTile, lit, compact bool) ink.Dims {
-	th := u.a.theme()
+// inkTile is a tile, as big as it's given: its icon, its name, a word
+// on it, its number; lit, black. The launcher's and the quick menu's.
+func inkTile(gtx ink.Ctx, th *theme.Theme, tl launchTile, lit, compact bool) ink.Dims {
 	size := gtx.Constraints.Min
 	r := image.Rectangle{Max: size}
 	fg, bg, quiet := th.Fg, th.Bg, th.Quiet

@@ -2,7 +2,7 @@ package main
 
 // A card over the page, in ink: a question (ask.go), facts or a cheat
 // sheet (info.go), a command's new key (keyset.go), the switcher and the
-// menus of rows (picker.go). It's a pane of its own in the middle of what the
+// menus, of rows or tiles, and the workspaces (picker.go). It's a pane of its own in the middle of what the
 // keyboard leaves, as tall as its UI says it wants (laid out once to
 // know, then placed). What a frame picked (an answer, close) is done
 // after the frame, by its take: the page drawn again under a frame still
@@ -42,7 +42,7 @@ func (a *bro) over() *inkOver {
 	case a.keyset != nil:
 		return a.keyset.over
 	case a.picker != nil:
-		return a.picker.over // nil for tiles, still drawn as they were
+		return a.picker.over
 	}
 	return nil
 }

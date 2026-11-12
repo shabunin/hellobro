@@ -128,9 +128,9 @@ func (a *bro) openWorkspaces() {
 		var drawn uint64
 		var armed bool
 		e := pickEntry{kind: "workspace", title: "Workspace " + ws.Name, detail: count,
-			paint: func(r image.Rectangle) {
+			paint: func(c kobo.Canvas, r image.Rectangle) {
 				drawn, armed = a.wsSum(ws), a.wsArmedFor(ws)
-				a.drawWorkspaceTile(r, ws, count, cur, n > 0, armed)
+				a.drawWorkspaceTile(c, r, ws, count, cur, n > 0, armed)
 			},
 			changed: func() bool { return a.wsSum(ws) != drawn || a.wsArmedFor(ws) != armed },
 			do:      func() { a.wmRun("workspace " + strconv.Quote(ws.Name)) }}
@@ -140,7 +140,7 @@ func (a *bro) openWorkspaces() {
 		es = append(es, e)
 	}
 	es = append(es, pickEntry{kind: "workspace", title: "New workspace", detail: "+",
-		paint: func(r image.Rectangle) { a.drawNewTile(r) }, do: a.newWorkspace})
+		paint: a.drawNewTile, do: a.newWorkspace})
 	p := &picker{all: es, // no title nor hint: the tiles have the whole screen; the keys are in the docs
 		tiles: 1, wide: true, keysOnly: true, refresh: a.drawThumbs}
 	p.key = func(ch string) {
@@ -198,8 +198,7 @@ func freeWorkspace(names []string) string {
 // drawWorkspaceTile draws ws in r: its name and count over its windows,
 // small, where they are; the one shown in a thicker frame. With
 // windows it has a × (closable); armed, the × was tapped once.
-func (a *bro) drawWorkspaceTile(r image.Rectangle, ws *wm.Node, count string, cur, closable, armed bool) {
-	c := a.C
+func (a *bro) drawWorkspaceTile(c kobo.Canvas, r image.Rectangle, ws *wm.Node, count string, cur, closable, armed bool) {
 	c.Fill(r, kobo.White)
 	head := image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+wsHeadH)
 	c.Fill(head, kobo.Black)
@@ -219,13 +218,13 @@ func (a *bro) drawWorkspaceTile(r image.Rectangle, ws *wm.Node, count string, cu
 	c.Text(a.F.Small, note, count, kobo.Light, kobo.AlignRight)
 	body := image.Rect(r.Min.X, head.Max.Y, r.Max.X, r.Max.Y)
 	k := float64(body.Dx()) / float64(max(1, a.wm.area.Dx()))
-	a.miniSplit(ws, body)
+	a.miniSplit(c, ws, body)
 	for _, f := range ws.Floating { // over the tiled ones, where they float
 		fr := f.FloatRect.Sub(a.wm.area.Min)
 		box := image.Rect(body.Min.X+int(float64(fr.Min.X)*k), body.Min.Y+int(float64(fr.Min.Y)*k),
 			body.Min.X+int(float64(fr.Max.X)*k), body.Min.Y+int(float64(fr.Max.Y)*k)).Intersect(body)
 		c.Fill(box, kobo.White)
-		a.miniSplit(f, box)
+		a.miniSplit(c, f, box)
 	}
 	if len(ws.Nodes) == 0 && len(ws.Floating) == 0 {
 		c.Text(a.F.Small, body, "empty", kobo.Mid, kobo.AlignCenter)
@@ -240,8 +239,7 @@ func (a *bro) drawWorkspaceTile(r image.Rectangle, ws *wm.Node, count string, cu
 // miniSplit lays n's children in r as the tree would: side by side or
 // one over another by their shares, or (tabbed, stacked) the one in
 // front; a window is a box with its title.
-func (a *bro) miniSplit(n *wm.Node, r image.Rectangle) {
-	c := a.C
+func (a *bro) miniSplit(c kobo.Canvas, n *wm.Node, r image.Rectangle) {
 	if n.Leaf() {
 		box := r.Inset(3)
 		c.Frame(box, 2, kobo.Black)
@@ -265,7 +263,7 @@ func (a *bro) miniSplit(n *wm.Node, r image.Rectangle) {
 		if len(n.Focus) > 0 && n.Focus[0].Parent == n {
 			front = n.Focus[0] // the one focused last
 		}
-		a.miniSplit(front, r)
+		a.miniSplit(c, front, r)
 		return
 	}
 	total := r.Dx()
@@ -287,13 +285,12 @@ func (a *bro) miniSplit(n *wm.Node, r image.Rectangle) {
 			cr = image.Rect(r.Min.X, r.Min.Y+at, r.Max.X, r.Min.Y+at+size)
 		}
 		at += size
-		a.miniSplit(ch, cr)
+		a.miniSplit(c, ch, cr)
 	}
 }
 
 // drawNewTile is the tile for a new workspace: a big +.
-func (a *bro) drawNewTile(r image.Rectangle) {
-	c := a.C
+func (a *bro) drawNewTile(c kobo.Canvas, r image.Rectangle) {
 	c.Fill(r, kobo.White)
 	c.Frame(r, 2, kobo.Black)
 	m := image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2-20)

@@ -25,13 +25,13 @@ var pickRowH = 58 // sizes.go: taller for fingers
 
 type pickEntry struct {
 	kind, title, detail string
-	icon                string                  // appIcon's, for a menu of tiles
-	on                  bool                    // a tile for what's on now: dark
-	stay                bool                    // picked, the menu stays (a tick)
-	hold                func()                  // a finger held on its tile: its settings, say
-	close               func()                  // its tile's × tapped (tileClose): a workspace's
-	paint               func(r image.Rectangle) // draws its tile, for one that isn't an icon's
-	changed             func() bool             // its tile would be drawn otherwise now (paint's)
+	icon                string                                 // appIcon's, for a menu of tiles
+	on                  bool                                   // a tile for what's on now: dark
+	stay                bool                                   // picked, the menu stays (a tick)
+	hold                func()                                 // a finger held on its tile: its settings, say
+	close               func()                                 // its tile's × tapped (tileClose): a workspace's
+	paint               func(c kobo.Canvas, r image.Rectangle) // draws its tile, for one that isn't an icon's
+	changed             func() bool                            // its tile would be drawn otherwise now (paint's)
 	current             bool
 	do                  func()
 	score               int
@@ -42,34 +42,19 @@ type picker struct {
 	all, shown  []pickEntry
 	extra       func(query string) *pickEntry // an entry made of what's typed, or nil
 	query       string
-	sel, top    int
-	box         image.Rectangle // fixed while it's up, so narrowing leaves nothing behind
-	rows        []image.Rectangle
+	sel         int
+	box         image.Rectangle    // fixed while it's up, so narrowing leaves nothing behind
 	tiles       int                // a menu of tiles, this many across (0: rows)
-	tileW       int                // their width (0: the box's, shared)
 	tileH       int                // their height (0: pickTileH's)
-	wide        bool               // the whole screen, tiles as it is: the workspaces'
+	wide        bool               // the whole screen, tiles as it is (wideTiles): the workspaces'
 	keysOnly    bool               // no line to type in: a key typed is key's
 	key         func(ch string)    // what a key typed does, keysOnly
 	refresh     func()             // before the tiles are asked whether they changed
 	entries     func() []pickEntry // all anew, when what they show may have changed (againPicker)
 	lookedAt    time.Time          // the tiles last asked whether they changed
-	held        *kobo.Gesture      // a finger down on a tile with a hold, at heldN
-	heldN       int
-	ui          *pickerUI // a menu of rows, in ink (tiles: nil, drawn as they were)
+	ui          *pickerUI
 	over        *inkOver
 	drawn       bool // all of it drawn once: then only what changes
-}
-
-// chrome is the height of p's title, line and margins: what isn't rows.
-func (p *picker) chrome() int {
-	if p.title == "" {
-		return 46
-	}
-	if p.keysOnly {
-		return 86
-	}
-	return 152
 }
 
 // tileHeight is a tile's height in p.
@@ -150,6 +135,9 @@ func (a *bro) showPicker(p *picker) {
 	if a.picker != nil && a.picker.wide && !p.wide { // the bar back first: this one leaves it be
 		a.unpick()
 	}
+	if a.picker != nil && a.picker.over != nil { // in its place
+		a.picker.over.gone()
+	}
 	b := a.screenFree()
 	w := min(1100, b.Dx()-80)
 	n := len(p.all)
@@ -158,29 +146,24 @@ func (a *bro) showPicker(p *picker) {
 	}
 	h := 136 + min(max(1, n), pickRowsMax)*pickRowH + 16
 	top := b.Min.Y + max(40, b.Dy()/8)
-	if p.wide { // the whole screen: as many across as makes them biggest
+	switch {
+	case p.wide: // the whole screen: as many across as makes them biggest (wideTiles)
 		p.box = b
 		a.Covered = true // the bar's not drawn over it
-		p.tiles, p.tileW, p.tileH = wideTiles(n, b.Dx()-40, b.Dy()-p.chrome()-16, a.wm.area)
-		a.picker = p
-		a.filterPicker()
-		a.drawPicker()
-		return
-	}
-	if p.tiles > 0 {
+	case p.tiles > 0:
 		p.tiles = max(2, min(3, w/340))
 		h = 136 + (n+p.tiles-1)/p.tiles*(p.tileHeight()+12) + 16
 	}
-	h = min(h, b.Max.Y-40-top)
-	p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
-	if p.tiles == 0 {
-		p.ui = newPickerUI(a, p)
-		p.over = newOver(p.ui.Layout, w)
-		p.over.at = p.box
-		p.over.take = func() {
-			if n, ok := p.ui.picked(); ok && a.picker == p {
-				a.pick(n)
-			}
+	if !p.wide {
+		h = min(h, b.Max.Y-40-top)
+		p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
+	}
+	p.ui = newPickerUI(a, p)
+	p.over = newOver(p.ui.Layout, w)
+	p.over.at = p.box
+	p.over.take = func() {
+		if a.picker == p {
+			p.ui.take()
 		}
 	}
 	a.picker = p
@@ -225,12 +208,11 @@ func (a *bro) pick(n int) {
 	if e.stay {
 		e.do()
 		if a.picker == p { // its entries anew, the same lit
-			top := p.top
 			if p.entries != nil {
 				p.all = p.entries()
 			}
 			a.filterPicker()
-			p.sel, p.top = n, top
+			p.sel = n
 			a.drawPicker()
 		}
 		return
@@ -301,7 +283,7 @@ func (a *bro) filterPicker() {
 			p.shown = append(p.shown, *e)
 		}
 	}
-	p.sel, p.top = 0, 0
+	p.sel = 0
 	if p.query == "" {
 		for i, e := range p.shown {
 			if e.current && e.kind == "session" {
@@ -348,125 +330,14 @@ func fuzzy(q, text string) int {
 }
 
 func (a *bro) drawPicker() {
-	p, c := a.picker, a.C
-	if o := p.over; o != nil { // in ink: all of it the first time, then what changed
-		if !p.drawn {
-			p.drawn = true
-			a.drawOver(o)
-			return
-		}
-		o.pane.Win.Invalidate()
-		a.overTick()
+	p := a.picker
+	if !p.drawn { // all of it the first time, then what changed
+		p.drawn = true
+		a.drawOver(p.over)
 		return
 	}
-	rows := (p.box.Dy() - p.chrome()) / pickRowH
-	if p.tiles > 0 {
-		rows = (p.box.Dy() - p.chrome()) / (p.tileHeight() + 12) * p.tiles
-	}
-	step := max(1, p.tiles) // tiles scroll by rows of them
-	rows = max(step, rows-rows%step)
-	if p.sel < p.top {
-		p.top = p.sel - p.sel%step
-	}
-	if p.sel >= p.top+rows {
-		p.top = p.sel - p.sel%step - rows + step
-	}
-	c.Fill(p.box, kobo.White)
-	c.Frame(p.box, 4, kobo.Black)
-	head := image.Rect(p.box.Min.X+24, p.box.Min.Y+10, p.box.Max.X-24, p.box.Min.Y+60)
-	if p.title == "" { // none: the tiles from the top
-		head.Max.Y = p.box.Min.Y + 20
-	} else {
-		c.Text(a.F.Panel, head, p.title, kobo.Black, kobo.AlignLeft)
-		keys := "type to narrow · ↑ ↓ Enter · Esc closes"
-		switch {
-		case p.keysOnly:
-			keys = p.hint
-		case p.tiles > 0:
-			keys = "tap one, or the arrows and Enter · Esc closes"
-		}
-		c.Text(a.F.Small, head, keys, kobo.Dark, kobo.AlignRight)
-	}
-	in := image.Rect(p.box.Min.X+20, head.Max.Y-4, p.box.Max.X-20, head.Max.Y-4)
-	if !p.keysOnly {
-		in = image.Rect(p.box.Min.X+20, head.Max.Y+6, p.box.Max.X-20, head.Max.Y+64)
-		c.Frame(in, 2, kobo.Black)
-		q := "› " + p.query
-		tr := in.Inset(4)
-		tr.Min.X += 12
-		c.Text(a.F.Body, tr, q, kobo.Black, kobo.AlignLeft)
-		cx := tr.Min.X + kobo.TextWidth(a.F.Body, q) + 3
-		c.Fill(image.Rect(cx, in.Min.Y+12, cx+3, in.Max.Y-12), kobo.Black) // the cursor
-		if p.query == "" {
-			c.Text(a.F.Small, tr, p.hint, kobo.Mid, kobo.AlignRight)
-		}
-	}
-
-	p.rows = p.rows[:0]
-	y := in.Max.Y + 10
-	if len(p.shown) == 0 {
-		c.Text(a.F.Body, image.Rect(in.Min.X+16, y, in.Max.X, y+pickRowH), "nothing matches", kobo.Dark, kobo.AlignLeft)
-	}
-	if p.tiles > 0 {
-		tw := (in.Dx() - (p.tiles-1)*12) / p.tiles
-		left := in.Min.X
-		if p.tileW > 0 { // narrower: centered
-			tw = p.tileW
-			left += (in.Dx() - p.tiles*tw - (p.tiles-1)*12) / 2
-		}
-		for n := p.top; n < min(len(p.shown), p.top+rows); n++ {
-			e, i := p.shown[n], n-p.top
-			x, ty := left+i%p.tiles*(tw+12), y+i/p.tiles*(p.tileHeight()+12)
-			r := image.Rect(x, ty, x+tw, ty+p.tileHeight())
-			p.rows = append(p.rows, r)
-			num := 0
-			if p.query == "" && n < 9 {
-				num = n + 1
-			}
-			if e.paint != nil {
-				e.paint(r)
-			} else {
-				a.drawTile(r, launchTile{name: e.title, note: e.detail, icon: e.icon, num: num}, e.on, false)
-			}
-			if n == p.sel { // the keys' choice: ringed, as dark is on
-				a.C.Frame(r.Inset(-6), 4, kobo.Black)
-			}
-		}
-		a.Mark(p.box, true)
-		return
-	}
-	for n := p.top; n < min(len(p.shown), p.top+rows); n++ {
-		e := p.shown[n]
-		r := image.Rect(p.box.Min.X+12, y, p.box.Max.X-12, y+pickRowH)
-		y += pickRowH
-		p.rows = append(p.rows, r)
-		fg, dim := uint8(kobo.Black), uint8(kobo.Dark)
-		if n == p.sel {
-			c.Fill(r, kobo.Black)
-			fg, dim = kobo.White, kobo.Light
-		}
-		text := r.Inset(4)
-		text.Min.X += 12
-		if p.query == "" && p.extra == nil && n < 9 {
-			c.Text(a.F.Panel, image.Rect(text.Min.X, text.Min.Y, text.Min.X+40, text.Max.Y), strconv.Itoa(n+1), fg, kobo.AlignLeft)
-		}
-		text.Min.X += 48
-		kw := 110
-		c.Text(a.F.Small, image.Rect(text.Max.X-kw, text.Min.Y, text.Max.X, text.Max.Y), e.kind, dim, kobo.AlignRight)
-		text.Max.X -= kw + 16
-		title := e.title
-		if e.current {
-			title += "  ●"
-		}
-		f := a.F.Body
-		if kobo.IsBig() {
-			f = a.F.Tab
-		}
-		c.Text(f, text, title, fg, kobo.AlignLeft)
-		text.Min.X += kobo.TextWidth(f, title) + 28
-		c.Text(a.F.Small, text, e.detail, dim, kobo.AlignLeft)
-	}
-	a.Mark(p.box, true)
+	p.over.pane.Win.Invalidate()
+	a.overTick()
 }
 
 // pickerKey takes every key while the menu is up.
@@ -522,67 +393,11 @@ func (a *bro) pickerKey(code uint16, value int32) {
 	a.drawPicker()
 }
 
-// pickerTap goes to the row tapped; a tap outside closes. (A menu in ink
-// takes its own taps: only one outside comes here.)
+// pickerTap closes the menu, tapped outside it: the card takes its
+// own taps, only one outside comes here.
 func (a *bro) pickerTap(pt image.Point) {
-	if a.picker.over != nil {
-		if !pt.In(a.picker.box) {
-			a.closePicker()
-		}
-		return
-	}
-	for n, r := range a.picker.rows {
-		if e := a.picker.shown[a.picker.top+n]; e.close != nil && pt.In(tileClose(r)) {
-			e.close()
-			return
-		}
-		if pt.In(r) {
-			a.pick(a.picker.top + n)
-			return
-		}
-	}
 	if !pt.In(a.picker.box) {
 		a.closePicker()
-	}
-}
-
-// pickHold is how long a finger stays on a tile for its hold: less
-// than a tap may last, so the gesture is told it's no tap.
-const pickHold = 600 * time.Millisecond
-
-// pickerDown notes a finger put down on an entry that has a hold.
-func (a *bro) pickerDown(pt image.Point, g *kobo.Gesture) {
-	p := a.picker
-	if p == nil {
-		return
-	}
-	p.held = nil
-	for i, r := range p.rows {
-		if n := p.top + i; pt.In(r) && n < len(p.shown) && p.shown[n].hold != nil {
-			p.held, p.heldN = g, n
-		}
-	}
-}
-
-// pickerHeld runs the hold of the entry a finger's stayed on, still.
-func (a *bro) pickerHeld() {
-	p := a.picker
-	if p == nil || p.held == nil {
-		return
-	}
-	g := p.held
-	switch {
-	case g.Dur != 0 || g.Moved >= 30: // lifted, or it's a swipe
-		p.held = nil
-	case time.Since(g.At) >= pickHold:
-		p.held = nil
-		g.Ignored = "held on a tile" // no tap when it lifts
-		if p.heldN >= len(p.shown) || p.shown[p.heldN].hold == nil {
-			return // the menu narrowed, typed to, under the finger
-		}
-		e := p.shown[p.heldN]
-		a.unpick()
-		e.hold()
 	}
 }
 
@@ -601,15 +416,14 @@ func (a *bro) againPicker() {
 	}) {
 		return
 	}
-	sel, top := p.sel, p.top
+	sel := p.sel
 	p.all = es
 	a.filterPicker()
-	p.sel, p.top = min(sel, max(0, len(p.shown)-1)), top
+	p.sel = min(sel, max(0, len(p.shown)-1))
 	a.drawPicker()
 }
 
 func (a *bro) pickerTick() {
-	a.pickerHeld()
 	p := a.picker
 	if p == nil || p.tiles == 0 || time.Since(p.lookedAt) < 3*time.Second || a.Blitting() {
 		return
@@ -624,17 +438,14 @@ func (a *bro) pickerTick() {
 // repaintTiles draws again the tiles whose paint would differ now.
 func (a *bro) repaintTiles() {
 	p := a.picker
-	for i, r := range p.rows {
-		n := p.top + i
-		if n >= len(p.shown) {
-			break
+	again := false
+	for _, e := range p.shown {
+		if e.changed != nil && e.paint != nil && e.changed() {
+			delete(p.ui.painted, e.title)
+			again = true
 		}
-		if e := p.shown[n]; e.changed != nil && e.paint != nil && e.changed() {
-			e.paint(r)
-			if n == p.sel {
-				a.C.Frame(r.Inset(-6), 4, kobo.Black)
-			}
-			a.Mark(r.Inset(-6), true)
-		}
+	}
+	if again {
+		p.over.pane.Win.Invalidate()
 	}
 }
