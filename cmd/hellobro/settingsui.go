@@ -109,7 +109,8 @@ func withHelp(th *theme.Theme, row ink.Widget, help string) ink.Widget {
 		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 			layout.Rigid(row),
 			layout.Rigid(func(gtx ink.Ctx) ink.Dims {
-				return layout.Inset{Left: th.Pad * 1.5, Right: th.Pad * 1.5, Bottom: th.Pad}.Layout(gtx, theme.Small(th, help).Layout)
+				// Top: clear of a focus ring round the row.
+				return layout.Inset{Top: th.Pad / 2, Left: th.Pad * 1.5, Right: th.Pad * 1.5, Bottom: th.Pad}.Layout(gtx, theme.Small(th, help).Layout)
 			}))
 	}
 }
