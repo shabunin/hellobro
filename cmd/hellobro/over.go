@@ -1,7 +1,8 @@
 package main
 
 // A card over the page, in ink: a question (ask.go), facts or a cheat
-// sheet (info.go), a command's new key (keyset.go). It's a pane of its own in the middle of what the
+// sheet (info.go), a command's new key (keyset.go), the switcher and the
+// menus of rows (picker.go). It's a pane of its own in the middle of what the
 // keyboard leaves, as tall as its UI says it wants (laid out once to
 // know, then placed). What a frame picked (an answer, close) is done
 // after the frame, by its take: the page drawn again under a frame still
@@ -23,6 +24,7 @@ type inkOver struct {
 	w    int             // its width at the Elipsa's density, as wide as the screen lets it be
 	h    int             // the height its UI wants, as laid out last; 0: as tall as it may be
 	tall bool            // as tall as it may be, always (a sheet)
+	at   image.Rectangle // where it goes, if it says (the switcher's), not in the middle
 	take func()          // after a frame: what it picked, done
 }
 
@@ -39,12 +41,19 @@ func (a *bro) over() *inkOver {
 		return a.info.over
 	case a.keyset != nil:
 		return a.keyset.over
+	case a.picker != nil:
+		return a.picker.over // nil for tiles, still drawn as they were
 	}
 	return nil
 }
 
-// place puts o in the middle of what the keyboard leaves.
+// place puts o in the middle of what the keyboard leaves, or at its at.
 func (o *inkOver) place(a *bro) {
+	if !o.at.Empty() {
+		o.box = o.at
+		o.pane.Place(o.box)
+		return
+	}
 	b := a.screenFree()
 	w := min(int(float32(o.w)*inkkobo.Metric().PxPerDp/1.42), b.Dx()-80)
 	h := o.h

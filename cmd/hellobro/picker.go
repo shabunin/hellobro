@@ -56,6 +56,9 @@ type picker struct {
 	lookedAt    time.Time          // the tiles last asked whether they changed
 	held        *kobo.Gesture      // a finger down on a tile with a hold, at heldN
 	heldN       int
+	ui          *pickerUI // a menu of rows, in ink (tiles: nil, drawn as they were)
+	over        *inkOver
+	drawn       bool // all of it drawn once: then only what changes
 }
 
 // chrome is the height of p's title, line and margins: what isn't rows.
@@ -170,6 +173,16 @@ func (a *bro) showPicker(p *picker) {
 	}
 	h = min(h, b.Max.Y-40-top)
 	p.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
+	if p.tiles == 0 {
+		p.ui = newPickerUI(a, p)
+		p.over = newOver(p.ui.Layout, w)
+		p.over.at = p.box
+		p.over.take = func() {
+			if n, ok := p.ui.picked(); ok && a.picker == p {
+				a.pick(n)
+			}
+		}
+	}
 	a.picker = p
 	a.filterPicker()
 	a.drawPicker()
@@ -230,6 +243,9 @@ func (a *bro) pick(n int) {
 // for one over the whole screen (the workspaces') the bar too.
 func (a *bro) unpick() {
 	wide := a.picker != nil && a.picker.wide
+	if a.picker != nil && a.picker.over != nil {
+		a.picker.over.gone()
+	}
 	a.picker = nil
 	if wide {
 		a.Covered = false
@@ -333,6 +349,16 @@ func fuzzy(q, text string) int {
 
 func (a *bro) drawPicker() {
 	p, c := a.picker, a.C
+	if o := p.over; o != nil { // in ink: all of it the first time, then what changed
+		if !p.drawn {
+			p.drawn = true
+			a.drawOver(o)
+			return
+		}
+		o.pane.Win.Invalidate()
+		a.overTick()
+		return
+	}
 	rows := (p.box.Dy() - p.chrome()) / pickRowH
 	if p.tiles > 0 {
 		rows = (p.box.Dy() - p.chrome()) / (p.tileHeight() + 12) * p.tiles
@@ -496,8 +522,15 @@ func (a *bro) pickerKey(code uint16, value int32) {
 	a.drawPicker()
 }
 
-// pickerTap goes to the row tapped; a tap outside closes.
+// pickerTap goes to the row tapped; a tap outside closes. (A menu in ink
+// takes its own taps: only one outside comes here.)
 func (a *bro) pickerTap(pt image.Point) {
+	if a.picker.over != nil {
+		if !pt.In(a.picker.box) {
+			a.closePicker()
+		}
+		return
+	}
 	for n, r := range a.picker.rows {
 		if e := a.picker.shown[a.picker.top+n]; e.close != nil && pt.In(tileClose(r)) {
 			e.close()
