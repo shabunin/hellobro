@@ -24,9 +24,9 @@ flick(W // 2, 30); time.sleep(2)                     # shown
 tap(*barbtn(3)); time.sleep(3)                       # the select tool
 x0, y0, x1, y1 = 120, int(H * 0.25), W - 200, int(H * 0.40)
 stroke([(x0 + (x1 - x0) * i // 20, y0 + (y1 - y0) * i // 20) for i in range(21)]); time.sleep(5)
-bx = x1 - (150 + 150 + 74)                           # copy, save, × under it
-tap(bx + 70, y1 + 42); time.sleep(4)                 # copy
-tap(bx + 220, y1 + 42); time.sleep(4)                # save
+bx = x1 - (168 + 168 + 88)                           # copy, save, × under it
+tap(bx + 78, y1 + 50); time.sleep(4)                 # copy
+tap(bx + 246, y1 + 50); time.sleep(4)                # save
 tid[0] += 1; a = tid[0]                              # two fingers down from the top
 frame(0, ID=a, TOOL=0, **at(W // 2 - 150, 40), P=30); time.sleep(0.02)
 tid[0] += 1; b = tid[0]

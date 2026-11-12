@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from feedlib import *
 
 def buttons(x1, y1):                       # where drawCut puts copy, save, zoom, × under a cut
-    x0 = x1 - (150 + 150 + 150 + 74)
-    return (x0 + 70, y1 + 42), (x0 + 220, y1 + 42), (x0 + 370, y1 + 42), (x0 + 482, y1 + 42)
+    x0 = x1 - (168 + 168 + 168 + 88)     # compact: 156 wide (× 76), 76 tall, 12 apart
+    return (x0 + 78, y1 + 50), (x0 + 246, y1 + 50), (x0 + 414, y1 + 50), (x0 + 542, y1 + 50)
 
 start()
 gui("books"); time.sleep(4)

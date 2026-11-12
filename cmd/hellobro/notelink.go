@@ -74,6 +74,7 @@ func loadAnchors() []noteAnchor {
 	if b, err := os.ReadFile(kobo.AppFile(marksFile)); err == nil {
 		json.Unmarshal(b, &as)
 	}
+	anchorsKnown(as)
 	return as
 }
 
@@ -82,13 +83,47 @@ func saveAnchors(as []noteAnchor) error {
 	if err != nil {
 		return err
 	}
-	return writeAtomic(kobo.AppFile(marksFile), b)
+	if err := writeAtomic(kobo.AppFile(marksFile), b); err != nil {
+		return err
+	}
+	anchorsKnown(as)
+	return nil
+}
+
+// anchorKey is what makes two marks the same part.
+type anchorKey struct {
+	note string
+	page int
+	box  [4]int
+}
+
+func (an noteAnchor) key() anchorKey { return anchorKey{an.Note, an.Page, an.Box} }
+
+// marked is the marks' keys, as last read or written; nil till then.
+// The select tool's ribbon asks it each time it's drawn, so it isn't
+// read from the file each time.
+var marked map[anchorKey]noteAnchor
+
+func anchorsKnown(as []noteAnchor) {
+	marked = make(map[anchorKey]noteAnchor, len(as))
+	for _, an := range as {
+		marked[an.key()] = an
+	}
+}
+
+// markedAs is the mark of k, if there's one.
+func markedAs(k anchorKey) (noteAnchor, bool) {
+	if marked == nil {
+		loadAnchors()
+	}
+	an, ok := marked[k]
+	return an, ok
 }
 
 // keepAnchor puts an first among the marks; the same part marked before
 // goes.
 func keepAnchor(an noteAnchor) error {
-	as := slices.DeleteFunc(loadAnchors(), func(o noteAnchor) bool { return o.Note == an.Note && o.Page == an.Page && o.Box == an.Box })
+	as := slices.DeleteFunc(loadAnchors(), func(o noteAnchor) bool { return o.key() == an.key() })
 	as = append([]noteAnchor{an}, as...)
 	return saveAnchors(as[:min(len(as), marksMax)])
 }
@@ -117,6 +152,15 @@ func (w *noteWin) markSel(a *bro) {
 	if len(w.sel) == 0 {
 		return
 	}
+	if old, ok := markedAs(w.selKey()); ok { // marked already: the ribbon's a toggle
+		if err := forgetAnchor(old.At); err != nil {
+			a.Notify("still marked: " + err.Error())
+			return
+		}
+		log.Printf("notebook %s: unmarked, on page %d", w.nb.name, w.selPage+1)
+		a.Notify("unmarked")
+		return
+	}
 	b := boxOf(w.sel)
 	an := noteAnchor{Note: w.nb.name, Page: w.selPage, Box: [4]int{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}, Label: selLabel(w.sel), At: time.Now()}
 	an.Thumb = w.anchorThumb(w.selPage, w.sel)
@@ -126,6 +170,21 @@ func (w *noteWin) markSel(a *bro) {
 	}
 	log.Printf("notebook %s: marked, on page %d", w.nb.name, w.selPage+1)
 	a.Notify("marked: the link tool puts a link to it, in any notebook")
+}
+
+// selKey is what's taken, as a mark of it would be.
+func (w *noteWin) selKey() anchorKey {
+	b := boxOf(w.sel)
+	return anchorKey{w.nb.name, w.selPage, [4]int{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}}
+}
+
+// selMarked says what's taken is among the marks.
+func (w *noteWin) selMarked() bool {
+	if len(w.sel) == 0 {
+		return false
+	}
+	_, ok := markedAs(w.selKey())
+	return ok
 }
 
 // anchorThumb is a small picture of ss, on page: 360 by 140 at most.

@@ -8,13 +8,14 @@ package main
 import (
 	"image"
 	"math"
+	"slices"
 
 	"hellobro/kobo"
 )
 
 // iconPart is a piece of an icon, in grid units.
 type iconPart struct {
-	kind byte      // 'l' a line through pts; 'o' a ring and 'd' a dot (x, y, r), 'b' one of the paper; 'f' a box (x0, y0, x1, y1) of ink, 'w' of the paper
+	kind byte      // 'l' a line through pts; 'o' a ring and 'd' a dot (x, y, r), 'b' one of the paper; 'f' a box (x0, y0, x1, y1) of ink, 'w' of the paper; 'p' the inside of a shape round pts, of ink
 	pts  []float64 // its points
 	w    float64   // a line's half width; 0: thin
 }
@@ -106,7 +107,9 @@ func noteIcon(id string) []iconPart {
 	case "delete":
 		return iconBin
 	case "mark": // a bookmark's ribbon
-		return []iconPart{iconShut(0.9, 6, 3, 18, 3, 18, 21, 12, 16, 6, 21)}
+		return []iconPart{iconShut(0.9, ribbonPts...)}
+	case "marked": // filled: it's among the marks
+		return []iconPart{{kind: 'p', pts: ribbonPts}, iconShut(0.9, ribbonPts...)}
 	case "link": // two links of a chain
 		return []iconPart{iconLine(0.9, append(iconArc(8.5, 15.5, 4.5, 45, 225), 12.5, 8.5)...), iconLine(0.9, append(iconArc(15.5, 8.5, 4.5, 225, 405), 11.5, 15.5)...),
 			iconLine(0.9, 9.5, 14.5, 14.5, 9.5)}
@@ -142,12 +145,47 @@ func drawIcon(c kobo.Canvas, parts []iconPart, r image.Rectangle, ink, bg uint8)
 				g = bg
 			}
 			c.Disc(at(p.pts[0], p.pts[1]), px(p.pts[2]), g, r)
+		case 'p':
+			var ps []image.Point
+			for i := 0; i+1 < len(p.pts); i += 2 {
+				ps = append(ps, at(p.pts[i], p.pts[i+1]))
+			}
+			fillShape(c, ps, ink, r)
 		case 'f', 'w':
 			g := ink
 			if p.kind == 'w' {
 				g = bg
 			}
 			c.Fill(image.Rectangle{at(p.pts[0], p.pts[1]), at(p.pts[2], p.pts[3])}.Canon().Intersect(r), g)
+		}
+	}
+}
+
+// ribbonPts are a bookmark's ribbon's corners.
+var ribbonPts = []float64{6, 3, 18, 3, 18, 21, 12, 16, 6, 21}
+
+// fillShape fills the inside of the shape round ps, row by row: between
+// each two of the sides it crosses.
+func fillShape(c kobo.Canvas, ps []image.Point, g uint8, clip image.Rectangle) {
+	if len(ps) < 3 {
+		return
+	}
+	y0, y1 := ps[0].Y, ps[0].Y
+	for _, p := range ps {
+		y0, y1 = min(y0, p.Y), max(y1, p.Y)
+	}
+	for y := y0; y < y1; y++ {
+		fy := float64(y) + 0.5
+		var xs []float64
+		for i, p := range ps {
+			q := ps[(i+1)%len(ps)]
+			if (float64(p.Y) <= fy) != (float64(q.Y) <= fy) {
+				xs = append(xs, float64(p.X)+(fy-float64(p.Y))*float64(q.X-p.X)/float64(q.Y-p.Y))
+			}
+		}
+		slices.Sort(xs)
+		for i := 0; i+1 < len(xs); i += 2 {
+			c.Fill(image.Rect(int(math.Round(xs[i])), y, int(math.Round(xs[i+1])), y+1).Intersect(clip), g)
 		}
 	}
 }

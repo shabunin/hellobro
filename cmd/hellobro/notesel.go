@@ -142,6 +142,16 @@ func (w *noteWin) turnDot(r image.Rectangle) image.Point {
 	return image.Pt((r.Min.X+r.Max.X)/2, r.Max.Y+noteTurnArm)
 }
 
+// selBtnSize is a select tool's button's height and width, and the gap
+// between two: big enough for a finger, in the frame for fingers bigger
+// yet.
+func selBtnSize() (h, w, gap int) {
+	if kobo.IsBig() {
+		return 84, 104, 12
+	}
+	return 68, 84, 10
+}
+
 // selButtons are the buttons by what's taken: under it, or over it if
 // there's no room under it (nor the turning dot there).
 func (w *noteWin) selButtons(a *bro) []barBtn {
@@ -150,15 +160,15 @@ func (w *noteWin) selButtons(a *bro) []barBtn {
 		return nil
 	}
 	area := w.paperArea()
-	h := 48
+	h, bw, gap := selBtnSize()
 	var bs []barBtn
 	x := 0
 	for _, id := range []string{"copy", "cut", "duplicate", "turn", "mark", "delete"} {
-		b := barBtn{id: id, r: image.Rect(x, 0, x+h+16, h)}
+		b := barBtn{id: id, r: image.Rect(x, 0, x+bw, h)}
 		bs = append(bs, b)
-		x = b.r.Max.X + 8
+		x = b.r.Max.X + gap
 	}
-	row := image.Rect(0, 0, x-8, h)
+	row := image.Rect(0, 0, x-gap, h)
 	y := r.Max.Y + 16
 	if w.turnDot(r).Y > r.Max.Y {
 		y += noteTurnArm
@@ -260,7 +270,7 @@ func (w *noteWin) drawSel(a *bro, clip image.Rectangle) {
 		}
 		for _, b := range w.selButtons(a) {
 			if b.r.Overlaps(clip) {
-				a.inkPaint(&w.selPane, b.r, a.inkIcon(noteIcon(b.id), false))
+				w.paintSelButton(a, b, false)
 			}
 		}
 	}
@@ -308,6 +318,13 @@ func (a *bro) noteSelTouch(w *noteWin, slot int, p image.Point, g *kobo.Gesture)
 		switch cs := corners(r); {
 		case slices.ContainsFunc(w.selButtons(a), func(b barBtn) bool { return p.In(b.r) }):
 			d.kind = dragButton
+			for _, b := range w.selButtons(a) {
+				if p.In(b.r) { // dark at once, while the finger's on it
+					w.paintSelButton(a, b, true)
+					a.Mark(b.r, false)
+					a.Show()
+				}
+			}
 		case near(p, w.turnDot(r), noteHandle):
 			d.kind = dragTurn
 		case slices.ContainsFunc(cs[:], func(c image.Point) bool { return near(p, c, noteHandle) }):
@@ -445,8 +462,18 @@ func (a *bro) noteDragEnd(g *kobo.Gesture) {
 	switch {
 	case d.kind == dragButton:
 		for _, b := range w.selButtons(a) {
+			if d.from.In(b.r) && !(g.Last.In(b.r) && g.Moved < noteSelStill) {
+				w.paintSelButton(a, b, false) // slid off it: nothing done
+				a.Mark(b.r, false)
+			}
+		}
+		for _, b := range w.selButtons(a) {
 			if g.Last.In(b.r) && g.Moved < noteSelStill {
 				w.selAct(a, b.id)
+				if i := slices.IndexFunc(w.selButtons(a), func(o barBtn) bool { return o == b }); i >= 0 {
+					w.paintSelButton(a, b, false) // still there (copy, mark): light again
+					a.Mark(b.r, false)
+				}
 				return
 			}
 		}
@@ -712,6 +739,16 @@ func (p *notePic) turned() *notePic {
 	var buf bytes.Buffer
 	png.Encode(&buf, t) // a gray image into memory: it can't fail
 	return &notePic{png: buf.Bytes(), gray: t}
+}
+
+// paintSelButton draws button b by what's taken; dark while it's
+// pressed. The ribbon's filled while what's taken is among the marks.
+func (w *noteWin) paintSelButton(a *bro, b barBtn, pressed bool) {
+	id := b.id
+	if id == "mark" && w.selMarked() {
+		id = "marked"
+	}
+	a.inkPaint(&w.selPane, b.r, a.inkIcon(noteIcon(id), pressed))
 }
 
 // selAct does what a button by what's taken says.

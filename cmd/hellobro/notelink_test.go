@@ -48,4 +48,16 @@ func TestNoteLinks(t *testing.T) {
 	if as := loadAnchors(); len(as) != 1 || as[0].Note != "a" {
 		t.Errorf("one forgotten: %+v", as)
 	}
+	// The ribbon asks the marks kept in memory, as they're written.
+	marked = nil
+	if _, ok := markedAs(anchorKey{note: "a"}); !ok {
+		t.Error("a: not marked")
+	}
+	if _, ok := markedAs(anchorKey{note: "b", page: 1}); ok {
+		t.Error("b: marked still")
+	}
+	must(t, keepAnchor(noteAnchor{Note: "c", Page: 2, Box: [4]int{1, 2, 3, 4}, At: t0.Add(3 * time.Second)}))
+	if _, ok := markedAs(anchorKey{"c", 2, [4]int{1, 2, 3, 4}}); !ok {
+		t.Error("c: not marked")
+	}
 }

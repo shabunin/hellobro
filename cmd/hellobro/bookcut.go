@@ -74,12 +74,25 @@ type bookCut struct {
 	from, to image.Point
 	shown    image.Rectangle // the frame on the screen now
 	drawn    time.Time
+	btn      int // on a cut's button (from 1), shown pressed: a tap there is the button's (pressCut)
 }
 
 // cutStart notes a contact on a PDF's page: it may become a cut.
 func (a *bro) cutStart(p image.Point, g *kobo.Gesture) bool {
 	w, ok := a.windowAt(p).(*bookWin)
-	if !ok || w.list || w.styling || w.b == nil || w.pdf == nil && !w.selecting && !g.Pen {
+	if !ok || w.list || w.styling || w.b == nil {
+		return false
+	}
+	for i, r := range w.cutRows {
+		if p.In(r.r) { // dark at once, while the finger's on it
+			drawCutButton(a, r.r, w.cutLabels[i], true)
+			a.Mark(r.r, false)
+			a.Show()
+			a.bk.cut = &bookCut{w: w, g: g, from: p, to: p, btn: i + 1}
+			return true
+		}
+	}
+	if w.pdf == nil && !w.selecting && !g.Pen {
 		return false
 	}
 	v, on := w.viewAt(p)
@@ -155,6 +168,9 @@ func (s *bookCut) rect() image.Rectangle {
 // and white updates, now and then.
 func (a *bro) cutMove(p image.Point, g *kobo.Gesture) {
 	s, w := a.bk.cut, a.bk.cut.w
+	if s.btn != 0 {
+		return
+	}
 	if !s.on {
 		switch {
 		case s.pan: // ours (ownPan)
@@ -217,6 +233,12 @@ func (a *bro) cutLift(g *kobo.Gesture) bool {
 		return false
 	}
 	a.bk.cut = nil
+	if s.btn != 0 {
+		if !g.Tap { // not tapped: nothing done, light again
+			s.w.unpressCut(a, s.btn-1)
+		}
+		return true
+	}
 	if s.pan {
 		s.w.panTo(a, s.panFrom.Sub(s.to.Sub(s.from)), true)
 		return true
@@ -245,6 +267,8 @@ func (a *bro) cutLetGo(g *kobo.Gesture) bool {
 	a.bk.cut = nil
 	w := s.w
 	switch {
+	case s.btn != 0:
+		w.unpressCut(a, s.btn-1)
 	case s.pan:
 		w.panTo(a, s.panFrom, true)
 	case s.on:
@@ -351,9 +375,12 @@ func (w *bookWin) drawCut(a *bro) {
 			drawCorner(c, p, w.grab == i+1, w.p.Body)
 		}
 	}
-	const h, gap = 64, 10
+	h, bw, gap := 76, 156, 12 // for a finger; in the frame for fingers bigger yet
+	if kobo.IsBig() {
+		h, bw, gap = 88, 180, 14
+	}
 	labels := []string{"copy", "save", "zoom", "×"}
-	widths := []int{140, 140, 140, 64}
+	widths := []int{bw, bw, bw, h}
 	do := []func(){func() { w.cutCopy(a) }, func() { w.cutSave(a) }, func() { w.zoomCut(a) }, func() { w.dropCut(); w.draw(a) }}
 	if !w.canZoom() { // two side by side: whole, each
 		labels, widths, do = slices.Delete(labels, 2, 3), slices.Delete(widths, 2, 3), slices.Delete(do, 2, 3)
@@ -391,8 +418,15 @@ func (w *bookWin) pressCut(a *bro, i int) {
 	a.Show()
 	r.do()
 	if i < len(w.cutRows) && w.cutRows[i].r == r.r && w.cutLabels[i] == label && !w.cut.Empty() {
-		drawCutButton(a, r.r, label, false)
-		a.Mark(r.r, false)
+		w.unpressCut(a, i)
+	}
+}
+
+// unpressCut draws the cut's button i light again.
+func (w *bookWin) unpressCut(a *bro, i int) {
+	if i < len(w.cutRows) && !w.cut.Empty() {
+		drawCutButton(a, w.cutRows[i].r, w.cutLabels[i], false)
+		a.Mark(w.cutRows[i].r, false)
 	}
 }
 

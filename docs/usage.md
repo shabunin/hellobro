@@ -826,7 +826,8 @@ that side, or the inside to move the whole rectangle; a drag anywhere
 else draws a new one. Or tap a dot (it fills in black) and tap where
 it should be, the corner across staying where it is. Tap the tool
 again, or Esc, to put it down; full screen without the bar puts it
-down too, so taps turn pages there. Under the rectangle:
+down too, so taps turn pages there. Under the rectangle (each button
+dark while the finger's on it; slid off it, nothing's done):
 
 - **copy**: its words (whole ones, line by line) into the clipboard,
   which the terminals paste (Ctrl+Shift+V), and its picture, which a
@@ -1047,8 +1048,10 @@ width, its gray.
   - the buttons under it: **copy** (two pages; Ctrl+C), **cut**
     (scissors; Ctrl+X), **duplicate** (two pages and a +; Ctrl+D: a
     copy down and right, taken), **turn** (an arrow round: a quarter,
-    clockwise), **mark** (a ribbon; `:mark`: to link to it, below),
-    **delete** (a bin; Delete or Backspace).
+    clockwise), **mark** (a ribbon; `:mark`: to link to it, below;
+    filled while it's marked, and tapped again it's unmarked),
+    **delete** (a bin; Delete or Backspace). A button goes dark while
+    the finger's on it; slid off it, nothing's done.
 
   What's done stays on the page; undo puts each back. A tap where
   nothing is lets go; another, with nothing taken, puts a cross where
