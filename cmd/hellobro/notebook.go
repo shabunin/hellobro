@@ -390,8 +390,7 @@ type noteWin struct {
 	optsOf     string    // whose choices are out, under its button: "pen", "paper", "" none (notepen.go)
 	opts       []barBtn
 	settings   bool // its settings shown, over it (notesettings.go)
-	setSel     int  // the row in focus there
-	setRows    []bookRow
+	set        *noteSetUI // and their ink
 	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
 	slotSize   image.Point // the page size the slots are for
 	exporting  bool        // a PDF of it being written (noteexport.go)
@@ -771,8 +770,7 @@ func (w *noteWin) show(a *bro) {
 		return
 	}
 	if w.settings {
-		w.drawSettings(a)
-		a.Mark(w.p.Body, true)
+		w.showSettings(a)
 		return
 	}
 	w.fitSlots(a)
@@ -940,8 +938,7 @@ func (w *noteWin) showBar(a *bro) {
 }
 
 func (w *noteWin) tap(a *bro, p image.Point) {
-	if w.settings {
-		w.settingsTap(a, p)
+	if w.settings { // the settings' own (inkDown)
 		return
 	}
 	w.endTyping(a)
@@ -1032,16 +1029,16 @@ const (
 )
 
 func (w *noteWin) press(a *bro, code uint16, value int32) bool {
+	m := a.tv.mods
+	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
+	if w.settings && w.ex == nil && w.typing == nil { // its keys, and none of the page's
+		return w.settingsKey(a, code, ch, value) || value == 0 || !m.ctrl
+	}
 	if value == 0 {
 		return false
 	}
-	m := a.tv.mods
-	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
 	if w.typing != nil && w.typeKey(a, code, ch) {
 		return true
-	}
-	if w.settings && w.ex == nil { // its keys, and none of the page's
-		return w.settingsKey(a, code, ch) || !m.ctrl
 	}
 	if e := w.ex; e != nil {
 		done, ok := exKey(e, code, ch)

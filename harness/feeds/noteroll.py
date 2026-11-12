@@ -27,9 +27,10 @@ start()
 gui("notebook"); time.sleep(4)
 fullscreen(); time.sleep(4)
 keys(":settings\n"); time.sleep(3)
-for i in range(5): keys("j"); time.sleep(0.3)
-key(28); time.sleep(3)                               # Enter: Pages, a roll
-keys("j"); time.sleep(0.5); key(28); time.sleep(3)   # the AI diary on
+for i in range(6): key(108); time.sleep(0.3)
+key(28); time.sleep(2); key(103); time.sleep(0.5); key(28); time.sleep(3)   # Pages: a roll
+for i in range(2): key(108); time.sleep(0.3)
+key(28); time.sleep(2); key(103); time.sleep(0.5); key(28); time.sleep(3)   # the AI diary on
 key(1); time.sleep(3)                                # Esc: back to the page
 line(W // 8, H - 260, words=2); time.sleep(18)       # asked after 3 s; the answer below
 swipe(0, -700)                                       # up: on down, the page grown for it

@@ -26,9 +26,9 @@ start()
 gui("notebook"); time.sleep(4)
 fullscreen(); time.sleep(4)
 keys(":settings\n"); time.sleep(3)
-for i in range(6): keys("j"); time.sleep(0.3)
-key(28); time.sleep(3)                               # Enter: the diary on
-keys("jjj"); time.sleep(1); key(28); time.sleep(4)   # its model: the list
+for i in range(8): keys("j"); time.sleep(0.3)
+key(28); time.sleep(2); key(103); time.sleep(0.5); key(28); time.sleep(3)   # the diary on
+keys("jj"); time.sleep(1); key(28); time.sleep(4)    # its model (past its voice): the list
 key(1); time.sleep(3)                                # Esc: as it was
 keys("j"); time.sleep(1); key(28); time.sleep(4)     # its font: the list
 key(1); time.sleep(3)                                # Esc: as it was (Gentium Book)

@@ -44,7 +44,7 @@ for k, what in ((6, "narrow dots"), (4, "narrow squares"), (2, "narrow lines"), 
     tap(*ch[k]); time.sleep(4); note(what)
 tap(*bar[8]); time.sleep(4); note("put away")
 tap(*bar[10]); time.sleep(4); note("settings")
-key(ENTER); time.sleep(3); note("a finger stepped")
+key(108); time.sleep(1); key(ENTER); time.sleep(3); key(108); time.sleep(1); key(ENTER); time.sleep(3); note("a finger stepped")
 key(ESC); time.sleep(4); note("the page again")
 key(KEY_SEMI, shift=True); time.sleep(2); keys("settings"); key(ENTER); time.sleep(4); note(":settings")
 key(KEY_Q); time.sleep(4); note("q: the page")

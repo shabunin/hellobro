@@ -8,167 +8,268 @@ package main
 // to the notebook" goes back.
 
 import (
+	"fmt"
 	"image"
 	"strings"
 
+	"hellobro/ink"
+	"hellobro/ink/inkkobo"
+	"hellobro/ink/layout"
+	"hellobro/ink/theme"
+	"hellobro/ink/widget"
 	"hellobro/kobo"
 )
 
-// noteSet is one of its rows: what it says, and a step on.
+// noteSet is one of its rows: what it says; its choices (a dropdown),
+// the one it is, and what picking one does. Without choices, a row that
+// says its value, and does open when tapped, if it opens something.
 type noteSet struct {
 	label string
+	opts  func(a *bro, w *noteWin) ([]string, int)
+	pick  func(a *bro, w *noteWin, i int)
 	value func(a *bro, w *noteWin) string
-	step  func(a *bro, w *noteWin, d int)
+	open  func(a *bro, w *noteWin)
 }
 
-// stepOwn steps a notebook's setting kept with the app's (settings.go),
-// d on.
-func stepOwn(key string) func(a *bro, w *noteWin, d int) {
-	return func(a *bro, _ *noteWin, d int) { a.stepSetting(settingIndex(key), d) }
+// own is a notebook's setting kept with the app's (settings.go).
+func own(label, key string) noteSet {
+	i := settingIndex(key)
+	return noteSet{label: label,
+		opts: func(a *bro, _ *noteWin) ([]string, int) { return settingList[i].shown, a.settingAt(i) },
+		pick: func(a *bro, _ *noteWin, v int) { a.pickSetting(i, v) }}
 }
 
-// ownShown is how setting key says its value.
-func ownShown(key string) func(a *bro, w *noteWin) string {
-	return func(a *bro, _ *noteWin) string {
-		st := settingList[settingIndex(key)]
-		return st.shown[a.set[key]]
-	}
+// two is a setting of two values, on (the first) or not, flipped.
+func two(label, yes, no string, on func(a *bro, w *noteWin) bool, flip func(a *bro, w *noteWin)) noteSet {
+	return noteSet{label: label,
+		opts: func(a *bro, w *noteWin) ([]string, int) {
+			if on(a, w) {
+				return []string{yes, no}, 0
+			}
+			return []string{yes, no}, 1
+		},
+		pick: func(a *bro, w *noteWin, v int) {
+			if (v == 0) != on(a, w) {
+				flip(a, w)
+			}
+		}}
 }
 
-// noteSettings are the rows; set at init, as their steps draw them.
+// noteSettings are the rows; set at init, as their picks draw them.
 var noteSettings []noteSet
 
 func init() { noteSettings = noteSetRows() }
 
 func noteSetRows() []noteSet {
 	return []noteSet{
-		{"A finger", ownShown("note-finger"), stepOwn("note-finger")},
-		{"Pen buttons", ownShown("pen-buttons"), stepOwn("pen-buttons")},
-		{"Export", ownShown("note-export"), stepOwn("note-export")},
-		{"Light by the left edge", ownShown("note-light"), stepOwn("note-light")},
-		{"Bar, fullscreen", func(a *bro, _ *noteWin) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ *noteWin, _ int) { a.flipFullBar("note") }},
-		{"Pages (this notebook)", func(a *bro, w *noteWin) string {
-			if w.nb.rollOn() {
-				return "a roll: scrolled up and down"
+		own("A finger", "note-finger"),
+		own("Pen buttons", "pen-buttons"),
+		own("Export", "note-export"),
+		own("Light by the left edge", "note-light"),
+		two("Bar, fullscreen", fullBarWord(true), fullBarWord(false), func(a *bro, _ *noteWin) bool { return a.fullBar("note") },
+			func(a *bro, _ *noteWin) { a.flipFullBar("note") }),
+		two("Pages (this notebook)", "a roll: scrolled up and down", "one by one", func(_ *bro, w *noteWin) bool { return w.nb.rollOn() },
+			func(a *bro, w *noteWin) { w.flipRoll(a) }),
+		{label: "Page size (new pages)", opts: func(_ *bro, w *noteWin) ([]string, int) {
+			var ss []string
+			at := -1
+			v := attr(w.nb.attrs, pageSizeAttr)
+			for k, ps := range pageSizes {
+				ss = append(ss, fmt.Sprintf("%s, %g × %g mm", ps.label, unitsMM(ps.w), unitsMM(ps.h)))
+				if v == ps.id || v == "" && ps.id == "screen" {
+					at = k
+				}
 			}
-			return "one by one"
-		}, func(a *bro, w *noteWin, _ int) { w.flipRoll(a) }},
-		{"Page size (new pages)", func(a *bro, w *noteWin) string { return w.nb.sizeShown() }, func(a *bro, w *noteWin, d int) { w.stepPageSize(a, d) }},
-		{"AI diary (this notebook)", func(a *bro, w *noteWin) string { return onOff(w.nb.diaryOn()) }, func(a *bro, w *noteWin, _ int) { w.flipDiary(a) }},
-		{"AI voice (this notebook)", func(a *bro, w *noteWin) string { return diaryVoices[w.nb.diaryVoice()].label }, func(a *bro, w *noteWin, d int) { w.stepVoice(d) }},
-		{"AI instructions (written)", func(a *bro, w *noteWin) string {
+			if at < 0 { // its own, set by :pagesize
+				ss, at = append(ss, w.nb.sizeShown()), len(ss)
+			}
+			return ss, at
+		}, pick: func(a *bro, w *noteWin, i int) {
+			if i < len(pageSizes) {
+				w.setPageSize(a, pageSizes[i].id)
+			}
+		}},
+		two("AI diary (this notebook)", "on", "off", func(_ *bro, w *noteWin) bool { return w.nb.diaryOn() },
+			func(a *bro, w *noteWin) { w.flipDiary(a) }),
+		{label: "AI voice (this notebook)", opts: func(_ *bro, w *noteWin) ([]string, int) {
+			var ss []string
+			for _, v := range diaryVoices {
+				ss = append(ss, v.label)
+			}
+			return ss, w.nb.diaryVoice()
+		}, pick: func(_ *bro, w *noteWin, i int) { w.stepVoice(i - w.nb.diaryVoice()) }},
+		{label: "AI instructions (written)", value: func(a *bro, w *noteWin) string {
 			if _, ps := diaryTalk(w.nb); len(ps) > 0 {
 				return strings.Join(ps, "; ")
 			}
 			return "none: write one, as “from now on, …”"
-		}, func(*bro, *noteWin, int) {}},
-		{"AI model", func(a *bro, _ *noteWin) string {
+		}},
+		{label: "AI model", value: func(a *bro, _ *noteWin) string {
 			m := diaryModelOf(a.setting("ai-model"))
 			if m.id == "conf" {
 				return "as ai.conf says: " + a.diaryModelNow()
 			}
 			return m.id
-		}, func(a *bro, w *noteWin, _ int) { w.chooseModel(a) }},
-		{"AI font (this notebook)", func(a *bro, w *noteWin) string {
+		}, open: func(a *bro, w *noteWin) { w.chooseModel(a) }},
+		{label: "AI font (this notebook)", value: func(a *bro, w *noteWin) string {
 			if f := w.nb.diaryFont(); f != diaryHand {
 				return f
 			}
 			return "handwriting (the Hershey script)"
-		}, func(a *bro, w *noteWin, _ int) { w.chooseFont(a) }},
-		{"AI answers", ownShown("ai-format"), stepOwn("ai-format")},
-		{"AI letters' size", ownShown("ai-size"), stepOwn("ai-size")},
-		{"AI asks after a pause", ownShown("ai-pause"), stepOwn("ai-pause")},
-		{"AI asks on taps", ownShown("ai-taps"), stepOwn("ai-taps")},
-		{"AI usage", func(a *bro, _ *noteWin) string { return a.usageShown() }, func(*bro, *noteWin, int) {}},
+		}, open: func(a *bro, w *noteWin) { w.chooseFont(a) }},
+		own("AI answers", "ai-format"),
+		own("AI letters' size", "ai-size"),
+		own("AI asks after a pause", "ai-pause"),
+		own("AI asks on taps", "ai-taps"),
+		{label: "AI usage", value: func(a *bro, _ *noteWin) string { return a.usageShown() }},
 	}
 }
 
 // settingsOn shows the settings, or the page again.
 func (w *noteWin) settingsOn(a *bro, on bool) {
 	w.endTyping(a)
-	w.optsOf, w.settings, w.setSel = "", on, 0
+	w.optsOf, w.settings = "", on
+	if w.set != nil {
+		w.set.list = layout.Scroll{}
+	}
 	w.place(a, w.p) // the bar fullscreen may be another now
 	w.draw(a)
 }
 
-// drawSettings draws them over the window's body: the header, then a
-// row each, its value a button that steps it.
+// noteSetUI is the settings in ink: the header (‹ All Notebooks,
+// Settings, back to the notebook), a dropdown for each, rows for the
+// rest, and what they're about at the foot.
+type noteSetUI struct {
+	a    *bro
+	w    *noteWin
+	pane *inkkobo.Pane
+	head libHeadUI
+	sel  []widget.Select
+	act  []widget.Clickable
+	list layout.Scroll
+	do   func()
+}
+
+// setOf is w's settings' ink, made the first time.
+func (w *noteWin) setOf(a *bro) *noteSetUI {
+	if w.set == nil {
+		u := &noteSetUI{a: a, w: w, sel: make([]widget.Select, len(noteSettings)), act: make([]widget.Clickable, len(noteSettings))}
+		u.pane = inkkobo.NewPane(u.Layout)
+		w.set = u
+	}
+	return w.set
+}
+
+func (u *noteSetUI) inkPane() *inkkobo.Pane { return u.pane }
+
+func (u *noteSetUI) take() {
+	if do := u.do; do != nil {
+		u.do = nil
+		do()
+	}
+}
+
+func (w *noteWin) inkBody(a *bro) inkBody {
+	if w.set != nil && w.settings && !w.p.Outer.Empty() && a.shows(w) && w.set.pane.At == w.p.Body {
+		return w.set
+	}
+	return nil
+}
+
+// drawSettings draws them over the window's body, all of it.
 func (w *noteWin) drawSettings(a *bro) {
-	c := a.C
-	area := w.p.Body.Inset(kobo.Pad)
-	c.Fill(w.p.Body, kobo.White)
-	w.setRows = nil
-	rowH := a.libRowH()
-	h := a.drawLibHeader(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), "All Notebooks", false,
-		func() { w.settings = false; a.notesFrom(w) }, "back to the notebook", func() { w.settingsOn(a, false) },
-		[]libTab{{"Settings", true, func() {}}})
-	w.setRows = append(w.setRows, h.rows...)
-	if w.setSel == len(noteSettings) { // "back to the notebook", by keys
-		c.Frame(h.back.Inset(-4), 3, kobo.Dark)
+	u := w.setOf(a)
+	u.pane.Place(w.p.Body)
+	u.pane.Win.Invalidate()
+	u.pane.Draw(a.C.Gray)
+}
+
+// showSettings draws what changed of them.
+func (w *noteWin) showSettings(a *bro) {
+	if w.inkBody(a) == nil || a.overlay() {
+		w.drawSettings(a)
+		a.Mark(w.p.Body, true)
+		return
 	}
-	y, boxW := area.Min.Y+rowH+16, min(area.Dx()/2, 560)
-	step := min(72, (area.Max.Y-88-y)/len(noteSettings)) // closer, where they'd go off the foot (landscape)
+	w.set.pane.Win.Invalidate()
+	a.flushPane(w.set.pane)
+	w.set.take()
+}
+
+func (u *noteSetUI) Layout(gtx ink.Ctx) ink.Dims {
+	a, w, th := u.a, u.w, u.a.theme()
+	hs := libHeadSpec{all: "All Notebooks", toAll: func() { w.settings = false; a.notesFrom(w) },
+		back: "back to the notebook", toBack: func() { w.settingsOn(a, false) }, tabs: []libTab{{"Settings", true, func() {}}}}
+	if do := u.head.taps(gtx, hs); do != nil {
+		u.do = do
+	}
 	for i, s := range noteSettings {
-		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+step-8)
-		y += step
-		if i == w.setSel {
-			c.Frame(r.Inset(-4), 3, kobo.Dark)
+		if s.opts == nil {
+			if u.act[i].Clicked(gtx) && s.open != nil {
+				u.do = func() { s.open(a, w) }
+			}
+			continue
 		}
-		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X-boxW, r.Max.Y), s.label, kobo.Black, kobo.AlignLeft)
-		b := image.Rect(r.Max.X-boxW, r.Min.Y, r.Max.X, r.Max.Y)
-		c.Frame(b, 2, kobo.Black)
-		c.Text(a.F.Small, b.Inset(8), kobo.Fit(a.F.Small, s.value(a, w), b.Dx()-16), kobo.Black, kobo.AlignCenter)
-		w.setRows = append(w.setRows, bookRow{b, func() { w.setSel = i; w.setStep(a, 1) }})
-	}
-	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "the pen always writes; the paper is a tool on the bar, each notebook its own", kobo.Mid, kobo.AlignLeft)
-	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+48, area.Max.X, y+88), kobo.Fit(a.F.Small, a.usageNote(), area.Dx()-36), kobo.Mid, kobo.AlignLeft)
-}
-
-// setStep steps the row in focus d on, and shows it.
-func (w *noteWin) setStep(a *bro, d int) {
-	if w.setSel == len(noteSettings) {
-		w.settingsOn(a, false)
-		return
-	}
-	noteSettings[w.setSel].step(a, w, d)
-	if a.asking != nil { // a list to choose from, over them: drawn when it's down
-		return
-	}
-	w.drawSettings(a)
-	a.Mark(w.p.Body, true)
-}
-
-// settingsTap takes a tap on them.
-func (w *noteWin) settingsTap(a *bro, p image.Point) {
-	for _, r := range w.setRows {
-		if kobo.Hit(p, r.r) {
-			r.do()
-			return
+		opts, at := s.opts(a, w)
+		sel := &u.sel[i]
+		if sel.Changed(gtx, len(opts)) {
+			v := sel.Value
+			u.do = func() { s.pick(a, w, v); w.showSettings(a) }
+		}
+		if !sel.IsOpen() {
+			sel.Value = at
 		}
 	}
+	size := gtx.Constraints.Max
+	ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+	rowH := libRowHeight(gtx, th)
+	rows := make([]ink.Widget, 0, len(noteSettings)+2)
+	for i, s := range noteSettings {
+		if s.opts != nil {
+			opts, _ := s.opts(a, w)
+			rows = append(rows, theme.Select(th, &u.sel[i], s.label, opts...).Layout)
+			continue
+		}
+		r := theme.Row(th, &u.act[i], s.label)
+		if s.open == nil {
+			r.Button = nil
+		}
+		r.Sub, r.More = s.value(a, w), s.open != nil
+		rows = append(rows, r.Layout)
+	}
+	for _, note := range []string{"the pen always writes; the paper is a tool on the bar, each notebook its own", a.usageNote()} {
+		l := theme.Small(th, note)
+		rows = append(rows, func(gtx ink.Ctx) ink.Dims { return layout.Inset{Top: th.Pad, Left: th.Pad}.Layout(gtx, l.Layout) })
+	}
+	return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(func(gtx ink.Ctx) ink.Dims { return u.head.layout(gtx, th, hs, rowH) }),
+			layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
+			layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+				u.list.Axis = layout.Vertical
+				return theme.List(th, &u.list).Layout(gtx, len(rows), func(gtx ink.Ctx, i int) ink.Dims { return rows[i](gtx) })
+			}))
+	})
 }
 
-// settingsKey: ↑ ↓ (j k, Tab) a row, ← → Enter Space a step, Esc q back.
-func (w *noteWin) settingsKey(a *bro, code uint16, ch string) bool {
-	n := len(noteSettings) + 1 // and "back to the notebook"
-	switch {
-	case code == keyUp || ch == "k":
-		w.setSel = (w.setSel - 1 + n) % n
-	case code == keyDown || ch == "j" || code == kobo.KeyTab:
-		w.setSel = (w.setSel + 1) % n
-	case code == keyLeft || ch == "h":
-		w.setStep(a, -1)
+// settingsKey hands a key to them: Tab and the arrows (j k) go through
+// them, Enter or Space opens a dropdown; Esc or q goes back to the
+// notebook.
+func (w *noteWin) settingsKey(a *bro, code uint16, ch string, value int32) bool {
+	u := w.setOf(a)
+	switch ch { // vi's, as the notebook has them
+	case "j":
+		code = keyDown
+	case "k":
+		code = keyUp
+	}
+	if u.pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps) {
+		w.showSettings(a)
 		return true
-	case code == keyRight || ch == "l" || code == kobo.KeyEnter || code == kobo.KeySpace:
-		w.setStep(a, 1)
-		return true
-	case code == kobo.KeyEsc || ch == "q":
+	}
+	if value == 1 && (code == kobo.KeyEsc || ch == "q") {
 		w.settingsOn(a, false)
 		return true
-	default:
-		return false
 	}
-	w.drawSettings(a)
-	a.Mark(w.p.Body, true)
-	return true
+	return false
 }

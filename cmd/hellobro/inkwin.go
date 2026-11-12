@@ -269,6 +269,12 @@ func (a *bro) updateRing() {
 		r = a.over().pane.Ring()
 	case ok && g.ink != nil && !a.overlay():
 		r = g.ink.pane.Ring()
+	case !a.overlay():
+		if bw, ok := a.focusedWin().(bodied); ok {
+			if b := bw.inkBody(a); b != nil {
+				r = b.inkPane().Ring()
+			}
+		}
 	}
 	a.SetRing(r)
 }

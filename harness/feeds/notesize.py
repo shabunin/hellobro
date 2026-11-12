@@ -19,8 +19,10 @@ keys(":new\n"); time.sleep(4)                         # a new page: landscape to
 keys(":pagesize 120x80\n"); time.sleep(4)            # a custom one, small
 stroke(word(W // 3, H // 2), pen=True, pressure=lambda t: 1800); time.sleep(3)
 keys(":settings\n"); time.sleep(3)
-for i in range(6): keys("j"); time.sleep(0.3)
-key(28); time.sleep(3)                               # Page size: stepped on (the named ones)
+for i in range(7): key(108); time.sleep(0.3)
+key(28); time.sleep(3)                               # Page size: its dropdown, the custom one last
+for i in range(4): key(103); time.sleep(0.3)
+key(28); time.sleep(3)                               # A4
 key(1); time.sleep(3)
 keys(":p 1\n"); time.sleep(4)                         # back to the first: landscape
 exit_app()
