@@ -27,6 +27,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"hellobro/ink"
+	"hellobro/ink/inkkobo"
+	"hellobro/ink/text"
 	"hellobro/kobo"
 )
 
@@ -62,12 +65,13 @@ type vkbdState struct {
 	top     int // the rows'
 	gen     int // the layouts so far
 	held    map[*kobo.Gesture]vkHeld
-	latched map[uint16]bool // modifiers down till the next key
-	next    time.Time       // the held key's next repeat
-	since   time.Time       // the keyboard went (or we started): auto waits from it
-	ask     bool            // a name's being typed (notelist.go): it shows if there's no keyboard
-	said    int             // shown (1) or hidden (-1) by a swipe or the menu, whatever the setting
-	lang    int             // the language typed in, of the setting's
+	latched map[uint16]bool               // modifiers down till the next key
+	next    time.Time                     // the held key's next repeat
+	since   time.Time                     // the keyboard went (or we started): auto waits from it
+	ask     bool                          // a name's being typed (notelist.go): it shows if there's no keyboard
+	said    int                           // shown (1) or hidden (-1) by a swipe or the menu, whatever the setting
+	lang    int                           // the language typed in, of the setting's
+	panes   map[image.Point]*inkkobo.Pane // the keys' paint, a pane for each size
 }
 
 // vkItem is a key in a row, w units wide; code 0 is a gap.
@@ -185,26 +189,45 @@ func (a *bro) vkLit(k vkey) bool {
 	return a.vk.latched[k.code]
 }
 
+// drawVkey paints key k in ink: framed, or black while it's down; its
+// letter as the layout and Shift have it, a word smaller. A pane for
+// each size of key, kept: a key typed is painted again at once.
 func (a *bro) drawVkey(k vkey) {
-	c, r := a.C, k.r.Inset(vkPad)
-	c.Fill(k.r, kobo.White)
-	fg := uint8(kobo.Black)
-	if a.vkLit(k) {
-		c.Fill(r, kobo.Black)
-		fg = kobo.White
-	} else {
-		c.Frame(r, 2, kobo.Black)
-	}
-	f, label := a.F.Panel, k.label
+	lit := a.vkLit(k)
+	label, word := k.label, false
 	if k.code == vkLang {
 		label = strings.ToUpper(kobo.Typing())
 	} else if label == "" {
 		label, _ = kobo.KeyChar(k.code, a.vk.latched[kobo.KeyLeftShift], a.tv.mods.caps)
 		label = kobo.Retype(label)
 	} else if utf8.RuneCountInString(label) > 1 { // a word; an arrow's big
-		f = a.F.Small
+		word = true
 	}
-	c.Text(f, r, label, fg, kobo.AlignCenter)
+	if a.vk.panes == nil {
+		a.vk.panes = map[image.Point]*inkkobo.Pane{}
+	}
+	p := a.vk.panes[k.r.Size()]
+	a.inkPaint(&p, k.r, func(gtx ink.Ctx) ink.Dims {
+		th := a.theme()
+		size := gtx.Constraints.Max
+		ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+		r := image.Rectangle{Max: size}.Inset(vkPad)
+		fg := th.Fg
+		if lit {
+			ink.Fill(gtx.Ops, r, th.Fg)
+			fg = th.Bg
+		} else {
+			ink.Frame(gtx.Ops, r, max(gtx.Dp(th.Border), 2), th.Fg)
+		}
+		f := th.Face(gtx, th.TextSize*1.15, text.Regular)
+		if word {
+			f = th.Face(gtx, th.TextSize*0.85, text.Regular)
+		}
+		l := text.Fit(f, label, r.Dx()-gtx.Dp(4))
+		ink.TextAt(gtx.Ops, f, r.Min.X+(r.Dx()-text.Width(f, l))/2, r.Min.Y+(r.Dy()-text.Height(f))/2+text.Ascent(f), l, fg)
+		return ink.Dims{Size: size}
+	})
+	a.vk.panes[k.r.Size()] = p
 }
 
 // drawVkbd draws the keys that only shows, or all.
