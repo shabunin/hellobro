@@ -821,6 +821,9 @@ func (a *App) Notify(text string) {
 
 // drawStatus refreshes the note, battery & clock text, if they changed.
 func (a *App) drawStatus() {
+	if a.scr == nil { // no screen: a test's
+		return
+	}
 	s := statusText(a.scr.info, a.network, a.system)
 	note := a.note
 	if a.notice != "" {

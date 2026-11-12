@@ -897,18 +897,23 @@ and the last two written.
 - **+ new notebook** (or n) asks what kind first ([below](#a-new-notebook))
   and makes it in the folder shown; **+ new folder** makes a folder there. The folders are folders
   in `Notebooks/`, four deep at most.
-- **rename** on a row (or F2) types its name in the row: Enter or
-  **ok** keeps it, Esc or **cancel** doesn't. Without a keyboard, the
-  one on the screen shows for it. A notebook's PDF exports are renamed
-  with it (only ones hellobro wrote); a folder's notebooks go with it,
-  open ones too.
-- **move** on a row (or m) moves it to another folder: Folders shows
-  where it is, with **move here** and **cancel** at the top; open a
-  folder (or go up) and tap **move here** (or m again; Esc doesn't).
-  Its export and its open window go with it, as with a rename.
-- **×** (or Delete) asks **delete?**: tap it again within 4 s. A
-  notebook goes to `Notebooks/.trash` (its window closes first), to
-  be fished out over USB or sftp; a folder goes only if it's empty.
+- Hold a row (or Space on it) to pick it: each row gets a box, and a
+  tap ticks or unticks one (a folder too: it opens again once picking's
+  done). Over the list then: **rename** (one picked only), **copy**,
+  **cut**, **delete**, **cancel** (or Esc), and how many are picked.
+- **rename** (or F2) types its name in the row: Enter or **ok** keeps
+  it, Esc or **cancel** doesn't. Without a keyboard, the one on the
+  screen shows for it. A notebook's PDF exports are renamed with it
+  (only ones hellobro wrote); a folder's notebooks go with it, open
+  ones too.
+- **copy** or **cut** (Ctrl+C, Ctrl+X: what's picked, or the row) then
+  **paste here** (Ctrl+V) in the folder shown (Folders; the top in
+  Recent and All): a copy named as it was, "(copy)" after if that's
+  taken, a folder with all in it; cut, it moves, its export and its
+  open window going with it, as with a rename. **cancel** forgets it.
+- **delete** (or Delete) asks first; then the notebooks go to
+  `Notebooks/.trash` (their windows close first), and a folder too,
+  with all in it, to be fished out over USB or sftp.
 - Tap a notebook, or Enter, to open it in the list's place; one open
   in another window is focused there. ↑ ↓ (or j k) pick, Tab goes to
   the next tab, Backspace up a folder, a swipe up or down pages.

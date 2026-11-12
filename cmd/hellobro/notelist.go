@@ -4,10 +4,10 @@ package main
 // in a window of their own, with the books' header and tabs
 // (library.go): Recent, the last written first; All, by name; Folders,
 // a folder at a time. Under the header: a new notebook (in the folder
-// shown) and a new folder. Each row renames it, or deletes it: tapped
-// twice, it goes to Notebooks/.trash (a folder, only if it's empty).
-// Moved, the Folders tab shows where to: a folder opened, "move here".
-// A
+// shown) and a new folder. A row held is picked, and the rows get boxes
+// to tick: the ones picked are copied, cut or deleted (to
+// Notebooks/.trash, asked first), one alone renamed. Copied or cut,
+// "paste here" puts them in the folder shown. A
 // name is typed in its row, the keyboard's or the one on the screen,
 // which shows for it while there's no keyboard. A notebook's bar has
 // "‹ All Notebooks" at its left (notebook.go); opened from one, the
@@ -28,8 +28,6 @@ import (
 	"hellobro/kobo"
 )
 
-const noteAskFor = 4 * time.Second // a delete asked: tap again this soon
-
 type notesWin struct {
 	p     kobo.Panel
 	tab   int
@@ -42,10 +40,17 @@ type notesWin struct {
 	listN int
 	rows  []bookRow
 	edit  *noteEdit // a name being typed
-	asked string    // a delete asked for: what
-	askAt time.Time
-	move  *libItem // what's being moved: the folders show where to
-	lib   *libUI   // the list, in ink
+	lib   *libUI    // the list, in ink
+
+	picking bool      // the rows have boxes: a row held, or Space
+	picks   []libItem // the ones ticked, in the order they were
+	clip    *noteClip // copied or cut, to paste in a folder
+}
+
+// noteClip is what's copied or cut from the list, to paste.
+type noteClip struct {
+	items []libItem
+	cut   bool
 }
 
 // noteEdit is a name being typed: a notebook's or a folder's new one, or
@@ -78,9 +83,9 @@ func (w *notesWin) load() {
 		w.dir = ""
 	}
 	w.items = libView(es, dirs, w.tab, w.dir)
-	if m := w.move; m != nil && m.dir { // a folder doesn't go into itself
-		w.items = slices.DeleteFunc(w.items, func(it libItem) bool { return !it.up && it.key == m.key })
-	}
+	w.picks = slices.DeleteFunc(w.picks, func(p libItem) bool { // gone meanwhile
+		return !slices.ContainsFunc(w.items, func(it libItem) bool { return it.key == p.key && it.dir == p.dir && !it.up })
+	})
 }
 
 func isNoteDir(dir string) bool {
@@ -107,10 +112,10 @@ func (w *notesWin) drawTitle(a *bro) {
 
 // show shows tab, in folder dir; the choice at the top.
 func (w *notesWin) show(a *bro, tab int, dir string) {
-	if w.move != nil { // where to: a folder
-		tab = libFolders
+	if dir != w.dir || tab != w.tab { // what's picked is here only
+		w.picking, w.picks = false, nil
 	}
-	w.tab, w.dir, w.sel, w.top, w.edit, w.asked = tab, dir, 0, 0, nil, ""
+	w.tab, w.dir, w.sel, w.top, w.edit = tab, dir, 0, 0, nil
 	a.mem.NotesTab, a.mem.NotesDir = tab, dir
 	a.mem.save()
 	w.load()
@@ -159,29 +164,48 @@ func (w *notesWin) update(a *bro) {
 }
 
 // libSpec is the list as it is: under the header, a new notebook (in
-// the folder shown) and a new folder; or, moving, here or not. Each row
-// renames, moves or deletes it.
+// the folder shown) and a new folder; picking, what's done to the ones
+// picked; copied or cut, paste here.
 func (w *notesWin) libSpec(a *bro) libSpec {
 	back := ""
 	if w.back != "" {
 		back = "back to the notebook"
 	}
 	s := libSpec{
-		id: fmt.Sprint(w.tab, w.dir, w.move != nil), sel: &w.sel, shown: &w.listN, edit: -1,
+		id: fmt.Sprint(w.tab, w.dir), sel: &w.sel, shown: &w.listN, edit: -1,
 		head: libHeadSpec{all: "All Notebooks", here: true, toAll: func() { w.show(a, w.tab, "") },
 			back: back, toBack: func() { w.toNotebook(a, w.back) }, tabs: libTabs(w.tab, func(k int) { w.show(a, k, w.dir) })},
 		tools: []libTab{{"+ new notebook", false, func() { w.newNotebook(a) }}, {"+ new folder", false, func() { w.startEdit(a, "", true, "") }}},
 		empty: "no notebooks yet: + new notebook makes one",
 	}
-	if m := w.move; m != nil {
-		s.tools = []libTab{{"move here", false, func() { w.moveHere(a) }}, {"cancel", false, func() { w.moving(a, nil) }}}
-		where := "to the top"
-		if w.dir != "" {
-			where = "to " + w.dir
+	where := "the top"
+	if f := w.folder(); f != "" {
+		where = f
+	}
+	switch {
+	case w.picking:
+		s.tools = nil
+		if len(w.picks) == 1 {
+			s.tools = append(s.tools, libTab{"rename", false, func() { w.renamePicked(a) }})
 		}
-		s.toolNote = m.name + " " + where + "?"
-	} else if w.tab == libFolders && w.dir != "" {
-		s.toolNote = "in " + w.dir
+		if len(w.picks) > 0 {
+			s.tools = append(s.tools, libTab{"copy", false, func() { w.clipPicked(a, false) }}, libTab{"cut", false, func() { w.clipPicked(a, true) }},
+				libTab{"delete", false, func() { w.deletePicked(a) }})
+		}
+		s.tools = append(s.tools, libTab{"cancel", false, func() { w.pickNone(a) }})
+		s.toolNote = fmt.Sprintf("%d picked", len(w.picks))
+	case w.clip != nil:
+		s.tools = []libTab{{"paste here", false, func() { w.paste(a) }}, {"cancel", false, func() { w.clip = nil; w.update(a) }},
+			{"+ new folder", false, func() { w.startEdit(a, "", true, "") }}}
+		what := "copied"
+		if w.clip.cut {
+			what = "cut"
+		}
+		s.toolNote = fmt.Sprintf("%d %s: paste in %s, or open a folder (Folders)", len(w.clip.items), what, where)
+	case w.tab == libFolders && w.dir != "":
+		s.toolNote = "in " + w.dir + " · hold one to pick it"
+	default:
+		s.toolNote = "hold one to pick it: copy, cut, delete, rename"
 	}
 	items := w.items
 	if e := w.edit; e != nil {
@@ -201,64 +225,146 @@ func (w *notesWin) libSpec(a *bro) libSpec {
 		s.editOK, s.editNo = func() { w.endEdit(a, true) }, func() { w.endEdit(a, false) }
 	}
 	s.items = items
-	s.open = func(i int) { w.open(a, items[i]) }
-	s.buttons = func(_ int, it libItem) []libTab {
-		if it.up || w.move != nil {
-			return nil
+	s.picking = w.picking
+	s.picked = func(i int) bool { return w.isPicked(items[i]) }
+	s.open = func(i int) {
+		if w.picking && !items[i].up {
+			w.pick(a, items[i])
+			return
 		}
-		del := "×"
-		if w.asking(it.key) {
-			del = "delete?"
+		w.open(a, items[i])
+	}
+	s.hold = func(i int) {
+		if !items[i].up && w.edit == nil {
+			w.picking = true
+			w.pick(a, items[i])
 		}
-		return []libTab{{"rename", false, func() { w.startEdit(a, it.key, it.dir, path.Base(it.key)) }},
-			{"move", false, func() { w.moving(a, &it) }}, {del, false, func() { w.remove(a, it) }}}
 	}
 	return s
 }
 
 // open opens the folder, or the notebook in this window (or focuses
-// it, if it's open elsewhere). Moving, only folders open.
+// it, if it's open elsewhere).
 func (w *notesWin) open(a *bro, it libItem) {
 	if it.dir {
 		w.show(a, libFolders, it.key)
 		return
 	}
-	if w.move == nil {
-		w.toNotebook(a, it.key)
-	}
+	w.toNotebook(a, it.key)
 }
 
-// moving starts moving it (the folders shown, from where it is), or
-// stops (nil).
-func (w *notesWin) moving(a *bro, it *libItem) {
-	w.move = it
-	if it == nil {
-		w.load()
-		w.draw(a)
+func (w *notesWin) isPicked(it libItem) bool {
+	return !it.up && slices.ContainsFunc(w.picks, func(p libItem) bool { return p.key == it.key && p.dir == it.dir })
+}
+
+// pick ticks it, or unticks it; none left ticked, the boxes stay till
+// cancel.
+func (w *notesWin) pick(a *bro, it libItem) {
+	if w.isPicked(it) {
+		w.picks = slices.DeleteFunc(w.picks, func(p libItem) bool { return p.key == it.key && p.dir == it.dir })
+	} else {
+		w.picks = append(w.picks, it)
+	}
+	w.picking = true
+	w.update(a)
+}
+
+// pickNone leaves picking.
+func (w *notesWin) pickNone(a *bro) {
+	w.picking, w.picks = false, nil
+	w.update(a)
+}
+
+func (w *notesWin) renamePicked(a *bro) {
+	if len(w.picks) != 1 {
 		return
 	}
-	dir := path.Dir(it.key)
-	if dir == "." {
-		dir = ""
-	}
-	w.show(a, libFolders, dir)
+	it := w.picks[0]
+	w.picking, w.picks = false, nil
+	w.startEdit(a, it.key, it.dir, path.Base(it.key))
 }
 
-// moveHere moves what's being moved to the folder shown.
-func (w *notesWin) moveHere(a *bro) {
-	m := w.move
-	w.move = nil
-	to := path.Join(w.dir, path.Base(m.key))
-	if err := w.moveTo(a, m.key, m.dir, to); err != nil {
-		a.Notify(err.Error())
+// clipPicked copies or cuts what's picked, to paste in a folder.
+func (w *notesWin) clipPicked(a *bro, cut bool) {
+	w.clip = &noteClip{items: w.picks, cut: cut}
+	w.picking, w.picks = false, nil
+	w.update(a)
+}
+
+// paste puts what's copied or cut in the folder shown: copies, named
+// "(copy)" if there's one so named; or moved, open notebooks following.
+func (w *notesWin) paste(a *bro) {
+	c := w.clip
+	if c == nil {
+		return
+	}
+	w.clip = nil
+	dir := w.folder()
+	n, last := 0, ""
+	var errs []string
+	for _, it := range c.items {
+		to := path.Join(dir, path.Base(it.key))
+		var err error
+		switch {
+		case c.cut && to == it.key: // it's here already
+			continue
+		case c.cut:
+			err = w.moveTo(a, it.key, it.dir, to)
+		default:
+			to, err = copyNote(a, it, dir)
+		}
+		if err != nil {
+			errs = append(errs, path.Base(it.key)+": "+err.Error())
+			continue
+		}
+		n, last = n+1, to
+	}
+	if len(errs) > 0 {
+		a.Notify(strings.Join(errs, "; "))
+	} else if n > 0 {
+		a.Notify(fmt.Sprintf("%d %s here", n, map[bool]string{true: "moved", false: "copied"}[c.cut]))
 	}
 	w.load()
 	for i, it := range w.items {
-		if it.key == to && !it.up {
+		if it.key == last && !it.up {
 			w.sel = i
 		}
 	}
 	w.draw(a)
+}
+
+// deletePicked asks, then puts what's picked in Notebooks/.trash.
+func (w *notesWin) deletePicked(a *bro) {
+	its := slices.Clone(w.picks)
+	if len(its) == 0 {
+		return
+	}
+	what := its[0].name
+	if len(its) > 1 {
+		what = fmt.Sprintf("%d of them", len(its))
+	}
+	say := "they go to Notebooks/.trash, to be taken back from there"
+	if slices.ContainsFunc(its, func(it libItem) bool { return it.dir }) {
+		say = "they go to Notebooks/.trash, a folder with all in it, to be taken back from there"
+	}
+	a.choose("Delete "+what+"?", say, askOpt{"delete", "d", func() {
+		var errs []string
+		for _, it := range its {
+			if err := removeNote(a, it); err != nil {
+				errs = append(errs, err.Error())
+			} else if w.back == it.key || it.dir && strings.HasPrefix(w.back, it.key+"/") { // nothing to go back to now
+				w.back = ""
+			}
+		}
+		if len(errs) > 0 {
+			a.Notify(strings.Join(errs, "; "))
+		} else if len(its) > 1 {
+			a.Notify(fmt.Sprintf("deleted %d (they're in Notebooks/.trash)", len(its)))
+		}
+		w.picking, w.picks = false, nil
+		w.load()
+		w.draw(a)
+	}}, askOpt{"cancel", "", nil})
 }
 
 // toNotebook puts the notebook name in the list's place; if it's open
@@ -298,7 +404,7 @@ func (w *notesWin) newNotebook(a *bro) {
 // dir), or a new folder's ("" key); the keyboard on the screen shows
 // for it if there's no other.
 func (w *notesWin) startEdit(a *bro, key string, dir bool, text string) {
-	w.edit, w.asked = &noteEdit{key: key, dir: dir, text: text}, ""
+	w.edit = &noteEdit{key: key, dir: dir, text: text}
 	if key == "" {
 		w.sel = 0
 	}
@@ -465,36 +571,28 @@ func (w *notesWin) folder() string {
 	return ""
 }
 
-// asking is whether key's delete is asked for, and waits for the
-// second tap.
-func (w *notesWin) asking(key string) bool {
-	return w.asked == key && time.Since(w.askAt) < noteAskFor
-}
-
-// remove asks first; asked, it moves the notebook to Notebooks/.trash
-// (closing its window) or takes the folder away, if it's empty.
-func (w *notesWin) remove(a *bro, it libItem) {
-	if !w.asking(it.key) {
-		w.asked, w.askAt, w.edit = it.key, time.Now(), nil
-		w.update(a)
-		return
-	}
-	w.asked = ""
-	if err := removeNote(a, it); err != nil {
-		a.Notify(err.Error())
-	} else if w.back == it.key { // nothing to go back to now
-		w.back = ""
-	}
-	w.load()
-	w.draw(a)
-}
-
 func removeNote(a *bro, it libItem) error {
-	if it.dir {
-		if err := os.Remove(filepath.Join(notesDir(), filepath.FromSlash(it.key))); err != nil {
-			return errors.New("only an empty folder goes: " + it.name + " has notebooks in it")
+	trash := filepath.Join(notesDir(), ".trash")
+	if err := os.MkdirAll(trash, 0o755); err != nil {
+		return err
+	}
+	if it.dir { // all in it, to the trash as it is
+		for _, nw := range a.noteWins() {
+			if strings.HasPrefix(nw.nb.name, it.key+"/") {
+				a.closeWin(nw) // kept first
+			}
 		}
-		log.Printf("notebooks: folder %s taken away", it.key)
+		a.nt.unsaved = slices.DeleteFunc(a.nt.unsaved, func(n *notebook) bool { return strings.HasPrefix(n.name, it.key+"/") })
+		base := strings.ReplaceAll(it.key, "/", " · ")
+		dst := filepath.Join(trash, base)
+		for i := 2; fileExists(dst); i++ {
+			dst = filepath.Join(trash, fmt.Sprintf("%s (%d)", base, i))
+		}
+		if err := os.Rename(filepath.Join(notesDir(), filepath.FromSlash(it.key)), dst); err != nil {
+			return err
+		}
+		log.Printf("notebooks: folder %s to the trash", it.key)
+		a.Notify("deleted " + it.name + " (it's in Notebooks/.trash)")
 		return nil
 	}
 	if nw := a.noteWindow(it.key); nw != nil {
@@ -502,10 +600,6 @@ func removeNote(a *bro, it libItem) error {
 	}
 	if nb := a.unsavedNote(it.key); nb != nil { // it's not to be kept now
 		a.nt.unsaved = slices.DeleteFunc(a.nt.unsaved, func(n *notebook) bool { return n == nb })
-	}
-	trash := filepath.Join(notesDir(), ".trash")
-	if err := os.MkdirAll(trash, 0o755); err != nil {
-		return err
 	}
 	base := strings.ReplaceAll(it.key, "/", " · ")
 	dst := filepath.Join(trash, base+noteExt)
@@ -527,20 +621,103 @@ func removeNote(a *bro, it libItem) error {
 	return nil
 }
 
+// copyNote copies the notebook or the folder it into the folder dir:
+// named as it is, or "(copy)" after if that's taken. It says what the
+// copy is.
+func copyNote(a *bro, it libItem, dir string) (string, error) {
+	base := path.Base(it.key)
+	taken := func(to string) bool {
+		if it.dir {
+			return fileExists(filepath.Join(notesDir(), filepath.FromSlash(to)))
+		}
+		return fileExists(notePath(to)) || a.noteWindow(to) != nil || a.unsavedNote(to) != nil
+	}
+	to := path.Join(dir, base)
+	for i := 1; taken(to); i++ {
+		to = path.Join(dir, base+" (copy)")
+		if i > 1 {
+			to = path.Join(dir, fmt.Sprintf("%s (copy %d)", base, i))
+		}
+	}
+	if it.dir {
+		if dir == it.key || strings.HasPrefix(dir, it.key+"/") {
+			return "", errors.New("a folder doesn't go into itself")
+		}
+		for _, nw := range a.noteWins() { // what's open in it, kept first
+			if strings.HasPrefix(nw.nb.name, it.key+"/") {
+				nw.keep(a)
+			}
+		}
+		if err := copyTree(filepath.Join(notesDir(), filepath.FromSlash(it.key)), filepath.Join(notesDir(), filepath.FromSlash(to))); err != nil {
+			return "", err
+		}
+		log.Printf("notebooks: folder %s copied to %s", it.key, to)
+		return to, nil
+	}
+	if nw := a.noteWindow(it.key); nw != nil {
+		nw.keep(a)
+	}
+	var err error
+	switch nb := a.unsavedNote(it.key); {
+	case nb != nil: // newer than its file
+		var b []byte
+		if b, err = nb.xopp(); err == nil {
+			err = writeAtomic(notePath(to), b)
+		}
+	case fileExists(notePath(it.key)):
+		err = copyFile(notePath(it.key), notePath(to))
+	default: // an .hbnote: written as a .xopp
+		var nb *notebook
+		if nb, err = loadNotebook(it.key); err == nil {
+			nb.name, nb.old = to, ""
+			err = nb.save()
+		}
+	}
+	if err != nil {
+		return "", err
+	}
+	log.Printf("notebooks: %s copied to %s", it.key, to)
+	return to, nil
+}
+
+func copyFile(from, to string) error {
+	b, err := os.ReadFile(from)
+	if err != nil {
+		return err
+	}
+	return writeAtomic(to, b)
+}
+
+// copyTree copies the folder from, all in it, as to.
+func copyTree(from, to string) error {
+	return filepath.WalkDir(from, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(from, p)
+		dst := filepath.Join(to, rel)
+		if d.IsDir() {
+			return os.MkdirAll(dst, 0o755)
+		}
+		return copyFile(p, dst)
+	})
+}
+
 // press: ↑ ↓ PgUp PgDn and Enter; Tab the next tab, Backspace up a
-// folder; n a new notebook, F2 rename, m move (m again: here, Esc: not),
-// Delete delete (twice); Esc back to the notebook. A name being typed
-// takes the keys.
+// folder; n a new notebook. Space picks the row (or not), Ctrl+C,
+// Ctrl+X copy or cut what's picked (the row, if none), Ctrl+V pastes,
+// F2 renames, Delete deletes (asked); Esc leaves picking, a copy, or
+// goes back to the notebook. A name being typed takes the keys.
 func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 	if value == 0 {
 		return false
 	}
 	m := &a.tv.mods
-	if m.ctrl || m.alt || m.meta {
-		return false
-	}
 	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
 	if e := w.edit; e != nil {
+		if m.ctrl || m.alt || m.meta {
+			return false
+		}
 		if done, ok := nameKey(&e.text, code, ch); done {
 			w.endEdit(a, ok)
 		} else {
@@ -552,6 +729,29 @@ func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 	if ok {
 		it = w.items[w.sel]
 	}
+	ok = ok && !it.up
+	orRow := func() bool { // what's picked, or the row if nothing is
+		if len(w.picks) == 0 && ok {
+			w.picking, w.picks = true, []libItem{it}
+		}
+		return len(w.picks) > 0
+	}
+	if m.alt || m.meta {
+		return false
+	}
+	if m.ctrl {
+		switch code {
+		case keyC, keyX:
+			if orRow() {
+				w.clipPicked(a, code == keyX)
+			}
+		case keyV:
+			w.paste(a)
+		default:
+			return false
+		}
+		return true
+	}
 	switch {
 	case code == 103 || ch == "k":
 		w.sel--
@@ -561,8 +761,11 @@ func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 		w.sel -= max(1, w.listN-1)
 	case code == 109:
 		w.sel += max(1, w.listN-1)
-	case code == kobo.KeyEnter && ok:
-		w.open(a, it)
+	case code == kobo.KeyEnter && w.sel < len(w.items):
+		w.open(a, w.items[w.sel])
+		return true
+	case code == kobo.KeySpace && ok:
+		w.pick(a, it)
 		return true
 	case code == kobo.KeyTab:
 		w.show(a, (w.tab+1)%len(libTabNames), w.dir)
@@ -573,27 +776,24 @@ func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 	case ch == "n":
 		w.newNotebook(a)
 		return true
-	case w.move != nil && (ch == "m" || code == kobo.KeyEsc):
-		if ch == "m" {
-			w.moveHere(a)
-		} else {
-			w.moving(a, nil)
+	case code == 60: // F2
+		switch {
+		case len(w.picks) == 1:
+			w.renamePicked(a)
+		case len(w.picks) == 0 && ok:
+			w.startEdit(a, it.key, it.dir, path.Base(it.key))
 		}
 		return true
-	case w.move != nil:
-		if code == kobo.KeyTab || ch == "n" || code == 60 || code == 111 {
-			return true // the folders only, while moving
+	case code == 111: // Delete
+		if orRow() {
+			w.deletePicked(a)
 		}
-		return false
-	case ch == "m" && ok && !it.up:
-		w.moving(a, &it)
 		return true
-	case code == 60 && ok && !it.up: // F2
-		w.startEdit(a, it.key, it.dir, path.Base(it.key))
+	case code == kobo.KeyEsc && w.picking:
+		w.pickNone(a)
 		return true
-	case code == 111 && ok && !it.up: // Delete
-		w.remove(a, it)
-		return true
+	case code == kobo.KeyEsc && w.clip != nil:
+		w.clip = nil
 	case code == kobo.KeyEsc && w.back != "":
 		w.toNotebook(a, w.back)
 		return true
@@ -614,7 +814,6 @@ func (w *notesWin) tap(a *bro, p image.Point) {
 }
 
 func (w *notesWin) closing(a *bro) {
-	w.move = nil
 	if w.edit != nil {
 		w.edit = nil
 		a.vkAsk(false)

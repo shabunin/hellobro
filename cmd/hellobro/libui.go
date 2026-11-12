@@ -46,8 +46,11 @@ type libSpec struct {
 	editNo   func()
 	buttons  func(i int, it libItem) []libTab
 	open     func(i int)
-	shown    *int     // how many rows show, for PgUp and PgDn
-	grid     *libGrid // pages small instead of items, if not nil
+	hold     func(i int)      // a row held: picked (nil: as a tap)
+	picking  bool             // the rows have boxes to tick
+	picked   func(i int) bool // ticked
+	shown    *int             // how many rows show, for PgUp and PgDn
+	grid     *libGrid         // pages small instead of items, if not nil
 }
 
 // libGrid is a grid of pages drawn small, as many across as fit: a
@@ -193,6 +196,9 @@ func (u *libUI) taps(gtx ink.Ctx, s libSpec) {
 	for i := range n {
 		if u.rows[i].Clicked(gtx) && s.open != nil {
 			u.do = func() { s.open(i) }
+		}
+		if u.rows[i].LongPressed(gtx) && s.hold != nil {
+			u.do = func() { s.hold(i) }
 		}
 		for k := range u.btns[i] {
 			if u.btns[i][k].Clicked(gtx) && s.buttons != nil && i < len(s.items) {
@@ -384,6 +390,15 @@ func (u *libUI) row(gtx ink.Ctx, s libSpec, i, rowH int) ink.Dims {
 	clk := &u.rows[i]
 	clk.Layout(cg, func(gtx ink.Ctx) ink.Dims {
 		x, end := pad, right-pad
+		if s.picking && !it.up { // its box, ticked if it's picked
+			bs := gtx.Dp(24)
+			b := image.Rect(x, (rowH-bs)/2, x+bs, (rowH+bs)/2)
+			ink.Frame(gtx.Ops, b, bd, fg)
+			if s.picked != nil && s.picked(i) {
+				ink.Fill(gtx.Ops, b.Inset(bd+gtx.Dp(3)), fg)
+			}
+			x += bs + gtx.Dp(14)
+		}
 		if it.dir && !it.up {
 			drawFolderInk(gtx, image.Rect(x, 0, x+gtx.Dp(26), rowH), fg)
 			x += gtx.Dp(38)
