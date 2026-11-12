@@ -267,9 +267,7 @@ func (w *bookWin) drawPinch(a *bro, p *pinch) {
 	}
 	r := image.Rect(m.X-150, m.Y-45, m.X+150, m.Y+45)
 	r = r.Add(image.Pt(max(0, w.area.Min.X-r.Min.X)+min(0, w.area.Max.X-r.Max.X), max(0, w.area.Min.Y-r.Min.Y)+min(0, w.area.Max.Y-r.Max.Y)))
-	c.Fill(r, kobo.White)
-	c.Frame(r, 3, kobo.Black)
-	c.Text(a.F.Body, r, fmt.Sprintf("zoom %d%%", p.z), kobo.Black, kobo.AlignCenter)
+	a.inkPaint(&w.zoomPane, r, a.inkButton(fmt.Sprintf("zoom %d%%", p.z), false))
 	p.drawn = r.Union(zone)
 	a.Mark(old.Union(p.drawn), false)
 }

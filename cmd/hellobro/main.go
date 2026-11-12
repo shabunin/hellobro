@@ -42,6 +42,7 @@ type bro struct {
 	media  mediaState
 	stat   statBar  // the terminal tabs' status bar
 	picker *picker  // the switcher, while it's up
+	exUI   *exUI    // the ":" line, drawn in ink (excmd.go)
 	asking *askBox  // a question, while it's up
 	info   *infoBox // facts to read, while they're up
 	keys   keyMap

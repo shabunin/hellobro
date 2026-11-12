@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	"hellobro/book"
+	"hellobro/ink"
+	"hellobro/ink/text"
 	"hellobro/kobo"
 )
 
@@ -177,29 +179,40 @@ func (w *bookWin) noteNext(a *bro) bool {
 	return true
 }
 
-// drawNote draws the note's box over the page.
+// drawNote paints the note's box over the page, in ink: its page laid
+// out for it, "go there" (a word's: "next", if there's more), and that a
+// tap elsewhere closes it. The taps are noteTap's.
 func (w *bookWin) drawNote(a *bro) {
 	n := w.note
 	if n == nil || n.page == nil {
 		return
 	}
-	c := a.C
-	c.Fill(n.box, kobo.White)
-	c.Fill(image.Rect(n.box.Min.X, n.box.Min.Y, n.box.Max.X, n.box.Min.Y+3), kobo.Black)
-	c.Frame(n.box, 1, kobo.Dark)
-	in := n.box.Inset(24)
-	faces := w.bookFaces(a)
-	for _, it := range n.page.Items {
-		switch it.Kind {
-		case book.ItemText:
-			c.TextAt(faces.Face(it.Style, it.Px), in.Min.X+it.X, in.Min.Y+it.Y, it.Text, kobo.Black, in)
-		case book.ItemRule:
-			c.Fill(image.Rect(it.X, it.Y, it.X+it.W, it.Y+it.H).Add(in.Min).Intersect(in), kobo.Dark)
-		}
-	}
+	a.inkPaint(&w.notePane, n.box, func(gtx ink.Ctx) ink.Dims { return w.noteLayout(gtx, a, n) })
 	if !n.under.Empty() && !n.under.Overlaps(n.box) {
-		c.Fill(n.under, kobo.Black)
+		a.C.Fill(n.under, kobo.Black)
 	}
+}
+
+func (w *bookWin) noteLayout(gtx ink.Ctx, a *bro, n *bookNote) ink.Dims {
+	th := a.theme()
+	size := gtx.Constraints.Max
+	box := image.Rectangle{Max: size}
+	ink.Fill(gtx.Ops, box, th.Bg)
+	ink.Frame(gtx.Ops, box, 1, ink.Dark)
+	ink.Fill(gtx.Ops, image.Rect(0, 0, size.X, 3), th.Fg)
+	in := box.Inset(noteBoxPad)
+	faces, page := w.bookFaces(a), n.page
+	ink.Draw(gtx.Ops, in, func(dst *image.Gray, r image.Rectangle) {
+		c := kobo.Canvas{Gray: dst}
+		for _, it := range page.Items {
+			switch it.Kind {
+			case book.ItemText:
+				c.TextAt(faces.Face(it.Style, it.Px), r.Min.X+it.X, r.Min.Y+it.Y, it.Text, kobo.Black, r)
+			case book.ItemRule:
+				c.Fill(image.Rect(it.X, it.Y, it.X+it.W, it.Y+it.H).Add(r.Min).Intersect(r), kobo.Dark)
+			}
+		}
+	})
 	label := "go there"
 	if n.word != "" {
 		label = ""
@@ -207,11 +220,18 @@ func (w *bookWin) drawNote(a *bro) {
 			label = fmt.Sprintf("next · %d/%d", n.at()+1, len(n.pages))
 		}
 	}
+	there := n.there.Sub(n.box.Min)
 	if label != "" {
-		c.Frame(n.there, 2, kobo.Black)
-		c.Text(a.F.Panel, n.there, label, kobo.Black, kobo.AlignCenter)
+		st := ink.Offset(gtx.Ops, there.Min)
+		cg := gtx
+		cg.Constraints = ink.Exact(there.Size())
+		a.inkButton(label, false)(cg)
+		st.Pop()
 	}
-	c.Text(a.F.Small, image.Rect(in.Min.X, n.there.Min.Y, n.there.Min.X-16, n.there.Max.Y), "a tap elsewhere closes it", kobo.Mid, kobo.AlignLeft)
+	small := th.Face(gtx, th.TextSize*0.85, text.Regular)
+	hint := text.Fit(small, "a tap elsewhere closes it", there.Min.X-in.Min.X-gtx.Dp(th.Pad))
+	ink.TextAt(gtx.Ops, small, in.Min.X, there.Min.Y+(there.Dy()-text.Height(small))/2+text.Ascent(small), hint, th.Quiet)
+	return ink.Dims{Size: size}
 }
 
 // noteTap takes a tap while a note shows: go there, or it goes.

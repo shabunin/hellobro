@@ -42,6 +42,7 @@ import (
 	"strings"
 	"time"
 
+	"hellobro/ink/inkkobo"
 	"hellobro/kobo"
 )
 
@@ -389,17 +390,19 @@ type noteWin struct {
 	mark       *noteMark // where the next paste goes
 	optsOf     string    // whose choices are out, under its button: "pen", "paper", "" none (notepen.go)
 	opts       []barBtn
-	settings   bool        // its settings shown, over it (notesettings.go)
-	set        *noteSetUI  // and their ink
-	barUI      *barUI      // the bar's ink
-	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
-	slotSize   image.Point // the page size the slots are for
-	exporting  bool        // a PDF of it being written (noteexport.go)
-	clearAsked time.Time   // "clear" tapped once: again soon, and it clears
-	overview   bool        // the pages shown small (notepages.go)
-	ovSel      int         // the page chosen there
-	ovFirst    int         // the first shown
-	ovDel      int         // the page whose × was tapped once, at ovDelAt: again soon, and it goes
+	optsPane   *inkkobo.Pane // their paint
+	selPane    *inkkobo.Pane // the selection's buttons' paint
+	settings   bool          // its settings shown, over it (notesettings.go)
+	set        *noteSetUI    // and their ink
+	barUI      *barUI        // the bar's ink
+	pdf        *notePDF      // the PDF the pages are on, open (notepdf.go)
+	slotSize   image.Point   // the page size the slots are for
+	exporting  bool          // a PDF of it being written (noteexport.go)
+	clearAsked time.Time     // "clear" tapped once: again soon, and it clears
+	overview   bool          // the pages shown small (notepages.go)
+	ovSel      int           // the page chosen there
+	ovFirst    int           // the first shown
+	ovDel      int           // the page whose × was tapped once, at ovDelAt: again soon, and it goes
 	ovDelAt    time.Time
 	undo, redo [][]noteOp      // each step's changes
 	changed    time.Time       // not kept since; zero: kept

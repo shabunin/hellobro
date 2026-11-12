@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"hellobro/ink"
+	"hellobro/ink/text"
 	"hellobro/kobo"
 )
 
@@ -201,31 +203,43 @@ func (w *noteWin) optsRect() image.Rectangle {
 	return r.Inset(-8).Intersect(w.paperArea())
 }
 
-// drawOpts draws them, the chosen black, if they're out and in clip; a
-// paper's on itself.
+// drawOpts paints them in ink, the chosen black, if they're out and
+// in clip; a paper's on itself. The taps are optsTap's.
 func (w *noteWin) drawOpts(a *bro, clip image.Rectangle) {
 	m := w.optsRect()
 	if m.Empty() || !m.Overlaps(clip) {
 		return
 	}
-	c := a.C
-	c.Fill(m, kobo.White)
-	c.Frame(m, 2, kobo.Black)
-	for _, o := range w.opts {
-		bg, ink := uint8(kobo.White), uint8(kobo.Black)
-		if o.id == a.penWidth() || o.id == a.penInk() || o.id == w.nb.paper {
-			bg, ink = kobo.Black, kobo.White
+	a.inkPaint(&w.optsPane, m, func(gtx ink.Ctx) ink.Dims {
+		th := a.theme()
+		size := gtx.Constraints.Max
+		bd := max(gtx.Dp(th.Border), 2)
+		ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+		ink.Frame(gtx.Ops, image.Rectangle{Max: size}, bd, th.Fg)
+		small := th.Face(gtx, th.TextSize*0.85, text.Regular)
+		for _, o := range w.opts {
+			r := o.r.Sub(m.Min)
+			fg, bg := th.Fg, th.Bg
+			if o.id == a.penWidth() || o.id == a.penInk() || o.id == w.nb.paper {
+				fg, bg = bg, fg
+			}
+			ink.Fill(gtx.Ops, r, bg)
+			ink.Frame(gtx.Ops, r, bd, th.Fg)
+			base := r.Min.Y + (r.Dy()-text.Height(small))/2 + text.Ascent(small)
+			if w.optsOf == "paper" { // its picture, then its words
+				pic := image.Rect(r.Min.X, r.Min.Y, r.Min.X+r.Dy(), r.Max.Y)
+				icon := paperIcon(o.id)
+				ink.Draw(gtx.Ops, pic, func(dst *image.Gray, dr image.Rectangle) {
+					drawIcon(kobo.Canvas{Gray: dst}, icon, dr, fg, bg)
+				})
+				ink.TextAt(gtx.Ops, small, pic.Max.X, base, text.Fit(small, o.label, r.Max.X-gtx.Dp(6)-pic.Max.X), fg)
+				continue
+			}
+			l := text.Fit(small, o.label, r.Dx()-gtx.Dp(6))
+			ink.TextAt(gtx.Ops, small, r.Min.X+(r.Dx()-text.Width(small, l))/2, base, l, fg)
 		}
-		c.Fill(o.r, bg)
-		c.Frame(o.r, 2, kobo.Black)
-		if w.optsOf == "paper" { // its picture, then its words
-			pic := image.Rect(o.r.Min.X, o.r.Min.Y, o.r.Min.X+o.r.Dy(), o.r.Max.Y)
-			drawIcon(c, paperIcon(o.id), pic, ink, bg)
-			c.Text(a.F.Small, image.Rect(pic.Max.X, o.r.Min.Y, o.r.Max.X-8, o.r.Max.Y), o.label, ink, kobo.AlignLeft)
-			continue
-		}
-		c.Text(a.F.Small, o.r, o.label, ink, kobo.AlignCenter)
-	}
+		return ink.Dims{Size: size}
+	})
 }
 
 // optsTap takes a tap on the choices; false if it's not on them.

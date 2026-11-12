@@ -377,13 +377,7 @@ func (w *bookWin) drawCut(a *bro) {
 
 // drawCutButton draws a cut's button, dark while it's pressed.
 func drawCutButton(a *bro, b image.Rectangle, label string, pressed bool) {
-	bg, fg := uint8(kobo.White), uint8(kobo.Black)
-	if pressed {
-		bg, fg = kobo.Black, kobo.White
-	}
-	a.C.Fill(b, bg)
-	a.C.Frame(b, 3, kobo.Black)
-	a.C.Text(a.F.Panel, b, label, fg, kobo.AlignCenter)
+	a.inkPaint(&a.bk.cutPane, b, a.inkButton(label, pressed))
 }
 
 // pressCut runs a cut's button r, shown pressed meanwhile: on the panel

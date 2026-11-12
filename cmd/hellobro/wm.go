@@ -52,6 +52,7 @@ type wmState struct {
 	tree      *wm.Tree
 	wins      map[*wm.Node]window
 	area      image.Rectangle     // where the windows go
+	emptyUI   *emptyUI            // an empty workspace's words (emptyui.go)
 	mode      string              // the keys' binding mode: "" is the default
 	moving    time.Time           // the last move, while the windows show as boxes (wmMoved)
 	grab      window              // the window every key goes to while it's in focus, but grab's own; nil: none
@@ -986,38 +987,6 @@ func within(n, c *wm.Node) bool {
 		}
 	}
 	return false
-}
-
-// drawEmpty says what to do on an empty workspace: tap it, or the keys,
-// as many of them as fit.
-func (a *bro) drawEmpty() {
-	r := a.wm.area.Inset(wmGap)
-	c := a.C
-	help := a.emptyHelp()
-	rowH := 38
-	h := 64 + 16 + len(help)*rowH
-	y := r.Min.Y + max(0, (r.Dy()-h)/3)
-	c.Text(a.F.Panel, image.Rect(r.Min.X, y, r.Max.X, y+60), "Nothing here yet: tap it for a new window, or the keys.", kobo.Dark, kobo.AlignCenter)
-	y += 64 + 16
-	keyW := 0
-	for _, l := range help {
-		keyW = max(keyW, kobo.TextWidth(a.F.Small, l[0]))
-	}
-	keyW = min(keyW, r.Dx()/2-kobo.Pad)
-	whatW := 0
-	for _, l := range help {
-		whatW = max(whatW, kobo.TextWidth(a.F.Small, l[1]))
-	}
-	left := r.Min.X + max(0, (r.Dx()-keyW-2*kobo.Pad-whatW)/2) // the table in the middle
-	for _, l := range help {
-		if y+rowH > r.Max.Y {
-			break
-		}
-		c.Text(a.F.Small, image.Rect(left, y, left+keyW, y+rowH), l[0], kobo.Black, kobo.AlignRight)
-		c.Text(a.F.Small, image.Rect(left+keyW+2*kobo.Pad, y, r.Max.X, y+rowH), l[1], kobo.Dark, kobo.AlignLeft)
-		y += rowH
-	}
-	a.wm.empty = r
 }
 
 // emptyHelp is the keys an empty workspace shows: the keys, what they do.

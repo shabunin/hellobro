@@ -15,6 +15,9 @@ import (
 	"strings"
 	"unicode"
 
+	"hellobro/ink"
+	"hellobro/ink/inkkobo"
+	"hellobro/ink/text"
 	"hellobro/kobo"
 )
 
@@ -138,17 +141,41 @@ func (a *bro) exStrip(body image.Rectangle) image.Rectangle {
 	return image.Rect(body.Min.X, body.Max.Y-a.libRowH(), body.Max.X, body.Max.Y)
 }
 
-// drawEx draws the line in r: what's typed, and what it could be.
+// drawEx draws the line in r, in ink: what's typed, a caret, and what
+// it could be. It's painted whole each time: a strip, and the page
+// under it may have been drawn since.
 func (a *bro) drawEx(r image.Rectangle, e *exLine, cmds []exCmd) {
-	c := a.C
-	c.Fill(r, kobo.White)
-	c.Fill(image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y+2), kobo.Black)
-	t := r.Inset(12)
-	s := ":" + e.text + "█"
-	w := min(t.Dx()*3/5, kobo.TextWidth(a.F.Body, s)+24)
-	c.Text(a.F.Body, image.Rect(t.Min.X, t.Min.Y, t.Min.X+w, t.Max.Y), s, kobo.Black, kobo.AlignLeft)
-	c.Text(a.F.Small, image.Rect(t.Min.X+w, t.Min.Y, t.Max.X, t.Max.Y), exHint(cmds, e.text), kobo.Mid, kobo.AlignLeft)
+	if a.exUI == nil {
+		a.exUI = &exUI{a: a}
+	}
+	u := a.exUI
+	u.text, u.hint = e.text, exHint(cmds, e.text)
+	a.inkPaint(&u.pane, r, u.Layout)
 	a.Mark(r, true)
+}
+
+type exUI struct {
+	a          *bro
+	pane       *inkkobo.Pane
+	text, hint string
+}
+
+func (u *exUI) Layout(gtx ink.Ctx) ink.Dims {
+	th := u.a.theme()
+	size := gtx.Constraints.Max
+	ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+	ink.Fill(gtx.Ops, image.Rect(0, 0, size.X, max(gtx.Dp(1.5), 2)), th.Fg)
+	f := th.Face(gtx, th.TextSize, text.Regular)
+	small := th.Face(gtx, th.TextSize*0.85, text.Regular)
+	pad := gtx.Dp(th.Pad * 1.5)
+	base := (size.Y-text.Height(f))/2 + text.Ascent(f)
+	s := text.Fit(f, ":"+u.text, size.X*3/5-pad)
+	ink.TextAt(gtx.Ops, f, pad, base, s, th.Fg)
+	cx := pad + text.Width(f, s) + gtx.Dp(1)
+	ink.Fill(gtx.Ops, image.Rect(cx, size.Y/4, cx+max(gtx.Dp(2), 3), size.Y-size.Y/4), th.Fg) // the caret
+	x := max(cx+pad*2, min(size.X*3/5, cx+pad*4))
+	ink.TextAt(gtx.Ops, small, x, base, text.Fit(small, u.hint, size.X-pad-x), th.Quiet)
+	return ink.Dims{Size: size}
 }
 
 // exKey types a key into the line: done when it's to run (ok) or be

@@ -24,6 +24,7 @@ import (
 	"golang.org/x/image/font"
 
 	"hellobro/book"
+	"hellobro/ink/inkkobo"
 	"hellobro/kobo"
 	"hellobro/pdf"
 )
@@ -125,11 +126,12 @@ type bookPlace struct {
 
 // bookState is what the readers share: the fonts, the size.
 type bookState struct {
-	fams  []bookFamily
-	faces *bookFaces
-	names map[string]font.Face // each family's regular, to show it by (bookstyle.go)
-	hold  *kobo.Gesture        // a finger still on a book, maybe holding a word (bookdict.go)
-	cut   *bookCut             // a gesture cutting a part of a PDF's page out (bookcut.go)
+	fams    []bookFamily
+	faces   *bookFaces
+	names   map[string]font.Face // each family's regular, to show it by (bookstyle.go)
+	hold    *kobo.Gesture        // a finger still on a book, maybe holding a word (bookdict.go)
+	cut     *bookCut             // a gesture cutting a part of a PDF's page out (bookcut.go)
+	cutPane *inkkobo.Pane        // its buttons' paint
 }
 
 type bookLaid struct {
@@ -208,20 +210,22 @@ type bookWin struct {
 	listN     int // the rows the list has room for
 	rows      []bookRow
 	shelf     []shelfBook
-	looking   bool         // the shelf is being looked for
-	shelfTab  int          // its tab: libRecent, libAll, libFolders
-	shelfDir  string       // the folder it shows, under booksRoot
-	back      string       // the book it was opened from, to go back to
-	named     string       // the name it was given, if it was (bookrename.go)
-	note      *bookNote    // a link's target over the page (booknote.go)
-	from      *bookFrom    // where a link was followed from
-	ex        *exLine      // a ":" command being typed (bookex.go)
-	found     *bookFind    // the word looked for last
-	finding   *atomic.Bool // set, the look going on is no longer wanted
-	edit      *noteEdit    // a shelf's book's name being typed: key its path
-	lib       *libUI       // the lists, in ink: the shelf, the contents, the bookmarks
-	style     *styleUI     // the style panel's ink
-	barUI     *barUI       // the bar's
+	looking   bool      // the shelf is being looked for
+	shelfTab  int       // its tab: libRecent, libAll, libFolders
+	shelfDir  string    // the folder it shows, under booksRoot
+	back      string    // the book it was opened from, to go back to
+	named     string    // the name it was given, if it was (bookrename.go)
+	note      *bookNote // a link's target over the page (booknote.go)
+	notePane  *inkkobo.Pane
+	zoomPane  *inkkobo.Pane // a pinch's zoom, said (bookzoom.go)
+	from      *bookFrom     // where a link was followed from
+	ex        *exLine       // a ":" command being typed (bookex.go)
+	found     *bookFind     // the word looked for last
+	finding   *atomic.Bool  // set, the look going on is no longer wanted
+	edit      *noteEdit     // a shelf's book's name being typed: key its path
+	lib       *libUI        // the lists, in ink: the shelf, the contents, the bookmarks
+	style     *styleUI      // the style panel's ink
+	barUI     *barUI        // the bar's
 }
 
 func (w *bookWin) Title() string {

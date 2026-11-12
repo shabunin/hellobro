@@ -12,6 +12,7 @@ import (
 
 	"hellobro/ink"
 	"hellobro/ink/inkkobo"
+	"hellobro/ink/text"
 	"hellobro/ink/theme"
 	"hellobro/ink/widget"
 	"hellobro/kobo"
@@ -281,3 +282,56 @@ func (a *bro) updateRing() {
 // flushPane puts what changed of p on the panel: a window's, so the
 // floating windows over it are drawn again where it changed.
 func (a *bro) flushPane(p *inkkobo.Pane) { p.FlushTo(a.C.Gray, a.Mark) }
+
+// inkPaint paints ui at r on the canvas, once, for the caller to mark:
+// what's only shown in ink, its taps the window's own (an empty
+// workspace, the ":" line, a cut's buttons). *p keeps the pane between
+// paints.
+func (a *bro) inkPaint(p **inkkobo.Pane, r image.Rectangle, ui ink.Widget) {
+	if *p == nil {
+		*p = inkkobo.NewPane(ui)
+	}
+	(*p).Win.UI = ui
+	(*p).Place(r)
+	(*p).Draw(a.C.Gray)
+}
+
+// inkButton is a button's look as a picture, as big as it's given: its
+// label in the middle, inverted while it's pressed.
+func (a *bro) inkButton(label string, pressed bool) ink.Widget {
+	return func(gtx ink.Ctx) ink.Dims {
+		th := a.theme()
+		size := gtx.Constraints.Max
+		r := image.Rectangle{Max: size}
+		fg, bg := th.Fg, th.Bg
+		if pressed {
+			fg, bg = bg, fg
+		}
+		ink.Fill(gtx.Ops, r, bg)
+		ink.Frame(gtx.Ops, r, max(gtx.Dp(th.Border), 2), th.Fg)
+		f := th.Face(gtx, th.TextSize, text.Regular)
+		s := text.Fit(f, label, size.X-gtx.Dp(th.Pad))
+		ink.TextAt(gtx.Ops, f, (size.X-text.Width(f, s))/2, (size.Y-text.Height(f))/2+text.Ascent(f), s, fg)
+		return ink.Dims{Size: size}
+	}
+}
+
+// inkIcon is an icon's button as a picture, as big as it's given;
+// inverted while it's pressed.
+func (a *bro) inkIcon(icon []iconPart, pressed bool) ink.Widget {
+	return func(gtx ink.Ctx) ink.Dims {
+		th := a.theme()
+		size := gtx.Constraints.Max
+		r := image.Rectangle{Max: size}
+		fg, bg := th.Fg, th.Bg
+		if pressed {
+			fg, bg = bg, fg
+		}
+		ink.Fill(gtx.Ops, r, bg)
+		ink.Frame(gtx.Ops, r, max(gtx.Dp(th.Border), 2), th.Fg)
+		ink.Draw(gtx.Ops, r, func(dst *image.Gray, dr image.Rectangle) {
+			drawIcon(kobo.Canvas{Gray: dst}, icon, dr, fg, bg)
+		})
+		return ink.Dims{Size: size}
+	}
+}

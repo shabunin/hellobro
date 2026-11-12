@@ -255,9 +255,7 @@ func (w *noteWin) drawSel(a *bro, clip image.Rectangle) {
 		}
 		for _, b := range w.selButtons(a) {
 			if b.r.Overlaps(clip) {
-				c.Fill(b.r, kobo.White)
-				c.Frame(b.r, 2, kobo.Black)
-				drawIcon(c, noteIcon(b.id), b.r, kobo.Black, kobo.White)
+				a.inkPaint(&w.selPane, b.r, a.inkIcon(noteIcon(b.id), false))
 			}
 		}
 	}
