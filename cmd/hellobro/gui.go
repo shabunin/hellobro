@@ -11,8 +11,9 @@ import (
 )
 
 type guiWin struct {
-	key   string // "wifi", "bluetooth", "sharing", "settings", "battery", "usage"
-	shown bool   // it showed when last placed
+	key   string  // "wifi", "bluetooth", "sharing", "settings", "battery", "usage"
+	shown bool    // it showed when last placed
+	ink   *inkWin // its body's ink's, if it's one of those (inkwin.go)
 }
 
 var guiTitles = map[string]string{
@@ -35,6 +36,15 @@ func (g *guiWin) radio() bool {
 
 func (g *guiWin) place(a *bro, p kobo.Panel) {
 	p.Name = g.Title()
+	if w := a.inkOf(g); w != nil {
+		w.place(p)
+		shown := !p.Outer.Empty()
+		if shown && !g.shown {
+			a.enterPower()
+		}
+		g.shown = shown
+		return
+	}
 	switch g.key {
 	case "wifi":
 		a.placeRadio(panelWiFi, p)
@@ -44,10 +54,6 @@ func (g *guiWin) place(a *bro, p kobo.Panel) {
 		a.placeShare(p)
 	case "settings":
 		a.placeSettings(p)
-	case "battery":
-		a.placeBattery(p)
-	case "usage":
-		a.placeUsage(p)
 	}
 	shown := !p.Outer.Empty()
 	if shown && !g.shown { // it comes up: what it shows, fresh
@@ -62,6 +68,9 @@ func (g *guiWin) place(a *bro, p kobo.Panel) {
 
 func (g *guiWin) panel(a *bro) kobo.Panel {
 	var p kobo.Panel
+	if g.ink != nil {
+		return a.winPanel(g.ink.p, a.guiFocused(g.key))
+	}
 	switch g.key {
 	case "wifi":
 		p = a.rv[panelWiFi].p
@@ -71,16 +80,16 @@ func (g *guiWin) panel(a *bro) kobo.Panel {
 		p = a.shp.p
 	case "settings":
 		p = a.sv.p
-	case "battery":
-		p = a.pv.batP
-	case "usage":
-		p = a.pv.useP
 	}
 	return a.winPanel(p, a.guiFocused(g.key))
 }
 
 // draw draws it all, as it is now.
 func (g *guiWin) draw(a *bro) {
+	if g.ink != nil {
+		g.ink.draw(a, a.guiFocused(g.key))
+		return
+	}
 	switch g.key {
 	case "wifi":
 		a.rv[panelWiFi].shown = ""
@@ -94,18 +103,23 @@ func (g *guiWin) draw(a *bro) {
 	case "settings":
 		a.sv.shown = ""
 		a.drawSettings()
-	case "battery":
-		a.pv.shownBat = ""
-		a.drawBattery()
-	case "usage":
-		a.pv.shownUse = ""
-		a.drawUsage()
 	}
 }
 
-func (g *guiWin) drawTitle(a *bro) { g.draw(a) }
+func (g *guiWin) drawTitle(a *bro) {
+	if g.ink != nil {
+		g.ink.drawTitle(a, a.guiFocused(g.key))
+		return
+	}
+	g.draw(a)
+}
 
 func (g *guiWin) press(a *bro, code uint16, value int32) bool {
+	if g.ink != nil {
+		took := g.ink.pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps)
+		a.inkTick()
+		return took
+	}
 	if g.radio() {
 		return a.radioKey(code, value)
 	}
@@ -113,11 +127,12 @@ func (g *guiWin) press(a *bro, code uint16, value int32) bool {
 }
 
 func (g *guiWin) tap(a *bro, p image.Point) {
-	if g.radio() {
-		a.radioTap(p)
+	if g.ink != nil { // its contacts came as they were (inkDown)
 		return
 	}
-	a.powerTap(p)
+	if g.radio() {
+		a.radioTap(p)
+	}
 }
 
 func (g *guiWin) closing(a *bro) {

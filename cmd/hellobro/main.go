@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"hellobro/ink/theme"
 	"hellobro/kobo"
 	"hellobro/radio"
 	"hellobro/share"
@@ -58,13 +59,13 @@ type bro struct {
 	relay  relayState
 	upd    updateState
 	net    netState // the header's network
-	pv     powerView
 	pw     powerState
 	kbd    kbdState
-	vk     vkbdState   // the on-screen keyboard (vkbd.go)
-	bk     bookState   // the reader's fonts (bookwin.go)
-	nt     noteState   // the notebooks' pen (notebook.go)
-	lay    kobo.Layout // the last layout, to lay out again
+	vk     vkbdState    // the on-screen keyboard (vkbd.go)
+	bk     bookState    // the reader's fonts (bookwin.go)
+	nt     noteState    // the notebooks' pen (notebook.go)
+	lay    kobo.Layout  // the last layout, to lay out again
+	th     *theme.Theme // the ink windows' look (inkwin.go)
 }
 
 const (
@@ -196,6 +197,7 @@ func (a *bro) Tick() {
 	a.ipcTick()
 	a.noteTick()
 	a.holdTick()
+	a.inkTick()
 	a.wmSettle(false)
 	a.wmKeep(false)
 	a.updateRing()
@@ -308,11 +310,13 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			a.pickerDown(p, g)
 		case a.edge == g && p.X >= kobo.EdgeWidth: // the right edge is ours
 		case a.wmTouch(p, g):
+		case a.inkDown(ev, p, g):
 		case a.noteTouch(ev, p, g):
 		case a.cutStart(p, g):
 		default:
 			a.selStart(p, g)
 		}
+	case a.inkMove(ev, p, g):
 	case a.noteMove(ev, p, g):
 	case a.vkMove(p, g):
 	case a.edge == g && a.edgeSwipe(p, g):
@@ -467,7 +471,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.bk.hold == g {
 		a.bk.hold = nil
 	}
-	if a.vkLift(g) || a.selLift(g) || a.cutLift(g) || a.wmDragLift(g) || a.noteLift(g) {
+	if a.inkLift(g) || a.vkLift(g) || a.selLift(g) || a.cutLift(g) || a.wmDragLift(g) || a.noteLift(g) {
 		return
 	}
 	if a.edge == g {

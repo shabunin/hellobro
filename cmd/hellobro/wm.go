@@ -554,8 +554,6 @@ func (a *bro) wmFocusMoved() {
 			if a.rs.prompt == nil {
 				a.rs.focus = radioPanelOf(g.key)
 			}
-		case "battery", "usage":
-			a.pv.useFocus = g.key == "usage"
 		}
 	}
 	if w != nil {

@@ -33,7 +33,7 @@ type focusState struct {
 // controls are w's, in Tab's order: left to right and down.
 func (a *bro) controls(w window) []control {
 	g, ok := w.(*guiWin)
-	if !ok || g.panel(a).Outer.Empty() {
+	if !ok || g.ink != nil || g.panel(a).Outer.Empty() { // ink has its own focus
 		return nil
 	}
 	var cs []control
@@ -143,7 +143,11 @@ func (a *bro) focusTouched(p image.Point) {
 // go. It's looked at every tick.
 func (a *bro) updateRing() {
 	var r image.Rectangle
-	if a.fs.ring && !a.overlay() && !a.Calibrating() {
+	if ir, ok := a.inkRing(); ok {
+		if !a.overlay() && !a.Calibrating() {
+			r = ir
+		}
+	} else if a.fs.ring && !a.overlay() && !a.Calibrating() {
 		w := a.focusedWin()
 		cs := a.controls(w)
 		if i := a.focused(w, cs); i >= 0 {

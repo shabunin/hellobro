@@ -11,7 +11,6 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"log"
 	"os"
 	"path/filepath"
@@ -32,18 +31,6 @@ const (
 	graphSpan  = 12 * time.Hour
 	clkTck     = 100 // /proc's ticks a second
 )
-
-type powerView struct {
-	batP, useP           kobo.Panel
-	useFocus             bool            // the keys go to What uses it, not Battery
-	text, graph, useText image.Rectangle // inside the panels
-	procs                image.Rectangle // Battery's: what keeps the CPU busy
-	shownBat, shownUse   string          // what the panels were drawn whole for: their place, focus
-	statBat, statUse     string          // their title strips' status, as drawn
-	batLines, procLines  []textLine      // the lines as drawn, so only those that change are again
-	useLines             []textLine
-	graphAt, graphDrawn  time.Time // the last sample graphed, and when
-}
 
 type powerState struct {
 	bat      battery
@@ -401,46 +388,6 @@ func mhz(khz int) string {
 
 // --- the tab ---
 
-// placeBattery puts the Battery window at p.
-func (a *bro) placeBattery(p kobo.Panel) {
-	v := &a.pv
-	v.batP, v.shownBat = p, ""
-	v.text, v.procs, v.graph = image.Rectangle{}, image.Rectangle{}, image.Rectangle{}
-	if p.Outer.Empty() {
-		return
-	}
-	b := v.batP.Body.Inset(kobo.Pad)
-	v.text = image.Rect(b.Min.X, b.Min.Y, b.Max.X, min(b.Max.Y, b.Min.Y+64+4*40+8))
-	// The processes before the graph, as many as fit with room for it
-	// (batProcs at most, two at least), and none without room for two.
-	room := b.Max.Y - v.text.Max.Y - 12
-	n := min(batProcs, (room-graphMin)/40-1)
-	if n < 2 {
-		n = min(batProcs, room/40-1)
-	}
-	if n >= 2 {
-		v.procs = image.Rect(b.Min.X, v.text.Max.Y+4, b.Max.X, v.text.Max.Y+4+(n+1)*40)
-	}
-	top := max(v.text.Max.Y, v.procs.Max.Y)
-	if g := image.Rect(b.Min.X, top+12, b.Max.X, b.Max.Y); g.Dy() >= graphMin {
-		v.graph = g
-	}
-}
-
-const (
-	batProcs = 5   // the Battery window's busiest processes, at most
-	graphMin = 120 // px the graph wants, or it's left out
-)
-
-// placeUsage puts What uses it at p.
-func (a *bro) placeUsage(p kobo.Panel) {
-	v := &a.pv
-	v.useP, v.shownUse, v.useText = p, "", image.Rectangle{}
-	if !p.Outer.Empty() {
-		v.useText = v.useP.Body.Inset(kobo.Pad)
-	}
-}
-
 func (a *bro) showingPower() bool { return a.guiShows("battery") || a.guiShows("usage") }
 
 func (a *bro) enterPower() {
@@ -506,258 +453,10 @@ func (a *bro) powerSample() {
 	}()
 }
 
+// drawPower asks the windows for a frame: a sample came.
 func (a *bro) drawPower() {
-	a.drawBattery()
-	a.drawUsage()
-}
-
-type textLine struct {
-	text string
-	g    uint8
-	big  bool
-}
-
-// drawLines writes lines down r, as many as fit, where *was were
-// drawn: only those that changed, each cleared first, or all of r if
-// they don't line up as before (more or fewer, or a big one moved). It
-// keeps lines in *was and says where it drew: on e-ink each line
-// redrawn costs, and most of a sample is as it was.
-func (a *bro) drawLines(r image.Rectangle, lines []textLine, was *[]textLine) []image.Rectangle {
-	if r.Empty() {
-		return nil
-	}
-	same := len(lines) == len(*was)
-	for i := 0; same && i < len(lines); i++ {
-		same = lines[i].big == (*was)[i].big
-	}
-	var dirty []image.Rectangle
-	if !same {
-		a.C.Fill(r, kobo.White)
-		dirty = append(dirty, r)
-	}
-	y := r.Min.Y
-	for i, l := range lines {
-		f, h := a.F.Small, 40
-		if l.big {
-			f, h = a.F.Panel, 64
-		}
-		if y+h > r.Max.Y {
-			break
-		}
-		lr := image.Rect(r.Min.X, y, r.Max.X, y+h)
-		if !same || l != (*was)[i] {
-			if same { // as wide as the text was or is, not the panel: less to refresh
-				w := max(kobo.TextWidth(f, l.text), kobo.TextWidth(f, (*was)[i].text)) + 8
-				cl := image.Rect(lr.Min.X, lr.Min.Y, min(lr.Max.X, lr.Min.X+w), lr.Max.Y)
-				a.C.Fill(cl, kobo.White)
-				dirty = append(dirty, cl)
-			}
-			a.C.Text(f, lr, l.text, l.g, kobo.AlignLeft)
-		}
-		y += h
-	}
-	*was = slices.Clone(lines)
-	return dirty
-}
-
-// markAll marks rs on the panel.
-func (a *bro) markAll(rs []image.Rectangle) {
-	for _, r := range rs {
-		a.Mark(r, true)
-	}
-}
-
-func (a *bro) drawBattery() {
-	v, ps := &a.pv, &a.pw
-	if !a.guiShows("battery") {
-		return
-	}
-	b := ps.bat
-	var lines []textLine
-	status := ""
-	if ps.at.IsZero() {
-		lines = append(lines, textLine{"looking…", kobo.Mid, false})
-	} else if !b.ok {
-		lines = append(lines, textLine{"no battery found", kobo.Dark, false})
-	} else {
-		word := "on battery"
-		if b.charging() {
-			word = strings.ToLower(b.status)
-		}
-		status = fmt.Sprintf("%d%%", b.pct) // the current is below: here it'd change the strip each time
-		lines = append(lines, textLine{fmt.Sprintf("%d%% · %s", b.pct, word), kobo.Black, true})
-		flow := "drawing"
-		if b.charging() {
-			flow = "taking in"
-		}
-		lines = append(lines, textLine{fmt.Sprintf("%s %d mA · %.2f W at %.2f V", flow, b.ma, float64(b.ma)*float64(b.mv)/1e6, float64(b.mv)/1000), kobo.Black, false})
-		gauge := ""
-		switch {
-		case b.charging() && b.toFull > 0 && b.toFull < 24*time.Hour:
-			gauge = "the gauge: full in " + hoursMins(b.toFull)
-		case !b.charging() && b.toEmpty > 0:
-			gauge = "the gauge: " + hoursMins(b.toEmpty) + " left"
-		}
-		lines = append(lines, textLine{strings.Join(nonEmpty(gauge, fmt.Sprintf("%.1f °C", float64(b.temp)/10), "health "+strings.ToLower(b.health)), " · "), kobo.Black, false})
-		if rate, over, ok := drainRate(ps.hist); ok {
-			l := fmt.Sprintf("measured: %+.1f %%/h over %s", rate, hoursMins(over))
-			if rate < 0 && !b.charging() {
-				l += fmt.Sprintf(" · %s left at that", hoursMins(time.Duration(float64(b.pct)/-rate*float64(time.Hour))))
-			}
-			lines = append(lines, textLine{l, kobo.Black, false})
-		} else {
-			lines = append(lines, textLine{"measured: in a while (a sample a minute)", kobo.Mid, false})
-		}
-	}
-	var procs []textLine
-	if u := ps.use; !v.procs.Empty() && u.ok {
-		procs = append(procs, textLine{fmt.Sprintf("CPU %d%% busy · of one core:", int(u.busy*100+0.5)), kobo.Dark, false})
-		for _, p := range u.procs {
-			if p.v < 0.5 {
-				break
-			}
-			procs = append(procs, textLine{fmt.Sprintf("%6.1f%%   %s", p.v, p.name), kobo.Black, false})
-		}
-		if len(procs) == 1 {
-			procs = append(procs, textLine{"nothing busy", kobo.Mid, false})
-		}
-	}
-	// Drawn whole once (placed, focused or not), then only what changed:
-	// the strip's status, a line, the graph once a minute with a sample.
-	focused := a.guiFocused("battery")
-	pn := a.winPanel(v.batP, focused)
-	var graphAt time.Time
-	if len(ps.hist) > 0 {
-		graphAt = ps.hist[len(ps.hist)-1].at
-	}
-	if key := fmt.Sprint(v.batP, focused); key != v.shownBat {
-		v.shownBat, v.statBat, v.batLines, v.procLines = key, status, nil, nil
-		a.DrawPanel(pn, status)
-		a.drawLines(v.text, lines, &v.batLines)
-		a.drawLines(v.procs, procs, &v.procLines)
-		a.drawGraph(v.graph, ps.hist)
-		v.graphAt, v.graphDrawn = graphAt, time.Now()
-		a.Mark(v.batP.Outer, true)
-		return
-	}
-	if status != v.statBat {
-		v.statBat = status
-		a.DrawPanelTitle(pn, status)
-		a.Mark(pn.Title, true)
-	}
-	a.markAll(a.drawLines(v.text, lines, &v.batLines))
-	a.markAll(a.drawLines(v.procs, procs, &v.procLines))
-	// A new sample a minute moves the line a pixel or two, and the graph
-	// is most of the window: untouched, it's drawn again every 5 min.
-	every := time.Minute
-	if a.IdleFor() > time.Minute {
-		every = 5 * time.Minute
-	}
-	if !graphAt.Equal(v.graphAt) && !v.graph.Empty() && time.Since(v.graphDrawn) >= every {
-		v.graphAt, v.graphDrawn = graphAt, time.Now()
-		a.C.Fill(v.graph, kobo.White)
-		a.drawGraph(v.graph, ps.hist)
-		a.Mark(v.graph, true)
-	}
-}
-
-// drawGraph draws the battery's last hours in r: percent up, time along.
-func (a *bro) drawGraph(r image.Rectangle, h []batSample) {
-	if r.Empty() {
-		return
-	}
-	c := a.C
-	labelW := kobo.TextWidth(a.F.Small, "100%") + 12
-	plot := image.Rect(r.Min.X+labelW, r.Min.Y+8, r.Max.X-8, r.Max.Y-44)
-	now := time.Now()
-	for _, pct := range []int{0, 50, 100} {
-		y := plot.Max.Y - pct*plot.Dy()/100
-		c.Fill(image.Rect(plot.Min.X, y, plot.Max.X, y+1), kobo.Light)
-		c.Text(a.F.Small, image.Rect(r.Min.X, y-20, plot.Min.X-8, y+20), strconv.Itoa(pct)+"%", kobo.Mid, kobo.AlignRight)
-	}
-	c.Frame(plot, 2, kobo.Dark)
-	for i := 1; i < 4; i++ { // a tick every 3 h
-		x := plot.Min.X + i*plot.Dx()/4
-		c.Fill(image.Rect(x, plot.Max.Y-8, x+2, plot.Max.Y), kobo.Dark)
-	}
-	under := image.Rect(plot.Min.X, plot.Max.Y+4, plot.Max.X, r.Max.Y)
-	c.Text(a.F.Small, under, fmt.Sprintf("%d h ago", int(graphSpan.Hours())), kobo.Mid, kobo.AlignLeft)
-	c.Text(a.F.Small, under, "now", kobo.Mid, kobo.AlignRight)
-	pt := func(s batSample) image.Point {
-		x := plot.Max.X - int(float64(plot.Dx())*now.Sub(s.at).Seconds()/graphSpan.Seconds())
-		return image.Pt(x, plot.Max.Y-s.pct*plot.Dy()/100)
-	}
-	var last *batSample
-	for i := range h {
-		s := &h[i]
-		if now.Sub(s.at) > graphSpan {
-			continue
-		}
-		g := uint8(kobo.Black)
-		if s.charging {
-			g = kobo.Dark
-		}
-		if last != nil && s.at.Sub(last.at) < 15*time.Minute { // a gap: hellobro was off
-			c.Line(pt(*last), pt(*s), 2, g, plot)
-		} else {
-			c.Disc(pt(*s), 3, g, plot)
-		}
-		last = s
-	}
-	if len(h) == 0 || now.Sub(h[len(h)-1].at) > graphSpan {
-		c.Text(a.F.Small, plot, "a sample a minute, from now on", kobo.Mid, kobo.AlignCenter)
-	}
-}
-
-func (a *bro) drawUsage() {
-	v, ps := &a.pv, &a.pw
-	if !a.guiShows("usage") {
-		return
-	}
-	u := ps.use
-	var lines []textLine
-	add := func(g uint8, format string, args ...any) {
-		lines = append(lines, textLine{fmt.Sprintf(format, args...), g, false})
-	}
-	if !u.ok {
-		add(kobo.Mid, "looking… (a sample every %d s)", int(a.powerEvery().Seconds()))
-	} else {
-		cores := u.cores
-		if cores == "0" {
-			cores = "one core on"
-		} else {
-			cores = "cores " + cores + " on"
-		}
-		add(kobo.Black, "CPU %d%% busy · %s · load %s", int(u.busy*100+0.5), cores, u.load)
-		add(kobo.Black, "speed: %s", shares(u.freqs, 3, func(v float64) string { return pct(v) }))
-		add(kobo.Black, "asleep: %s", shares(u.cstates, 4, func(v float64) string { return pct(v) }))
-		add(kobo.Black, "wakeups %.0f/s: %s", u.wakeups, shares(u.irqs, 4, func(v float64) string { return fmt.Sprintf("%.0f", v) }))
-		add(kobo.Black, "%s", a.powerDevices())
-		lines = append(lines, textLine{"", kobo.Black, false})
-		add(kobo.Dark, "busy, of one core:")
-		for _, p := range u.procs {
-			if p.v < 0.5 {
-				break
-			}
-			add(kobo.Black, "%6.1f%%   %s", p.v, p.name)
-		}
-	}
-	focused := a.guiFocused("usage")
-	pn := a.winPanel(v.useP, focused)
-	status := fmt.Sprintf("every %d s", int(a.powerEvery().Seconds()))
-	if key := fmt.Sprint(v.useP, focused); key != v.shownUse {
-		v.shownUse, v.statUse, v.useLines = key, status, nil
-		a.DrawPanel(pn, status)
-		a.drawLines(v.useText, lines, &v.useLines)
-		a.Mark(v.useP.Outer, true)
-		return
-	}
-	if status != v.statUse {
-		v.statUse = status
-		a.DrawPanelTitle(pn, status)
-		a.Mark(pn.Title, true)
-	}
-	a.markAll(a.drawLines(v.useText, lines, &v.useLines))
+	a.inkRedraw("battery")
+	a.inkRedraw("usage")
 }
 
 // powerDevices are the things that draw besides the CPU: the radios and
@@ -817,5 +516,3 @@ func hoursMins(d time.Duration) string {
 func nonEmpty(ss ...string) []string {
 	return slices.DeleteFunc(ss, func(s string) bool { return s == "" })
 }
-
-func (a *bro) powerTap(p image.Point) {}
