@@ -167,6 +167,7 @@ func makeCommands() []*command {
 			run: func(a *bro) { a.stepLight(-lightStep) }},
 		&command{id: "light.toggle", title: "Light: on / off (the backlight)", keys: []string{"mod+\\"}, run: (*bro).toggleLight},
 		&command{id: "rotate", title: "Rotate the screen", run: func(a *bro) { a.Rotate() }},
+		&command{id: "screenshot", title: "Screenshot: a part of the screen, or all", keys: []string{"mod+shift+p"}, run: (*bro).shotStart},
 	)
 	for r, name := range []string{"Portrait", "Landscape", "Portrait, upside down", "Landscape, the other way"} {
 		cs = append(cs, &command{id: "screen." + []string{"portrait", "landscape", "portrait2", "landscape2"}[r], title: "Screen: " + name,

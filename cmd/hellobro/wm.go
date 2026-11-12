@@ -627,6 +627,8 @@ func (a *bro) menuEntries() []pickEntry {
 	var entries []pickEntry
 	for _, t := range []struct{ id, title, note, icon string }{
 		{"rotate", "Rotate", "the screen", "rotate"},
+		{"set.auto-rotate", "Auto-rotate", "", "autorotate"},
+		{"screenshot", "Screenshot", "a part, or all", "screenshot"},
 		{"calibrate", "Touch", "calibrate", "touch"},
 		{"keyboard", "Keyboard", "on the screen", "keyboard"},
 		{"light.toggle", "Light", "on / off", "light"},
@@ -655,6 +657,10 @@ func (a *bro) menuEntries() []pickEntry {
 			if a.vk.on {
 				e.detail = "shown"
 			}
+		case t.id == "set.auto-rotate": // how it is; tapped, the menu stays to show it
+			on := a.setting("auto-rotate") == "on"
+			e.on, e.stay, e.detail = on, true, onOff(on)
+			e.do = func() { a.pickSetting(settingIndex("auto-rotate"), 1-a.set["auto-rotate"]) }
 		case t.id == "wifi":
 			e.on, e.stay, e.do = r.ws.On, true, func() { a.radioFlip(panelWiFi) }
 			e.hold = func() { a.openGUI("wifi") } // held: its window, the networks

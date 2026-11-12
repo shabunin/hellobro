@@ -119,7 +119,7 @@ The bar; remembered in `bar`); a full-screen window has none either.
 
 A swipe up or down along the right edge of the screen opens the menu,
 tiles big enough for a finger, each an icon, a word and its keys: rotate
-the screen, touch calibration, the on-screen keyboard, the light,
+the screen, auto-rotate (on or off, where it is), a screenshot, touch calibration, the on-screen keyboard, the light,
 Wi-Fi, Bluetooth, Settings, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
 Nickel. Tap one, or its number, or the arrows (the one they're on has
 a ring) and Enter (or type to narrow); Esc or a tap outside closes it.
@@ -152,6 +152,14 @@ nothing has touched the screen for 2 s, it turns. Lying flat it stays
 as it is. It only turns to a rotation the touch has been calibrated
 for: turn to each once with Rotate (it calibrates then). A Rotate by
 hand stays till the Kobo is turned again. It's off at first.
+
+**Screenshot** (the quick menu, the switcher, or Shift+Mod+P): the menu
+goes, and the screen is kept as it was then. Drag a rectangle round a
+part of it (a finger or the pen; its outline is dashed) to keep that
+part, tap anywhere for all of it, or Esc for none. It's a PNG in
+`Screenshots` on the Kobo's storage (`hellobro-2026-11-12-190130.png`,
+over USB or file sharing), and the clipboard's picture as well, to
+paste into a notebook (Ctrl+V).
 
 Settings, Touch, **Sizes**: **for fingers** (the default) has a
 taller bar and title strips, bigger window buttons, and

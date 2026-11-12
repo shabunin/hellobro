@@ -387,6 +387,11 @@ func appIcon(id string) []iconPart {
 		return ps
 	case "rotate":
 		return noteIcon("turn")
+	case "autorotate": // turning, an A in it
+		return append(noteIcon("turn"), iconLine(0.5, 9.8, 15, 12, 9, 14.2, 15), iconLine(0.5, 10.6, 13, 13.4, 13))
+	case "screenshot": // a frame's corners, round a part
+		return []iconPart{iconLine(0.9, 3, 8, 3, 3, 8, 3), iconLine(0.9, 16, 3, 21, 3, 21, 8), iconLine(0.9, 21, 16, 21, 21, 16, 21),
+			iconLine(0.9, 8, 21, 3, 21, 3, 16), box(8, 9, 16, 15)}
 	case "light":
 		ps := []iconPart{ring(12, 12, 4, 0.8)}
 		for k := range 8 {

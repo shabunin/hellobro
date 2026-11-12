@@ -63,6 +63,7 @@ type bro struct {
 	nt     noteState    // the notebooks' pen (notebook.go)
 	lay    kobo.Layout  // the last layout, to lay out again
 	th     *theme.Theme // the ink windows' look (inkwin.go)
+	shot   *shot        // a screenshot being taken (shot.go)
 }
 
 const (
@@ -253,6 +254,11 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.Calibrating():
 		return false
+	case a.shot != nil && m.Code == kobo.KeyEsc:
+		if m.Value == 1 {
+			a.shotCancel()
+		}
+		return true
 	case a.asking != nil:
 		a.askKey(m.Code, m.Value)
 		return true
@@ -290,6 +296,9 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			a.nt.hoverAt = time.Now()
 		}
 	case ev.Kind == kobo.TouchDown:
+		if a.shotDown(p, g) {
+			return
+		}
 		if a.vkTouch(p, g) {
 			return
 		}
@@ -311,6 +320,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		default:
 			a.selStart(p, g)
 		}
+	case a.shotMove(p, g):
 	case a.inkMove(ev, p, g):
 	case a.noteMove(ev, p, g):
 	case a.vkMove(p, g):
@@ -466,7 +476,7 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.bk.hold == g {
 		a.bk.hold = nil
 	}
-	if a.inkLift(g) || a.vkLift(g) || a.selLift(g) || a.cutLift(g) || a.wmDragLift(g) || a.noteLift(g) {
+	if a.shotLift(g) || a.inkLift(g) || a.vkLift(g) || a.selLift(g) || a.cutLift(g) || a.wmDragLift(g) || a.noteLift(g) {
 		return
 	}
 	if a.edge == g {
