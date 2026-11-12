@@ -200,6 +200,7 @@ func (a *bro) Tick() {
 	a.ipcTick()
 	a.noteTick()
 	a.holdTick()
+	a.noteHoldTick()
 	a.inkTick()
 	a.wmSettle(false)
 	a.wmKeep(false)

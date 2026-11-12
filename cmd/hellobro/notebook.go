@@ -444,14 +444,15 @@ type noteInk struct {
 
 type noteState struct {
 	ink      *noteInk
-	drag     *noteDrag   // the select tool's
-	unsaved  []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here
-	triedAt  time.Time   // when they were last tried
-	lookedAt time.Time   // when the open ones' files were last looked at
-	liftAt   time.Time   // the last stroke's end, for noteClean
-	hoverAt  time.Time   // the pen last seen in the air, over the screen
-	taps     diaryTapper // a finger's taps on a page, for the diary (notediary.go)
-	wizDir   string      // the folder the new notebook's wizard makes it in (notewizard.go)
+	drag     *noteDrag     // the select tool's
+	unsaved  []*notebook   // closed but not kept (a full card, say): kept when they can be; opened, from here
+	triedAt  time.Time     // when they were last tried
+	lookedAt time.Time     // when the open ones' files were last looked at
+	liftAt   time.Time     // the last stroke's end, for noteClean
+	hoverAt  time.Time     // the pen last seen in the air, over the screen
+	taps     diaryTapper   // a finger's taps on a page, for the diary (notediary.go)
+	wizDir   string        // the folder the new notebook's wizard makes it in (notewizard.go)
+	hold     *kobo.Gesture // a finger on a page, where fingers turn them: held, it selects (notesel.go)
 }
 
 const (
@@ -1288,6 +1289,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	}
 	if !ev.Pen && a.fingerTurns() {
 		g.Owner = ownLeaf
+		a.nt.hold = g // held still, it takes what's there (noteHoldTick)
 		return true
 	}
 	if a.nt.ink != nil {

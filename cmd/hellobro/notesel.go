@@ -31,6 +31,7 @@ import (
 	"math"
 	"os"
 	"slices"
+	"time"
 
 	"hellobro/kobo"
 )
@@ -66,6 +67,7 @@ type noteDrag struct {
 	kind   int
 	corner int               // dragScale: which (0 top left, clockwise)
 	shown  []image.Rectangle // what the last frame drew over, on screen
+	held   bool              // a finger held: lifted where it was, nothing more
 }
 
 // noteMark is where the next paste goes: a page, and a point on it.
@@ -448,6 +450,7 @@ func (a *bro) noteDragEnd(g *kobo.Gesture) {
 				return
 			}
 		}
+	case d.shown == nil && d.held: // what the hold took stays taken
 	case d.shown == nil:
 		w.selectAt(d.page, w.toPage(d.from, d.at))
 	case d.kind == dragMove:
@@ -859,4 +862,43 @@ func (w *noteWin) pasteWhere(size image.Point) (int, image.Rectangle) {
 func (w *noteWin) pasted(page int, s *noteStroke) {
 	w.erasing, w.selecting = false, true
 	w.sel, w.selPage = []*noteStroke{s}, page
+}
+
+// noteHoldTick: a finger held still on a page where fingers turn them
+// (the pen writes) picks up the select tool. What's under it is taken,
+// and the finger goes on as the select tool's: dragged, it moves it;
+// with nothing there, it draws the rectangle to take what's in it.
+func (a *bro) noteHoldTick() {
+	g := a.nt.hold
+	switch {
+	case g == nil:
+		return
+	case g.Owner != ownLeaf || g.Moved >= holdSlop: // a swipe, or done
+		a.nt.hold = nil
+		return
+	case time.Since(g.At) < selHold:
+		return
+	}
+	a.nt.hold = nil
+	w, ok := a.windowAt(g.Start).(*noteWin)
+	slot := -1
+	if ok {
+		slot = w.slotAt(g.Start)
+	}
+	if !ok || slot < 0 || a.overlay() || w.overview || w.settings || w.texting || w.linking != nil || a.nt.drag != nil {
+		return
+	}
+	before := w.selArea(a)
+	w.setTool(a, "select")
+	page := w.cur + slot
+	w.sel, w.mark = nil, nil
+	if w.selectAt(page, w.toPage(g.Start, w.slots[slot])); w.mark != nil { // nothing there: no paste mark
+		w.mark = nil
+	}
+	log.Printf("notebook %s: held, the select tool: %d taken", w.nb.name, len(w.sel))
+	if a.noteSelTouch(w, slot, g.Start, g) {
+		a.nt.drag.held = true
+	}
+	w.selChanged(a, before)
+	g.NoLight()
 }

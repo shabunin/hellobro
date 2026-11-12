@@ -1010,7 +1010,12 @@ width, its gray.
   remembered (`pen` in `hellobro.json`). The notebook's settings, **A
   finger**, chooses instead: **writes** (fingers always write, as
   the pen does) or **turns** (fingers only turn pages, so a hand resting
-  on the screen writes nothing; only the pen writes). Near the left and
+  on the screen writes nothing; only the pen writes). Where fingers
+  turn pages, a finger held still on the page for 0.6 s picks up the
+  select tool: what's under it is taken (its frame and buttons show),
+  and the same finger dragged on moves it; held where nothing is and
+  dragged, it draws the rectangle that takes what's in it (below).
+  The pen, P, puts the select tool down again. Near the left and
   right edges a finger writes nothing: those are the light's and the
   workspaces' swipes. Full screen, the right edge is still the menu's
   (it's everywhere), and the left edge is the light's unless the settings' **Light by the
