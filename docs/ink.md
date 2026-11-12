@@ -102,14 +102,34 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 
 `cmd/gallery` is an app of its own beside hellobro, as brotools is: its
 page is one ink window (`ink/inkkobo`), the header and its buttons the
-Kobo app's as ever. It's where the components are made and tried;
-hellobro doesn't use ink yet. Its header switches between the components
+Kobo app's as ever. It's where the components are made and tried. Its header switches between the components
 (a tab each: Controls, Pickers, Text, Lists, Scroll, Table, Tree,
 Grid, Draw, Popups) and the demos: a Calendar (a day, a week of hours,
 a month, an agenda; an event opened, a new one added) and a Mail (three
 columns across, two upright; search, reply, flag, archive, a new
 message). The apps move onto it one window at a
 time once the controls they need are in the gallery.
+
+## In hellobro
+
+hellobro's windows move onto ink one at a time, each step a build that
+works. In ink now: the settings' windows (Settings, Sharing, Wi-Fi,
+Bluetooth, Battery, What uses it, Keys), the questions, facts and
+cheat sheets (`over.go`, a card over the page), the switcher and its
+menus, the quick menu and the workspaces (tiles, a workspace's windows
+painted small into them), the launcher, the books' shelf, a book's
+contents, bookmarks and pages small (`libui.go`, a PDF's as a grid),
+the reader's style panel, the notebooks' list and settings, and the
+book's and the notebook's bars. A window's ink is a pane over its body
+(`inkBody`); what's drawn its own way (a page, thumbnails, the pen's
+sample) goes in through `ink.Draw` or a kept image.
+
+Still drawn the old way: the window manager's bar and title strips
+(`kobo`), an empty workspace, the keyboard on the screen, the notices,
+the ex line, the book's note, dictionary and cut buttons, the
+notebook's tool choices, overview strip and selection buttons, and the
+bodies themselves (terminal cells, book pages, notebook ink), which
+stay drawn their own way for speed.
 
 ```sh
 make gallery              # the ARM build
