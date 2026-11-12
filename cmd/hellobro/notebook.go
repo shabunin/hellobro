@@ -389,9 +389,9 @@ type noteWin struct {
 	mark       *noteMark // where the next paste goes
 	optsOf     string    // whose choices are out, under its button: "pen", "paper", "" none (notepen.go)
 	opts       []barBtn
-	settings   bool // its settings shown, over it (notesettings.go)
-	set        *noteSetUI // and their ink
-	barUI      *barUI     // the bar's ink
+	settings   bool        // its settings shown, over it (notesettings.go)
+	set        *noteSetUI  // and their ink
+	barUI      *barUI      // the bar's ink
 	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
 	slotSize   image.Point // the page size the slots are for
 	exporting  bool        // a PDF of it being written (noteexport.go)
