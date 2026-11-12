@@ -199,7 +199,7 @@ func xoppToPic(xi xoppImage) (*noteStroke, error) {
 			s.attrs = append(s.attrs, a)
 		}
 	}
-	p.ink = attr(s.attrs, texAttr) != ""
+	p.ink = attr(s.attrs, texAttr) != "" || attr(s.attrs, mermaidAttr) != ""
 	return s, nil
 }
 

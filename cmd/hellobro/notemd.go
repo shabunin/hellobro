@@ -20,10 +20,14 @@ import (
 	"golang.org/x/image/font"
 
 	"hellobro/md"
+	"hellobro/mermaid"
 	"hellobro/tex"
 )
 
-const texAttr = "hellobro-tex" // a formula's source, on its picture
+const (
+	texAttr     = "hellobro-tex"     // a formula's source, on its picture
+	mermaidAttr = "hellobro-mermaid" // a diagram's
+)
 
 // mdAtom is a piece of a line: a word in a font, or a formula drawn.
 type mdAtom struct {
@@ -123,7 +127,9 @@ func (w *noteWin) diaryLayMD(page int, below image.Rectangle, r diaryReply, fam 
 			lines[0] = append([]mdPlaced{{a: mk, x: -mw, grp: -1}}, lines[0]...)
 			l.lines(lines, ix+mw, x0+width-ix-mw)
 		case md.Code:
-			l.code(b.Text, x0, width)
+			if !isDiagram(b) || !l.diagram(b.Text, x0, width) {
+				l.code(b.Text, x0, width)
+			}
 		case md.Math:
 			l.lines([][]mdPlaced{{{a: l.formula(b.Text, true, pt)}}}, x0, width)
 		case md.Table:
@@ -422,6 +428,81 @@ func (l *mdLay) line(ln []mdPlaced, x0, width int) {
 		i = j
 	}
 	l.y = base + desc + lead - lead/2
+}
+
+// isDiagram says if a block of code is a diagram in Mermaid's language:
+// marked so, or unmarked and starting as one does.
+func isDiagram(b md.Block) bool {
+	if strings.EqualFold(b.Lang, "mermaid") {
+		return true
+	}
+	if b.Lang != "" {
+		return false
+	}
+	f := strings.Fields(b.Text)
+	if len(f) == 0 {
+		return false
+	}
+	switch f[0] {
+	case "graph", "flowchart", "sequenceDiagram", "stateDiagram", "stateDiagram-v2", "pie":
+		return true
+	}
+	return false
+}
+
+// diagram draws a diagram (package mermaid), centered, a picture that
+// keeps its source: its letters a little smaller than the text's, and
+// smaller again where it'd be wider than the text or higher than a page.
+// False if it's not one it draws: it's code then.
+func (l *mdLay) diagram(src string, x0, width int) bool {
+	em := float64(l.em()) * 0.85
+	maxH := l.bottom() - diaryMargin
+	var r mermaid.Result
+	for try := 0; try < 4; try++ {
+		var err error
+		if r, err = mermaid.Render(src, mermaid.Options{Em: em, Face: l.diagramFace}); err != nil {
+			log.Printf("diary: a diagram it doesn't draw: %v", err)
+			return false
+		}
+		b := r.Img.Bounds()
+		k := min(float64(width)/float64(b.Dx()), float64(maxH)/float64(b.Dy()))
+		if k >= 1 || em <= 8 {
+			break
+		}
+		em = max(8, em*k*0.97)
+	}
+	b := r.Img.Bounds()
+	k := min(1, float64(width)/float64(b.Dx()), float64(maxH)/float64(b.Dy())) // at the smallest, the picture made smaller
+	w, h := int(float64(b.Dx())*k), int(float64(b.Dy())*k)
+	ink := image.NewNRGBA(b) // black, as transparent as the drawing's white: on any paper
+	for i, g := range r.Img.Pix {
+		ink.Pix[4*i+3] = 255 - g
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, ink)
+	l.need(h)
+	x := x0 + (width-w)/2
+	s := picStroke(&notePic{png: buf.Bytes(), gray: r.Img, ink: true}, image.Rect(x, l.y, x+w, l.y+h))
+	s.attrs = l.first([]xml.Attr{{Name: xml.Name{Local: diaryAttr}, Value: "diary"}, {Name: xml.Name{Local: mermaidAttr}, Value: src}})
+	l.w.diary.writing = append(l.w.diary.writing, diaryWord{page: l.page, strokes: []*noteStroke{s}})
+	l.y += h
+	return true
+}
+
+// diagramFace is the notebook's font for a diagram's labels, in a style;
+// code in Go Mono.
+func (l *mdLay) diagramFace(st md.Style, px float64) font.Face {
+	if st&md.Mono != 0 {
+		return noteFontFace(famGoMono, int(px+0.5))
+	}
+	style := 0
+	if st&md.Bold != 0 {
+		style |= styleBold
+	}
+	if st&md.Italic != 0 {
+		style |= styleItalic
+	}
+	return noteFontFace(fontName(l.fam, style), int(px+0.5))
 }
 
 // code is a block of code, in Go Mono, framed: its lines cut where

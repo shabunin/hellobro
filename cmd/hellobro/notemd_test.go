@@ -11,7 +11,8 @@ import (
 
 const mdAnswer = "## Solving\n\nThe roots of $ax^2+bx+c=0$ are **two**:\n\n$$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$\n\n" +
 	"- one *item*\n- two `code`\n  1. deeper\n\n```go\nfunc f(x float64) float64 {\n\treturn x*x // a long comment that goes on and on past the frame's edge for sure\n}\n```\n\n" +
-	"| a | b |\n|---|--:|\n| Привет | αβγ |\n\n> a quote\n\n---\nThe end."
+	"| a | b |\n|---|--:|\n| Привет | αβγ |\n\n> a quote\n\n```mermaid\ngraph LR\n  A[Начало] -->|да| B{$x > 0$?}\n```\n\n" +
+	"```mermaid\ngantt\n  title not drawn: code\n```\n\n---\nThe end."
 
 func TestDiaryLayMD(t *testing.T) {
 	q := lineAt(300, false)
@@ -26,7 +27,7 @@ func TestDiaryLayMD(t *testing.T) {
 		w.diaryWriteWord(a)
 	}
 	var texts []string
-	pics, lines := 0, 0
+	pics, lines, diagrams := 0, 0, 0
 	for _, pg := range w.nb.pages {
 		for _, s := range pg[:] {
 			if s == q {
@@ -40,7 +41,9 @@ func TestDiaryLayMD(t *testing.T) {
 				texts = append(texts, s.txt.s)
 			case s.pic != nil:
 				pics++
-				if attr(s.attrs, texAttr) == "" {
+				if attr(s.attrs, mermaidAttr) != "" {
+					diagrams++
+				} else if attr(s.attrs, texAttr) == "" {
 					t.Error("a formula without its source")
 				}
 			default:
@@ -49,13 +52,13 @@ func TestDiaryLayMD(t *testing.T) {
 		}
 	}
 	all := strings.Join(texts, "|")
-	for _, want := range []string{"Solving", "two", "•", "item", "code", "1.", "func f(x float64) float64 {", "Привет", "αβγ", "a quote", "The end."} {
+	for _, want := range []string{"Solving", "two", "•", "item", "code", "1.", "func f(x float64) float64 {", "Привет", "αβγ", "a quote", "gantt", "The end."} {
 		if !strings.Contains(all, want) {
 			t.Errorf("no %q in %s", want, all)
 		}
 	}
-	if pics != 2 || lines < 4 {
-		t.Errorf("%d formulas, %d lines (frame, rules, bar)", pics, lines)
+	if pics != 3 || diagrams != 1 || lines < 4 {
+		t.Errorf("%d pictures, %d diagrams, %d lines (frame, rules, bar)", pics, diagrams, lines)
 	}
 	if talk, _ := diaryTalk(w.nb); len(talk) != 2 {
 		t.Errorf("the talk: %+v", talk)

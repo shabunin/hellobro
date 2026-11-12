@@ -1067,6 +1067,18 @@ Book, then Go, so Cyrillic and Greek always show, as in any text in a
 notebook. In plain text, `x^2` and `2^{10}` are written as powers (x²,
 2¹⁰).
 
+A diagram comes as a ` ```mermaid ` block, in Mermaid's language, and
+is drawn: flowcharts (`graph`, `flowchart`: its shapes, `-->` `-.->`
+`==>` and labeled edges, subgraphs, any direction), state diagrams
+(`stateDiagram-v2`: `[*]`, composite states, choices, forks), sequence
+diagrams (`sequenceDiagram`: participants and actors, the arrows,
+notes, `loop`/`alt`/`opt`/`par` frames, `autonumber`) and pies. Laid
+out in ranks as Mermaid's own (dagre) does, its labels in the
+notebook's font, Markdown and `$...$` formulas in them too. It's a
+picture, made smaller where it'd be wider than the text or higher than
+a page, its source kept in the `.xopp` (`hellobro-mermaid`). Other
+kinds (Gantt, class diagrams...) stay code.
+
 What it's sent: the picture, and the talk so far as text: each
 question as it read it and its answer, the last six, from all the
 notebook's pages. The talk is kept on the answers' strokes in the
@@ -1094,7 +1106,7 @@ Its settings, under the notebook's:
   styles; it comes with hellobro), Go, the fonts the books are read in
   (the Kobo's own: Georgia, Amasis and the rest), or **handwriting**
   (the Hershey script, drawn as strokes; plain text only).
-- **AI answers**: **Markdown** (code, formulas, tables, as above) or
+- **AI answers**: **Markdown** (code, formulas, tables, diagrams, as above) or
   **plain text**.
 - **AI letters' size**: medium (15 pt), small, large, huge.
 - **AI usage**: what this Kobo's questions to the model cost, over 5

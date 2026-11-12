@@ -388,7 +388,8 @@ var diaryFormats = map[string]string{
 	"hand":  "plain text, no Markdown, no LaTeX: write formulas plainly, as x^2 + 1, sqrt(2); new lines only between paragraphs",
 	"plain": "plain text, no Markdown, no LaTeX: write formulas plainly, with Unicode's signs where they help: x² + 1, √2, π, ≤, →; new lines only between paragraphs",
 	"md": "Markdown where it helps: **bold**, *italic*, lists, tables, `code` and fenced code blocks (```), a heading only in a long answer; " +
-		"formulas in LaTeX, $...$ in a line and $$...$$ on a line of their own. In the JSON, escape each backslash (\\\\frac, \\\\alpha) and write new lines as \\n",
+		"formulas in LaTeX, $...$ in a line and $$...$$ on a line of their own; a diagram, where one helps, as a ```mermaid block " +
+		"(flowchart, sequenceDiagram, stateDiagram-v2 or pie; labels with brackets or punctuation in quotes). In the JSON, escape each backslash (\\\\frac, \\\\alpha) and write new lines as \\n",
 }
 
 // diaryVoices are the manners it can answer in, by name: a notebook's

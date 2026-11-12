@@ -39,7 +39,7 @@ for i in range(3):                                   # three quick taps: asked n
     tid[0] += 1
     frame(0, ID=tid[0], TOOL=0, **at(W * 3 // 4, H * 2 // 3), P=30); time.sleep(0.05)
     frame(0, ID=-1); time.sleep(0.2)
-time.sleep(40)                                       # a long answer, onto a new page
+time.sleep(75)                                       # a long answer, onto a new page
 key(44, ctrl=True); time.sleep(4)                    # Ctrl+Z: the answer undone
 line(W // 8, H // 8 + 520, words=2); time.sleep(16)  # asked: the talk, the first answer only
 keys(":settings\n"); time.sleep(4)                    # its usage
