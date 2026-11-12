@@ -45,6 +45,7 @@ type notesWin struct {
 	asked string    // a delete asked for: what
 	askAt time.Time
 	move  *libItem // what's being moved: the folders show where to
+	lib   *libUI   // the list, in ink
 }
 
 // noteEdit is a name being typed: a notebook's or a folder's new one, or
@@ -113,7 +114,7 @@ func (w *notesWin) show(a *bro, tab int, dir string) {
 	a.mem.NotesTab, a.mem.NotesDir = tab, dir
 	a.mem.save()
 	w.load()
-	w.draw(a)
+	w.update(a)
 }
 
 func (w *notesWin) draw(a *bro) {
@@ -122,88 +123,90 @@ func (w *notesWin) draw(a *bro) {
 	}
 	pn := w.panel(a)
 	a.DrawPanel(pn, fmt.Sprintf("%d notebooks", w.n))
-	c := a.C
-	rowH := a.libRowH()
-	area := w.p.Body.Inset(kobo.Pad)
+	w.libOf(a).put(a, w.p.Body, true)
+	a.Mark(pn.Outer, true)
+}
+
+// libOf is the list's ink, made the first time.
+func (w *notesWin) libOf(a *bro) *libUI {
+	if w.lib == nil {
+		w.lib = newLibUI(a, func() libSpec { return w.libSpec(a) })
+	}
+	return w.lib
+}
+
+func (w *notesWin) inkBody(a *bro) inkBody {
+	if w.lib != nil && !w.p.Outer.Empty() && a.shows(w) && w.lib.pane.At == w.p.Body {
+		return w.lib
+	}
+	return nil
+}
+
+// update draws what changed of the list, if it shows; else all of it.
+func (w *notesWin) update(a *bro) {
+	if w.inkBody(a) != nil && !a.overlay() {
+		w.lib.put(a, w.p.Body, false)
+		return
+	}
+	w.draw(a)
+}
+
+// libSpec is the list as it is: under the header, a new notebook (in
+// the folder shown) and a new folder; or, moving, here or not. Each row
+// renames, moves or deletes it.
+func (w *notesWin) libSpec(a *bro) libSpec {
 	back := ""
 	if w.back != "" {
 		back = "back to the notebook"
 	}
-	h := a.drawLibHeader(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), "All Notebooks", true,
-		func() { w.show(a, w.tab, "") }, back, func() { w.toNotebook(a, w.back) },
-		libTabs(w.tab, func(k int) { w.show(a, k, w.dir) }))
-	w.rows = h.rows
-	area.Min.Y += rowH + 12
-	// what's made here: a notebook, a folder; or, moving, here or not
-	x := area.Min.X
-	bs := []libTab{{"+ new notebook", false, func() { w.newNotebook(a) }}, {"+ new folder", false, func() { w.startEdit(a, "", true, "") }}}
-	if w.move != nil {
-		bs = []libTab{{"move here", false, func() { w.moveHere(a) }}, {"cancel", false, func() { w.moving(a, nil) }}}
-	}
-	for _, b := range bs {
-		r := image.Rect(x, area.Min.Y, x+kobo.TextWidth(a.F.Panel, b.name)+48, area.Min.Y+rowH-12)
-		c.Frame(r, 2, kobo.Black)
-		c.Text(a.F.Panel, r, b.name, kobo.Black, kobo.AlignCenter)
-		w.rows = append(w.rows, bookRow{r, b.do})
-		x = r.Max.X + 16
+	s := libSpec{
+		id: fmt.Sprint(w.tab, w.dir, w.move != nil), sel: &w.sel, shown: &w.listN, edit: -1,
+		head: libHeadSpec{all: "All Notebooks", here: true, toAll: func() { w.show(a, w.tab, "") },
+			back: back, toBack: func() { w.toNotebook(a, w.back) }, tabs: libTabs(w.tab, func(k int) { w.show(a, k, w.dir) })},
+		tools: []libTab{{"+ new notebook", false, func() { w.newNotebook(a) }}, {"+ new folder", false, func() { w.startEdit(a, "", true, "") }}},
+		empty: "no notebooks yet: + new notebook makes one",
 	}
 	if m := w.move; m != nil {
+		s.tools = []libTab{{"move here", false, func() { w.moveHere(a) }}, {"cancel", false, func() { w.moving(a, nil) }}}
 		where := "to the top"
 		if w.dir != "" {
 			where = "to " + w.dir
 		}
-		c.Text(a.F.Small, image.Rect(x+16, area.Min.Y, area.Max.X, area.Min.Y+rowH-12), m.name+" "+where+"?", kobo.Mid, kobo.AlignLeft)
+		s.toolNote = m.name + " " + where + "?"
 	} else if w.tab == libFolders && w.dir != "" {
-		c.Text(a.F.Small, image.Rect(x+16, area.Min.Y, area.Max.X, area.Min.Y+rowH-12), "in "+w.dir, kobo.Mid, kobo.AlignLeft)
+		s.toolNote = "in " + w.dir
 	}
-	area.Min.Y += rowH
 	items := w.items
-	if e := w.edit; e != nil && e.key == "" { // a new folder's name: at the top
-		items = append([]libItem{{dir: true}}, items...)
-	}
-	n := max(1, area.Dy()/rowH)
-	w.listN = n
-	if len(items) == 0 {
-		c.Text(a.F.Body, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), "no notebooks yet: + new notebook makes one", kobo.Dark, kobo.AlignLeft)
-		a.Mark(pn.Outer, true)
-		return
-	}
-	w.sel = max(0, min(w.sel, len(items)-1))
-	if w.sel < w.top {
-		w.top = w.sel
-	} else if w.sel >= w.top+n {
-		w.top = w.sel - n + 1
-	}
-	w.top = max(0, min(w.top, len(items)-n))
-	for k := 0; k < n && w.top+k < len(items); k++ {
-		i := w.top + k
-		it := items[i]
-		r := image.Rect(area.Min.X, area.Min.Y+k*rowH, area.Max.X, area.Min.Y+(k+1)*rowH)
-		if e := w.edit; e != nil && e.key == it.key && e.dir == it.dir && !it.up {
-			w.drawEdit(a, r)
-			continue
+	if e := w.edit; e != nil {
+		if e.key == "" { // a new folder's name: at the top
+			items = append([]libItem{{dir: true}}, items...)
+			s.edit = 0
 		}
-		var btns []libTab
-		if !it.up && w.move == nil {
-			del := "×"
-			if w.asking(it.key) {
-				del = "delete?"
+		for i, it := range items {
+			if s.edit < 0 && e.key == it.key && e.dir == it.dir && !it.up {
+				s.edit = i
 			}
-			btns = []libTab{{"rename", false, func() { w.startEdit(a, it.key, it.dir, path.Base(it.key)) }},
-				{"move", false, func() { w.moving(a, &it) }}, {del, false, func() { w.remove(a, it) }}}
 		}
-		w.rows = append(w.rows, a.drawLibRow(r, it, i == w.sel, func() { w.open(a, it) }, btns...)...)
+		s.prompt, s.typed = "name:", e.text
+		if e.key == "" {
+			s.prompt = "new folder:"
+		}
+		s.editOK, s.editNo = func() { w.endEdit(a, true) }, func() { w.endEdit(a, false) }
 	}
-	a.Mark(pn.Outer, true)
-}
-
-// drawEdit draws the name being typed in r, with ok and cancel.
-func (w *notesWin) drawEdit(a *bro, r image.Rectangle) {
-	prompt := "name: "
-	if w.edit.key == "" {
-		prompt = "new folder: "
+	s.items = items
+	s.open = func(i int) { w.open(a, items[i]) }
+	s.buttons = func(_ int, it libItem) []libTab {
+		if it.up || w.move != nil {
+			return nil
+		}
+		del := "×"
+		if w.asking(it.key) {
+			del = "delete?"
+		}
+		return []libTab{{"rename", false, func() { w.startEdit(a, it.key, it.dir, path.Base(it.key)) }},
+			{"move", false, func() { w.moving(a, &it) }}, {del, false, func() { w.remove(a, it) }}}
 	}
-	w.rows = append(w.rows, a.drawNameEdit(r, prompt, w.edit.text, func() { w.endEdit(a, true) }, func() { w.endEdit(a, false) })...)
+	return s
 }
 
 // open opens the folder, or the notebook in this window (or focuses
@@ -473,7 +476,7 @@ func (w *notesWin) asking(key string) bool {
 func (w *notesWin) remove(a *bro, it libItem) {
 	if !w.asking(it.key) {
 		w.asked, w.askAt, w.edit = it.key, time.Now(), nil
-		w.draw(a)
+		w.update(a)
 		return
 	}
 	w.asked = ""
@@ -541,7 +544,7 @@ func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 		if done, ok := nameKey(&e.text, code, ch); done {
 			w.endEdit(a, ok)
 		} else {
-			w.draw(a)
+			w.update(a)
 		}
 		return true
 	}
@@ -597,7 +600,7 @@ func (w *notesWin) press(a *bro, code uint16, value int32) bool {
 	default:
 		return false
 	}
-	w.draw(a)
+	w.update(a)
 	return true
 }
 
@@ -608,21 +611,6 @@ func (w *notesWin) tap(a *bro, p image.Point) {
 			return
 		}
 	}
-}
-
-// swipe up or down goes a screenful on or back.
-func (w *notesWin) swipe(a *bro, from, to image.Point) {
-	d := to.Sub(from)
-	if kobo.Abs(d.Y) < 60 || kobo.Abs(d.Y) < 2*kobo.Abs(d.X) {
-		return
-	}
-	n := max(1, w.listN-1)
-	if d.Y > 0 {
-		n = -n
-	}
-	w.sel += n
-	w.top += n
-	w.draw(a)
 }
 
 func (w *notesWin) closing(a *bro) {

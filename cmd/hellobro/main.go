@@ -485,9 +485,6 @@ func (a *bro) Lift(g *kobo.Gesture) {
 		case *bookWin:
 			w.swipe(a, g.Start, g.Last)
 			return
-		case *notesWin:
-			w.swipe(a, g.Start, g.Last)
-			return
 		}
 		a.termSwipe(g.Start, g.Last)
 	}
