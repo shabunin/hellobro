@@ -23,11 +23,12 @@ import (
 
 // ScreenInfo is the screen as FBInk has it set up.
 type ScreenInfo struct {
-	ViewW, ViewH      int // what we draw into
-	ScreenW, ScreenH  int // full panel in the current rotation
-	OriginX, OriginY  int // viewport offset inside the panel
-	Rota              int // current native rotation (what FBINK_FORCE_ROTA takes)
-	Canonical         int // FB_ROTATE_* as the device is physically held: 0 UR, 1 CW, 2 UD, 3 CCW
+	ViewW, ViewH      int    // what we draw into
+	ScreenW, ScreenH  int    // full panel in the current rotation
+	OriginX, OriginY  int    // viewport offset inside the panel
+	Rota              int    // current native rotation (what FBINK_FORCE_ROTA takes)
+	Canonical         int    // FB_ROTATE_* as the device is physically held: 0 UR, 1 CW, 2 UD, 3 CCW
+	RotaMap           [4]int // each native rotation's canonical one
 	Swap, MirX, MirY  bool
 	Version, Codename string
 	Device            string // name, platform and ID, as FBInk knows the device
@@ -218,10 +219,15 @@ func parseFbinkState(dump string) (ScreenInfo, error) {
 		return s, fmt.Errorf("unexpected fbink -e output: %q", dump)
 	}
 	// rotationMap='{ a, b, c, d }': index is native, value is canonical.
-	s.Canonical = s.Rota
+	s.Canonical, s.RotaMap = s.Rota, [4]int{0, 1, 2, 3}
 	m := strings.Fields(strings.NewReplacer("{", "", "}", "", ",", " ").Replace(kv["rotationMap"]))
-	if len(m) == 4 && s.Rota >= 0 && s.Rota < 4 {
-		s.Canonical, _ = strconv.Atoi(m[s.Rota])
+	if len(m) == 4 {
+		for i := range m {
+			s.RotaMap[i], _ = strconv.Atoi(m[i])
+		}
+		if s.Rota >= 0 && s.Rota < 4 {
+			s.Canonical = s.RotaMap[s.Rota]
+		}
 	}
 	return s, nil
 }

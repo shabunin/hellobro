@@ -64,6 +64,9 @@ var settingList = []setting{
 		shown:  []string{"for a text field (a name, find, a note's text)", "off", "when no keyboard is connected (after 10 s)", "always"}},
 	{key: "languages", label: "Languages to type in%s", cmd: "language", // a tap: ticks to choose them (langs.go)
 		values: langValues(false), shown: langValues(true)},
+	{key: "auto-rotate", group: "Screen", label: "Auto-rotate",
+		values: []string{"off", "on"},
+		shown:  []string{"off: turned by Rotate only", "turns as it's held (to a rotation calibrated once)"}},
 	{key: "touch-marks", group: "Touch", label: "Touch marks",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "a ring where it touched, a dot where it lifted, for 3 s"}},
@@ -350,6 +353,8 @@ func (a *bro) pickSetting(i, v int) {
 			a.applyMod()
 		case "touch-marks":
 			a.SetTouchMarks(a.setting(st.key) == "on")
+		case "auto-rotate":
+			a.SetAutoRotate(a.setting(st.key) == "on")
 		case "vkbd":
 			a.vk.said = 0 // the setting's say now
 			a.vkApply()

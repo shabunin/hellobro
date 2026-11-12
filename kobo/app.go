@@ -178,6 +178,7 @@ type App struct {
 	calib     *calibState // non-nil while calibrating
 	calibNote string
 	gestures  map[int32]*Gesture
+	tiltOn    bool // watchTilt runs (tilt.go)
 	devs      []inputDev
 	entered   bool // the first tab got its Enter
 

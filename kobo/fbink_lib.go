@@ -75,6 +75,7 @@ func (l *fbinkLib) setRota(rota int) (ScreenInfo, error) {
 		OriginX: int(st.view_hori_origin), OriginY: int(st.view_vert_origin),
 		Rota:      int(st.current_rota),
 		Canonical: int(st.rotation_map[st.current_rota&3]),
+		RotaMap:   [4]int{int(st.rotation_map[0]), int(st.rotation_map[1]), int(st.rotation_map[2]), int(st.rotation_map[3])},
 		Swap:      bool(st.touch_swap_axes), MirX: bool(st.touch_mirror_x), MirY: bool(st.touch_mirror_y),
 		Version:  C.GoString(C.fbink_version()) + " (linked in)",
 		Codename: C.GoString(&st.device_codename[0]),

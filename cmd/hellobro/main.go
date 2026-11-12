@@ -121,6 +121,7 @@ func main() {
 	a.keys = loadKeys()
 	a.applyMod()
 	a.SetTouchMarks(a.setting("touch-marks") == "on")
+	a.SetAutoRotate(a.setting("auto-rotate") == "on")
 	a.wmInit()
 	a.ipcStart()
 	a.termInit()

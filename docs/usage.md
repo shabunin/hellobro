@@ -145,6 +145,14 @@ land: a ring where a finger (or the pen) came down, a dot where it
 lifted after moving, each for 3 s; the log has each touch then, to the
 millisecond.
 
+Settings, Screen, **Auto-rotate** turns the screen as the Kobo is
+held: it asks the Elipsa's tilt sensor (the KX122, over I²C, as FBInk
+does) every second, and once a side has been up for two looks, and
+nothing has touched the screen for 2 s, it turns. Lying flat it stays
+as it is. It only turns to a rotation the touch has been calibrated
+for: turn to each once with Rotate (it calibrates then). A Rotate by
+hand stays till the Kobo is turned again. It's off at first.
+
 Settings, Touch, **Sizes**: **for fingers** (the default) has a
 taller bar and title strips, bigger window buttons, and
 taller rows in menus, Settings, Wi-Fi and Bluetooth, the books' and
@@ -999,7 +1007,9 @@ width, its gray.
 - **select** (or S) takes what's written, and pictures, to change
   them; the pen and fingers both work with it. Tap a stroke or a
   picture to take it (the ink over a picture first), or draw a
-  rectangle round some to take all that's wholly inside. A dashed frame
+  rectangle round some, as in AutoCAD: drawn left to right (a window,
+  its outline whole) it takes all that's wholly inside; right to left
+  (crossing, its outline dashed) all it touches too. A dashed frame
   goes round what's taken, with a dot at each corner and one over it:
   - drag inside the frame to move it, onto the page beside it too where
     two show;
