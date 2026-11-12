@@ -1,195 +1,74 @@
 # hello bro
 
-A terminal, a Linux in your pocket and a way in for your computer, on a
-Kobo e-reader. Bring a Bluetooth keyboard.
+A terminal, a Linux, books, notebooks and a calendar on a Kobo
+e-reader. Bring a Bluetooth keyboard, or use your fingers and the pen.
 
 <p align="center">
   <img src="docs/screenshots/tmux.png" width="48.5%" alt="vim, git log and htop in tmux on a PC, over SSH">
-  <img src="docs/screenshots/btop.png" width="48.5%" alt="btop on the PC, over SSH">
-</p>
-<p align="center">
-  <img src="docs/screenshots/ssh.png" width="48.5%" alt="An SSH session">
-  <img src="docs/screenshots/ncmpcpp.png" width="48.5%" alt="ncmpcpp on mpd, the bar showing what plays">
-</p>
-<p align="center">
   <img src="docs/screenshots/tiling.png" width="48.5%" alt="Wi-Fi, Sharing, Bluetooth and Settings, tiled">
-  <img src="docs/screenshots/switcher.png" width="48.5%" alt="The switcher, over them">
 </p>
 <p align="center">
   <img src="docs/screenshots/launcher.png" width="98%" alt="The launcher: terminals, books and notebooks, settings, the Kobo, as tiles for a finger">
 </p>
-<p align="center">
-  <img src="docs/screenshots/workspaces.png" width="62%" alt="The workspaces as tiles, what's in their windows drawn small and live: a shell and Wi-Fi, a book, Bluetooth and Settings, + for a new one">
-  <img src="docs/screenshots/workspaces-portrait.png" width="35%" alt="The same, the Kobo upright">
-</p>
 
-hellobro takes the screen over from Nickel, draws its own e-ink UI through
-[FBInk](https://github.com/NiLuJe/FBInk), and gives Nickel back when you
-leave. It's built for the Kobo Elipsa (N604) and written in Go.
+hellobro takes the screen over from Nickel, draws its own e-ink UI, and
+gives Nickel back when you leave. It's built for the Kobo Elipsa (N604)
+and written in Go.
 
 ## What it does
 
-- **Windows, as i3 has them**: a tiling window manager with i3's keys
-  (Mod+Enter, Mod+arrows, Mod+1…0), workspaces, splits, tabbed and
-  stacked containers, floating windows, a scratchpad, binding modes, and
-  i3's IPC, so `i3-msg`, `swaymsg` and i3ipc scripts work, and
-  `hellobro-msg notify TEXT` puts up a note. One slim bar at the top
-  lists each workspace's windows; a tap on it (or two fingers down from
-  the top) shows them all as tiles,
-  over the whole screen, what's in their windows drawn small and live,
-  with a + for a new one, so fingers alone make and find them. The windows
-  come back as they were left.
-- **A launcher for fingers**: a new window shows every app as a tile
-  (terminals and hosts, books and notebooks, the settings' windows,
-  rotate, keyboard, light, sleep, lock), to tap; numbers and arrows work
-  too.
-- **SSH**: an xterm-256color terminal, as many as you like, mouse,
-  reconnects by itself. tmux, htop, helix, Claude Code all work.
-- **On-screen keyboard**: a laptop's rows under the windows and the
-  modifiers in strips at the sides, for when there's no Bluetooth
-  keyboard: shown for a text field only, by itself while none is
-  connected, or always; two fingers swiped up from the screen's foot
-  bring it. Typing in Russian, Ukrainian, German or Greek too, on it and on a
-  keyboard (Ctrl+Alt+Space).
-- **Books**: a reader for EPUBs, in the Kobo's own fonts, with the
-  books' pictures, styles and fonts, a page at a time, with bookmarks,
-  and offline dictionaries for a word held (Ancient Greek too); and
-  PDFs, drawn by MuPDF, their margins trimmed, pinched to zoom.
-- **Shell**: Alpine Linux in a jail, with `apk` for tools, or the same
-  terminal on the Kobo itself.
-- **Music**: mpv, cmus or any Linux player with MPRIS, in Alpine, to
-  Bluetooth headphones. The media keys and the headphones' buttons work,
-  and the bar shows what plays.
-- **Sleep when idle**: untouched for 30 minutes on battery (Settings),
-  the Kobo sleeps (music or not), so one left on the shelf keeps its
-  charge. A toast at 10%.
-- **Host files**: a saved host's home mounted for Alpine, read-only or
-  read-write: copy, rsync, or play music straight from the PC.
-- **Settings**: Wi-Fi and Bluetooth without going back to Nickel, and
-  sharing: SFTP and SSH for a paired computer (`kobo.local`). Updates go
-  over the air.
-- **Notebooks**: pages to write on with the pen, in a window: paper
-  plain, lined, squared or dotted (narrow too), pens (fine to bold, gray, a marker), an eraser, undo; text
-  typed from a keyboard; a select
-  tool to move, scale, turn, copy and duplicate strokes and pasted PDF
-  clips; all the pages small, to add, copy, move and delete them; two
-  pages side by side in landscape, or a roll scrolled up and down that grows
-  as you write; exported as a PDF, or a page as a PNG. All Notebooks
-  lists them (recent, all, in folders) to open, rename and delete. Kept as
-  Xournal++ files, to go on with on a computer. An AI diary, if you
-  like: write a question, rest the pen, and the answer comes back
-  under it, formulas, code, tables, diagrams and plots drawn (a language model, over
-  your OpenCode Go key).
-- **Calendar**: events and tasks, by the day, the week, the month or
-  as an agenda; tasks ticked off. Synced with a CalDAV server
-  (Nextcloud, Fastmail, iCloud…), or kept on the Kobo; Google's and
-  others' calendars subscribed to. The agenda is the sleep screen.
-- **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
-  what's using it, powertop style.
-- **From afar**: a relay through a VPS, so the Kobo and your PC reach
-  each other away from home.
+- **Windows** like i3: tiling, workspaces, i3's keys and IPC
+- **Terminals**: SSH to your computers, or Alpine Linux on the Kobo
+- **Books**: EPUBs and PDFs, with dictionaries
+- **Notebooks**: write with the pen; an AI that answers your handwriting, if you like
+- **Calendar**: events and tasks, synced over CalDAV or from Google; the agenda on the sleep screen
+- **Music**: Linux players in Alpine, to Bluetooth headphones
+- **Settings**: Wi-Fi, Bluetooth, the battery, file sharing, updates over Wi-Fi
 
 ## Install
 
-You need a Kobo with [NickelMenu](https://pgaskin.net/NickelMenu/)
-installed. hellobro is built and tested on the Elipsa (N604, firmware
-4.38).
+You need [NickelMenu](https://pgaskin.net/NickelMenu/) on the Kobo.
 
 1. Download `hellobro-<version>.zip` from the
    [latest release](https://github.com/shabunin/hellobro/releases/latest).
-2. Plug the Kobo in over USB and choose Connect, so it shows up as a
-   drive (`KOBOeReader`).
-3. Unzip the file into the top of that drive. It holds a `.adds` folder,
-   which merges with the one already there (NickelMenu's):
-   `.adds/hellobro/` is the app, `.adds/nm/hellobro` its menu entry.
-   `.adds` is hidden, so if your file manager won't show it, unzip from
-   a terminal: `unzip hellobro-<version>.zip -d /path/to/KOBOeReader`.
-4. Eject the Kobo. Open **Hello Bro** from NickelMenu (the menu at the
-   bottom right of the home screen). The first start asks you to tap two
-   targets, to calibrate the touch screen. Mod+Shift+E (Mod is the
-   Win key), or quit in the menu (swipe along the right edge), goes back to Nickel.
+2. Connect the Kobo over USB and unzip the file into the top of its
+   drive (it holds a hidden `.adds` folder).
+3. Eject it and open **Hello Bro** from NickelMenu.
 
-### Updates over Wi-Fi
+To leave, swipe down the right edge and tap quit (or Mod+Shift+E).
 
-Pair the computer once:
+## Updates
 
-1. In hellobro, open Settings and press `pair` under Sharing (it turns
-   file sharing on).
-   It shows a code.
-2. On the computer, run `ssh -p 2022 kobo.local` and type the code.
-
-Then, for a new release, download the bare `hellobro` file and send it:
+Pair your computer once (Settings, Sharing, `pair`, then
+`ssh -p 2022 kobo.local` and type the code). After that:
 
 ```sh
 scp -P 2022 hellobro kobo.local:/mnt/onboard/.adds/hellobro/hellobro.new
 ssh -p 2022 kobo.local hellobro-update
 ```
 
-hellobro restarts into the new build, and goes back to the old one by
-itself if the new one fails. Unzipping a new release over USB works too.
-If `kobo.local` doesn't resolve, use the Kobo's IP (Settings, Wi-Fi).
+From source (podman needed): `make`, then `make push`.
 
-### From source
+## Getting around
 
-You need podman for the build.
+- Mod+Enter: a new window (Mod is the Win key)
+- Mod+D: go to anything
+- Swipe the left edge: the light; the right edge: the menu
+- Tap the top bar: all the workspaces
 
-```sh
-make                 # static ARM build, in a container
-make install         # to the Kobo, mounted over USB
-make push            # later: a new build over Wi-Fi (paired, as above)
-make dist            # a release's files, in dist/
-```
-
-## Keys
-
-| | |
-| --- | --- |
-| Mod+Enter | a new window: the launcher, tiles for all the apps (1 Alpine, 2 the Kobo's sh, 3… a saved host) |
-| Mod+D, Mod+Space | go to: windows, workspaces, hosts, settings, commands |
-| Mod+arrows (or H J K L), with Shift | focus the window there, move it there |
-| Mod+1…0, with Shift | go to a workspace, send the window there |
-| Mod+B, Mod+V | split: the next window beside, below |
-| Mod+E, Mod+W, Mod+S | side by side ⇄ one above another, tabbed, stacked |
-| Mod+F | fullscreen, or a window's fullscreen (two fingers swiped down from the top leave it) |
-| Mod+Shift+Space | floating, or a window's float (tile puts it back) |
-| Mod+R | resize: the arrows, then Esc |
-| Mod+Shift+Q | close the window |
-| pen across text, Ctrl+Shift+V | copy, paste |
-| Ctrl+Shift+Space | play / pause, anywhere |
-| Ctrl+Shift+< / > | previous / next track |
-| Shift+Mod+S, power button | sleep |
-| Shift+Mod+X | lock: touch does nothing till it again |
-| swipe the left edge, Mod+] / Mod+[ | frontlight |
-| Mod+\\ | frontlight on / off |
-| Mod+Shift+E, or the menu (swipe along the right edge) | back to Nickel |
-
-Every key can be changed in Settings (Keys) or `keys.conf`, which takes
-any i3 command line and binding modes. See [Keys](docs/usage.md#keys)
-and [i3's IPC](docs/usage.md#i3s-ipc).
+Everything else is in [the docs](docs/usage.md).
 
 ## Docs
 
-- [Using hellobro](docs/usage.md): the windows, every one of them, sleep, sharing, updates
-- [From afar](docs/relay.md): the relay through a VPS
-- [Developing](docs/development.md): code, building, the test harness
+- [Using hellobro](docs/usage.md)
+- [From afar](docs/relay.md): reaching the Kobo through a VPS
+- [Developing](docs/development.md)
 - [AGENTS.md](AGENTS.md): for coding agents
-
-The tabs as they were before the windows (v0.2.1) live on the
-[`legacy`](https://github.com/shabunin/hellobro/tree/legacy) branch.
-
-**Bro Tools**, a diagnostics app (keys, touch, stylus, network, sound,
-system), lives here too. It's only installed on request:
-`make install-tools`.
 
 ## License
 
-[GPL-3.0-or-later](LICENSE). hellobro links in
-[FBInk](https://github.com/NiLuJe/FBInk) by NiLuJe, also GPL-3.0-or-later.
-Its prebuilt files and their source are described in
-[third_party/fbink](third_party/fbink/README.md). It carries two fonts
-under the SIL Open Font License 1.1, unchanged: Gentium Book (SIL
-Global) and STIX Two Math (the STIX Fonts Project), in
-[third_party/fonts](third_party/fonts), each with its license.
-
-<sub>The screenshots come from the test harness on a PC (`harness/`),
-with the app's own rendering.</sub>
+[GPL-3.0-or-later](LICENSE). It links in
+[FBInk](https://github.com/NiLuJe/FBInk) by NiLuJe (GPL-3.0-or-later,
+see [third_party/fbink](third_party/fbink/README.md)) and carries Gentium
+Book and STIX Two Math under the SIL Open Font License 1.1
+([third_party/fonts](third_party/fonts)).
