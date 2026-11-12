@@ -2,6 +2,8 @@ package cal_test
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -201,5 +203,56 @@ func TestConflict(t *testing.T) {
 	sync(t, st, c, ck)
 	if got := summaries(st); got != "theirs once more" {
 		t.Errorf("deleted here: %s", got)
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	feed := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nX-WR-CALNAME:Holidays\r\n" +
+		"BEGIN:VEVENT\r\nUID:x\r\nDTSTART;VALUE=DATE:20261225\r\nSUMMARY:Christmas\r\nRRULE:FREQ=YEARLY\r\nEND:VEVENT\r\n" +
+		"BEGIN:VEVENT\r\nUID:y\r\nDTSTART:20261113T100000Z\r\nDTEND:20261113T110000Z\r\nSUMMARY:talk\r\nEND:VEVENT\r\n" +
+		"BEGIN:VEVENT\r\nUID:y\r\nRECURRENCE-ID:20261113T100000Z\r\nDTSTART:20261113T120000Z\r\nSUMMARY:talk, moved\r\nEND:VEVENT\r\n" +
+		"END:VCALENDAR\r\n"
+	n := 0
+	hs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n++
+		io.WriteString(w, feed)
+	}))
+	defer hs.Close()
+	st, _ := cal.Open(t.TempDir())
+	urls := []string{hs.URL + "/basic.ics"}
+	r, err := st.SyncSubs(context.Background(), hs.Client(), "", urls)
+	if err != nil || r.Got != 2 {
+		t.Fatalf("%v %v", r, err)
+	}
+	if got := summaries(st); got != "talk, Christmas" {
+		t.Errorf("got %s", got)
+	}
+	var sub cal.Folder
+	for _, f := range st.Folders() {
+		if f.ReadOnly() {
+			sub = f
+		}
+	}
+	if sub.Name != "Holidays" {
+		t.Errorf("folders %+v", st.Folders())
+	}
+	it := cal.New(cal.Event)
+	if _, err := st.Save(sub.ID, it, time.Now()); err == nil {
+		t.Error("saved into a subscription")
+	}
+	if home := st.Home(cal.Event); home == sub.ID {
+		t.Error("new ones into a subscription")
+	}
+	// The same again: nothing new. Then reopened: still there.
+	if r, _ := st.SyncSubs(context.Background(), hs.Client(), "", urls); r.Got != 0 {
+		t.Errorf("again: %v", r)
+	}
+	st2, _ := cal.Open(st.Dir)
+	if got := summaries(st2); got != "talk, Christmas" {
+		t.Errorf("reopened: %s", got)
+	}
+	// Unsubscribed: gone.
+	if r, _ := st2.SyncSubs(context.Background(), hs.Client(), "", nil); r.Removed != 2 || summaries(st2) != "" {
+		t.Errorf("unsubscribed: %v %s", r, summaries(st2))
 	}
 }

@@ -1,16 +1,13 @@
 package main
 
-// The calendar: events and tasks (cal/), kept in the app's folder
-// (calendar/) and, with calendar.conf there, in step with a CalDAV
-// server's: when it opens, every quarter of an hour while it's open, a
-// few seconds after a change, and when asked (sync, or s).
+// The calendar's window: events and tasks (cal/), kept in the app's
+// folder (calendar/) and, with calendar.conf there, in step with a
+// CalDAV server's (calsync.go): when it opens, a few seconds after a
+// change, and when asked (sync, or s), besides the app's own.
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"image"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -36,9 +33,8 @@ var (
 )
 
 type calUI struct {
-	a       *bro
-	st      *cal.Store
-	openErr string
+	a  *bro
+	st *cal.Store
 
 	view                              widget.Enum
 	todayB, prevB, nextB, addB, syncB widget.Clickable
@@ -54,44 +50,34 @@ type calUI struct {
 
 	ed *calEdit // the dialog: an item being changed
 
-	syncing, again bool
-	synced         time.Time // last in step
-	said           string    // what went wrong, if it did
-	next           time.Time // the next sync; zero: none
-	wantSync       bool
-	typing         bool // an editor had the focus at the last frame
-	vk             int  // 1: ask for the keyboard, -1: let it go (after the frame)
-	toast          widget.Toast
+	wantSync bool
+	typing   bool // an editor had the focus at the last frame
+	vk       int  // 1: ask for the keyboard, -1: let it go (after the frame)
+	toast    widget.Toast
 }
 
 func newCalUI(a *bro) inkUI {
-	u := &calUI{a: a, btn: map[string]*widget.Clickable{}, used: map[string]bool{}}
+	u := &calUI{a: a, st: a.calStore(), btn: map[string]*widget.Clickable{}, used: map[string]bool{}}
 	u.view.Value = "week"
 	u.hours.Axis, u.agenda.Axis, u.tasks.Axis = layout.Vertical, layout.Vertical, layout.Vertical
-	st, err := cal.Open(kobo.AppFile("calendar"))
-	if err != nil {
-		log.Printf("calendar: %v", err)
-		u.openErr = err.Error()
-		return u
-	}
-	u.st = st
 	return u
 }
 
 func (u *calUI) Status() string {
+	c := &u.a.cal
 	switch {
 	case u.st == nil:
 		return "can't open it"
-	case u.syncing:
+	case c.syncing:
 		return "syncing…"
-	case u.said != "":
-		return u.said
+	case c.said != "":
+		return c.said
 	}
-	if n := u.st.Pending(); n > 0 && !u.synced.IsZero() {
+	if n := u.st.Pending(); n > 0 && !c.synced.IsZero() {
 		return fmt.Sprintf("%d to send", n)
 	}
-	if !u.synced.IsZero() {
-		return "synced " + u.synced.Format("15:04")
+	if !c.synced.IsZero() {
+		return "synced " + c.synced.Format("15:04")
 	}
 	if _, err := os.Stat(kobo.AppFile(calConf)); err != nil {
 		return "on this Kobo"
@@ -103,75 +89,12 @@ func (u *calUI) Status() string {
 func (u *calUI) take() {
 	if u.wantSync {
 		u.wantSync = false
-		u.syncNow()
+		u.a.calSyncNow()
 	}
 	if u.vk != 0 {
 		u.a.vkAsk(u.vk > 0)
 		u.vk = 0
 	}
-}
-
-// syncNow syncs with the server in calendar.conf, if there is one.
-func (u *calUI) syncNow() {
-	if u.st == nil {
-		return
-	}
-	if u.syncing {
-		u.again = true
-		return
-	}
-	c, err := cal.LoadConf(kobo.AppFile(calConf))
-	if err != nil {
-		u.next = time.Time{}
-		if !errors.Is(err, os.ErrNotExist) {
-			u.said = calConf + ": " + err.Error()
-		}
-		return
-	}
-	u.syncing, u.said = true, ""
-	cl := &cal.Client{URL: c.URL, User: c.User, Password: c.Password, UserAgent: "hellobro/" + version}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		res, err := u.st.Sync(ctx, cl, time.Now)
-		u.a.Do(func() {
-			u.syncing = false
-			if err != nil {
-				log.Printf("calendar: sync: %v", err)
-				u.said = "not synced: " + calErr(err)
-			} else {
-				u.synced = time.Now()
-				log.Printf("calendar: synced: %s", res)
-				if res != (cal.Synced{}) {
-					u.toast.Text = res.String() // shown at the next frame
-				}
-			}
-			u.next = time.Now().Add(c.Every)
-			if u.again {
-				u.again = false
-				u.next = time.Now()
-			}
-			u.a.inkRedraw(calKey)
-		})
-	}()
-}
-
-// calErr is err, short: the strip has room for a few words.
-func calErr(err error) string {
-	s := err.Error()
-	var se *cal.StatusError
-	switch {
-	case errors.As(err, &se) && se.Code == 401:
-		return "the server says the user or password is wrong"
-	case strings.Contains(s, "no such host"), strings.Contains(s, "network is unreachable"):
-		return "offline?"
-	case errors.Is(err, context.DeadlineExceeded):
-		return "the server took too long"
-	}
-	if len(s) > 120 {
-		s = s[:120] + "…"
-	}
-	return s
 }
 
 func dayOf(t time.Time) time.Time {
@@ -215,21 +138,15 @@ func (u *calUI) Layout(gtx ink.Ctx) ink.Dims {
 	size := gtx.Constraints.Max
 	ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
 	if u.st == nil {
-		return layout.UniformInset(th.Pad*2).Layout(gtx, theme.Body(th, "the calendar's folder can't be opened: "+u.openErr).Layout)
+		return layout.UniformInset(th.Pad*2).Layout(gtx, theme.Body(th, "the calendar's folder can't be opened: "+u.a.cal.openErr).Layout)
 	}
-	if u.at.IsZero() { // just opened
+	if u.at.IsZero() { // just opened: synced now
 		u.at = dayOf(gtx.Now)
-		u.next = gtx.Now
+		u.wantSync = true
 	}
-	if !u.next.IsZero() && !u.syncing {
-		if !gtx.Now.Before(u.next) {
-			u.wantSync, u.next = true, time.Time{}
-		} else {
-			gtx.InvalidateAt(u.next)
-		}
-	}
-	if u.toast.Text != "" && !u.toast.Showing(gtx) {
-		u.toast.Show(gtx, u.toast.Text)
+	if n := u.a.cal.news; n != "" {
+		u.a.cal.news = ""
+		u.toast.Show(gtx, n)
 	}
 	u.events(gtx)
 	for k := range u.used {
@@ -245,7 +162,7 @@ func (u *calUI) Layout(gtx ink.Ctx) ink.Dims {
 	}
 	sp := layout.Rigid(layout.Spacer{Width: th.Pad}.Layout)
 	syncL := "sync"
-	if u.syncing {
+	if u.a.cal.syncing {
 		syncL = "syncing…"
 	}
 	dims := layout.Flex{Axis: layout.Vertical}.Layout(gtx,
@@ -376,14 +293,10 @@ func (u *calUI) events(gtx ink.Ctx) {
 // saved is an item saved or deleted: it goes to the server soon.
 func (u *calUI) saved(err error) {
 	if err != nil {
-		u.said = "not saved: " + err.Error()
+		u.a.cal.said = "not saved: " + err.Error()
 		return
 	}
-	if _, err := os.Stat(kobo.AppFile(calConf)); err == nil && !u.syncing {
-		u.next = time.Now().Add(calAfter)
-	} else if u.syncing {
-		u.again = true
-	}
+	u.a.calSoon()
 }
 
 // occurrences in a day's row: those at a time of day, and those all day

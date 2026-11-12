@@ -82,7 +82,8 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   your OpenCode Go key).
 - **Calendar**: events and tasks, by the day, the week, the month or
   as an agenda; tasks ticked off. Synced with a CalDAV server
-  (Nextcloud, Fastmail, iCloud…), or kept on the Kobo.
+  (Nextcloud, Fastmail, iCloud…), or kept on the Kobo; Google's and
+  others' calendars subscribed to. The agenda is the sleep screen.
 - **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
   what's using it, powertop style.
 - **From afar**: a relay through a VPS, so the Kobo and your PC reach

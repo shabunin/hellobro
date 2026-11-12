@@ -449,6 +449,15 @@ from then, not at once). hellobro never quits by itself: sleep is what
 an idle Kobo gets. Left awake untouched, the Kobo lasts about 12 hours
 from full.
 
+The sleep screen is the calendar's agenda (Settings, Power: the sleep
+screen; or plain): the date, what's left of today, tomorrow, the tasks
+to do (with no day, or late), then the next two weeks' days with
+something on, as much as fits. It's the calendar as last synced (the
+radios are off while it sleeps), drawn again at midnight: the RTC's
+alarm wakes the Kobo a moment for it, and it sleeps on. A press of the
+power button within a minute after midnight is taken for that alarm:
+press it again.
+
 At 10% on battery a toast says to plug it in (once on the way down),
 and the lock screen says so too. Nothing else happens: it doesn't
 sleep or quit for it.
@@ -1328,17 +1337,28 @@ today, **,** and **.** (or PgUp and PgDn) back and on, **n** a new one,
 
 It's all kept in `calendar/` in the app's folder, so it works without a
 server. With `calendar.conf` there, it's synced with a CalDAV server
-(Nextcloud, Fastmail, iCloud, Radicale, mailbox.org…): when the window
-opens, every 15 minutes while it's open, a few seconds after a change,
-and on **sync**. The strip says how it went: synced at, how many to
-send, or why not.
+(Nextcloud, Fastmail, iCloud, Radicale, mailbox.org…): whenever
+there's a network, every 15 minutes, the window open or not (so the
+[sleep screen](#sleep)'s agenda is fresh); when the window opens, a few
+seconds after a change, and on **sync**. The strip says how it went:
+synced at, how many to send, or why not.
 
 ```
 url = https://dav.example.com/remote.php/dav/
 user = you
 password = an app password
+ics = https://calendar.google.com/calendar/ical/…/private-…/basic.ics
 every = 15
 ```
+
+`ics` lines (as many as you like, `webcal://` too) are calendars
+subscribed to: fetched whole, shown, read only (a tap shows one, it
+can't be changed). That's how Google Calendar comes in: in Google
+Calendar on the web, Settings, the calendar, **Integrate calendar**,
+**Secret address in iCal format** (a work account's admin may have
+turned it off). Google's CalDAV wants an OAuth login, not a password,
+so changing Google's events from the Kobo isn't there yet. Without
+`url`, what's made on the Kobo stays on it.
 
 `url` is a calendar, the calendars' home, or the server's root (its
 calendars are found from your principal); all of them are synced. What
@@ -1608,7 +1628,7 @@ Kobo's storage:
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard`, `clipboard.png`, `clipboard.xopp` | what's copied, the picture of a PDF's part copied, and ink copied from a notebook ([Copy and paste](#copy-and-paste), [Notebooks](#notebooks)) |
 | `notebooks/NAME.hbnote` | the first notebooks, till they're opened: then they're `Notebooks/NAME.xopp` on the Kobo's storage ([Notebooks](#notebooks)) |
-| `calendar.conf`, `calendar/` | the CalDAV server and its password; the calendars, an `.ics` file each event or task ([Calendar](#calendar)) |
+| `calendar.conf`, `calendar/` | the CalDAV server and its password, the calendars subscribed to; the calendars, an `.ics` file each event or task ([Calendar](#calendar)) |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |
 | `hellobro.log` | the log (`make push-log`) |

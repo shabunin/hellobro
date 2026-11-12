@@ -221,6 +221,7 @@ type App struct {
 	noPower    bool            // the power button doesn't reach us
 	wokeAt     time.Time       // from sleep: the power press that woke us comes after
 	asleep     bool            // the sleep screen is up: nothing else gets drawn
+	sleepAgain time.Time       // when the sleep screen is to be drawn again (the RTC wakes us); zero: never
 	sleeping   atomic.Bool     // asleep, for the watchdog: the clock jumps
 	locked     bool            // touch does nothing, keys only what the Program lets through (lock.go)
 	lockHint   string          // how to unlock

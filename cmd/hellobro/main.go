@@ -66,6 +66,7 @@ type bro struct {
 	th      *theme.Theme     // the ink windows' look (inkwin.go)
 	shot    *shot            // a screenshot being taken (shot.go)
 	trio    [3]*kobo.Gesture // three fingers together: may become the workspaces' swipe
+	cal     calState         // the calendar's store and its syncing (calsync.go)
 }
 
 const (
@@ -200,6 +201,7 @@ func (a *bro) Tick() {
 	a.trialTick()
 	a.ipcTick()
 	a.noteTick()
+	a.calTick()
 	a.holdTick()
 	a.inkTick()
 	a.wmSettle(false)

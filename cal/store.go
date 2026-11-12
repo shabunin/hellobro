@@ -23,6 +23,13 @@ type Store struct {
 	Dir  string
 	mu   sync.Mutex
 	cals []*Folder
+	ver  int // changed each time anything is
+
+	between struct { // Between's last answer
+		from, to time.Time
+		ver      int
+		occ      []Occurrence
+	}
 }
 
 // Folder is a calendar on the device.
@@ -31,12 +38,17 @@ type Folder struct {
 	Href    string            `json:"href"` // on the server; "": ours alone
 	Name    string            `json:"name"`
 	Comps   []string          `json:"comps,omitempty"`
+	Sub     bool              `json:"sub,omitempty"`  // subscribed to: an .ics at Href, read only (its items in feed.ics)
+	Hash    string            `json:"hash,omitempty"` // a subscription's, as last fetched
 	CTag    string            `json:"ctag,omitempty"`
 	Entries map[string]*Entry `json:"entries"` // by file name
 }
 
 // Holds says the calendar takes items of kind.
 func (f *Folder) Holds(kind string) bool { return Calendar{Comps: f.Comps}.Holds(kind) }
+
+// ReadOnly says its items can't be changed here.
+func (f *Folder) ReadOnly() bool { return f.Sub }
 
 // Entry is an item in a calendar on the device.
 type Entry struct {
@@ -75,6 +87,15 @@ func Open(dir string) (*Store, error) {
 		if f.Entries == nil {
 			f.Entries = map[string]*Entry{}
 		}
+		if f.Sub {
+			if data, err := os.ReadFile(filepath.Join(dir, f.ID, feedFile)); err == nil {
+				if c, err := ParseString(string(data)); err == nil {
+					f.fill(c)
+				}
+			}
+			s.cals = append(s.cals, f)
+			continue
+		}
 		for name, e := range f.Entries {
 			e.File, e.In = name, f
 			data, err := os.ReadFile(filepath.Join(dir, f.ID, name))
@@ -99,7 +120,17 @@ func Open(dir string) (*Store, error) {
 
 // saveState writes state.json; s.mu held.
 func (s *Store) saveState() error {
-	b, err := json.MarshalIndent(state{s.cals}, "", "\t")
+	s.ver++
+	var st state
+	for _, f := range s.cals {
+		if f.Sub { // its items are its feed's
+			cp := *f
+			cp.Entries = nil
+			f = &cp
+		}
+		st.Cals = append(st.Cals, f)
+	}
+	b, err := json.MarshalIndent(st, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -134,10 +165,12 @@ func fileOf(uid string) string {
 }
 
 func (s *Store) writeEntry(e *Entry) error {
+	s.ver++
 	return writeFile(filepath.Join(s.Dir, e.In.ID, e.File), []byte(e.Item.Cal.String()))
 }
 
 func (s *Store) removeEntry(e *Entry) {
+	s.ver++
 	os.Remove(filepath.Join(s.Dir, e.In.ID, e.File))
 	delete(e.In.Entries, e.File)
 }
@@ -159,11 +192,16 @@ func (s *Store) Home(kind string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, f := range s.cals {
-		if f.Holds(kind) {
+		if f.Holds(kind) && !f.Sub {
 			return f.ID
 		}
 	}
-	return s.cals[0].ID
+	for _, f := range s.cals {
+		if !f.Sub {
+			return f.ID
+		}
+	}
+	return ""
 }
 
 // Occurrence is an item at one of its times. Its Entry is a copy, as
@@ -187,7 +225,10 @@ func (o Occurrence) End() time.Time {
 func (s *Store) Between(from, to time.Time) []Occurrence {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []Occurrence
+	if b := &s.between; b.ver == s.ver && b.from.Equal(from) && b.to.Equal(to) && b.occ != nil {
+		return b.occ
+	}
+	out := []Occurrence{}
 	for _, f := range s.cals {
 		for _, e := range f.Entries {
 			if e.Gone || e.Item.Kind == Task && (e.Item.Done || e.Item.End.IsZero()) {
@@ -209,6 +250,7 @@ func (s *Store) Between(from, to time.Time) []Occurrence {
 		}
 		return a.Item.Summary < b.Item.Summary
 	})
+	s.between.from, s.between.to, s.between.ver, s.between.occ = from, to, s.ver, out
 	return out
 }
 
@@ -258,9 +300,15 @@ func (s *Store) Save(id string, it *Item, now time.Time) (*Entry, error) {
 	if f == nil {
 		return nil, fmt.Errorf("no calendar %q", id)
 	}
+	if f.Sub {
+		return nil, fmt.Errorf("%s is read only", f.Name)
+	}
 	it.Apply(now)
 	var e *Entry
 	for _, g := range s.cals {
+		if g.Sub {
+			continue
+		}
 		for _, x := range g.Entries {
 			if x.Item.UID == it.UID && !x.Gone {
 				e = x
@@ -290,6 +338,9 @@ func (s *Store) Delete(uid string, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, f := range s.cals {
+		if f.Sub {
+			continue
+		}
 		for _, e := range f.Entries {
 			if e.Item.UID == uid && !e.Gone {
 				s.drop(e)
@@ -303,6 +354,7 @@ func (s *Store) Delete(uid string, now time.Time) error {
 // drop deletes e here: at once if the server never had it, else when
 // Sync has taken it from there too.
 func (s *Store) drop(e *Entry) {
+	s.ver++
 	if e.Href == "" {
 		s.removeEntry(e)
 		return
@@ -391,7 +443,12 @@ func (s *Store) Sync(ctx context.Context, c *Client, now func() time.Time) (Sync
 		f.Name, f.Comps = sc.Name, sc.Comps
 		keep = append(keep, f)
 	}
+	var subs []*Folder
 	for _, f := range s.cals {
+		if f.Sub {
+			subs = append(subs, f)
+			continue
+		}
 		if f.Href != "" && !hasFolder(keep, f) {
 			os.RemoveAll(filepath.Join(s.Dir, f.ID))
 			continue
@@ -403,14 +460,14 @@ func (s *Store) Sync(ctx context.Context, c *Client, now func() time.Time) (Sync
 			os.RemoveAll(filepath.Join(s.Dir, f.ID))
 		}
 	}
-	s.cals = keep
+	s.cals = append(keep, subs...)
 	for _, e := range orphans { // ours alone: to the server's
 		if e.Gone {
 			continue
 		}
 		f := s.cals[0]
 		for _, g := range s.cals {
-			if g.Holds(e.Item.Kind) {
+			if g.Holds(e.Item.Kind) && !g.Sub {
 				f = g
 				break
 			}
@@ -444,7 +501,7 @@ func hasFolder(fs []*Folder, f *Folder) bool {
 
 func (s *Store) byHref(href string) *Folder {
 	for _, f := range s.cals {
-		if f.Href != "" && samePath(f.Href, href) {
+		if !f.Sub && f.Href != "" && samePath(f.Href, href) {
 			return f
 		}
 	}

@@ -243,6 +243,10 @@ func TestConf(t *testing.T) {
 	if err != nil || c.URL != "https://dav.example.com/" || c.User != "me" || c.Password != "a b c" || c.Every != 30*time.Minute {
 		t.Errorf("%+v %v", c, err)
 	}
+	os.WriteFile(p, []byte("ics = webcal://a/b.ics\nics = https://c/d.ics\n"), 0o644)
+	if c, err := LoadConf(p); err != nil || len(c.ICS) != 2 || c.URL != "" {
+		t.Errorf("ics alone: %+v %v", c, err)
+	}
 	os.WriteFile(p, []byte("user = me\n"), 0o644)
 	if _, err := LoadConf(p); err == nil {
 		t.Error("no url: no error")

@@ -25,6 +25,14 @@ type Sleeper interface {
 	Wake()
 }
 
+// SleepScreener is a Program that draws the sleep screen itself (an
+// agenda, say): on c, all of it, as of now; false leaves it to us. A
+// time to draw it again (a new day) wakes the Kobo then for a moment,
+// by the RTC's alarm, and it sleeps on.
+type SleepScreener interface {
+	SleepScreen(c Canvas, now time.Time) (again time.Time, ok bool)
+}
+
 // Sleep puts the Kobo to sleep, now.
 func (a *App) Sleep() {
 	if a.asleep || a.calib != nil {
@@ -54,10 +62,56 @@ func (a *App) Sleep() {
 		if prep != nil {
 			prep()
 		}
-		woke := suspend()
+		var woke string
+		for {
+			again := a.sleepAgain
+			setAlarm(again)
+			woke = suspend()
+			if again.IsZero() || !alarmRang(again, time.Now()) {
+				break
+			}
+			// The alarm: the sleep screen as of now, and on sleeping.
+			log.Printf("sleep: the sleep screen again (%s)", woke)
+			done := make(chan struct{})
+			a.Do(func() {
+				a.asleep = false
+				a.drawSleep()
+				a.WaitBlit()
+				a.markAll(true)
+				a.flush()
+				a.WaitBlit()
+				a.asleep = true
+				close(done)
+			})
+			<-done
+		}
+		setAlarm(time.Time{})
 		a.alive.Store(time.Now().UnixNano())
 		a.Do(func() { a.wake(light, woke) })
 	}()
+}
+
+const rtcAlarm = "/sys/class/rtc/rtc0/wakealarm"
+
+// setAlarm has the RTC wake the Kobo at t; zero: not.
+func setAlarm(t time.Time) {
+	if os.Getenv("HELLOBRO_FAKE_SLEEP") != "" || !exists(rtcAlarm) {
+		return
+	}
+	writeSys(rtcAlarm, "0") // a new one only over none
+	if t.IsZero() {
+		return
+	}
+	if err := writeSys(rtcAlarm, fmt.Sprint(t.Unix())); err != nil {
+		log.Printf("sleep: the alarm: %v", err)
+	}
+}
+
+// alarmRang says waking at now was the alarm set for again, not the
+// power button: the kernel doesn't tell them apart (both the PMIC's).
+// A press within a minute of it is taken for the alarm.
+func alarmRang(again, now time.Time) bool {
+	return !now.Before(again.Add(-10*time.Second)) && now.Before(again.Add(time.Minute))
 }
 
 func (a *App) wake(light int, why string) {
@@ -79,9 +133,17 @@ func (a *App) wake(light int, why string) {
 	}
 }
 
-// drawSleep is the screen that stays on the panel while asleep.
+// drawSleep is the screen that stays on the panel while asleep: the
+// Program's, if it has one.
 func (a *App) drawSleep() {
 	c := a.panel()
+	a.sleepAgain = time.Time{}
+	if s, ok := a.prog.(SleepScreener); ok {
+		if again, ok := s.SleepScreen(c, time.Now()); ok {
+			a.sleepAgain = again
+			return
+		}
+	}
 	b := c.Bounds()
 	c.Fill(b, White)
 	cy := b.Dy() / 2

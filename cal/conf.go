@@ -11,15 +11,17 @@ import (
 
 // Conf is calendar.conf: the CalDAV server's URL (a calendar, the
 // calendars' home, or the server's root), the user and the password (an
-// app's password, mostly), and how often to sync while the calendar is
-// open.
+// app's password, mostly), calendars subscribed to (an .ics's URL each,
+// read only), and how often to sync.
 //
 //	url = https://dav.example.com/
 //	user = me
 //	password = an app password
+//	ics = https://calendar.google.com/calendar/ical/…/basic.ics
 //	every = 15
 type Conf struct {
 	URL, User, Password string
+	ICS                 []string
 	Every               time.Duration
 }
 
@@ -48,6 +50,8 @@ func LoadConf(path string) (Conf, error) {
 			c.User = val
 		case "password", "pass":
 			c.Password = val
+		case "ics", "ical", "webcal", "subscribe":
+			c.ICS = append(c.ICS, val)
 		case "every":
 			if n, err := strconv.Atoi(strings.TrimSuffix(val, "m")); err == nil && n > 0 {
 				c.Every = time.Duration(n) * time.Minute
@@ -55,7 +59,10 @@ func LoadConf(path string) (Conf, error) {
 		}
 	}
 	if c.URL == "" {
-		return c, errors.New("no url in it")
+		if len(c.ICS) == 0 {
+			return c, errors.New("no url in it, nor an ics")
+		}
+		return c, sc.Err()
 	}
 	if !strings.HasPrefix(c.URL, "http://") && !strings.HasPrefix(c.URL, "https://") {
 		c.URL = "https://" + c.URL

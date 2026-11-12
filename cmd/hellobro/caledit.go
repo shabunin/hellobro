@@ -35,7 +35,8 @@ type calEdit struct {
 	cals   []cal.Folder // calSel's
 
 	save, cancel, del widget.Clickable
-	sure              bool // delete was tapped once
+	sure              bool   // delete was tapped once
+	from              string // a subscription's name: it's read only
 }
 
 var (
@@ -70,6 +71,9 @@ func (u *calUI) startNew(gtx ink.Ctx) {
 // edit opens the dialog for e.
 func (u *calUI) edit(e *cal.Entry) {
 	u.ed = u.newEdit(e.Item, e.In.ID, false)
+	if e.In.ReadOnly() {
+		u.ed.from = e.In.Name
+	}
 }
 
 func (u *calUI) newEdit(it *cal.Item, in string, isNew bool) *calEdit {
@@ -93,7 +97,11 @@ func (u *calUI) newEdit(it *cal.Item, in string, isNew bool) *calEdit {
 		ed.reps = append([]string{it.RRule}, repRules...)
 		ed.repeat.Value = 0
 	}
-	ed.cals = u.st.Folders()
+	for _, f := range u.st.Folders() {
+		if !f.ReadOnly() {
+			ed.cals = append(ed.cals, f)
+		}
+	}
 	for i, f := range ed.cals {
 		if f.ID == in {
 			ed.calSel.Value = i
@@ -225,6 +233,10 @@ func (ed *calEdit) apply() {
 func (ed *calEdit) layout(gtx ink.Ctx, th *theme.Theme, u *calUI) {
 	if ed.cancel.Clicked(gtx) {
 		u.ed = nil
+		return
+	}
+	if ed.from != "" {
+		theme.Dialog(th, ed.it.Summary, calSays(&ed.it)+"\nfrom "+ed.from+", read only", theme.Button(th, &ed.cancel, "close")).Layout(gtx)
 		return
 	}
 	if ed.del.Clicked(gtx) {
@@ -364,6 +376,37 @@ func firstLines(s string, n int) string {
 		if r := []rune(l); len(r) > 90 {
 			ls[i] = string(r[:90]) + "…"
 		}
+	}
+	return strings.Join(ls, "\n")
+}
+
+// calSays is an item, in a few lines: when, where, what about, from where.
+func calSays(it *cal.Item) string {
+	var ls []string
+	switch {
+	case it.Kind == cal.Task && it.End.IsZero():
+		ls = append(ls, "a task")
+	case it.Kind == cal.Task && it.AllDay:
+		ls = append(ls, "a task, due "+it.End.Format("Monday 2 January"))
+	case it.Kind == cal.Task:
+		ls = append(ls, "a task, due "+it.End.Format("Monday 2 January, 15:04"))
+	case it.AllDay:
+		s := it.Start.Format("Monday 2 January")
+		if last := it.End.AddDate(0, 0, -1); last.After(it.Start) {
+			s += " to " + last.Format("Monday 2 January")
+		}
+		ls = append(ls, s+", all day")
+	default:
+		ls = append(ls, it.Start.Format("Monday 2 January, 15:04")+"–"+it.End.Format("15:04"))
+	}
+	if it.RRule != "" {
+		ls = append(ls, "repeats ("+strings.ToLower(it.RRule)+")")
+	}
+	if it.Location != "" {
+		ls = append(ls, it.Location)
+	}
+	if d := strings.TrimSpace(it.Description); d != "" {
+		ls = append(ls, firstLines(d, 4))
 	}
 	return strings.Join(ls, "\n")
 }
