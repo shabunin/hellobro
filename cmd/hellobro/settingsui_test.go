@@ -75,3 +75,44 @@ func TestSettingsUINarrow(t *testing.T) {
 		t.Errorf("the value at %v, its name at %v: not under it", value, name)
 	}
 }
+
+// The sliders: their value said over the track, picked when the finger
+// lifts; each setting with a help line under it; the notebooks' and the
+// AI's settings in the app's too.
+func TestSettingsUISliders(t *testing.T) {
+	a := &bro{App: &kobo.App{}, set: settings{"text-size": 1, "ai-size": 1}}
+	u := inkUIs["settings"](a)
+	it := inktest.New(image.Pt(900, 7000), inktest.ElipsaMetric, u.Layout)
+	inkSave(t, it, "settings-all")
+	for _, s := range []string{"Text size", "as it comes, 100%", "how tall the strips, rows and buttons are", "Notebooks", "A finger in a notebook",
+		"AI notebooks", "Letters of an answer", "medium, 15 pt", "Your prompts"} {
+		if _, err := it.Find(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p, err := it.Find("Letters of an answer")
+	must(t, err)
+	y := p.Y + 50 // the track, under its title
+	it.Press(image.Pt(60, y))
+	it.Move(image.Pt(880, y))
+	it.Frame()
+	if a.set["ai-size"] != 1 {
+		t.Errorf("picked while held: %d", a.set["ai-size"])
+	}
+	it.Release(image.Pt(880, y))
+	it.Frame()
+	if a.setting("ai-size") != "xl" {
+		t.Errorf("dragged to the end: %q", a.setting("ai-size"))
+	}
+	if _, err := it.Find("huge, 24 pt"); err != nil {
+		t.Error(err)
+	}
+	a.set["ai-size"] = 1
+	a.set.save()
+
+	a.set["text-size"] = 4
+	a.applyTextSize()
+	if ts := a.theme().TextSize; ts != 27 {
+		t.Errorf("150%%: %v", ts)
+	}
+}

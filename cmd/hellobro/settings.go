@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"hellobro/ink"
 	"hellobro/kobo"
 )
 
@@ -29,96 +30,131 @@ type setting struct {
 	key, label, cmd string
 	title           string // in the switcher, if not the label
 	group           string // a heading in the panel, before the first of each
-	app             string // an app's own ("notebook": notesettings.go): not in the panel, nor the switcher
+	help            string // a line under it, saying what it's for
+	slider          bool   // its values in order, along a track
 	values          []string
 	shown           []string
 }
 
 var settingList = []setting{
 	{key: "light-idle", group: "Light", label: "Light off when idle",
+		help:   "the front light goes off by itself; a touch or a key puts it back as it was",
 		values: []string{"10", "30", "60", "300", "off"},
 		shown:  []string{"after 10 s untouched", "after 30 s untouched", "after 1 min untouched", "after 5 min untouched", "stays on"}},
 	{key: "light-start", label: "Light at start",
+		help:   "the light when hellobro starts: as you left it in hellobro, or Nickel's",
 		values: []string{"last", "nickel"},
 		shown:  []string{"as you last set it", "as Nickel had it"}},
+	{key: "text-size", group: "Screen", label: "Text size", slider: true,
+		help:   "the letters of the menus, lists, settings and buttons; not a terminal's, a book's or a notebook's",
+		values: []string{"85", "100", "115", "130", "150"},
+		shown:  []string{"smaller, 85%", "as it comes, 100%", "larger, 115%", "large, 130%", "largest, 150%"}},
+	{key: "auto-rotate", label: "Auto-rotate",
+		help:   "turns the screen as the Kobo is held, once it's still for a moment; each rotation is calibrated once, the first time",
+		values: []string{"off", "on"},
+		shown:  []string{"off: turned by Rotate only", "turns as it's held"}},
+	{key: "touch-size", label: "Sizes", title: "Sizes: for fingers or compact",
+		help:   "how tall the strips, rows and buttons are",
+		values: []string{"fingers", "compact"},
+		shown:  []string{"for fingers: taller strips, rows and buttons", "compact: more on the screen"}},
 	{key: "sleep-battery", group: "Power", label: "Sleep when idle, on battery",
+		help:   "the Kobo sleeps as with the power button; a press wakes it, where it was",
 		values: []string{"5", "15", "30", "60", "120", "off"},
 		shown:  []string{"after 5 min untouched", "after 15 min untouched", "after 30 min untouched", "after 1 h untouched", "after 2 h untouched", "never by itself"}},
 	{key: "sleep-power", label: "… plugged in", title: "Sleep when idle, plugged in",
 		values: []string{"off", "5", "15", "30", "60", "120"},
 		shown:  []string{"never by itself", "after 5 min untouched", "after 15 min untouched", "after 30 min untouched", "after 1 h untouched", "after 2 h untouched"}},
 	{key: "term-calm", label: "A terminal changing by itself", title: "Power: a terminal changing by itself",
+		help:   "a clock or a progress bar in a terminal: shown in batches saves the battery",
 		values: []string{"2", "5", "10", "off"},
 		shown:  []string{"on screen every 2 s, once untouched 5 s", "on screen every 5 s, once untouched 5 s", "on screen every 10 s, once untouched 5 s", "on screen at once, always"}},
 	{key: "term-clean", label: "… its quick updates cleaned up", title: "Power: a terminal's quick updates cleaned up",
+		help:   "quick updates leave a ghost of what was there; a clean one takes it away",
 		values: []string{"stop", "4"},
 		shown:  []string{"once its output stops", "when it pauses, or every 4 s"}},
 	{key: "mod", group: "Keyboard", label: "Mod key, the window keys'",
+		help:   "the key held for the window manager's keys (Mod+Enter, Mod+D…)",
 		values: []string{"super", "alt"},
 		shown:  []string{"Super, the Win key", "Alt (the Win key is Alt then)"}},
 	{key: "kbd-gone", label: "The keyboard gone", title: "The keyboard gone: Bluetooth",
+		help:   "when a Bluetooth keyboard drops off, the Bluetooth window comes up to bring it back",
 		values: []string{"15", "30", "60", "off"},
 		shown:  []string{"Bluetooth full screen after 15 s", "Bluetooth full screen after 30 s", "Bluetooth full screen after 1 min", "nothing comes up"}},
 	{key: "vkbd", label: "On-screen keyboard%s", cmd: "keyboard",
+		help:   "the keyboard drawn at the bottom of the screen, for fingers",
 		values: []string{"fields", "none", "auto", "on"},
 		shown:  []string{"for a text field (a name, find, a note's text)", "off", "when no keyboard is connected (after 10 s)", "always"}},
 	{key: "languages", label: "Languages to type in%s", cmd: "language", // a tap: ticks to choose them (langs.go)
+		help:   "the layouts a language key goes through, on both keyboards",
 		values: langValues(false), shown: langValues(true)},
-	{key: "auto-rotate", group: "Screen", label: "Auto-rotate",
-		values: []string{"off", "on"},
-		shown:  []string{"off: turned by Rotate only", "turns as it's held (to a rotation calibrated once)"}},
 	{key: "touch-marks", group: "Touch", label: "Touch marks",
+		help:   "to see where the screen felt a finger or the pen",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "a ring where it touched, a dot where it lifted, for 3 s"}},
-	{key: "note-finger", app: "notebook", label: "A finger in a notebook",
-		values: []string{"auto", "writes", "turns"},
-		shown:  []string{"writes, till a pen has: then it turns pages", "writes, as the pen does", "turns pages: only the pen writes"}},
-	{key: "pen-buttons", app: "notebook", label: "The pen's buttons",
-		values: []string{"marker", "eraser", "both"},
-		shown:  []string{"the first a marker, the second an eraser", "the first an eraser, the second a marker", "both erase"}},
 	{key: "edge-swipe", label: "Workspaces by touch",
+		help:   "how a finger goes to the next workspace; three fingers down from the top show them all",
 		values: []string{"two", "edge"},
 		shown:  []string{"two fingers swiped across", "two fingers, or one swiped in from a side"}},
-	{key: "touch-size", label: "Sizes", title: "Sizes: for fingers or compact",
-		values: []string{"fingers", "compact"},
-		shown:  []string{"for fingers: taller strips, rows and buttons", "compact: more on the screen"}},
-	{key: "note-export", app: "notebook", label: "Notebook export",
+	{key: "note-finger", group: "Notebooks", label: "A finger in a notebook",
+		help:   "the pen always writes; this is a finger's part",
+		values: []string{"auto", "writes", "turns"},
+		shown:  []string{"writes, till a pen has: then it turns pages", "writes, as the pen does", "turns pages: only the pen writes"}},
+	{key: "pen-buttons", label: "The pen's buttons",
+		help:   "what the pen does while a button on it is held",
+		values: []string{"marker", "eraser", "both"},
+		shown:  []string{"the first a marker, the second an eraser", "the first an eraser, the second a marker", "both erase"}},
+	{key: "note-export", label: "Notebook export",
+		help:   "what export makes, in the notebook's folder, for sharing",
 		values: []string{"ask", "pdf", "png"},
 		shown:  []string{"asks: a PDF of the pages, or a PNG of the page shown", "a PDF of the pages", "a PNG of the page shown"}},
-	{key: "note-light", app: "notebook", label: "The light by the left edge, in a notebook",
+	{key: "note-light", label: "The light by the left edge, in a notebook",
+		help:   "a finger up or down the left edge, as in the books",
 		values: []string{"on", "off"},
 		shown:  []string{"a finger up or down the left edge sets it", "off: a finger there is the page's (full screen)"}},
-	{key: "ai-model", app: "notebook", label: "The AI diary's model",
-		values: diaryModelIDs(), shown: diaryModelIDs()},
-	{key: "ai-format", app: "notebook", label: "The AI diary's answers",
+	{key: "ai-model", group: "AI notebooks", label: "Model",
+		help:   "the model an AI notebook asks, on OpenCode Go (the key in ai.conf); each with its cost when tried",
+		values: diaryModelIDs(), shown: diaryModelsShown()},
+	{key: "ai-format", label: "Answers", title: "AI notebooks: answers",
+		help:   "Markdown has headings, tables, code, formulas in LaTeX, diagrams and graphs",
 		values: []string{"md", "plain"}, shown: []string{"Markdown: formulas, code, diagrams", "plain text"}},
-	{key: "ai-size", app: "notebook", label: "The AI diary's letters",
-		values: []string{"m", "s", "l", "xl"}, shown: []string{"medium", "small", "large", "huge"}},
-	{key: "ai-pause", app: "notebook", label: "The AI diary asks after a pause",
+	{key: "ai-size", label: "Letters of an answer", title: "AI notebooks: letters of an answer", slider: true,
+		help:   "how big an answer is written in a notebook (from the next answer)",
+		values: []string{"s", "m", "l", "xl"}, shown: []string{"small, 12 pt", "medium, 15 pt", "large, 19 pt", "huge, 24 pt"}},
+	{key: "ai-pause", label: "Asks after a pause", title: "AI notebooks: asks after a pause",
+		help:   "once the pen rests this long, what's written goes to the model",
 		values: []string{"3", "2", "5", "10", "off"},
 		shown:  []string{"the pen rests 3 s", "the pen rests 2 s", "the pen rests 5 s", "the pen rests 10 s", "off: only taps ask"}},
-	{key: "ai-taps", app: "notebook", label: "The AI diary asks on taps",
+	{key: "ai-taps", label: "Asks on taps", title: "AI notebooks: asks on taps",
+		help:   "quick taps of a finger on the page ask at once, finished or not",
 		values: []string{"3", "2", "off"},
 		shown:  []string{"three quick taps", "two quick taps", "off"}},
+	{key: "ai-prompts", label: "Your prompts",
+		help:   "the prompts you saved, for every notebook: read them, forget one, write a new one",
+		values: []string{""}, shown: []string{""}}, // a window of them: notewizard.go
 	{key: "nickel", group: "At start", label: "Nickel while hellobro runs",
+		help:   "Nickel is Kobo's own reader; closed frees its memory but takes longer to go back",
 		values: []string{"frozen", "closed"},
 		shown:  []string{"frozen: back to it at once", "closed, as KOReader does (from the next start)"}},
 	{key: "radios", label: "Wi-Fi and Bluetooth at start",
 		values: []string{"kobo", "on"},
 		shown:  []string{"as Kobo had them, and put back so", "turned on, and left on"}},
 	{key: "share", group: "Sharing", label: "File sharing (SFTP, port 2022)",
+		help:   "a computer paired once reaches the Kobo's files, and a shell, over Wi-Fi",
 		values: []string{"off", "on", "pair"},
 		shown:  []string{"off", "on (Sharing, above)", "pair a computer"}},
 	{key: "relay", label: "Relay, a way in from afar (relay.conf)",
+		help:   "through your own server, when the Kobo isn't on the computer's network",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on, while sharing and awake"}},
 	{key: "mdns", label: "Show the Kobo as kobo.local (mDNS)",
 		values: []string{"on", "off"},
 		shown:  []string{"yes, while sharing", "no"}},
 	{key: "profile", label: "CPU profiles (make push-profile)",
+		help:   "for working on hellobro: what it spends its time on",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on, for a paired computer"}},
 	{key: "notify", group: "Terminal", label: "Terminal notifications",
+		help:   "a program in a terminal asking for attention",
 		values: []string{"all", "messages", "off"},
 		shown:  []string{"the bell and messages", "messages only (OSC 9, 777)", "off"}},
 	{key: "notify-light", label: "… the light, if it's off", title: "Notifications: the light, if it's off",
@@ -131,14 +167,16 @@ var settingList = []setting{
 		values: []string{"3", "5", "10", "off"},
 		shown:  []string{"for 3 s", "for 5 s", "for 10 s", "none"}},
 	{key: "bar", label: "The bar%s", cmd: "statusbar",
+		help:   "the strip at the top: workspaces, the time, the battery",
 		values: []string{"on", "off"},
 		shown:  []string{"shown", "hidden"}},
 	{key: "alpine-bus", group: "Alpine", label: "System bus access", title: "Alpine: system bus access",
+		help:   "lets Alpine's programs talk to the Kobo's own services",
 		values: []string{"off", "on"},
 		shown:  []string{"off", "on: e.g. sound (it reaches Bluetooth and Wi-Fi setup too)"}},
 	{key: "alpine-remove", label: "Remove it", title: "Alpine: remove it",
 		values: []string{""}, shown: []string{""}}, // the question: alpine.go
-	{key: "keys", group: "Keys", label: "Keys", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
+	{key: "keys", group: "Keys", label: "Keys", help: "the keys of every command, as keys.conf has them", values: []string{""}, shown: []string{""}}, // the Keys menu: keyset.go
 }
 
 // setLine is a line of the panel: a group's heading, or setting i.
@@ -152,9 +190,6 @@ type setLine struct {
 var settingLines = func() []setLine {
 	var ls []setLine
 	for i, st := range settingList {
-		if st.app != "" {
-			continue
-		}
 		if st.group != "" {
 			ls = append(ls, setLine{head: st.group, i: -1})
 		}
@@ -181,7 +216,7 @@ var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 var valueRenamed = map[string]string{"vkbd=off": "fields"}
 
 // The defaults, by key: the index of a value.
-var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2}
+var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2, "text-size": 1, "ai-size": 1}
 
 // settingCommands step the settings from the switcher, each to its next
 // value, as a tap on its row does, and a toast says what it is now. The
@@ -190,11 +225,11 @@ var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2}
 func settingCommands() []*command {
 	var cs []*command
 	for i, st := range settingList {
-		if st.app != "" {
-			continue
-		}
 		switch st.key {
-		case "share", "relay", "bar", "tabs", "keys":
+		case "share", "relay", "bar", "tabs", "keys", "ai-model": // the models are too many to step through
+			continue
+		case "ai-prompts":
+			cs = append(cs, &command{id: "ai.prompts", title: "AI notebooks: your prompts", run: func(a *bro) { a.openGUI(promptsKey) }})
 			continue
 		case "languages":
 			cs = append(cs, &command{id: "languages", title: "Setting: Languages to type in, ticked", run: (*bro).openLangs})
@@ -261,7 +296,7 @@ func loadSettings() settings {
 func (s settings) save() {
 	var b strings.Builder
 	for _, st := range settingList {
-		if st.key != "bar" && st.key != "tabs" && st.key != "keys" && st.key != "alpine-remove" { // kept in their own files, or none
+		if st.key != "bar" && st.key != "tabs" && st.key != "keys" && st.key != "alpine-remove" && st.key != "ai-prompts" { // kept in their own files, or none
 			fmt.Fprintf(&b, "%s=%s\n", st.key, st.values[s[st.key]])
 		}
 	}
@@ -322,6 +357,9 @@ func (a *bro) pickSetting(i, v int) {
 	case "languages":
 		a.openLangs()
 		return
+	case "ai-prompts":
+		a.openGUI(promptsKey)
+		return
 	case "bar":
 		if v != a.settingAt(i) {
 			a.toggleBar()
@@ -361,6 +399,9 @@ func (a *bro) pickSetting(i, v int) {
 		case "touch-size":
 			a.applySizes()
 			a.Relayout()
+		case "text-size":
+			a.applyTextSize()
+			a.Relayout()
 		}
 	}
 	log.Printf("settings: %s = %s", st.key, a.setting(st.key))
@@ -397,6 +438,15 @@ func (a *bro) settingShown(i int) string {
 		return fmt.Sprintf("%d set by you (keys.conf)", len(a.keys.named))
 	case st.key == "languages":
 		return st.shown[indexOf(st.values, a.setting(st.key))]
+	case st.key == "ai-prompts":
+		switch n := len(loadPrompts()); n {
+		case 0:
+			return "none saved yet"
+		case 1:
+			return "1 saved"
+		default:
+			return fmt.Sprintf("%d saved", n)
+		}
 	}
 	return st.shown[a.settingAt(i)]
 }
@@ -408,6 +458,15 @@ func indexOf(vs []string, v string) int {
 		}
 	}
 	return 0
+}
+
+// textSize is the theme's letters as they come, before the setting.
+const textSize = 18
+
+// applyTextSize makes the ink windows' letters as big as the setting.
+func (a *bro) applyTextSize() {
+	n, _ := strconv.Atoi(a.setting("text-size"))
+	a.theme().TextSize = textSize * ink.Dp(max(n, 50)) / 100
 }
 
 // applyLightIdle tells the App when the light goes off by itself.

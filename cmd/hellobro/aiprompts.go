@@ -61,7 +61,11 @@ func savePrompts(ps []aiPrompt) error {
 
 // keepPrompt saves p for every notebook, in place of one of its name.
 func keepPrompt(p aiPrompt) error {
-	ps := slices.DeleteFunc(loadPrompts(), func(q aiPrompt) bool { return q.Name == p.Name })
+	ps := loadPrompts()
+	if i := slices.IndexFunc(ps, func(q aiPrompt) bool { return q.Name == p.Name }); i >= 0 {
+		ps[i] = p // where it was
+		return savePrompts(ps)
+	}
 	return savePrompts(append(ps, p))
 }
 

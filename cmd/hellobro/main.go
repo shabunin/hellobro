@@ -105,6 +105,7 @@ func main() {
 	a.vk = vkbdState{held: map[*kobo.Gesture]vkHeld{}, latched: map[uint16]bool{}, since: time.Now()}
 	a.set = loadSettings()
 	a.applySizes() // before anything is laid out
+	a.applyTextSize()
 	a.vk.on = a.setting("vkbd") == "on"
 	kobo.SetTyping(a.langs()[0])
 	a.mem = loadRemembered(kobo.AppFile(""))

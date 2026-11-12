@@ -294,9 +294,9 @@ func (r *Range) update(gtx ink.Ctx) {
 				v = r.High
 			}
 			switch e.Name {
-			case "Left", "Down":
+			case "Left":
 				r.set(v - step)
-			case "Right", "Up":
+			case "Right":
 				r.set(v + step)
 			case "Space":
 				r.active = 1 - r.active
@@ -307,7 +307,7 @@ func (r *Range) update(gtx ink.Ctx) {
 	}
 }
 
-var rangeKeys = []string{"Left", "Right", "Up", "Down", "Space"}
+var rangeKeys = []string{"Left", "Right", "Space"} // ↑ ↓ the focus's, as floatKeys
 
 func abs32(v float32) float32 {
 	if v < 0 {

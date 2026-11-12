@@ -14,7 +14,6 @@ import (
 	"hellobro/ink/inkkobo"
 	"hellobro/ink/text"
 	"hellobro/ink/theme"
-	"hellobro/ink/widget"
 	"hellobro/kobo"
 )
 
@@ -34,9 +33,8 @@ var inkUIs = map[string]func(a *bro) inkUI{
 	"wifi":      func(a *bro) inkUI { return &radioUI{a: a, panel: panelWiFi} },
 	"bluetooth": func(a *bro) inkUI { return &radioUI{a: a, panel: panelBT} },
 	wizKey:      newNoteWiz,
-	"settings": func(a *bro) inkUI {
-		return &settingsUI{a: a, sel: make([]widget.Select, len(settingList)), act: make([]widget.Clickable, len(settingList))}
-	},
+	"settings":  newSettingsUI,
+	promptsKey:  newPromptsUI,
 }
 
 // inkWin is a guiWin's ink: its pane, and its strip as drawn.

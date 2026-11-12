@@ -8,6 +8,10 @@ package main
 // opens where "+ new notebook" was tapped (the list, the launcher), or
 // as a window of its own (the switcher), and the notebook takes its
 // place.
+//
+// The same steps are the saved prompts' window (Settings, AI notebooks,
+// Your prompts): the list of them, each to read, change or forget, and
+// a new one; no notebook made.
 
 import (
 	"bytes"
@@ -32,16 +36,20 @@ import (
 const keyN = 49 // n, on the keyboard
 
 const (
-	wizKind  = iota // plain, or AI
-	wizVoice        // which prompt
-	wizOwn          // the writer's own
-	wizKey   = "newnote"
+	wizKind    = iota // plain, or AI
+	wizVoice          // which prompt
+	wizOwn            // the writer's own
+	wizKey     = "newnote"
+	promptsKey = "prompts"
 )
 
 type noteWizUI struct {
-	a    *bro
-	dir  string // the folder it goes in
-	step int
+	a       *bro
+	dir     string // the folder it goes in
+	step    int
+	first   int    // the first step: wizVoice for the prompts' window
+	manage  bool   // the prompts' window, not a new notebook's
+	editing string // the saved prompt being changed, by name
 
 	plain, withAI, back, create, own widget.Clickable
 	cards, forget                    []widget.Clickable // the prompts': each, and the saved ones' ×
@@ -63,6 +71,14 @@ type noteWizUI struct {
 
 func newNoteWiz(a *bro) inkUI {
 	u := &noteWizUI{a: a, dir: a.nt.wizDir}
+	u.how.Value = "keys"
+	u.keep.Value = true
+	return u
+}
+
+// newPromptsUI is the saved prompts' window.
+func newPromptsUI(a *bro) inkUI {
+	u := &noteWizUI{a: a, manage: true, step: wizVoice, first: wizVoice, saved: loadPrompts()}
 	u.how.Value = "keys"
 	u.keep.Value = true
 	return u
@@ -174,7 +190,7 @@ func (u *noteWizUI) readHand() {
 				u.how.Value, u.said = "keys", "read: put it right if it needs it"
 				log.Printf("wizard: read the prompt, %d characters", len(out.Text))
 			}
-			a.inkRedraw(wizKey)
+			a.inkRedraw(u.winKey())
 		})
 	}()
 }
@@ -220,17 +236,29 @@ func (u *noteWizUI) events(gtx ink.Ctx) {
 	if u.withAI.Clicked(gtx) {
 		u.step, u.saved = wizVoice, loadPrompts()
 	}
-	if u.back.Clicked(gtx) {
+	if u.back.Clicked(gtx) && u.step > u.first {
 		u.step--
 		a.vkAsk(false)
 	}
 	if u.own.Clicked(gtx) {
-		u.step = wizOwn
+		u.step, u.editing = wizOwn, ""
+		u.area.SetText("")
+		u.name.SetText("")
+		u.sheet.Clear()
+		u.said = ""
 		a.vkAsk(true)
 	}
 	for i := range u.cards {
-		if u.cards[i].Clicked(gtx) {
-			u.pick = i
+		if !u.cards[i].Clicked(gtx) {
+			continue
+		}
+		u.pick = i
+		if k := i - len(diaryVoices); u.manage && k >= 0 && k < len(u.saved) { // to change it
+			p := u.saved[k]
+			u.step, u.editing, u.said = wizOwn, p.Name, ""
+			u.how.Value = "keys"
+			u.area.SetText(p.Text)
+			u.name.SetText(p.Name)
 		}
 	}
 	for i := range u.forget {
@@ -262,6 +290,23 @@ func (u *noteWizUI) events(gtx ink.Ctx) {
 	case u.step == wizVoice && u.pick-len(diaryVoices) < len(u.saved):
 		p := u.saved[u.pick-len(diaryVoices)]
 		u.do = func() { u.make(true, func(nb *notebook) { nb.setOwnVoice(p) }) }
+	case u.step == wizOwn && u.manage:
+		p := u.ownPrompt()
+		if p.Text == "" {
+			u.said = "write the prompt first: typed, or by hand and read"
+			return
+		}
+		err := keepPrompt(p)
+		if err == nil && u.editing != "" && u.editing != p.Name { // renamed
+			err = forgetPrompt(u.editing)
+		}
+		if err != nil {
+			u.said = "can't save it: " + err.Error()
+			return
+		}
+		u.step, u.saved, u.editing = wizVoice, loadPrompts(), ""
+		a.vkAsk(false)
+		a.drawSettings()
 	case u.step == wizOwn:
 		p := u.ownPrompt()
 		if p.Text == "" {
@@ -288,20 +333,28 @@ func (u *noteWizUI) key(code uint16, value int32) bool {
 		u.plain.Click()
 	case u.step == wizKind && code == kobo.KeyA:
 		u.withAI.Click()
-	case u.step > wizKind && code == kobo.KeyEsc && !u.area.Focused() && !u.name.Focused():
+	case u.step > u.first && code == kobo.KeyEsc && !u.area.Focused() && !u.name.Focused():
 		u.back.Click()
 	default:
 		return false
 	}
-	u.a.inkRedraw(wizKey)
+	u.a.inkRedraw(u.winKey())
 	return true
+}
+
+// winKey is the window it's in.
+func (u *noteWizUI) winKey() string {
+	if u.manage {
+		return promptsKey
+	}
+	return wizKey
 }
 
 // head is a step's title, with ‹ back before it but on the first.
 func (u *noteWizUI) head(gtx ink.Ctx, title string) ink.Dims {
 	th := u.a.theme()
 	kids := []layout.FlexChild{}
-	if u.step > wizKind {
+	if u.step > u.first {
 		kids = append(kids, layout.Rigid(theme.Button(th, &u.back, "‹ back").Layout), layout.Rigid(layout.Spacer{Width: th.Pad}.Layout))
 	}
 	kids = append(kids, layout.Flexed(1, theme.Title(th, title).Layout))
@@ -375,31 +428,49 @@ func (u *noteWizUI) voiceStep(gtx ink.Ctx) ink.Dims {
 	u.pick = min(u.pick, n-1)
 	rows := []ink.Widget{}
 	for i, v := range diaryVoices {
+		if u.manage {
+			break
+		}
 		rows = append(rows, func(gtx ink.Ctx) ink.Dims { return u.card(gtx, &u.cards[i], v.label, v.text, u.pick == i) })
 	}
-	if len(u.saved) > 0 {
+	switch {
+	case len(u.saved) > 0 && !u.manage:
 		rows = append(rows, theme.Section(th, "Yours, saved"))
+	case len(u.saved) == 0 && u.manage:
+		rows = append(rows, func(gtx ink.Ctx) ink.Dims {
+			return layout.Inset{Bottom: th.Pad}.Layout(gtx, theme.Body(th, "none saved yet: write one here, or save one when you make an AI notebook").Layout)
+		})
 	}
 	for i, p := range u.saved {
 		k := len(diaryVoices) + i
 		rows = append(rows, func(gtx ink.Ctx) ink.Dims {
 			return layout.Flex{}.Layout(gtx,
-				layout.Flexed(1, func(gtx ink.Ctx) ink.Dims { return u.card(gtx, &u.cards[k], p.Name, p.Text, u.pick == k) }),
+				layout.Flexed(1, func(gtx ink.Ctx) ink.Dims { return u.card(gtx, &u.cards[k], p.Name, p.Text, u.pick == k && !u.manage) }),
 				layout.Rigid(layout.Spacer{Width: th.Pad}.Layout),
 				layout.Rigid(theme.Button(th, &u.forget[i], "forget").Layout))
 		})
 	}
-	rows = append(rows, theme.Row(th, &u.own, "+ your own prompt").Layout)
 	u.list.Axis = layout.Vertical
+	list := func(gtx ink.Ctx) ink.Dims {
+		return theme.List(th, &u.list).Layout(gtx, len(rows), func(gtx ink.Ctx, i int) ink.Dims { return rows[i](gtx) })
+	}
+	if u.manage {
+		rows = append(rows, theme.Row(th, &u.own, "+ a new one").Layout)
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(func(gtx ink.Ctx) ink.Dims { return u.head(gtx, "Your AI prompts") }),
+			layout.Rigid(theme.Small(th, "saved for every notebook: the AI voices after the ones that come with it; tap one to change it. "+
+				"Forgotten, a notebook that has it keeps it").Layout),
+			layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
+			layout.Flexed(1, list))
+	}
+	rows = append(rows, theme.Row(th, &u.own, "+ your own prompt").Layout)
 	make := theme.Button(th, &u.create, "make it")
 	make.Strong = true
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims { return u.head(gtx, "How should it answer?") }),
 		layout.Rigid(theme.Small(th, "what it's told, in full, before what you write; it's the notebook's own, to change in its settings").Layout),
 		layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
-		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
-			return theme.List(th, &u.list).Layout(gtx, len(rows), func(gtx ink.Ctx, i int) ink.Dims { return rows[i](gtx) })
-		}),
+		layout.Flexed(1, list),
 		layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
 		layout.Rigid(make.Layout))
 }
@@ -407,7 +478,20 @@ func (u *noteWizUI) voiceStep(gtx ink.Ctx) ink.Dims {
 func (u *noteWizUI) ownStep(gtx ink.Ctx) ink.Dims {
 	th := u.a.theme()
 	make := theme.Button(th, &u.create, "make it")
+	if u.manage {
+		make.Text = "keep it"
+	}
 	make.Strong = true
+	keep := func(gtx ink.Ctx) ink.Dims {
+		if u.manage { // it's what this window is for
+			return ink.Dims{}
+		}
+		return theme.CheckBox(th, &u.keep, "save it for every notebook").Layout(gtx)
+	}
+	title := "Your own prompt"
+	if u.editing != "" {
+		title = u.editing
+	}
 	editor := func(gtx ink.Ctx) ink.Dims {
 		if u.how.Value == "hand" {
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
@@ -432,7 +516,7 @@ func (u *noteWizUI) ownStep(gtx ink.Ctx) ink.Dims {
 		return ta.Layout(gtx)
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(func(gtx ink.Ctx) ink.Dims { return u.head(gtx, "Your own prompt") }),
+		layout.Rigid(func(gtx ink.Ctx) ink.Dims { return u.head(gtx, title) }),
 		layout.Rigid(theme.Small(th, "how it should answer: who it is, its manner, its language; typed, or written by hand and read to text by the AI").Layout),
 		layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
 		layout.Rigid(theme.Tabs(th, &u.how, []string{"keys", "hand"}, []string{"typed", "by hand"}).Layout),
@@ -446,7 +530,7 @@ func (u *noteWizUI) ownStep(gtx ink.Ctx) ink.Dims {
 		}),
 		layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
 		layout.Rigid(theme.Editor(th, &u.name, "its name (to find it again)").Layout),
-		layout.Rigid(theme.CheckBox(th, &u.keep, "save it for every notebook").Layout),
+		layout.Rigid(keep),
 		layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
 		layout.Rigid(make.Layout))
 }

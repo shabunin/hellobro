@@ -164,7 +164,12 @@ part, tap anywhere for all of it, or Esc for none. It's a PNG in
 over USB or file sharing), and the clipboard's picture as well, to
 paste into a notebook (Ctrl+V).
 
-Settings, Touch, **Sizes**: **for fingers** (the default) has a
+Settings, Screen, **Text size** (a slider: 85% to 150%) makes the
+letters of the menus, lists, settings, the launcher and the buttons
+bigger or smaller, at once; a terminal's, a book's and a notebook's
+have their own.
+
+Settings, Screen, **Sizes**: **for fingers** (the default) has a
 taller bar and title strips, bigger window buttons, and
 taller rows in menus, Settings, Wi-Fi and Bluetooth, the books' and
 notebooks' lists, and the bars over a notebook's and a book's page;
@@ -1103,7 +1108,10 @@ hand**: write it on the sheet, then **read it to text**: the model reads
 it, and it comes back as text to put right before it's kept). Give it a
 name to find it again (else its first words are), and **save it for
 every notebook** (on) keeps it in `ai-prompts.json`, for the next new
-notebook and for **AI voice** in any notebook's settings. **‹ back**
+notebook and for **AI voice** in any notebook's settings. Settings, AI
+notebooks, **Your prompts** lists them (also "AI notebooks: your
+prompts" in the switcher): tap one to read it whole and change it
+(**keep it**), **forget** one, or **+ a new one**, typed or by hand. **‹ back**
 (or Esc) goes a step back; closing the window makes none.
 
 ### The AI diary
@@ -1325,7 +1333,13 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
   running, as [bluetooth.koplugin](https://github.com/Tharavol/bluetooth.koplugin)
   does on the Sage; off undoes it.
 - The Settings window: a setting is a dropdown of its values: tap it
-  (or Enter) and pick one. ↑ ↓ go through them, the list following. They're kept in `settings`.
+  (or Enter) and pick one; under each, a line says what it's for. ↑ ↓
+  go through them, the list following. A setting whose values go in
+  order (**Text size**, an AI answer's letters) is a slider: drag along
+  it (it's picked when the finger lifts), or ← → on it. The notebooks'
+  settings and the AI notebooks' (the model, the answers, their
+  letters, when it asks, **Your prompts**) are here too, as well as in
+  a notebook's own. They're kept in `settings`.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
   since Nickel wakes up thinking so; networks and devices added stay.
   "Wi-Fi and Bluetooth at start", turned on (and not in airplane mode,

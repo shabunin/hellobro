@@ -119,6 +119,20 @@ func diaryModelIDs() []string {
 	return ids
 }
 
+// diaryModelsShown are the models as the Settings list them: the cost,
+// how long it took.
+func diaryModelsShown() []string {
+	var ls []string
+	for _, m := range diaryModels {
+		if m.id == "conf" {
+			ls = append(ls, "as ai.conf says")
+			continue
+		}
+		ls = append(ls, m.label(""))
+	}
+	return ls
+}
+
 func diaryModelOf(id string) diaryModel {
 	for _, m := range diaryModels {
 		if m.id == id {

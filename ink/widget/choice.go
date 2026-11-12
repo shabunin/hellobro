@@ -179,9 +179,9 @@ func (f *Float) update(gtx ink.Ctx) {
 				step = (f.Max - f.Min) / 10
 			}
 			switch e.Name {
-			case "Left", "Down":
+			case "Left":
 				f.set(f.Value - step)
-			case "Right", "Up":
+			case "Right":
 				f.set(f.Value + step)
 			case "Home":
 				f.set(f.Min)
@@ -194,7 +194,9 @@ func (f *Float) update(gtx ink.Ctx) {
 	}
 }
 
-var floatKeys = []string{"Left", "Right", "Up", "Down", "Home", "End"}
+// floatKeys are a slider's: ← → along it; ↑ ↓ are left to the focus,
+// to the row above or below, as a slider is a row in a form.
+var floatKeys = []string{"Left", "Right", "Home", "End"}
 
 // Layout lays w (the slider as drawn) out as its area: a touch at x is
 // the value x along its width.
