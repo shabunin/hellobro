@@ -124,12 +124,17 @@ book's and the notebook's bars. A window's ink is a pane over its body
 (`inkBody`); what's drawn its own way (a page, thumbnails, the pen's
 sample) goes in through `ink.Draw` or a kept image.
 
-Still drawn the old way: the window manager's bar and title strips
-(`kobo`), an empty workspace, the keyboard on the screen, the notices,
-the ex line, the book's note, dictionary and cut buttons, the
-notebook's tool choices, overview strip and selection buttons, and the
-bodies themselves (terminal cells, book pages, notebook ink), which
-stay drawn their own way for speed.
+What's only shown, its taps the window's own, is painted once in ink
+(`inkPaint`): an empty workspace, the `:` line, the keyboard on the
+screen (a pane for each size of key), a book's note or word looked
+up, a cut's buttons, a pinch's zoom, the notebook's pen and paper
+choices, its selection's buttons and its pages small.
+
+Still the old way: the window manager's bar, title strips, tabbed
+containers' tabs and notices. They're `kobo`'s, shared with brotools and
+the gallery, and laid out there for kobo's fonts, which are ink's own
+Go fonts at the same sizes. The bodies themselves (terminal cells, book
+pages, notebook ink) stay drawn their own way for speed.
 
 ```sh
 make gallery              # the ARM build
