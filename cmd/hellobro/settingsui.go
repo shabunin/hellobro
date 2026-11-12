@@ -6,8 +6,6 @@ package main
 // at once (pickSetting).
 
 import (
-	"slices"
-
 	"hellobro/ink"
 	"hellobro/ink/layout"
 	"hellobro/ink/theme"
@@ -36,7 +34,7 @@ func (u *settingsUI) Status() string { return "" }
 
 // opens says setting st is a row that opens something, not a choice.
 func (st setting) opens() bool {
-	return st.key == "keys" || st.key == "alpine-remove" || st.key == "languages" || st.key == "ai-prompts"
+	return st.key == "keys" || st.key == "alpine-remove" || st.key == "languages" || st.key == "ai-prompts" || st.key == "ai-model"
 }
 
 func (u *settingsUI) Layout(gtx ink.Ctx) ink.Dims {
@@ -91,11 +89,6 @@ func (u *settingsUI) Layout(gtx ink.Ctx) ink.Dims {
 			sl := theme.Slider(th, &u.fl[i], label, v)
 			sl.Ticks = true
 			row = func(gtx ink.Ctx) ink.Dims { return layout.Inset{Top: th.Pad}.Layout(gtx, sl.Layout) } // as a dropdown's row has
-		case st.key == "ai-model": // the API's list, fetched when it's old
-			a.modelsWant()
-			shown := slices.Clone(st.shown)
-			shown[0] = "as ai.conf says: " + a.diaryConfModel()
-			row = theme.Select(th, &u.sel[i], label, shown...).Layout
 		default:
 			row = theme.Select(th, &u.sel[i], label, st.shown...).Layout
 		}

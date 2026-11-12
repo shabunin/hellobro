@@ -20,18 +20,20 @@ type Column struct {
 
 // TableStyle is a table: heads to sort by over rows that move under the
 // finger. Mark is underlined where the cells have it (what was searched
-// for); Empty is said when there are no rows.
+// for); Empty is said when there are no rows; the row Sel (-1: none) is
+// framed, the one chosen.
 type TableStyle struct {
 	Theme   *Theme
 	Table   *widget.Table
 	Columns []Column
 	Mark    string
 	Empty   string
+	Sel     int
 }
 
 // Table is t as a table of columns.
 func Table(th *Theme, t *widget.Table, columns ...Column) TableStyle {
-	return TableStyle{Theme: th, Table: t, Columns: columns, Empty: "nothing here"}
+	return TableStyle{Theme: th, Table: t, Columns: columns, Empty: "nothing here", Sel: -1}
 }
 
 // widths shares w out among the columns.
@@ -158,6 +160,9 @@ func (t TableStyle) Layout(gtx ink.Ctx, n int, cell func(i, c int) string) ink.D
 				x += ws[c]
 			}
 			ink.Fill(gtx.Ops, image.Rect(0, rh-1, rr.Dx(), rh), th.Quiet)
+			if i == t.Sel {
+				ink.Frame(gtx.Ops, rr, 2*b, th.Fg)
+			}
 			if tb.Rows[i].Pressed() {
 				ink.Invert(gtx.Ops, rr)
 			}

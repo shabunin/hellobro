@@ -1258,12 +1258,18 @@ Its settings, under the notebook's:
   on, answer in French", "call me Harry", "be my Latin teacher". It
   says it will, and keeps it on that answer: shown here, and gone if
   that answer's undone or erased.
-- **AI model**: a tap lists them: **as ai.conf says** first, then the
-  models the API lists that read pictures (handwriting), cheapest
-  first, with their price a million tokens in / out. The list is
-  fetched when the settings show and it's a day old (or ai.conf's
-  `base` changed), and kept in `ai-models.json` in the app's folder, so
-  it's there offline. The same choice is in Settings, AI notebooks.
+- **AI model**: a tap opens the **AI models** window (also in
+  Settings, AI notebooks, and `ai.models` in the switcher): the API's
+  list as a table. Search it (a name, a maker, a word of what it's
+  for), tap a head to sort by it (again: the other way), and the chips
+  filter: **pictures** (on at first: the handwriting is sent as one),
+  **PDF**, **audio**, **reasoning**, **tools**, **JSON**, **open
+  weights**, **free**. A model tapped is told of below: what it reads
+  and can do, how much it takes in and writes, what it knows up to, its
+  prices (a million tokens; from the cache; dearer at some hours) and
+  how it's asked; **use it**, or **as ai.conf says**. The list is
+  fetched when it's a day old (or ai.conf's `base` changed), or on
+  **refresh**, and kept in `ai-models.json`, so it's there offline.
 - **AI font (this notebook)**: a tap lists them: **Gentium Book**
   (first: Latin, Cyrillic and Greek, polytonic too, in all four
   styles; it comes with hellobro), Go, the fonts the books are read in

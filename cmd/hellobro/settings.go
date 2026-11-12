@@ -117,7 +117,7 @@ var settingList = []setting{
 		values: []string{"on", "off"},
 		shown:  []string{"a finger up or down the left edge sets it", "off: a finger there is the page's (full screen)"}},
 	{key: "ai-model", group: "AI notebooks", label: "Model",
-		help:   "the model an AI notebook asks (the key in ai.conf): those the API lists that read pictures, and their price a million tokens in / out",
+		help:   "the model an AI notebook asks (the key in ai.conf): the API's list, to search, sort and filter by what they can do",
 		values: []string{"conf", ai.DefaultModel}, shown: []string{"as ai.conf says", ai.DefaultModel}}, // the API's list, once it's had (applyModels)
 	{key: "ai-format", label: "Answers", title: "AI notebooks: answers",
 		help:   "Markdown has headings, tables, code, formulas in LaTeX, diagrams and graphs",
@@ -231,7 +231,10 @@ func settingCommands() []*command {
 	var cs []*command
 	for i, st := range settingList {
 		switch st.key {
-		case "share", "relay", "bar", "tabs", "keys", "ai-model": // the models are too many to step through
+		case "share", "relay", "bar", "tabs", "keys":
+			continue
+		case "ai-model": // too many to step through: their window
+			cs = append(cs, &command{id: "ai.models", title: "AI notebooks: the models", run: func(a *bro) { a.openGUI(modelsKey) }})
 			continue
 		case "ai-prompts":
 			cs = append(cs, &command{id: "ai.prompts", title: "AI notebooks: your prompts", run: func(a *bro) { a.openGUI(promptsKey) }})
@@ -370,6 +373,9 @@ func (a *bro) pickSetting(i, v int) {
 		return
 	case "ai-prompts":
 		a.openGUI(promptsKey)
+		return
+	case "ai-model":
+		a.openGUI(modelsKey)
 		return
 	case "bar":
 		if v != a.settingAt(i) {

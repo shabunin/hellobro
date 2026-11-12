@@ -36,6 +36,7 @@ var inkUIs = map[string]func(a *bro) inkUI{
 	"settings":  newSettingsUI,
 	promptsKey:  newPromptsUI,
 	calKey:      newCalUI,
+	modelsKey:   newModelsUI,
 }
 
 // inkWin is a guiWin's ink: its pane, and its strip as drawn.

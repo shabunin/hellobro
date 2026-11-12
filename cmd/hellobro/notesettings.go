@@ -13,7 +13,6 @@ import (
 	"image"
 	"image/draw"
 	"image/png"
-	"slices"
 	"strings"
 	"time"
 
@@ -112,13 +111,15 @@ func noteSetRows() []noteSet {
 			}
 			return "none: write one, as “from now on, …”"
 		}},
-		{label: "AI model", opts: func(a *bro, _ *noteWin) ([]string, int) {
-			a.modelsWant()
-			i := settingIndex("ai-model")
-			shown := slices.Clone(settingList[i].shown)
-			shown[0] = "as ai.conf says: " + a.diaryConfModel()
-			return shown, a.settingAt(i)
-		}, pick: func(a *bro, _ *noteWin, v int) { a.pickSetting(settingIndex("ai-model"), v) }},
+		{label: "AI model", value: func(a *bro, _ *noteWin) string {
+			if m := a.setting("ai-model"); m != "conf" {
+				if lm, ok := a.modelOf(m); ok {
+					return modelLabel(lm)
+				}
+				return m
+			}
+			return "as ai.conf says: " + a.diaryConfModel()
+		}, open: func(a *bro, _ *noteWin) { a.openGUI(modelsKey) }},
 		{label: "AI font (this notebook)", value: func(a *bro, w *noteWin) string {
 			if f := w.nb.diaryFont(); f != diaryHand {
 				return f

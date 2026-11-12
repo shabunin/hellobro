@@ -73,6 +73,7 @@ var (
 const (
 	modelsFile  = "ai-models.json"
 	modelsStale = 24 * time.Hour
+	modelsV     = 2 // the cache's: an older one is fetched again (v2: the models' features)
 )
 
 // modelsState is the models' list, as last fetched.
@@ -80,9 +81,11 @@ type modelsState struct {
 	List     []ai.Model `json:"models"`
 	At       time.Time  `json:"at"`
 	Base     string     `json:"base"` // the API it's of
+	V        int        `json:"v"`
 	loaded   bool
 	fetching bool
 	err      string
+	errAt    time.Time
 }
 
 // models is the list, read from its file the first time.
@@ -99,10 +102,19 @@ func (a *bro) models() *modelsState {
 
 // modelsWant fetches the list again if it's old, or of another API than
 // ai.conf's now, off the loop; the setting's choices are its then.
-func (a *bro) modelsWant() {
+func (a *bro) modelsWant() { a.modelsFetch(false) }
+
+// modelsFetch fetches the list: now if force, else if it's old (and not
+// failed a moment ago).
+func (a *bro) modelsFetch(force bool) {
 	ms := a.models()
 	c, err := ai.Load(kobo.AppFile("ai.conf"))
-	if err != nil || ms.fetching || ms.Base == c.Base && time.Since(ms.At) < modelsStale {
+	if err != nil {
+		ms.err = diaryConfErr(err)
+		return
+	}
+	fresh := ms.Base == c.Base && ms.V == modelsV && time.Since(ms.At) < modelsStale
+	if ms.fetching || !force && (fresh || time.Since(ms.errAt) < 5*time.Minute) {
 		return
 	}
 	ms.fetching = true
@@ -115,10 +127,11 @@ func (a *bro) modelsWant() {
 			ms.fetching = false
 			if err != nil {
 				log.Printf("ai: the models' list: %v", err)
-				ms.err = err.Error()
+				ms.err, ms.errAt = err.Error(), time.Now()
+				a.inkRedraw(modelsKey)
 				return
 			}
-			ms.List, ms.At, ms.Base, ms.err = list, time.Now(), c.Base, ""
+			ms.List, ms.At, ms.Base, ms.V, ms.err = list, time.Now(), c.Base, modelsV, ""
 			if b, err := json.MarshalIndent(ms, "", " "); err == nil {
 				writeAtomic(kobo.AppFile(modelsFile), b)
 			}
@@ -126,8 +139,10 @@ func (a *bro) modelsWant() {
 			a.applyModels()
 			a.noteSettingsRedraw()
 			a.inkRedraw("settings")
+			a.inkRedraw(modelsKey)
 		})
 	}()
+	a.inkRedraw(modelsKey) // "fetching"
 }
 
 // diaryCan says the diary can ask m: it reads pictures (if the list
@@ -135,15 +150,15 @@ func (a *bro) modelsWant() {
 func diaryCan(m ai.Model) bool { return (m.Images || !m.Known) && m.Proto != "-" }
 
 // applyModels makes the list the "ai-model" setting's choices: as
-// ai.conf says first, then those the diary can ask, cheapest first; the
-// one chosen stays, listed or not.
+// ai.conf says first, then those we can ask, cheapest first; the one
+// chosen stays, listed or not.
 func (a *bro) applyModels() {
 	i := settingIndex("ai-model")
 	st := &settingList[i]
 	cur := st.values[a.set["ai-model"]]
 	values, shown := []string{"conf"}, []string{"as ai.conf says"}
 	for _, m := range a.models().List {
-		if diaryCan(m) {
+		if m.Proto != "-" {
 			values, shown = append(values, m.ID), append(shown, modelLabel(m))
 		}
 	}

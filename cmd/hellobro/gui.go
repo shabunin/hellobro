@@ -18,7 +18,7 @@ type guiWin struct {
 
 var guiTitles = map[string]string{
 	"wifi": "Wi-Fi", "bluetooth": "Bluetooth", "sharing": "Sharing", "settings": "Settings",
-	"battery": "Battery", "usage": "What uses it", wizKey: "New notebook", promptsKey: "Your AI prompts",
+	"battery": "Battery", "usage": "What uses it", wizKey: "New notebook", promptsKey: "Your AI prompts", modelsKey: "AI models",
 	calKey: "Calendar",
 }
 

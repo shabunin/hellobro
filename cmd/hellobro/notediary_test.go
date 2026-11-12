@@ -113,7 +113,7 @@ func TestDiaryModels(t *testing.T) {
 	a := &bro{set: map[string]int{"ai-model": 1}} // the default model
 	a.nt.models = modelsState{loaded: true, List: []ai.Model{
 		{ID: "cheap", Images: true, Known: true, In: 0.5, Out: 3},
-		{ID: "blind", Known: true, In: 0.1, Out: 0.2},               // no pictures: not listed
+		{ID: "blind", Known: true, In: 0.1, Out: 0.2},               // no pictures: listed, the window says so
 		{ID: "gemini-x", Images: true, Known: true, Proto: "-"},     // can't be asked
 		{ID: "unknown", Proto: "openai", In: -1, Out: -1},           // OpenRouter's, say: tried
 		{ID: "free-one", Images: true, Known: true},                 // free
@@ -121,14 +121,14 @@ func TestDiaryModels(t *testing.T) {
 	}}
 	a.applyModels()
 	st := settingList[i]
-	want := []string{"conf", "cheap", "unknown", "free-one", "dear", ai.DefaultModel}
+	want := []string{"conf", "cheap", "blind", "unknown", "free-one", "dear", ai.DefaultModel}
 	if !slices.Equal(st.values, want) {
 		t.Fatalf("values %v, want %v", st.values, want)
 	}
-	if st.values[a.set["ai-model"]] != ai.DefaultModel || !strings.HasSuffix(st.shown[5], "not listed now") {
-		t.Errorf("the one chosen: %d, %q", a.set["ai-model"], st.shown[5])
+	if st.values[a.set["ai-model"]] != ai.DefaultModel || !strings.HasSuffix(st.shown[6], "not listed now") {
+		t.Errorf("the one chosen: %d, %q", a.set["ai-model"], st.shown[6])
 	}
-	for k, w := range map[int]string{1: "cheap · $0.5 / $3", 2: "unknown", 3: "free-one · free", 4: "dear · $15 / $75"} {
+	for k, w := range map[int]string{1: "cheap · $0.5 / $3", 3: "unknown", 4: "free-one · free", 5: "dear · $15 / $75"} {
 		if st.shown[k] != w {
 			t.Errorf("shown %q, want %q", st.shown[k], w)
 		}
