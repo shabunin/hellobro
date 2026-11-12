@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"log"
 	"os"
 	"slices"
@@ -223,15 +222,6 @@ func settingIndex(key string) int {
 	return -1
 }
 
-type settingsView struct {
-	p     kobo.Panel
-	rows  []image.Rectangle
-	hint  image.Rectangle
-	sel   int
-	top   int // the first row shown, when not all fit
-	shown string
-}
-
 type settings map[string]int // by key, the value's index
 
 func loadSettings() settings {
@@ -302,6 +292,23 @@ func (a *bro) settingMinutes(key string) time.Duration {
 // stepSetting moves setting i on (or back) a value.
 func (a *bro) stepSetting(i, d int) {
 	st := settingList[i]
+	n := len(st.values)
+	a.pickSetting(i, (a.settingAt(i)+d+n)%n)
+}
+
+// settingAt is setting i's value, an index into its values.
+func (a *bro) settingAt(i int) int {
+	st := settingList[i]
+	if st.key == "bar" {
+		return indexOf(st.values, a.setting("bar"))
+	}
+	return a.set[st.key]
+}
+
+// pickSetting makes setting i's value its v'th, and does what that
+// takes. The ones that are a menu or a question open it.
+func (a *bro) pickSetting(i, v int) {
+	st := settingList[i]
 	switch st.key {
 	case "keys":
 		a.openKeys(nil)
@@ -313,21 +320,19 @@ func (a *bro) stepSetting(i, d int) {
 		a.openLangs()
 		return
 	case "bar":
-		a.toggleBar()
+		if v != a.settingAt(i) {
+			a.toggleBar()
+		}
 	case "share": // off, on, pair: pairing turns it on and opens pairing, and stays "on"
-		was := a.set[st.key]
-		n := len(st.values)
-		next := (was + d + n) % n
-		if st.values[next] == "pair" {
+		if st.values[v] == "pair" {
 			a.sharePair()
 			break
 		}
-		a.set[st.key] = next
+		a.set[st.key] = v
 		a.set.save()
 		a.shareApply()
 	default:
-		n := len(st.values)
-		a.set[st.key] = (a.set[st.key] + d + n) % n
+		a.set[st.key] = v
 		a.set.save()
 		switch st.key {
 		case "mdns", "relay":
@@ -345,8 +350,6 @@ func (a *bro) stepSetting(i, d int) {
 			a.applyMod()
 		case "touch-marks":
 			a.SetTouchMarks(a.setting(st.key) == "on")
-		case "languages":
-			a.typeIn(0)
 		case "vkbd":
 			a.vk.said = 0 // the setting's say now
 			a.vkApply()
@@ -359,112 +362,9 @@ func (a *bro) stepSetting(i, d int) {
 	a.drawSettings()
 }
 
-// placeSettings puts the Settings window at p.
-func (a *bro) placeSettings(p kobo.Panel) {
-	v := &a.sv
-	v.p = p
-	b := v.p.Body.Inset(kobo.Pad)
-	v.rows = v.rows[:0]
-	if p.Outer.Empty() || b.Dy() < 120 {
-		v.hint, v.shown = image.Rectangle{}, ""
-		return
-	}
-	h := max(setRowMin, min(setRowH, (b.Dy()-40)/len(settingLines))) // closer, if that makes room for all
-	for i := range settingLines {
-		y := b.Min.Y + i*h
-		if y+h > b.Max.Y-40 {
-			break // no room: a short screen
-		}
-		v.rows = append(v.rows, image.Rect(b.Min.X, y, b.Max.X, y+h))
-	}
-	v.hint = image.Rect(b.Min.X, b.Max.Y-40, b.Max.X, b.Max.Y)
-	v.shown = ""
-}
-
-func (a *bro) drawSettings() {
-	v, c := &a.sv, a.C
-	if !a.guiShows("settings") || len(v.rows) == 0 {
-		return
-	}
-	focused := a.guiFocused("settings")
-	var vals []string
-	for _, st := range settingList {
-		vals = append(vals, a.setting(st.key))
-	}
-	n, sl := len(v.rows), settingLine(v.sel)
-	top := sl // the selected one in sight, and its group's heading if that's right above
-	if sl > 0 && settingLines[sl-1].head != "" {
-		top--
-	}
-	if top < v.top {
-		v.top = top
-	}
-	if sl >= v.top+n {
-		v.top = sl - n + 1
-	}
-	v.top = max(0, min(v.top, len(settingLines)-n))
-	key := fmt.Sprint(vals, v.sel, v.top, n, focused, a.share.code)
-	if key == v.shown {
-		return
-	}
-	v.shown = key
-	p := a.winPanel(v.p, focused)
-	a.DrawPanel(p, "")
-	for k, rr := range v.rows {
-		if l := settingLines[v.top+k]; l.head != "" {
-			t := rr.Inset(4)
-			t.Min.X += 12
-			c.Text(a.F.Small, t, l.head, kobo.Dark, kobo.AlignLeft)
-			c.Fill(image.Rect(t.Min.X, rr.Max.Y-6, t.Max.X, rr.Max.Y-4), kobo.Mid)
-			continue
-		}
-		i := settingLines[v.top+k].i
-		st := settingList[i]
-		fg, dim := uint8(kobo.Black), uint8(kobo.Dark)
-		if i == v.sel {
-			if focused {
-				c.Fill(rr, kobo.Black)
-				fg, dim = kobo.White, kobo.Light
-			} else {
-				c.Frame(rr, 2, kobo.Black)
-			}
-		}
-		t := rr.Inset(4)
-		t.Min.X += 12
-		t.Max.X -= 12
-		shown := st.shown[indexOf(st.values, vals[i])]
-		switch {
-		case st.key == "share" && a.share.code != "":
-			shown = "pairing: code " + a.share.code
-		case st.key == "alpine-remove":
-			shown = alpineSummary()
-		case st.key == "keys" && len(a.keys.named) == 0:
-			shown = "the defaults (keys.conf)"
-		case st.key == "keys":
-			shown = fmt.Sprintf("%d set by you (keys.conf)", len(a.keys.named))
-		}
-		label := a.settingLabel(st)
-		value := "‹ " + shown + " ›"
-		vw := kobo.TextWidth(a.F.Small, value)
-		if room := max(t.Dx()/2, t.Dx()-kobo.TextWidth(a.F.Body, label)-20); vw > room { // narrow: the value cut short, the label whole if it can be
-			marks := kobo.TextWidth(a.F.Small, "‹  ›")
-			value = "‹ " + kobo.Fit(a.F.Small, shown, max(0, room-marks)) + " ›"
-			vw = kobo.TextWidth(a.F.Small, value)
-		}
-		c.Text(a.F.Small, image.Rect(t.Max.X-vw, t.Min.Y, t.Max.X, t.Max.Y), value, dim, kobo.AlignRight)
-		t.Max.X -= vw + 20
-		c.Text(a.F.Body, t, label, fg, kobo.AlignLeft)
-	}
-	hint := "Tap a setting to change it, or ↑ ↓ and ← → (Enter)."
-	switch {
-	case v.top+n < len(settingLines): // a short screen
-		hint = fmt.Sprintf("▼ %d more: tap here, or ↓", len(settingLines)-v.top-n)
-	case v.top > 0:
-		hint = "▲ back to the top: tap here, or ↑"
-	}
-	c.Text(a.F.Small, v.hint, hint, kobo.Dark, kobo.AlignLeft)
-	a.Mark(p.Outer, true)
-}
+// drawSettings asks the Settings window for a frame: what it shows
+// changed.
+func (a *bro) drawSettings() { a.inkRedraw("settings") }
 
 // settingLabel is st's label, with its key in.
 func (a *bro) settingLabel(st setting) string {
@@ -478,6 +378,24 @@ func (a *bro) settingLabel(st setting) string {
 	return fmt.Sprintf(st.label, k)
 }
 
+// settingShown is what setting i's value says, as it is now.
+func (a *bro) settingShown(i int) string {
+	st := settingList[i]
+	switch {
+	case st.key == "share" && a.share.code != "":
+		return "pairing: code " + a.share.code
+	case st.key == "alpine-remove":
+		return alpineSummary()
+	case st.key == "keys" && len(a.keys.named) == 0:
+		return "the defaults (keys.conf)"
+	case st.key == "keys":
+		return fmt.Sprintf("%d set by you (keys.conf)", len(a.keys.named))
+	case st.key == "languages":
+		return st.shown[indexOf(st.values, a.setting(st.key))]
+	}
+	return st.shown[a.settingAt(i)]
+}
+
 func indexOf(vs []string, v string) int {
 	for i, s := range vs {
 		if s == v {
@@ -485,58 +403,6 @@ func indexOf(vs []string, v string) int {
 		}
 	}
 	return 0
-}
-
-// settingsTap changes the setting tapped.
-func (a *bro) settingsTap(pt image.Point) {
-	v := &a.sv
-	if pt.In(v.hint) && len(v.rows) < len(settingLines) { // the rest of a list that doesn't fit, or back
-		if v.top+len(v.rows) < len(settingLines) {
-			v.top = len(settingLines) - len(v.rows)
-		} else {
-			v.top = 0
-		}
-		l := v.top
-		for settingLines[l].head != "" {
-			l++
-		}
-		v.sel = settingLines[l].i
-		a.drawSettings()
-		return
-	}
-	for k, rr := range v.rows {
-		if l := settingLines[v.top+k]; pt.In(rr) && l.head == "" {
-			v.sel = l.i
-			a.stepSetting(v.sel, 1)
-			return
-		}
-	}
-}
-
-// settingsKey takes the keys while the panel has the focus.
-func (a *bro) settingsKey(code uint16) {
-	v := &a.sv
-	switch code {
-	case keyUp:
-		v.sel = max(0, v.sel-1)
-	case keyDown:
-		v.sel = min(len(settingList)-1, v.sel+1)
-	case keyPgUp:
-		v.sel = max(0, v.sel-len(v.rows))
-	case keyPgDn:
-		v.sel = min(len(settingList)-1, v.sel+len(v.rows))
-	case keyHome:
-		v.sel = 0
-	case keyEnd:
-		v.sel = len(settingList) - 1
-	case keyLeft:
-		a.stepSetting(v.sel, -1)
-		return
-	case keyRight, kobo.KeyEnter, kobo.KeySpace:
-		a.stepSetting(v.sel, 1)
-		return
-	}
-	a.drawSettings()
 }
 
 // applyLightIdle tells the App when the light goes off by itself.

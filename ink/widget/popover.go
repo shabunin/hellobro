@@ -8,8 +8,9 @@ import (
 
 // Popover is what opens over everything from a field: a dropdown's
 // options, a menu, a calendar. A tap on the field opens it (or Enter,
-// Space, ↓ in focus), a tap outside or Esc closes it; while it's open
-// the keys are its own.
+// Space in focus: ↑ ↓ go on to the next control, as in a list of
+// settings), a tap outside or Esc closes it; while it's open the keys
+// are its own.
 type Popover struct {
 	Field Clickable // what opens it
 
@@ -18,8 +19,6 @@ type Popover struct {
 }
 
 type backdrop struct{ _ byte }
-
-var popoverKeys = []string{"Down"}
 
 // IsOpen says it shows.
 func (p *Popover) IsOpen() bool { return p.open }
@@ -43,18 +42,12 @@ func (p *Popover) Close(gtx ink.Ctx) {
 // toggled takes the field's taps and the backdrop's: true if it's to
 // open (the caller opens it, set up as it wants).
 func (p *Popover) toggled(gtx ink.Ctx) bool {
-	p.Field.Keys = popoverKeys
 	open := false
 	for p.Field.Clicked(gtx) {
 		if p.open {
 			p.Close(gtx)
 			open = false
 		} else {
-			open = true
-		}
-	}
-	for _, k := range p.Field.TakeKeys(gtx) {
-		if k.Name == "Down" && !p.open {
 			open = true
 		}
 	}

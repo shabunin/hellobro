@@ -123,6 +123,14 @@ func (c Ctx) Events(tag Tag) []Event {
 // Focused says the keys go to tag.
 func (c Ctx) Focused(tag Tag) bool { return c.w != nil && c.w.focus == tag && tag != nil }
 
+// FocusedTag is the tag the keys go to, or nil.
+func (c Ctx) FocusedTag() Tag {
+	if c.w == nil {
+		return nil
+	}
+	return c.w.focus
+}
+
 // Focus gives tag the keys (nil: no one).
 func (c Ctx) Focus(tag Tag) {
 	if c.w != nil {

@@ -74,9 +74,11 @@ type Focus struct {
 
 // Reveal asks an area that scrolls (Area.Reveal) to show R, in its own
 // coordinates: the keys moved the focus to something in it that doesn't
-// show, or not all of it.
+// show, or not all of it. Or with Edge, to go to its start (-1) or its
+// end (1): the focus came round to it from its other end.
 type Reveal struct {
-	R image.Rectangle
+	R    image.Rectangle
+	Edge int
 }
 
 func (Pointer) isEvent() {}

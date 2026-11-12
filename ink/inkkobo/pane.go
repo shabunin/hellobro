@@ -56,13 +56,33 @@ func (p *Pane) Flush(a *kobo.App) (pen bool) {
 	if p.At.Empty() {
 		return false
 	}
-	for _, u := range p.Win.Frame(time.Now()) {
+	for _, u := range together(p.Win.Frame(time.Now())) {
 		r := u.R.Add(p.At.Min)
 		kobo.CopyGray(a.C.Gray, r, p.Win.Image(), u.R.Min)
 		a.Mark(r, u.Gray || u.Full)
 		pen = pen || u.Pen
 	}
 	return pen
+}
+
+// together makes a frame's updates one, if they're most of what they
+// span: a list scrolled changes its labels and its values, two columns,
+// and the panel showing one, then the other, has them out of step for a
+// moment.
+func together(us []ink.Update) []ink.Update {
+	if len(us) < 2 {
+		return us
+	}
+	all, sum := ink.Update{}, 0
+	for _, u := range us {
+		all.R = all.R.Union(u.R)
+		all.Gray, all.Full, all.Pen = all.Gray || u.Gray, all.Full || u.Full, all.Pen || u.Pen
+		sum += u.R.Dx() * u.R.Dy()
+	}
+	if sum*2 < all.R.Dx()*all.R.Dy() {
+		return us
+	}
+	return []ink.Update{all}
 }
 
 // Ring is the focus ring, on the canvas; empty: none.

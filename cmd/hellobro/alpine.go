@@ -358,7 +358,6 @@ func (a *bro) alpineRemoveAsk() {
 					return
 				}
 				a.Toast("Alpine removed; the next Alpine session sets it up anew", 5*time.Second)
-				a.sv.shown = ""
 				a.drawSettings()
 			})
 		}()

@@ -172,12 +172,13 @@ Moving windows is the same: while Mod+Shift and the arrows move one
 (tiled or floating), the windows are boxes; a second after the last
 move, or at once on any other key or a touch, they're laid out for real.
 
-In a settings' window, Tab moves the keys' focus through its controls,
-as on a desktop: the buttons and the lists; Shift+Tab goes back. A
-dashed frame shows where it is. Enter or Space presses the button in
-focus; a list takes ↑ ↓, PgUp/PgDn, Home/End and Enter. The frame shows
-once Tab is used, and a touch takes it away. The terminals keep Tab for
-the shell.
+In a settings' window, Tab (or ↓) moves the keys' focus through its
+controls, as on a desktop: the buttons, the rows, the dropdowns;
+Shift+Tab (or ↑) goes back, and the list follows. A dashed frame shows
+where it is. Enter or Space presses the button in focus or opens the
+dropdown, whose ↑ ↓ then pick and Esc closes. The frame shows once a key
+moved it, and a touch takes it away. The terminals keep Tab for the
+shell.
 
 ### The on-screen keyboard
 
@@ -1251,19 +1252,22 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
 
 ## Settings: Wi-Fi and Bluetooth
 
-- Wi-Fi: tap a network to pick it, again (or Enter) to join or leave it;
-  a new secured one asks for its password (`show` reveals it: tap it, or
-  Tab to it and Enter).
-  "other network…" (or n) joins a hidden one by name. The address comes
+- Wi-Fi: tap a network (or Enter on it) to open it: its buttons come
+  under it, `connect` or `disconnect`, and `forget` for a saved one. A
+  new secured one asks for its password (`show` reveals it: tap it, or
+  Tab to it and Enter); the answer done, the keys are back on the button.
+  "another network…" (or n) joins a hidden one by name. The address comes
   from the DHCP client already running (Kobo's), or one started for it. Networks are saved
-  when wpa_supplicant's file allows it. `turn off`/`turn on` (or o) unload
-  and load the driver and power the chip, as Kobo does; s scans, f forgets.
+  when wpa_supplicant's file allows it. The switch at the top (or o) unloads
+  and loads the driver and powers the chip, as Kobo does; s scans, f forgets
+  the one open.
   Turning it on starts wpa_supplicant and the DHCP client the way Kobo ran
-  them, as seen while Wi-Fi was on (kept in `wifi-recipe`). `info` (or i)
-  shows the details: the network, access point, band and channel,
+  them, as seen while Wi-Fi was on (kept in `wifi-recipe`). `details` (or i)
+  shows them: the network, access point, band and channel,
   signal, address, gateway, DNS, the interface and its MAC; c copies
   them, Esc closes.
-- Bluetooth: `scan` (s) looks for 40 s; a new device pairs (with a code to
+- Bluetooth: `scan` (s) looks for 40 s; a device opens as a network
+  does, with `pair`, `connect` or `disconnect`, and `forget`. A new one pairs (with a code to
   confirm, or to type on a keyboard, shown in the window), then gets trusted
   and connected. Paired ones connect, disconnect, and are forgotten with f.
   Pairing goes through hellobro's own agent while Nickel is frozen.
@@ -1272,8 +1276,8 @@ shell](#the-alpine-shell)); mplayer has no MPRIS.
   Realtek UART chip), and starts bluetoothd and bluealsa if they aren't
   running, as [bluetooth.koplugin](https://github.com/Tharavol/bluetooth.koplugin)
   does on the Sage; off undoes it.
-- The Settings window: a tap (or ←/→, Enter) changes one; ↑ ↓ and
-  PgUp/PgDn go through them. They're kept in `settings`.
+- The Settings window: a setting is a dropdown of its values: tap it
+  (or Enter) and pick one. ↑ ↓ go through them, the list following. They're kept in `settings`.
 - When hellobro quits, the radios' power goes back to how Kobo had it,
   since Nickel wakes up thinking so; networks and devices added stay.
   "Wi-Fi and Bluetooth at start", turned on (and not in airplane mode,

@@ -547,7 +547,6 @@ func (a *bro) wmFocusMoved() {
 	}
 	a.wm.focus = w
 	a.tv.sel = nil // a terminal's selection is the focused one's
-	a.fs.at = ""
 	if g, ok := w.(*guiWin); ok {
 		switch g.key {
 		case "wifi", "bluetooth", "sharing", "settings":

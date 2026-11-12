@@ -10,7 +10,7 @@ import (
 
 // Choice is a list that opens over everything from a field or a button:
 // a dropdown's options, a menu's actions. A tap on its field opens it (or
-// Enter, Space, ↓ in focus); a tap on an item picks it, a tap outside
+// Enter, Space in focus); a tap on an item picks it, a tap outside
 // closes it; open, ↑ ↓ go through the items, Enter picks, Esc closes.
 type Choice struct {
 	Popover

@@ -24,6 +24,7 @@ type Window struct {
 	focus    Tag                 // the keys go to it
 	ring     bool                // the focus shows: the keys moved it, no touch since
 	again    bool                // another frame, at once
+	wrapTo   int                 // the focus came round: on to the first (1) or last (-1) next frame
 	quick    bool                // this frame's changes in the fast waveform
 	pen      bool                // and it's ink being written
 	bw       []Update            // what quick frames left in black and white, for the next frame to put back in grays
@@ -112,6 +113,23 @@ func (w *Window) frame(now time.Time) {
 	}
 	clear(w.asked)
 	w.quick, w.pen = false, false
+	w.layout(now)
+	if step := w.wrapTo; step != 0 {
+		// The focus came round a list's end: the list's at its other end
+		// now, and its first control there (or last) is laid out.
+		w.wrapTo = 0
+		if w.moveFocus(step) {
+			w.layout(now)
+		}
+	}
+	if w.focus != nil && w.focus != Root && !w.focusable(w.focus) {
+		w.focus = nil
+	}
+	w.diffUpdates()
+}
+
+// layout lays the UI out and paints it into back: the areas, the texts.
+func (w *Window) layout(now time.Time) {
 	for pass := 0; ; pass++ {
 		w.again = false
 		w.ops.Reset()
@@ -141,9 +159,11 @@ func (w *Window) frame(now time.Time) {
 			}
 		}
 	}
-	if w.focus != nil && w.focus != Root && !w.focusable(w.focus) {
-		w.focus = nil
-	}
+}
+
+// diffUpdates are what changed since the frame before: the panel's
+// updates.
+func (w *Window) diffUpdates() {
 	if !w.painted {
 		w.updates = []Update{{R: w.back.Rect, Gray: true, Full: true}}
 		w.painted = true
@@ -389,7 +409,20 @@ func (w *Window) moveFocus(step int) bool {
 		case i < 0:
 			i = len(fs) - 1
 		default:
-			i = (i + step + len(fs)) % len(fs)
+			next := (i + step + len(fs)) % len(fs)
+			if a := fs[next]; next != i+step && a.r.Empty() && len(a.in) > 0 {
+				// Round the end, to something in a list out of sight:
+				// what's laid out of the list is near where it is, not
+				// its other end. The list goes there, and the next
+				// frame has the focus on what's first (or last) then.
+				for _, t := range a.in {
+					w.send(t, Reveal{Edge: -step})
+				}
+				w.wrapTo = step
+				w.setFocus(nil)
+				return true
+			}
+			i = next
 		}
 		if a := fs[i]; !a.r.Empty() || list != nil && innermost(a) == list {
 			w.setFocus(a.Tag)
@@ -420,7 +453,7 @@ func (w *Window) reveal() {
 	}
 	for _, a := range w.areas {
 		if a.Tag == t {
-			w.send(t, Reveal{f.full.Sub(a.off)})
+			w.send(t, Reveal{R: f.full.Sub(a.off)})
 			return
 		}
 	}

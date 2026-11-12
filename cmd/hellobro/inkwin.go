@@ -12,6 +12,7 @@ import (
 	"hellobro/ink"
 	"hellobro/ink/inkkobo"
 	"hellobro/ink/theme"
+	"hellobro/ink/widget"
 	"hellobro/kobo"
 )
 
@@ -25,8 +26,14 @@ type inkUI interface {
 
 // inkUIs make the windows that are ink's, by key.
 var inkUIs = map[string]func(a *bro) inkUI{
-	"battery": func(a *bro) inkUI { return &batteryUI{a: a} },
-	"usage":   func(a *bro) inkUI { return &usageUI{a: a} },
+	"battery":   func(a *bro) inkUI { return &batteryUI{a: a} },
+	"usage":     func(a *bro) inkUI { return &usageUI{a: a} },
+	"sharing":   func(a *bro) inkUI { return &shareUI{a: a} },
+	"wifi":      func(a *bro) inkUI { return &radioUI{a: a, panel: panelWiFi} },
+	"bluetooth": func(a *bro) inkUI { return &radioUI{a: a, panel: panelBT} },
+	"settings": func(a *bro) inkUI {
+		return &settingsUI{a: a, sel: make([]widget.Select, len(settingList)), act: make([]widget.Clickable, len(settingList))}
+	},
 }
 
 // inkWin is a guiWin's ink: its pane, and its strip as drawn.
@@ -182,11 +189,12 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 	return true
 }
 
-// inkRing is the focus ring of the ink window in focus, if it is one.
-func (a *bro) inkRing() (image.Rectangle, bool) {
-	g, ok := a.focusedWin().(*guiWin)
-	if !ok || g.ink == nil {
-		return image.Rectangle{}, false
+// updateRing puts the focus ring where the ink window in focus has it,
+// if it shows: Tab moved the focus, and no touch since.
+func (a *bro) updateRing() {
+	var r image.Rectangle
+	if g, ok := a.focusedWin().(*guiWin); ok && g.ink != nil && !a.overlay() && !a.Calibrating() {
+		r = g.ink.pane.Ring()
 	}
-	return g.ink.pane.Ring(), true
+	a.SetRing(r)
 }

@@ -221,9 +221,11 @@ ssh -p 2022 kobo.local <command>      # a shell on the Kobo, as root
   is, which the keys and the selection go to. The emulator and the
   remote are resized only when a window that shows changes size
   (`t.size`).
-- A new button or list in a settings' window goes into `controls()` (`focus.go`), so
-  Tab reaches it; Enter on a button is a tap on it. The focus ring is
-  stamped at blit time (`kobo/ring.go`), never drawn into the canvas.
+- A settings' window is an ink UI (`inkUIs`, `inkwin.go`; the library
+  in [docs/ink.md](docs/ink.md)): its controls are ink's widgets, so
+  Tab and the arrows reach them; Enter on a button is a tap on it. The
+  focus ring is stamped at blit time (`kobo/ring.go`), never drawn into
+  the canvas.
 - Tests sit next to the code (`*_test.go`). Parsers and logic get table
   tests.
 - User-facing text is short and lower-key, like the rest of the UI.

@@ -99,9 +99,12 @@ func TestControls(t *testing.T) {
 			if g.pause.IsOpen() || g.pause.Value != 2 || !g.pause.Field.Focused() {
 				t.Errorf("open %v, value %d, focus back %v", g.pause.IsOpen(), g.pause.Value, g.pause.Field.Focused())
 			}
-			it.Key("Down", 0)
+			it.Key("Space", 0)
 			if !g.pause.IsOpen() || !it.Key("Esc", 0) || g.pause.IsOpen() || g.Quit {
-				t.Errorf("↓ then Esc: open %v, quit %v", g.pause.IsOpen(), g.Quit)
+				t.Errorf("Space then Esc: open %v, quit %v", g.pause.IsOpen(), g.Quit)
+			}
+			if it.Key("Down", 0); g.pause.IsOpen() || g.pause.Field.Focused() {
+				t.Errorf("↓ on it: open %v, focus kept %v", g.pause.IsOpen(), g.pause.Field.Focused())
 			}
 			// More options than fit: paged, its bar there.
 			must(t, it.TapText("as ai.conf says"))

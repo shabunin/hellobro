@@ -52,7 +52,10 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
   underlined in it), `Tree`, `Tabs`, `Header`, `List` with its bar,
   `GridList`, `ScrollBox`, `Dialog`, `Toast`, `Divider`.
 - `ink/text`: faces by style and size, widths, wrapping, `Fit`.
-- `ink/inkkobo`: runs an ink UI as a Kobo app (a `kobo.Program`).
+- `ink/inkkobo`: runs an ink UI as a Kobo app (a `kobo.Program`), or
+  as a pane in one (`Pane`: hellobro's windows); a frame's updates that
+  are most of what they span go to the panel as one, so a list scrolled
+  doesn't show its labels moved and its values not, for a moment.
 - `ink/inktest`: drives a window without a screen: `Tap`, `Hold`,
   `Swipe`, `Key`, `Type`, `Find` by words, `Save` a PNG.
 - `ink/gallery`: pages of every control, and two demos made of them, a
@@ -67,8 +70,11 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 - Focus: Tab and Shift+Tab (and the arrows, an editor's ↑ ↓ at its
   ends) go through the focusable areas in the order they were laid out,
   into a list's rows that don't show too: the list moves to show the one
-  focused (`Reveal`). Enter and Space press; Esc leaves an editor. The ring is the host's to
-  stamp (`Window.Ring`), never painted into the frame. A touch hides it.
+  focused (`Reveal`); round past the last, the list goes back to its
+  start (`Reveal.Edge`). A dropdown opens with Enter or Space, not ↓:
+  the arrows go on, down a list of settings. Enter and Space press; Esc
+  leaves an editor. The ring is the host's to stamp (`Window.Ring`),
+  never painted into the frame. A touch hides it.
 - Keys nobody in focus takes go to `ink.Root`; a window that asks for
   them there took them (Esc, its letters).
 - A pointer goes to the topmost area under it; areas that `Watch` (a

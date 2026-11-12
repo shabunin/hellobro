@@ -46,12 +46,8 @@ type bro struct {
 	info   *infoBox // facts to read, while they're up
 	keys   keyMap
 	keyset *keySet // Settings' Keys: a key being asked for
-	rv     [2]radioPanelView
 	rs     radioState
 	slp    sleepState
-	sv     settingsView
-	shp    sharePanel // the Settings tab's Sharing
-	fs     focusState // the keys' focus: focus.go
 	set    settings
 	mem    remembered // hellobro.json
 	mnt    mountState // the hosts' files, mounted (mount.go)
@@ -278,8 +274,6 @@ func (a *bro) Key(m kobo.KeyMsg) bool {
 		return true
 	case a.wm.mode != "": // a mode has its keys, and only those
 		return true
-	case a.focusKeyed(m.Code, m.Value): // Tab, and Enter on a button
-		return true
 	}
 	return a.wmKey(m.Code, m.Value)
 }
@@ -300,7 +294,6 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		if !ev.Pen && a.pairUp(g) {
 			return
 		}
-		a.focusTouched(p)
 		a.holdStart(p, g)
 		if !ev.Pen && !a.overlay() && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
 			a.edge = g

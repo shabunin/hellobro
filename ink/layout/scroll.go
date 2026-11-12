@@ -89,6 +89,15 @@ func (s *Scroll) events(gtx ink.Ctx, room int) {
 	for _, e := range gtx.Events(s) {
 		switch e := e.(type) {
 		case ink.Reveal:
+			if e.Edge != 0 {
+				s.fling.stop()
+				s.moved, s.pages, s.off = 0, 0, 0
+				s.first = 0
+				if e.Edge > 0 {
+					s.first = max(s.n-1, 0) // the end's clamp brings the rest back
+				}
+				continue
+			}
 			lo, hi := ax.main(e.R.Min), ax.main(e.R.Max)
 			switch {
 			case lo < 0:
@@ -146,6 +155,10 @@ func (s *Scroll) events(gtx ink.Ctx, room int) {
 
 // big is the room an item has along the list: as much as it wants.
 const big = 1 << 24
+
+// aside is how many items out of sight, each side, are laid out still for
+// the keys: the next control past a heading or two.
+const aside = 3
 
 // Layout lays out the items that show of n, el laying out item i,
 // filling what it's given.
@@ -267,10 +280,19 @@ func (s *Scroll) Layout(gtx ink.Ctx, n int, el func(gtx ink.Ctx, i int) ink.Dims
 		call.Add(gtx.Ops)
 		st.Pop()
 	}
-	// The one before, out of sight: Shift+Tab goes to it from the first.
-	if s.first > 0 {
-		call, d := item(gtx, s.first-1)
-		at(call, -s.off-ax.main(d.Size))
+	// A few before, out of sight: Shift+Tab goes to them from the first
+	// (a few, as the one just before may be a heading, nothing to stop at).
+	// They go in in order, as the focus goes through them in that order.
+	var before []laid
+	back := -s.off
+	for i := s.first - 1; i >= 0 && i >= s.first-aside; i-- {
+		call, d := item(gtx, i)
+		back -= ax.main(d.Size)
+		before = append(before, laid{call, d})
+	}
+	for k := len(before) - 1; k >= 0; k-- {
+		at(before[k].call, back)
+		back += ax.main(before[k].d.Size)
 	}
 	pos, cross := -s.off, 0
 	s.shown, s.startFrac, s.endFrac = len(shown), 0, 1
@@ -286,11 +308,11 @@ func (s *Scroll) Layout(gtx ink.Ctx, n int, el func(gtx ink.Ctx, i int) ink.Dims
 		pos += l
 		cross = max(cross, ax.cross(it.d.Size))
 	}
-	i := s.first + len(shown)
-	// And the one after: Tab goes to it from the last.
-	if i < n {
-		call, _ := item(gtx, i)
+	// And a few after: Tab goes to them from the last.
+	for i := s.first + len(shown); i < n && i < s.first+len(shown)+aside; i++ {
+		call, d := item(gtx, i)
 		at(call, pos)
+		pos += ax.main(d.Size)
 	}
 	clip.Pop()
 	return ink.Dims{Size: gtx.Constraints.Constrain(ax.pt(room, cross))}

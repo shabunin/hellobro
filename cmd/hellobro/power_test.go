@@ -4,8 +4,6 @@ import (
 	"math"
 	"testing"
 	"time"
-
-
 )
 
 func TestParseProcStat(t *testing.T) {

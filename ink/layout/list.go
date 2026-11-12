@@ -59,9 +59,16 @@ func (l *List) events(gtx ink.Ctx) {
 	for _, e := range gtx.Events(l) {
 		if r, ok := e.(ink.Reveal); ok {
 			// The keys went to what's past the page: the page it's on.
-			if ax.main(r.R.Max) > ax.main(l.size) {
+			// Or came round to the list's other end: its first page, or
+			// its last.
+			switch {
+			case r.Edge < 0:
+				l.ScrollTo(0)
+			case r.Edge > 0:
+				l.ScrollTo(l.n - 1)
+			case ax.main(r.R.Max) > ax.main(l.size):
 				l.turn++
-			} else if ax.main(r.R.Min) < 0 {
+			case ax.main(r.R.Min) < 0:
 				l.turn--
 			}
 			continue

@@ -168,7 +168,7 @@ func (b ButtonStyle) Layout(gtx ink.Ctx) ink.Dims {
 			fg, bg = bg, fg
 		}
 		ink.Fill(gtx.Ops, r, bg)
-		ink.Frame(gtx.Ops, r, th.border(gtx)+boolInt(b.Strong || b.Button.Focused()), fg)
+		ink.Frame(gtx.Ops, r, th.border(gtx)+boolInt(b.Button.Focused()), th.Fg) // black, filled or not: the same size
 		in := gtx
 		in.Constraints = ink.Exact(image.Pt(max(size.X-2*padX, 0), size.Y))
 		st := ink.Offset(gtx.Ops, image.Pt(padX, 0))

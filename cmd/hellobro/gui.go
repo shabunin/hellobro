@@ -36,25 +36,7 @@ func (g *guiWin) radio() bool {
 
 func (g *guiWin) place(a *bro, p kobo.Panel) {
 	p.Name = g.Title()
-	if w := a.inkOf(g); w != nil {
-		w.place(p)
-		shown := !p.Outer.Empty()
-		if shown && !g.shown {
-			a.enterPower()
-		}
-		g.shown = shown
-		return
-	}
-	switch g.key {
-	case "wifi":
-		a.placeRadio(panelWiFi, p)
-	case "bluetooth":
-		a.placeRadio(panelBT, p)
-	case "sharing":
-		a.placeShare(p)
-	case "settings":
-		a.placeSettings(p)
-	}
+	a.inkOf(g).place(p)
 	shown := !p.Outer.Empty()
 	if shown && !g.shown { // it comes up: what it shows, fresh
 		if g.radio() {
@@ -67,73 +49,22 @@ func (g *guiWin) place(a *bro, p kobo.Panel) {
 }
 
 func (g *guiWin) panel(a *bro) kobo.Panel {
-	var p kobo.Panel
-	if g.ink != nil {
-		return a.winPanel(g.ink.p, a.guiFocused(g.key))
-	}
-	switch g.key {
-	case "wifi":
-		p = a.rv[panelWiFi].p
-	case "bluetooth":
-		p = a.rv[panelBT].p
-	case "sharing":
-		p = a.shp.p
-	case "settings":
-		p = a.sv.p
-	}
-	return a.winPanel(p, a.guiFocused(g.key))
+	return a.winPanel(a.inkOf(g).p, a.guiFocused(g.key))
 }
 
 // draw draws it all, as it is now.
-func (g *guiWin) draw(a *bro) {
-	if g.ink != nil {
-		g.ink.draw(a, a.guiFocused(g.key))
-		return
-	}
-	switch g.key {
-	case "wifi":
-		a.rv[panelWiFi].shown = ""
-		a.drawRadioPanel(panelWiFi)
-	case "bluetooth":
-		a.rv[panelBT].shown = ""
-		a.drawRadioPanel(panelBT)
-	case "sharing":
-		a.shp.shown = ""
-		a.drawShare()
-	case "settings":
-		a.sv.shown = ""
-		a.drawSettings()
-	}
-}
+func (g *guiWin) draw(a *bro) { a.inkOf(g).draw(a, a.guiFocused(g.key)) }
 
-func (g *guiWin) drawTitle(a *bro) {
-	if g.ink != nil {
-		g.ink.drawTitle(a, a.guiFocused(g.key))
-		return
-	}
-	g.draw(a)
-}
+func (g *guiWin) drawTitle(a *bro) { a.inkOf(g).drawTitle(a, a.guiFocused(g.key)) }
 
 func (g *guiWin) press(a *bro, code uint16, value int32) bool {
-	if g.ink != nil {
-		took := g.ink.pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps)
-		a.inkTick()
-		return took
-	}
-	if g.radio() {
-		return a.radioKey(code, value)
-	}
-	return false
+	took := a.inkOf(g).pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps)
+	a.inkTick()
+	return took
 }
 
-func (g *guiWin) tap(a *bro, p image.Point) {
-	if g.ink != nil { // its contacts came as they were (inkDown)
-		return
-	}
-	if g.radio() {
-		a.radioTap(p)
-	}
-}
+// tap: its contacts came as they were (inkDown).
+func (g *guiWin) tap(a *bro, p image.Point) {}
 
 func (g *guiWin) closing(a *bro) {
 	if p := a.rs.prompt; p != nil && radioPanelOf(g.key) == p.panel {
