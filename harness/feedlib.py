@@ -156,8 +156,11 @@ def exit_app():
 # keys that moved about the tabs and panels are the window manager's
 # now. Taps at the tabs' places may land elsewhere.
 def gui(name):
-    """Opens (or focuses) a settings' window by its name, through the switcher."""
+    """Opens (or focuses) a settings' window by its name, through the switcher.
+    "notebook" is a new one's wizard: Enter there makes a plain notebook."""
     mod(32); time.sleep(1.2); keys(name); time.sleep(0.6); key(ENTER); time.sleep(2.5)
+    if name == "notebook":
+        key(ENTER); time.sleep(2)
 made = set()
 def tab(n):
     """Workspace n, as tab n was: 1 SSH (a launcher), 2 Shell (the Kobo's sh), 3 Settings, 4 Power."""

@@ -291,14 +291,7 @@ func (w *notesWin) newNotebook(a *bro) {
 	if w.tab == libFolders {
 		dir = w.dir
 	}
-	name := newNoteName(time.Now(), func(n string) bool {
-		n = path.Join(dir, n)
-		_, err := os.Stat(notePath(n))
-		return err == nil || a.noteWindow(n) != nil
-	})
-	if nw := a.noteOpen(path.Join(dir, name)); nw != nil {
-		a.replaceWin(w, nw)
-	}
+	a.newNotebookWiz(w, dir) // plain, or the AI's (notewizard.go)
 }
 
 // startEdit types a new name for key (a notebook's, or a folder's if

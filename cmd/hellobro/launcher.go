@@ -86,7 +86,7 @@ func (a *bro) launchGroups(t *termSession) []launchGroup {
 	read := []launchTile{
 		{"Books", "EPUBs and PDFs", "book", 0, func() { a.replaceWin(t, a.newBookWin("")) }},
 		{"Notebooks", "all, in folders", "notebooks", 0, func() { a.replaceWin(t, a.newNotesWin("")) }},
-		{"New notebook", "to write in", "new", 0, func() { a.launchNotebook(t, "") }},
+		{"New notebook", "to write in", "new", 0, func() { a.newNotebookWiz(t, "") }},
 	}
 	m := &t.pane.menu
 	if m.recent == nil || time.Since(m.recentAt) > launchRecentFor { // the card's looked at, not at every key

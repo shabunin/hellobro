@@ -448,6 +448,7 @@ type noteState struct {
 	liftAt   time.Time   // the last stroke's end, for noteClean
 	hoverAt  time.Time   // the pen last seen in the air, over the screen
 	taps     diaryTapper // a finger's taps on a page, for the diary (notediary.go)
+	wizDir   string      // the folder the new notebook's wizard makes it in (notewizard.go)
 }
 
 const (

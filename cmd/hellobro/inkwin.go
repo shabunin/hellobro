@@ -33,6 +33,7 @@ var inkUIs = map[string]func(a *bro) inkUI{
 	"sharing":   func(a *bro) inkUI { return &shareUI{a: a} },
 	"wifi":      func(a *bro) inkUI { return &radioUI{a: a, panel: panelWiFi} },
 	"bluetooth": func(a *bro) inkUI { return &radioUI{a: a, panel: panelBT} },
+	wizKey:      newNoteWiz,
 	"settings": func(a *bro) inkUI {
 		return &settingsUI{a: a, sel: make([]widget.Select, len(settingList)), act: make([]widget.Clickable, len(settingList))}
 	},
@@ -103,6 +104,9 @@ func (w *inkWin) flush(a *bro, focused bool) {
 		w.drawTitle(a, focused)
 	}
 	a.flushPane(w.pane)
+	if t, ok := w.ui.(interface{ take() }); ok { // what the frame picked, done after it
+		t.take()
+	}
 }
 
 // inkMods are the modifiers held, as ink has them.

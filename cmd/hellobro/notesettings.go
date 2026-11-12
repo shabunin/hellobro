@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"image"
 	"strings"
+	"time"
 
 	"hellobro/ink"
 	"hellobro/ink/inkkobo"
@@ -92,12 +93,15 @@ func noteSetRows() []noteSet {
 		two("AI diary (this notebook)", "on", "off", func(_ *bro, w *noteWin) bool { return w.nb.diaryOn() },
 			func(a *bro, w *noteWin) { w.flipDiary(a) }),
 		{label: "AI voice (this notebook)", opts: func(_ *bro, w *noteWin) ([]string, int) {
-			var ss []string
-			for _, v := range diaryVoices {
-				ss = append(ss, v.label)
+			ls, at, _ := w.voiceChoices()
+			return ls, at
+		}, pick: func(_ *bro, w *noteWin, i int) {
+			if _, _, pick := w.voiceChoices(); i < len(pick) {
+				pick[i]()
+				w.changed = time.Now()
 			}
-			return ss, w.nb.diaryVoice()
-		}, pick: func(_ *bro, w *noteWin, i int) { w.stepVoice(i - w.nb.diaryVoice()) }},
+		}},
+		{label: "AI prompt (this notebook)", value: func(_ *bro, w *noteWin) string { return w.nb.voiceText() }},
 		{label: "AI instructions (written)", value: func(a *bro, w *noteWin) string {
 			if _, ps := diaryTalk(w.nb); len(ps) > 0 {
 				return strings.Join(ps, "; ")

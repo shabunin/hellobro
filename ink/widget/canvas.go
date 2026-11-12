@@ -31,6 +31,9 @@ type stroke struct {
 	erase bool
 }
 
+// Image is what's drawn, as last laid out (nil before that).
+func (c *Canvas) Image() *image.Gray { return c.img }
+
 // Strokes is how many there are.
 func (c *Canvas) Strokes() int { return len(c.strokes) }
 

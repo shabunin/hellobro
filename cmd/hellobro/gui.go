@@ -18,7 +18,7 @@ type guiWin struct {
 
 var guiTitles = map[string]string{
 	"wifi": "Wi-Fi", "bluetooth": "Bluetooth", "sharing": "Sharing", "settings": "Settings",
-	"battery": "Battery", "usage": "What uses it",
+	"battery": "Battery", "usage": "What uses it", wizKey: "New notebook",
 }
 
 // guiName is the window key's name, "" if there's none.
@@ -58,6 +58,10 @@ func (g *guiWin) draw(a *bro) { a.inkOf(g).draw(a, a.guiFocused(g.key)) }
 func (g *guiWin) drawTitle(a *bro) { a.inkOf(g).drawTitle(a, a.guiFocused(g.key)) }
 
 func (g *guiWin) press(a *bro, code uint16, value int32) bool {
+	if u, ok := a.inkOf(g).ui.(*noteWizUI); ok && u.key(code, value) {
+		a.inkTick()
+		return true
+	}
 	took := a.inkOf(g).pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps)
 	a.inkTick()
 	return took

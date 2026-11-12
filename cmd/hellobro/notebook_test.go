@@ -482,10 +482,10 @@ func TestNoteEdge(t *testing.T) {
 		{false, false, left, true}, // the light's, or a workspace swipe
 		{false, false, right, true},
 		{false, false, mid, false},
-		{true, false, left, true}, // full screen: the light still
+		{true, false, left, true},  // full screen: the light still
 		{true, false, right, true}, // full screen: the menu still
-		{true, true, left, false}, // the light off: the page's
-		{false, true, left, true}, // out of full screen, still the workspaces'
+		{true, true, left, false},  // the light off: the page's
+		{false, true, left, true},  // out of full screen, still the workspaces'
 	} {
 		a.Full = c.full
 		a.set["note-light"] = map[bool]int{false: 0, true: 1}[c.lightOff]

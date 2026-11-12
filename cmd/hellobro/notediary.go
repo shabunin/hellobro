@@ -135,6 +135,7 @@ func (a *bro) diaryConf() (ai.Config, error) {
 		c.Model, c.Proto = m, ""
 	}
 	c.MaxOut = max(c.MaxOut, diaryMaxOut)
+	c.Agent = "hellobro/" + version // as OpenCode asks of the apps calling it
 	return c, err
 }
 
@@ -397,37 +398,6 @@ var diaryFormats = map[string]string{
 		"(+ - * / ^, sqrt, sin, cos, tan, exp, ln, log10, abs, pi), points: (1, 2) (3, 4) : name, x = 2 for an upright line, xlabel: t, s. In the JSON, escape each backslash (\\\\frac, \\\\alpha) and write new lines as \\n",
 }
 
-// diaryVoices are the manners it can answer in, by name: a notebook's
-// own (its settings).
-var diaryVoices = []struct{ id, label, text string }{
-	{"diary", "a diary, as Tom Riddle's", "You are a diary that answers, like Tom Riddle's: personal, warm, a little mysterious; you remember what was written to you."},
-	{"tutor", "a tutor: step by step", "You are a patient tutor. Given a problem, work it through step by step; given the writer's own working, check it and point out where it goes wrong; ask a guiding question when it helps them learn."},
-	{"helper", "a helper, plain", "You are a helpful assistant: plain, accurate and to the point."},
-	{"brief", "brief: a line at most", "Answer as briefly as you can: a word, a number, or one sentence."},
-}
-
-const diaryVoiceAttr = "hellobro-diary-voice"
-
-// diaryVoice is w's notebook's voice (diaryVoices), as its file keeps it.
-func (nb *notebook) diaryVoice() int {
-	v := attr(nb.attrs, diaryVoiceAttr)
-	for i, dv := range diaryVoices {
-		if dv.id == v {
-			return i
-		}
-	}
-	return 0
-}
-
-// stepVoice turns to the notebook's next voice, d on.
-func (w *noteWin) stepVoice(d int) {
-	n := len(diaryVoices)
-	i := (w.nb.diaryVoice() + d + n) % n
-	w.nb.attrs = slices.DeleteFunc(w.nb.attrs, func(a xml.Attr) bool { return a.Name.Local == diaryVoiceAttr })
-	w.nb.attrs = append(w.nb.attrs, xml.Attr{Name: xml.Name{Local: diaryVoiceAttr}, Value: diaryVoices[i].id})
-	w.changed = time.Now()
-}
-
 // An answer's first stroke keeps what was asked, what was answered and
 // an instruction it was given: the talk is read back from the pages, so
 // an answer undone or erased is gone from it too.
@@ -479,7 +449,7 @@ func (a *bro) diaryFormat(nb *notebook) string {
 // writer's instructions.
 func diarySystem(nb *notebook, prompts []string, format string) string {
 	var b strings.Builder
-	b.WriteString(diaryVoices[nb.diaryVoice()].text + "\n\n" + strings.Replace(diaryRules, "FORMAT", diaryFormats[format], 1))
+	b.WriteString(nb.voiceText() + "\n\n" + strings.Replace(diaryRules, "FORMAT", diaryFormats[format], 1))
 	if autoNamed(nb.name) {
 		b.WriteString("\n- The notebook has no name yet: with your answer, add \"title\":\"<one to three words naming what it's about, in the writer's language, no punctuation>\".")
 	}
@@ -579,7 +549,6 @@ func (w *noteWin) diaryAsk(a *bro, now bool) {
 		log.Printf("diary: the picture: %v", err)
 		return
 	}
-	cfg.Agent = "hellobro/" + version
 	h := fnv.New64a()
 	h.Write([]byte(w.nb.name))
 	cfg.Session = fmt.Sprintf("hellobro-%x", h.Sum64())

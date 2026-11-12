@@ -889,8 +889,8 @@ and the last two written.
   time, its folders first; the top row goes up). Opened from a
   notebook, **back to the notebook** is at the top right, where the
   books have "back to the book" (or Esc).
-- **+ new notebook** (or n) makes one in the folder shown and opens
-  it; **+ new folder** makes a folder there. The folders are folders
+- **+ new notebook** (or n) asks what kind first ([below](#a-new-notebook))
+  and makes it in the folder shown; **+ new folder** makes a folder there. The folders are folders
   in `Notebooks/`, four deep at most.
 - **rename** on a row (or F2) types its name in the row: Enter or
   **ok** keeps it, Esc or **cancel** doesn't. Without a keyboard, the
@@ -1084,6 +1084,28 @@ width, its gray.
   beside it as `NAME (Kobo).xopp`, to be put together there. The first notebooks, `notebooks/NAME.hbnote` next
   to hellobro, become `.xopp` when they're opened.
 
+### A new notebook
+
+A new notebook (**+ new notebook**, "Notebook" in the switcher, the
+launcher's **New notebook**) asks first what it's to be:
+
+- **A notebook** (Enter or n): one to write and draw in, nothing sent
+  anywhere.
+- **An AI notebook** (a): one that answers ([the AI diary](#the-ai-diary)),
+  then **How should it answer?**: the prompts it comes with, each shown
+  in full (a diary as Tom Riddle's, a tutor, a helper, brief, a language
+  partner, a translator, a programmer), the ones you saved after them
+  (**forget** drops one), and **+ your own prompt**. Tap one, then
+  **make it**.
+
+**Your own prompt** is typed (**typed**) or written by hand (**by
+hand**: write it on the sheet, then **read it to text**: the model reads
+it, and it comes back as text to put right before it's kept). Give it a
+name to find it again (else its first words are), and **save it for
+every notebook** (on) keeps it in `ai-prompts.json`, for the next new
+notebook and for **AI voice** in any notebook's settings. **‹ back**
+(or Esc) goes a step back; closing the window makes none.
+
 ### The AI diary
 
 A notebook can answer what's written in it, as Tom Riddle's diary did.
@@ -1177,7 +1199,11 @@ Its settings, under the notebook's:
 
 - **AI voice (this notebook)**: how it answers: **a diary, as Tom
   Riddle's**, **a tutor** (works problems step by step, checks yours),
-  **a helper** (plain), **brief** (a line at most).
+  **a helper** (plain), **brief** (a line at most), **a language
+  partner**, **a translator**, **a programmer**, or one of yours
+  (**yours: ...**, saved from the new notebook's wizard).
+- **AI prompt (this notebook)**: what that voice tells the model, in
+  full.
 - **AI instructions (written)**: write one to it, by hand: "from now
   on, answer in French", "call me Harry", "be my Latin teacher". It
   says it will, and keeps it on that answer: shown here, and gone if

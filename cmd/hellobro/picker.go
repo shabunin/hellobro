@@ -98,7 +98,7 @@ func (a *bro) openPicker() {
 	for _, k := range guiKeys {
 		p.all = append(p.all, pickEntry{kind: "window", title: guiName(k), detail: "settings", do: func() { a.openGUI(k) }})
 	}
-	p.all = append(p.all, pickEntry{kind: "new", title: "Notebook", detail: "a new one, to write in with the pen", do: func() { a.openNotebook("") }})
+	p.all = append(p.all, pickEntry{kind: "new", title: "Notebook", detail: "a new one, to write in with the pen", do: func() { a.newNotebookWiz(nil, "") }})
 	for _, n := range noteNames() {
 		p.all = append(p.all, pickEntry{kind: "notebook", title: n, detail: "written with the pen", do: func() { a.openNotebook(n) }})
 	}
