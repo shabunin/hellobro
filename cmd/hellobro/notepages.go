@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"image"
 	"log"
-	"math"
 	"slices"
 	"time"
 
@@ -35,17 +34,11 @@ const (
 	pageDel
 )
 
-// defaultMeta is a page as a new one is, in the file: the Elipsa's
-// screen, in points.
-func defaultMeta() notePage {
-	return notePage{w: math.Round(notePageW*notePt72*100) / 100, h: math.Round(notePageH*notePt72*100) / 100}
-}
-
 // padMeta gives each page what it has besides its strokes, so pages
 // can be put in and taken out with it.
 func (nb *notebook) padMeta() {
 	for len(nb.meta) < len(nb.pages) {
-		nb.meta = append(nb.meta, defaultMeta())
+		nb.meta = append(nb.meta, nb.newMeta())
 	}
 }
 
@@ -60,7 +53,7 @@ func (nb *notebook) removePage(at int) {
 	nb.pages = slices.Delete(nb.pages, at, at+1)
 	nb.meta = slices.Delete(nb.meta, at, at+1)
 	if len(nb.pages) == 0 {
-		nb.pages, nb.meta = [][]*noteStroke{nil}, []notePage{defaultMeta()}
+		nb.pages, nb.meta = [][]*noteStroke{nil}, []notePage{nb.newMeta()}
 	}
 }
 
@@ -331,9 +324,9 @@ func (w *noteWin) pageEdit(id string) bool {
 	var ops []noteOp
 	switch id {
 	case "new before":
-		ops = []noteOp{{kind: pageIns, page: n, meta: defaultMeta()}}
+		ops = []noteOp{{kind: pageIns, page: n, meta: nb.newMeta()}}
 	case "new after":
-		ops, w.ovSel = []noteOp{{kind: pageIns, page: n + 1, meta: defaultMeta()}}, n+1
+		ops, w.ovSel = []noteOp{{kind: pageIns, page: n + 1, meta: nb.newMeta()}}, n+1
 	case "copy page":
 		var copies []*noteStroke
 		for _, s := range nb.pages[n] {

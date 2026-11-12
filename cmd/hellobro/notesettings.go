@@ -53,6 +53,7 @@ func noteSetRows() []noteSet {
 			}
 			return "one by one"
 		}, func(a *bro, w *noteWin, _ int) { w.flipRoll(a) }},
+		{"Page size (new pages)", func(a *bro, w *noteWin) string { return w.nb.sizeShown() }, func(a *bro, w *noteWin, d int) { w.stepPageSize(a, d) }},
 		{"AI diary (this notebook)", func(a *bro, w *noteWin) string { return onOff(w.nb.diaryOn()) }, func(a *bro, w *noteWin, _ int) { w.flipDiary(a) }},
 		{"AI voice (this notebook)", func(a *bro, w *noteWin) string { return diaryVoices[w.nb.diaryVoice()].label }, func(a *bro, w *noteWin, d int) { w.stepVoice(d) }},
 		{"AI instructions (written)", func(a *bro, w *noteWin) string {

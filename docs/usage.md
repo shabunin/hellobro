@@ -938,6 +938,16 @@ width, its gray.
   last page, if it has something on it, a new page. Once a pen has
   written (or as the settings say, below), a finger swiped across the page turns it too (leftward: the
   next, as pages turn).
+- **Page size (new pages)**: **the screen, upright** (as pages have
+  always been), **the screen, across** (a landscape page: it fills a
+  landscape screen, one page, not two side by side), **A4**, **A5**,
+  **Letter**, **a square**; or any size with `:pagesize 200x120` (mm,
+  40 to 1000 a side; `:pagesize landscape` and the rest by name too).
+  New pages are made so, and the page shown too if nothing's on it yet;
+  a page written on keeps its size, so a notebook can have pages of
+  several (two of different sizes aren't shown side by side). Each
+  page's size is in the `.xopp`, for Xournal++ and the PDF export. A
+  page lower than the window shows its top and foot.
 - **Pages (this notebook)**: **one by one**, or **a roll: scrolled up
   and down**. A roll shows the page as wide as the window (no wider
   than it is, landscape), and the arrows and keys scroll it a
@@ -1196,6 +1206,7 @@ and **?** its sheet of keys and commands too.
 | `:new`, `:copy`, `:delete`, `:clear` | a page after this one, a copy of it, this one gone, cleared (all undone with Ctrl+Z) |
 | `:pen`, `:eraser`, `:select`, `:text`, `:u`, `:redo` | the tools; undo, redo |
 | `:paper lines` | plain, lines, squares, dots, or one of them `-narrow` |
+| `:pagesize SIZE` | new pages' size (screen, landscape, a4, a5, letter, square, or W x H in mm), the blank page shown's too |
 | `:settings` | the notebook's settings |
 | `:o` | the pages' view, on or off |
 | `:w`, `:export [pdf\|png]` | written now; the export (asks, unless said) |

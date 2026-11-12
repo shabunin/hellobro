@@ -781,9 +781,9 @@ func (w *noteWin) diaryPage(page int) int {
 	if next < len(w.nb.pages) && len(w.nb.pages[next]) == 0 {
 		return next
 	}
-	m := defaultMeta()
+	m := w.nb.newMeta() // as new pages are (not a roll's grown page)
 	if page < len(w.nb.meta) && w.nb.pdfPath() == "" {
-		m = w.nb.meta[page]
+		m.bg = w.nb.meta[page].bg
 	}
 	if next > len(w.nb.pages) {
 		next = len(w.nb.pages)

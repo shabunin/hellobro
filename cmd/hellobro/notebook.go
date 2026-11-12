@@ -452,14 +452,14 @@ const (
 )
 
 // noteSlots fits pages of size (page units) into area: one, or two side
-// by side if there's room for two nearly as big (a landscape screen).
-// It gives where they go, and the scale.
-func noteSlots(area image.Rectangle, size image.Point) ([]image.Rectangle, float64) {
+// by side if there's room for two nearly as big (a landscape screen),
+// unless one. It gives where they go, and the scale.
+func noteSlots(area image.Rectangle, size image.Point, one bool) ([]image.Rectangle, float64) {
 	h := float64(area.Dy()) / float64(size.Y)
-	one := math.Min(float64(area.Dx())/float64(size.X), h)
+	single := math.Min(float64(area.Dx())/float64(size.X), h)
 	two := math.Min(float64(area.Dx()-noteGap)/float64(2*size.X), h)
-	n, scale := 1, one
-	if two >= noteSpread*one {
+	n, scale := 1, single
+	if two >= noteSpread*single && !one {
 		n, scale = 2, two
 	}
 	pw, ph := int(float64(size.X)*scale), int(float64(size.Y)*scale)
@@ -496,7 +496,7 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 		slot, _ := rollSlot(w.paperArea(), w.slotSize, w.scroll)
 		w.slots = []image.Rectangle{slot}
 	} else {
-		w.slots, w.scale = noteSlots(w.paperArea().Inset(kobo.Pad/2), w.slotSize)
+		w.slots, w.scale = noteSlots(w.paperArea().Inset(kobo.Pad/2), w.slotSize, w.pageSize(w.cur+1) != w.slotSize)
 	}
 	if !w.bar.Empty() {
 		w.layBar(a)
@@ -699,6 +699,14 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 		for _, pg := range w.slots {
 			c.Fill(image.Rect(pg.Min.X-2, pg.Min.Y, pg.Min.X, pg.Max.Y).Intersect(area), kobo.Mid)
 			c.Fill(image.Rect(pg.Max.X, pg.Min.Y, pg.Max.X+2, pg.Max.Y).Intersect(area), kobo.Mid)
+		}
+	}
+	if pa := w.paperArea(); !w.roll() { // lower than the window (a landscape page, upright): its top and foot
+		for _, pg := range w.slots {
+			if pg.Min.Y > pa.Min.Y+kobo.Pad {
+				c.Fill(image.Rect(pg.Min.X-2, pg.Min.Y-2, pg.Max.X+2, pg.Min.Y).Intersect(area), kobo.Mid)
+				c.Fill(image.Rect(pg.Min.X-2, pg.Max.Y, pg.Max.X+2, pg.Max.Y+2).Intersect(area), kobo.Mid)
+			}
 		}
 	}
 	w.drawThinking(a, clip) // the diary at work (notediary.go)

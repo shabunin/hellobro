@@ -462,7 +462,7 @@ func (l *mdLay) diagram(src string, x0, width int) bool {
 	em := float64(l.em()) * 0.85
 	maxH := l.bottom() - diaryMargin
 	if l.w.nb.rollOn() { // a screen's, not the roll's
-		maxH = notePageH - 2*diaryMargin
+		maxH = min(notePageH, l.w.pageSize(l.page).X*4/3) - 2*diaryMargin
 	}
 	var r mermaid.Result
 	for try := 0; try < 4; try++ {

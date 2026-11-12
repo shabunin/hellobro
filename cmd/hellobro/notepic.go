@@ -149,7 +149,8 @@ func (w *noteWin) paste(a *bro) {
 // shown, or at the top of the one after it.
 func (w *noteWin) pastePlace(size image.Point) (int, image.Rectangle) {
 	const margin = noteRule
-	room := image.Pt(notePageW-2*margin, notePageH-3*margin)
+	ps := w.pageSize(w.cur)
+	room := image.Pt(ps.X-2*margin, min(ps.Y, notePageH)-3*margin) // a roll's grown page: no more than a screen
 	if size.X > room.X || size.Y > room.Y {
 		k := min(float64(room.X)/float64(size.X), float64(room.Y)/float64(size.Y))
 		size = image.Pt(max(1, int(float64(size.X)*k)), max(1, int(float64(size.Y)*k)))

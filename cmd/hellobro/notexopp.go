@@ -220,7 +220,7 @@ func (nb *notebook) xoppText() []byte {
 		n--
 	}
 	for i, strokes := range nb.pages[:n] {
-		pg := defaultMeta()
+		pg := nb.newMeta()
 		if i < len(nb.meta) {
 			pg = nb.meta[i]
 		}

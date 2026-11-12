@@ -79,7 +79,7 @@ func (w *noteWin) pageSize(n int) image.Point {
 		m := w.nb.meta[n]
 		return image.Pt(int(m.w/notePt72+0.5), int(m.h/notePt72+0.5))
 	}
-	return image.Pt(notePageW, notePageH)
+	return w.nb.newSize() // a page not made yet: as it will be
 }
 
 // pageBounds is page n, in page units.

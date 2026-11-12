@@ -62,6 +62,17 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 			w.place(a, w.p) // its button shows it
 			return nil
 		}},
+		{"pagesize", "screen|landscape|a4|a5|letter|square|WxH", "new pages' size (W x H in mm), the page shown's too if it's blank", func(arg string) error {
+			if err := w.setPageSize(a, arg); err != nil {
+				return err
+			}
+			w.place(a, w.p)
+			w.show(a)
+			if a.shows(w) {
+				a.MarkFlash(w.paperArea())
+			}
+			return nil
+		}},
 		{"settings", "", "its settings: a finger, export, the bar", func(string) error { w.settingsOn(a, true); return nil }},
 		{"pages o", "", "the pages' view, on or off", func(string) error { w.overviewOn(a, !w.overview); return nil }},
 		{"export", "pdf|png", "export: a PDF of the pages, or this page as a PNG (none: asks)", func(arg string) error {

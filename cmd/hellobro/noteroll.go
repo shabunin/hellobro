@@ -81,7 +81,7 @@ func (w *noteWin) growPage(n, h int) bool {
 	}
 	w.nb.padMeta()
 	for len(w.nb.meta) <= n {
-		w.nb.meta = append(w.nb.meta, defaultMeta())
+		w.nb.meta = append(w.nb.meta, w.nb.newMeta())
 	}
 	w.nb.meta[n].h = math.Round(float64(h)*notePt72*100) / 100
 	w.changed = time.Now()
