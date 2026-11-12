@@ -87,6 +87,7 @@ func (a *bro) launchGroups(t *termSession) []launchGroup {
 		{"Books", "EPUBs and PDFs", "book", 0, func() { a.replaceWin(t, a.newBookWin("")) }},
 		{"Notebooks", "all, in folders", "notebooks", 0, func() { a.replaceWin(t, a.newNotesWin("")) }},
 		{"New notebook", "to write in", "new", 0, func() { a.newNotebookWiz(t, "") }},
+		{"Calendar", "events and tasks", "calendar", 0, func() { a.replaceWin(t, &guiWin{key: calKey}) }},
 	}
 	m := &t.pane.menu
 	if m.recent == nil || time.Since(m.recentAt) > launchRecentFor { // the card's looked at, not at every key
@@ -363,6 +364,8 @@ func appIcon(id string) []iconPart {
 		return []iconPart{iconShut(0.8, 6, 3, 20, 3, 20, 21, 6, 21), iconLine(0.6, 3, 7, 8, 7), iconLine(0.6, 3, 12, 8, 12), iconLine(0.6, 3, 17, 8, 17), iconLine(0.4, 11, 9, 17, 9), iconLine(0.4, 11, 13, 17, 13)}
 	case "notebook":
 		return []iconPart{iconShut(0.8, 5, 3, 19, 3, 19, 21, 5, 21), iconLine(0.3, 8, 8, 16, 8), iconLine(0.3, 8, 12, 16, 12), iconLine(0.3, 8, 16, 13, 16)}
+	case "calendar":
+		return []iconPart{iconShut(0.8, 3, 5, 21, 5, 21, 21, 3, 21), iconLine(0.8, 3, 10, 21, 10), iconLine(0.9, 8, 3, 8, 7), iconLine(0.9, 16, 3, 16, 7), box(6, 13, 9, 16), box(11, 13, 14, 16), box(16, 13, 19, 16), box(6, 17, 9, 20)}
 	case "new":
 		return []iconPart{iconShut(0.8, 5, 3, 19, 3, 19, 21, 5, 21), iconLine(1, 12, 8, 12, 16), iconLine(1, 8, 12, 16, 12)}
 	case "wifi":

@@ -19,6 +19,7 @@ type guiWin struct {
 var guiTitles = map[string]string{
 	"wifi": "Wi-Fi", "bluetooth": "Bluetooth", "sharing": "Sharing", "settings": "Settings",
 	"battery": "Battery", "usage": "What uses it", wizKey: "New notebook", promptsKey: "Your AI prompts",
+	calKey: "Calendar",
 }
 
 // guiName is the window key's name, "" if there's none.
@@ -41,7 +42,7 @@ func (g *guiWin) place(a *bro, p kobo.Panel) {
 	if shown && !g.shown { // it comes up: what it shows, fresh
 		if g.radio() {
 			a.enterRadio()
-		} else {
+		} else if g.key == "battery" || g.key == "usage" {
 			a.enterPower()
 		}
 	}

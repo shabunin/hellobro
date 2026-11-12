@@ -21,6 +21,9 @@
 /status-bar
 /music-state
 /wifi-recipe
+/ai.conf
+/calendar.conf
+/calendar/
 /hellobro.new
 /hellobro.old
 # make dist

@@ -139,6 +139,7 @@ func makeCommands() []*command {
 		&command{id: "language", title: "Keyboard: type in the next language (Settings, Languages)", keys: []string{"ctrl+alt+space"},
 			run: func(a *bro) { a.typeIn(a.vk.lang + 1) }},
 		&command{id: "books", title: "Books: the shelf, to read one", run: (*bro).openShelf},
+		&command{id: "calendar", title: "Calendar: events and tasks", run: func(a *bro) { a.openGUI(calKey) }},
 		&command{id: "notebooks", title: "Notebooks: all of them, to open, rename, put in folders", run: (*bro).openNotes},
 		&command{id: "settings", title: "Settings", run: func(a *bro) { a.openGUI("settings") }, hidden: true}, // the switcher has its window
 		&command{id: "statusbar", title: "The bar: show / hide", keys: []string{"mod+shift+b"}, run: (*bro).toggleBar},

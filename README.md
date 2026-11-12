@@ -80,6 +80,9 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   like: write a question, rest the pen, and the answer comes back
   under it, formulas, code, tables, diagrams and plots drawn (a language model, over
   your OpenCode Go key).
+- **Calendar**: events and tasks, by the day, the week, the month or
+  as an agenda; tasks ticked off. Synced with a CalDAV server
+  (Nextcloud, Fastmail, iCloud…), or kept on the Kobo.
 - **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
   what's using it, powertop style.
 - **From afar**: a relay through a VPS, so the Kobo and your PC reach

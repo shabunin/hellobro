@@ -1305,6 +1305,47 @@ and **?** its sheet of keys and commands too.
 | `:rename NAME`, `:mv FOLDER` | renamed; moved to the folder (made if need be; `:mv /` the top) |
 | `:ls`, `:q` | All Notebooks; close the window (`:wq` too: it's written anyway) |
 
+## Calendar
+
+Events and tasks, in a window: the launcher's **Calendar**, or
+`calendar` in the switcher. **day**, **week** (the hours, what's all day
+over them), **month**, **agenda** (four weeks from the day shown) and
+**tasks**. **today**, **‹** and **›** go about; tap a day's name, or a
+day in the month, for that day. **+ new** makes an event (or a task, in
+the tasks); tap one to change it, its calendar too, or delete it (tap
+**delete** twice). An event repeats every day, week, month or year;
+one from elsewhere that repeats otherwise keeps its rule ("as it was"),
+and changing it changes all of it, from its first day.
+
+In the tasks, type one on the top line and Enter; tick its box when
+it's done. Those with a day due come first, the soonest first; **the
+done ones too** shows those. A task due on a day shows on it, over
+the hours.
+
+Keys, while nothing's being typed: **1**–**5** the views, **t**
+today, **,** and **.** (or PgUp and PgDn) back and on, **n** a new one,
+**s** sync, Esc closes the dialog.
+
+It's all kept in `calendar/` in the app's folder, so it works without a
+server. With `calendar.conf` there, it's synced with a CalDAV server
+(Nextcloud, Fastmail, iCloud, Radicale, mailbox.org…): when the window
+opens, every 15 minutes while it's open, a few seconds after a change,
+and on **sync**. The strip says how it went: synced at, how many to
+send, or why not.
+
+```
+url = https://dav.example.com/remote.php/dav/
+user = you
+password = an app password
+every = 15
+```
+
+`url` is a calendar, the calendars' home, or the server's root (its
+calendars are found from your principal); all of them are synced. What
+was made before the server is sent to its first calendar. Changed on
+both sides, the later change is kept. What the calendar doesn't show of
+an event (alarms, attendees, time zones) is kept as it came.
+
 ## Music
 
 hellobro has no player of its own: the music is a Linux player's, in the
@@ -1567,6 +1608,7 @@ Kobo's storage:
 | `keys.conf` | the keys ([Keys](#keys)) |
 | `clipboard`, `clipboard.png`, `clipboard.xopp` | what's copied, the picture of a PDF's part copied, and ink copied from a notebook ([Copy and paste](#copy-and-paste), [Notebooks](#notebooks)) |
 | `notebooks/NAME.hbnote` | the first notebooks, till they're opened: then they're `Notebooks/NAME.xopp` on the Kobo's storage ([Notebooks](#notebooks)) |
+| `calendar.conf`, `calendar/` | the CalDAV server and its password; the calendars, an `.ics` file each event or task ([Calendar](#calendar)) |
 | `wifi-recipe` | how Kobo starts Wi-Fi, as seen |
 | `touch-calibration.conf` | the touch calibration (shared with brotools) |
 | `hellobro.log` | the log (`make push-log`) |
