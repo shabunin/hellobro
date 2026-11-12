@@ -447,6 +447,7 @@ type noteInk struct {
 
 type noteState struct {
 	models   modelsState // the AI models to choose from (notediary.go)
+	places   notePlaces  // where each was left (noteplace.go)
 	ink      *noteInk
 	drag     *noteDrag   // the select tool's
 	unsaved  []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here
@@ -1179,6 +1180,10 @@ func (w *noteWin) closing(a *bro) {
 		a.nt.drag = nil
 		a.Ink(false)
 	}
+	a.notePlaceSeen(w) // where it was left: there when it's opened again
+	if a.places().dirty {
+		a.notePlacesWrite()
+	}
 	if !w.keep(a) {
 		a.nt.unsaved = append(a.nt.unsaved, w.nb)
 		a.Notify("notebook " + w.nb.name + " not kept: it's held, and kept once it can be")
@@ -1623,7 +1628,9 @@ func (a *bro) noteOpen(name string) *noteWin {
 	}
 	if nb := a.unsavedNote(name); nb != nil { // newer than its file
 		a.nt.unsaved = slices.DeleteFunc(a.nt.unsaved, func(n *notebook) bool { return n == nb })
-		return &noteWin{nb: nb, changed: time.Now()}
+		w := &noteWin{nb: nb, changed: time.Now()}
+		a.putPlace(w)
+		return w
 	}
 	nb, err := loadNotebook(name)
 	if err != nil {
@@ -1635,6 +1642,7 @@ func (a *bro) noteOpen(name string) *noteWin {
 	if nb.old != "" { // as .xopp, soon
 		w.changed = time.Now()
 	}
+	a.putPlace(w)
 	return w
 }
 
@@ -1671,6 +1679,7 @@ func (a *bro) noteTick() {
 	}
 	a.noteClean()
 	a.diaryTick()
+	a.notePlacesTick(false)
 	for _, w := range a.noteWins() {
 		if !w.changed.IsZero() && time.Since(w.changed) > noteKeepAfter {
 			w.keep(a)
@@ -1723,6 +1732,7 @@ func (w *noteWin) readAgain(a *bro) bool {
 }
 
 func (a *bro) noteExit() {
+	a.notePlacesTick(true)
 	for _, w := range a.noteWins() {
 		w.keep(a)
 	}

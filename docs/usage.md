@@ -412,9 +412,12 @@ itself (root), the socket is `/tmp/hellobro-ipc/ipc.sock`.
 
 ## The light
 
-A swipe up or down the left edge sets it, full screen too (and keys:
-see `keys.conf`). A notebook's settings, **Light by the left edge**,
-can turn it off there, so a finger by the edge is the page's.
+A swipe up or down the left edge sets it, full screen too, over any
+window (and keys: see `keys.conf`). The edge's strip is the light's as
+the right one is the menu's: a finger coming down there is the swipe's,
+and a tap there is still the window's (a button, a row, a page turned).
+A notebook's settings, **Light by the left edge**, can turn it off
+there, so a finger by the edge is the page's.
 When nothing's touched or typed for 30 s, the light goes off by itself,
 and the next touch or key brings it back as it was; that touch or key
 does what it does as well. The terminal's output doesn't count, only
@@ -899,7 +902,9 @@ A notebook is pages to write on with the pen: sums worked out by hand,
 say. "Notebook" in the switcher (Mod+D) opens a new one; the ones
 you have are listed there by name (the date and time each was made,
 till it's renamed); the launcher has **Notebooks**, **New notebook**
-and the last two written.
+and the last two written. A notebook opens where it was left: its
+page, how far down its roll; after a restart, or the Kobo turned off,
+too (`note-places.json` in the app's folder).
 
 - **All Notebooks** (the launcher's **Notebooks**, **Notebooks** in the
   switcher, **‹ All Notebooks** at the left of a notebook's bar, or q)

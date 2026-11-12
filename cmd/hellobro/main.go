@@ -316,13 +316,13 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			return
 		}
 		a.holdStart(p, g)
-		if !ev.Pen && !a.overlay() && (!a.Full && p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) { // the right edge's menu, full screen too
+		if !ev.Pen && a.edgeHeld(p) {
 			a.edge = g
 		}
 		switch {
 		case a.overDown(ev, p, g):
 		case a.overlay():
-		case a.edge == g && p.X >= kobo.EdgeWidth: // the right edge is ours
+		case a.edge == g: // the edges' strips are theirs: a swipe along or in (edgeSwipe, the light's: kobo's); a tap the window's (edgeTap)
 		case a.fullTop(ev, p): // the top's swipes', full screen; a tap there is the bar's (topTap)
 		case a.wmTouch(p, g):
 		case a.inkDown(ev, p, g):
@@ -368,11 +368,27 @@ func (a *bro) topTap(p image.Point) bool {
 	return true
 }
 
-// edgeTap hands a tap at the right edge, which the menu's swipe holds
-// (the finger may yet go along it), to what's there in ink: a button
-// by the edge (the models' "use it", a dialog's) is a button there too.
+// edgeHeld says a finger down at p is the edges': along the left edge
+// it may set the light (where that's wanted: lightAt) or, out of full
+// screen, swipe in to the workspace before; along the right edge, open
+// the menu (full screen too) or swipe in to the next. Both strips are
+// held alike: the window has the finger only as a tap (edgeTap).
+func (a *bro) edgeHeld(p image.Point) bool {
+	if a.overlay() {
+		return false
+	}
+	if p.X < kobo.EdgeWidth {
+		return a.lightAt(p) || !a.Full
+	}
+	return p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth
+}
+
+// edgeTap hands a tap in an edge's strip, held for its swipes (the
+// finger might yet have gone along it), to what's there in ink: a button
+// by the edge (the models' "use it", a dialog's, a row) is a button
+// there too. What isn't ink has it as any tap (wmTap).
 func (a *bro) edgeTap(p image.Point) bool {
-	if p.X < a.C.Bounds().Dx()-kobo.EdgeWidth || a.overlay() {
+	if !a.edgeHeld(p) {
 		return false
 	}
 	return a.inkTap(p)
@@ -498,7 +514,7 @@ func (a *bro) edgeSwipe(p image.Point, g *kobo.Gesture) bool {
 		g.Owner, a.edge = ownMenu, nil
 		log.Print("menu swipe")
 		a.menu()
-	case kobo.Abs(dx) > menuSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) && (dx < 0) == right && a.setting("edge-swipe") == "edge": // inward
+	case kobo.Abs(dx) > menuSwipe && kobo.Abs(dx) > 2*kobo.Abs(dy) && (dx < 0) == right && (right || !a.Full) && a.setting("edge-swipe") == "edge": // inward
 		g.Owner, a.edge = ownEdge, nil
 		if a.tv.sel != nil && a.tv.sel.g == g {
 			a.tv.sel = nil
