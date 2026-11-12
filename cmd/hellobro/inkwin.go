@@ -134,7 +134,11 @@ func (a *bro) inkWins() []*guiWin {
 
 // inkTick lays out what's due and puts it on the panel.
 func (a *bro) inkTick() {
-	if a.overlay() || a.Calibrating() {
+	if a.Calibrating() {
+		return
+	}
+	a.askTick()
+	if a.overlay() {
 		return
 	}
 	for _, g := range a.inkWins() {
@@ -168,6 +172,9 @@ func (a *bro) inkMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if g.Owner != ownPane {
 		return false
 	}
+	if q := a.asking; q != nil && q.pane.Move(ev, p, g) {
+		return true
+	}
 	for _, gw := range a.inkWins() {
 		if gw.ink.pane.Move(ev, p, g) {
 			break
@@ -179,6 +186,10 @@ func (a *bro) inkMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 func (a *bro) inkLift(g *kobo.Gesture) bool {
 	if g.Owner != ownPane {
 		return false
+	}
+	if q := a.asking; q != nil && q.pane.Lift(g) {
+		a.inkTick()
+		return true
 	}
 	for _, w := range a.wm.wins {
 		if gw, ok := w.(*guiWin); ok && gw.ink != nil && gw.ink.pane.Lift(g) {
@@ -193,7 +204,11 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 // if it shows: Tab moved the focus, and no touch since.
 func (a *bro) updateRing() {
 	var r image.Rectangle
-	if g, ok := a.focusedWin().(*guiWin); ok && g.ink != nil && !a.overlay() && !a.Calibrating() {
+	switch g, ok := a.focusedWin().(*guiWin); {
+	case a.Calibrating():
+	case a.asking != nil && !a.wm.offscreen:
+		r = a.asking.pane.Ring()
+	case ok && g.ink != nil && !a.overlay():
 		r = g.ink.pane.Ring()
 	}
 	a.SetRing(r)

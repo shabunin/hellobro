@@ -299,6 +299,7 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			a.edge = g
 		}
 		switch {
+		case a.askDown(ev, p, g):
 		case a.overlay():
 			a.pickerDown(p, g)
 		case a.edge == g && p.X >= kobo.EdgeWidth: // the right edge is ours

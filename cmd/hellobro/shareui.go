@@ -65,7 +65,7 @@ func (u *shareUI) Layout(gtx ink.Ctx) ink.Dims {
 	rows := []ink.Widget{on.Layout}
 	text := func(w ink.Widget) { rows = append(rows, para(th, w)) }
 	if s.srv == nil {
-		text(quiet(th, "Then a file manager reaches it (sftp://), or sftp, scp, sshfs, or a shell with ssh."))
+		rows = append(rows, quiet(th, "Then a file manager reaches it (sftp://), or sftp, scp, sshfs, or a shell with ssh."))
 		if s.err != "" {
 			text(theme.Body(th, "It didn't start: "+s.err).Layout)
 		}
@@ -88,13 +88,13 @@ func (u *shareUI) Layout(gtx ink.Ctx) ink.Dims {
 			} {
 				text(theme.Body(th, c).Layout)
 			}
-			text(quiet(th, fmt.Sprintf("%s:%s · host key %s", ip, port, s.srv.HostKey())))
+			rows = append(rows, quiet(th, fmt.Sprintf("%s:%s · host key %s", ip, port, s.srv.HostKey())))
 		}
 		rows = append(rows, theme.Section(th, "Computers"))
 		if s.code != "" {
 			left := max(0, time.Until(s.until)).Round(time.Second)
 			text(theme.Title(th, "Pairing code: "+s.code[:3]+" "+s.code[3:]).Layout)
-			text(quiet(th, fmt.Sprintf("On the computer: ssh -p %s %s, then type the code (%s left).", port, host, left)))
+			rows = append(rows, quiet(th, fmt.Sprintf("On the computer: ssh -p %s %s, then type the code (%s left).", port, host, left)))
 		} else {
 			r := theme.Row(th, nil, fmt.Sprintf("%d paired", len(s.keys)))
 			r.Sub = "a computer that's paired gets in with its key"
@@ -139,7 +139,7 @@ func (u *shareUI) Layout(gtx ink.Ctx) ink.Dims {
 		}
 	}
 	if s.note != "" {
-		text(quiet(th, s.note))
+		rows = append(rows, quiet(th, s.note))
 	}
 	return padList(gtx, th, &u.list, rows)
 }
