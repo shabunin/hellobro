@@ -24,6 +24,7 @@ type Window struct {
 	focus    Tag                 // the keys go to it
 	ring     bool                // the focus shows: the keys moved it, no touch since
 	again    bool                // another frame, at once
+	quick    bool                // this frame's changes in the fast waveform
 	wake     time.Time           // and one then
 	input    bool                // input since the last frame
 	updates  []Update            // painted, not yet taken
@@ -39,7 +40,7 @@ type contactTo struct {
 
 // Update is a part of the window that changed: Gray if it has more
 // than black and white in it (a grayscale waveform), else the fast one
-// will do. Full is all of it, new.
+// will do (or a widget asked for it: Quick). Full is all of it, new.
 type Update struct {
 	R    image.Rectangle
 	Gray bool
@@ -106,6 +107,7 @@ func (w *Window) frame(now time.Time) {
 		w.wake = time.Time{}
 	}
 	clear(w.asked)
+	w.quick = false
 	for pass := 0; ; pass++ {
 		w.again = false
 		w.ops.Reset()
@@ -142,7 +144,13 @@ func (w *Window) frame(now time.Time) {
 		w.updates = []Update{{R: w.back.Rect, Gray: true, Full: true}}
 		w.painted = true
 	} else {
-		w.updates = mergeUpdates(append(w.updates, diff(w.front, w.back)...))
+		d := diff(w.front, w.back)
+		if w.quick {
+			for i := range d {
+				d[i].Gray = false
+			}
+		}
+		w.updates = mergeUpdates(append(w.updates, d...))
 	}
 	w.front, w.back = w.back, w.front
 }

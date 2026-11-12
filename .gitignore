@@ -3,6 +3,8 @@
 /hellobro-nocgo
 /brotools
 /brotools-nocgo
+/gallery
+/gallery-nocgo
 # stamp: the cross-build image exists
 /.cross-image
 # things the app writes next to itself, should it ever run from here

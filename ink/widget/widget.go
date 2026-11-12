@@ -149,7 +149,11 @@ func (b *Clickable) events(gtx ink.Ctx) {
 
 // Layout lays w out and makes it pressable: its area, focusable.
 func (b *Clickable) Layout(gtx ink.Ctx, w ink.Widget) ink.Dims {
+	was := b.pressed
 	b.events(gtx)
+	if b.pressed != was && b.pressed {
+		gtx.Quick() // held down: inverted at once
+	}
 	m := ink.Record(gtx.Ops)
 	d := w(gtx)
 	call := m.Stop()

@@ -134,3 +134,12 @@ func (c Ctx) InvalidateAt(t time.Time) {
 		c.w.wakeAt(t)
 	}
 }
+
+// Quick asks for this frame's changes in the fast black-and-white
+// waveform, grays rounded: a button held down shows at once, and the
+// frame that lets it up puts the grays back.
+func (c Ctx) Quick() {
+	if c.w != nil {
+		c.w.quick = true
+	}
+}

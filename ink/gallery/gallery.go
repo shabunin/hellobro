@@ -1,6 +1,6 @@
-// Package demo is a page of every ink control, as a settings window
+// Package gallery is the pages of every ink control, as a settings window
 // would have them: for the tests to drive, and to see on the Kobo.
-package demo
+package gallery
 
 import (
 	"fmt"
@@ -77,7 +77,7 @@ func (d *Demo) Layout(gtx ink.Ctx) ink.Dims {
 	page := layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
 			h := theme.Header(th, "ink")
-			h.Back, h.BackText = &d.back, "All Notebooks"
+			h.Back, h.BackText = &d.back, "quit"
 			return h.Layout(gtx)
 		}),
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims {

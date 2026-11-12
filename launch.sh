@@ -1,5 +1,5 @@
 #!/bin/sh
-# Starts one of the apps next to it (hellobro, brotools) with Nickel
+# Starts one of the apps next to it (hellobro, brotools, gallery) with Nickel
 # frozen, so Nickel can't draw over it.
 #
 # usage: launch.sh APP
@@ -15,7 +15,7 @@
 # it, its media player too, which the headphones' buttons go to.
 cd "$(dirname "$0")" || exit 0
 app=${1:-hellobro}
-case $app in hellobro | brotools) ;; *) exit 0 ;; esac
+case $app in hellobro | brotools | gallery) ;; *) exit 0 ;; esac
 exec </dev/null >/dev/null 2>&1 # Nickel reads our output, and it'll be frozen: never block on it
 PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin # for wpa_cli
 say() { echo "$(date '+%Y/%m/%d %H:%M:%S') launch.sh: $*" >>"$app.log"; }

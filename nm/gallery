@@ -1,0 +1,5 @@
+# Launch ink's gallery (cmd/gallery) from NickelMenu: the UI library's
+# controls, to try; make push-gallery puts it on the Kobo.
+menu_item : main : ink Gallery : cmd_output : 9999 : quiet : exec /bin/sh /mnt/onboard/.adds/hellobro/launch.sh gallery
+chain_always : nickel_open : library : library
+chain_always : nickel_misc : home

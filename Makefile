@@ -1,6 +1,6 @@
 KOBO ?= /run/media/$(USER)/KOBOeReader
 CROSS ?= hellobro-cross
-APPS = hellobro brotools
+APPS = hellobro brotools gallery
 ADDS = $(KOBO)/.adds/hellobro
 
 all: $(APPS)
@@ -9,6 +9,7 @@ all: $(APPS)
 KOBO_SRC = $(wildcard kobo/*.go) go.mod go.sum
 hellobro: $(wildcard cmd/hellobro/*.go book/*.go pdf/*.go dict/*.go wm/*.go hand/*.go hand/fonts/* ai/*.go md/*.go tex/*.go mermaid/*.go third_party/fonts/*/*) third_party/mupdf/libmupdf.a
 brotools: $(wildcard cmd/brotools/*.go)
+gallery: $(wildcard cmd/gallery/*.go ink/*.go ink/*/*.go)
 
 # The build's version: the commit, and when it was built (hellobro --version).
 VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)-$(shell date +%m%d.%H%M)
@@ -84,6 +85,17 @@ push: hellobro
 	scp $(SCP_TO) launch.sh $(KOBO_HOST):$(KOBO_DIR)/launch.sh.new
 	ssh $(SSH_TO) $(KOBO_HOST) 'cd $(KOBO_DIR) && mv -f launch.sh.new launch.sh' # it may be running: a new file, not over it
 	ssh $(SSH_TO) $(KOBO_HOST) hellobro-update
+
+# ink's gallery (cmd/gallery), the same way: next to hellobro, started
+# from NickelMenu (nm/gallery) once hellobro's gone back to Nickel.
+push-gallery: gallery
+	scp $(SCP_TO) gallery $(KOBO_HOST):$(KOBO_DIR)/gallery.new
+	scp $(SCP_TO) launch.sh $(KOBO_HOST):$(KOBO_DIR)/launch.sh.new
+	scp $(SCP_TO) nm/gallery $(KOBO_HOST):/mnt/onboard/.adds/nm/gallery
+	ssh $(SSH_TO) $(KOBO_HOST) 'cd $(KOBO_DIR) && mv -f gallery.new gallery && mv -f launch.sh.new launch.sh'
+
+push-gallery-log:
+	ssh $(SSH_TO) $(KOBO_HOST) cat $(KOBO_DIR)/gallery.log
 
 # The same, back to the build before.
 push-rollback:
