@@ -144,6 +144,21 @@ func (a *bro) inkTick() {
 	for _, g := range a.inkWins() {
 		g.ink.flush(a, a.focusedWin() == window(g))
 	}
+	for _, u := range a.launchers() {
+		u.pane.Flush(a.App)
+		u.take()
+	}
+}
+
+// launchers are the launchers' panes that show their tiles.
+func (a *bro) launchers() []*launchUI {
+	var us []*launchUI
+	for _, w := range a.wm.wins {
+		if t, ok := w.(*termSession); ok && t.pane.launch != nil && t.pane.launch.shows(a) {
+			us = append(us, t.pane.launch)
+		}
+	}
+	return us
 }
 
 // inkRedraw asks key's window, if it's ink's and shows, for a frame.
@@ -156,12 +171,23 @@ func (a *bro) inkRedraw(key string) {
 // inkDown gives a contact coming down on an ink window's body to it, and
 // focuses the window.
 func (a *bro) inkDown(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
-	gw, ok := a.windowAt(p).(*guiWin)
-	if !ok || gw.ink == nil || !gw.ink.pane.Down(ev, p, g, ownPane) {
+	var pane *inkkobo.Pane
+	w := a.windowAt(p)
+	switch w := w.(type) {
+	case *guiWin:
+		if w.ink != nil {
+			pane = w.ink.pane
+		}
+	case *termSession:
+		if u := w.pane.launch; u != nil && u.shows(a) {
+			pane = u.pane
+		}
+	}
+	if pane == nil || !pane.Down(ev, p, g, ownPane) {
 		return false
 	}
-	if a.focusedWin() != window(gw) {
-		a.wm.tree.Focus(a.nodeOf(gw))
+	if a.focusedWin() != w {
+		a.wm.tree.Focus(a.nodeOf(w))
 		a.wmApply()
 	}
 	a.inkTick()
@@ -177,6 +203,11 @@ func (a *bro) inkMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	}
 	for _, gw := range a.inkWins() {
 		if gw.ink.pane.Move(ev, p, g) {
+			return true
+		}
+	}
+	for _, u := range a.launchers() {
+		if u.pane.Move(ev, p, g) {
 			break
 		}
 	}
@@ -193,6 +224,9 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 	}
 	for _, w := range a.wm.wins {
 		if gw, ok := w.(*guiWin); ok && gw.ink != nil && gw.ink.pane.Lift(g) {
+			break
+		}
+		if t, ok := w.(*termSession); ok && t.pane.launch != nil && t.pane.launch.pane.Lift(g) {
 			break
 		}
 	}

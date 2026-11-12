@@ -142,7 +142,7 @@ type termPane struct {
 	shown        [][]cellKey // what's drawn
 	shownConnect []string    // the connect screen's rows as drawn, nil: draw it all
 	shownStatus  string
-	picks        []launchPick    // the launcher's choices, as drawn, for taps
+	launch       *launchUI       // the launcher's tiles, in ink
 	menu         menuPlaced      // the launcher's tiles (launcher.go)
 	cursorY      int             // the row the cursor was drawn on
 	alt          bool            // the alternate screen was drawn
@@ -291,7 +291,7 @@ func (a *bro) termGeometry() {
 // keeps its size: the remote isn't told of every fold.
 func (a *bro) paneGeometry(t *termSession) {
 	f, pn := a.face(t), &t.pane
-	pn.shown, pn.shownConnect, pn.picks, pn.grid = nil, nil, nil, image.Rectangle{}
+	pn.shown, pn.shownConnect, pn.grid = nil, nil, image.Rectangle{}
 	pn.menu.sig = ""
 	if pn.p.Body.Empty() {
 		return
@@ -406,12 +406,6 @@ func (a *bro) drawTermStatus() {
 	}
 }
 
-// launchPick is a choice on the launcher, where it's drawn.
-type launchPick struct {
-	r  image.Rectangle
-	do func()
-}
-
 // guiKeys are the settings' windows, as the launcher offers them.
 var guiKeys = []string{"wifi", "bluetooth", "sharing", "settings", "battery", "usage"}
 
@@ -428,7 +422,9 @@ func (a *bro) drawConnect(t *termSession) {
 	if pn.menu.sig != "" { // the tiles were drawn: all of it again
 		pn.menu.sig, pn.shownConnect = "", nil
 	}
-	pn.picks = nil
+	if pn.launch != nil {
+		pn.launch.pane.Place(image.Rectangle{}) // the tiles gone
+	}
 	var lines []string
 	switch {
 	case t.prompt != nil && t.prompt.yesno:
@@ -1282,7 +1278,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 			return true
 		case code == kobo.KeyEsc && t.input != "": // what's typed goes first
 			t.input = ""
-			t.pane.menu.lit, t.pane.menu.top = 0, 0
+			t.pane.menu.lit = 0
 		case code == kobo.KeyEsc:
 			a.launchUnask(t)
 			a.closeWin(t)
@@ -1303,7 +1299,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 			if r := []rune(t.input); len(r) > 0 {
 				t.input = string(r[:len(r)-1])
 			}
-			t.pane.menu.lit, t.pane.menu.top = 0, 0 // what matches now: the best lit
+			t.pane.menu.lit = 0 // what matches now: the best lit
 		case printable && t.input == "" && t.edit == nil && ch >= "1" && ch <= "9":
 			a.launchUnask(t)
 			switch i := int(ch[0] - '1'); {
@@ -1319,7 +1315,7 @@ func (a *bro) termKey(code uint16, value int32) bool {
 		case printable && !m.ctrl:
 			t.input += kobo.Type(ch)
 			if t.edit == nil {
-				t.pane.menu.lit, t.pane.menu.top = 0, 0
+				t.pane.menu.lit = 0
 			}
 		default:
 			return false // Esc, F-keys: the app's
@@ -1478,13 +1474,7 @@ func (a *bro) termTap(p image.Point) {
 		a.endSession()
 		return
 	}
-	if !t.connected() {
-		for _, k := range t.pane.picks {
-			if p.In(k.r) {
-				k.do()
-				return
-			}
-		}
+	if !t.connected() { // the launcher's tiles take their own taps
 		return
 	}
 	x, y, ok := a.termCell(p)
@@ -1503,8 +1493,8 @@ func (a *bro) termTap(p image.Point) {
 // termSwipe turns a vertical swipe into mouse wheel steps, one per row moved.
 func (a *bro) termSwipe(from, to image.Point) bool {
 	t := a.term()
-	if t != nil && !t.connected() {
-		return a.menuSwipe(t, from, to)
+	if t != nil && !t.connected() { // the launcher's list scrolls itself
+		return false
 	}
 	x, y, ok := a.termCell(from)
 	if t == nil || !t.connected() || !ok {
