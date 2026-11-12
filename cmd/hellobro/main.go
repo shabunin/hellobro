@@ -112,7 +112,7 @@ func main() {
 	a.mem = loadRemembered(kobo.AppFile(""))
 	a.tv.hosts = a.mem.hosts()
 	radio.StateDir = kobo.AppFile("")
-	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true, Bar: true}, a)
+	a.App = kobo.New(kobo.Config{Name: "hellobro", Title: "hello bro", About: []string{version, "github.com/shabunin/hellobro"}, Tabs: []string{"1"}, OwnKeys: true, Bar: true, Plus: true}, a)
 	a.loadBar() // the App's, before it's up
 	a.App.LightAt = a.lightAt
 	a.App.TopSwipe = a.topSwipe

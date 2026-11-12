@@ -22,6 +22,9 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
+
+	"hellobro/ink"
+	"hellobro/ink/theme"
 )
 
 // Gray levels the panel shows cleanly (multiples of 0x11).
@@ -312,6 +315,7 @@ type Layout struct {
 
 	header, tabBar, footer, status, titleText image.Rectangle
 	tabs                                      []image.Rectangle
+	plus                                      image.Rectangle // Config.Plus's: a new tab
 	btnRotate, btnCalib, btnExit, btnSleep    image.Rectangle
 	bar                                       bool // Config.Bar's: no header, the tabs and status in one
 }
@@ -372,7 +376,7 @@ func makeLayout(w, h int, f Fonts, cfg Config, tabs, info []string, full, barOff
 		return L
 	}
 	if cfg.Bar {
-		return makeBar(L, f, tabs, info)
+		return makeBar(L, f, tabs, info, cfg.Plus)
 	}
 	title := cfg.Title
 	L.header = image.Rect(0, 0, w, headerH)
@@ -409,12 +413,15 @@ func makeLayout(w, h int, f Fonts, cfg Config, tabs, info []string, full, barOff
 // as wide as their labels and what's in them want (squeezed when they
 // don't fit), and the status after them. No footer: the page goes down
 // to the bottom.
-func makeBar(L Layout, f Fonts, tabs, info []string) Layout {
+func makeBar(L Layout, f Fonts, tabs, info []string, plus bool) Layout {
 	w, h := L.W, L.H
 	L.tabBar = image.Rect(0, 0, w, barH)
 	L.Page = image.Rect(0, barH, w, h)
 	L.Body = L.Page.Inset(Pad)
 	room := (w - 2*Pad) * 7 / 10 // the rest is the status's
+	if plus {
+		room -= barH
+	}
 	want := make([]int, len(tabs))
 	for i := range want {
 		want[i] = 2*barTabPad + TextWidth(f.Panel, tabs[i])
@@ -427,6 +434,10 @@ func makeBar(L Layout, f Fonts, tabs, info []string) Layout {
 	for _, tw := range squeeze(want, room) {
 		L.tabs = append(L.tabs, image.Rect(x, 0, x+tw, barH))
 		x += tw
+	}
+	if plus {
+		L.plus = image.Rect(x, 0, x+barH, barH)
+		x += barH
 	}
 	L.status = image.Rect(x+Pad, 0, w-Pad, barH)
 	return L
@@ -833,6 +844,11 @@ func (a *App) drawStatus() {
 		return
 	}
 	a.status = s + "\x00" + note
+	if a.L.bar {
+		a.paintBar(s, note)
+		a.Mark(a.L.status, true)
+		return
+	}
 	r := a.L.status
 	a.C.Fill(r, Black)
 	a.C.Text(a.F.Small, r, s, Light, AlignRight)
@@ -909,33 +925,39 @@ func (a *App) drawTabs() {
 }
 
 // drawBar draws Config.Bar's bar: black, as i3's, the tab up white; each
-// tab its label, bold, and what's in it; then the status and ≡.
+// tab its label, bold, and what's in it; the + for a new one; then the
+// status.
 func (a *App) drawBar() {
-	c, L := a.C, a.L
-	c.Fill(L.tabBar, Black)
+	a.status = ""
+	a.drawStatus()      // and the rest of the bar with it
+	if a.status == "" { // the status had no room: the bar anyway
+		a.paintBar("", "")
+	}
+	a.Mark(a.L.tabBar, true)
+}
+
+// paintBar paints the bar, in ink, with status and note at its right.
+func (a *App) paintBar(status, note string) {
+	L := a.L
+	o := L.tabBar.Min
+	b := theme.Bar{Look: FrameLook(), Plus: L.plus.Sub(o), Status: status, StatusR: L.status.Sub(o)}
 	order := a.Tabs()
 	for i, r := range L.tabs {
-		label, info := a.cfg.Tabs[order[i]], ""
+		t := theme.BarTab{R: r.Sub(o), Label: a.cfg.Tabs[order[i]], Up: order[i] == a.Tab}
 		if i < len(a.tabInfo) {
-			info = a.tabInfo[i]
+			t.Info = a.tabInfo[i]
 		}
-		fg, dim := uint8(White), uint8(Light)
-		if order[i] == a.Tab {
-			c.Fill(r, White)
-			fg, dim = Black, Dark
-		} else if i > 0 && order[i-1] != a.Tab {
-			c.Fill(image.Rect(r.Min.X, r.Min.Y+10, r.Min.X+1, r.Max.Y-10), Mid)
-		}
-		in := image.Rect(r.Min.X+barTabPad, r.Min.Y, r.Max.X-barTabPad, r.Max.Y)
-		c.Text(a.F.Panel, in, label, fg, AlignLeft)
-		if lw := TextWidth(a.F.Panel, label) + barInfoGap; info != "" && lw < in.Dx() {
-			in.Min.X += lw
-			c.Text(a.F.Small, in, info, dim, AlignLeft)
-		}
+		t.Line = !t.Up && i > 0 && order[i-1] != a.Tab
+		b.Tabs = append(b.Tabs, t)
 	}
-	a.status = ""
-	a.drawStatus()
-	a.Mark(L.tabBar, true)
+	a.noteR = image.Rectangle{}
+	if note != "" {
+		r := L.status
+		r.Max.X -= TextWidth(a.F.Small, status) + 28
+		b.Note, b.NoteR = note, r.Sub(o)
+		a.noteR = image.Rect(max(r.Min.X, r.Max.X-TextWidth(a.F.Small, note)), r.Min.Y, r.Max.X, r.Max.Y)
+	}
+	PaintInk(a.C.Gray, L.tabBar, func(gtx ink.Ctx) ink.Dims { return b.Layout(gtx, frameTheme) })
 }
 
 // DrawFooter redraws the footer, for an app whose idle timeout changed.
@@ -1017,64 +1039,42 @@ func (a *App) DrawPanel(p Panel, status string) {
 }
 
 // DrawPanelTitle draws the title strip: the name, the button, and status
-// on the right.
+// on the right; in ink (theme.Strip).
 func (a *App) DrawPanelTitle(p Panel, status string) {
 	if p.Title.Empty() {
 		return
 	}
-	c := a.C
-	bg, ink, dim := uint8(Light), uint8(Black), uint8(Dark)
-	if p.Focused {
-		bg, ink, dim = Black, White, Light
-	}
-	c.Fill(p.Title, bg)
-	c.Fill(image.Rect(p.Title.Min.X, p.Title.Max.Y-2, p.Title.Max.X, p.Title.Max.Y), Black)
+	o := p.Title.Min
 	t := image.Rect(p.Title.Min.X+16, p.Title.Min.Y, p.Title.Max.X-16, p.Title.Max.Y-2)
-	box := func(r image.Rectangle) {
-		c.Fill(r, White)
-		c.Frame(r, 2, Black)
-	}
+	st := theme.Strip{Look: FrameLook(), Name: p.Name, Status: status, Focused: p.Focused}
 	for _, b := range windowButtons(p) {
 		if b.r.Empty() {
 			continue
 		}
-		box(b.r)
-		m := image.Pt(b.r.Min.X+winIconPad+winIconW/2, (b.r.Min.Y+b.r.Max.Y)/2)
-		if !p.Words {
-			m.X = (b.r.Min.X + b.r.Max.X) / 2
-		}
-		c.windowIcon(b.icon, m)
+		icon := b.icon
+		box := theme.StripBox{R: b.r.Sub(o), Icon: func(dst *image.Gray, m image.Point) { Canvas{dst}.windowIcon(icon, m) }}
 		if p.Words {
-			c.Text(a.F.Small, image.Rect(m.X+winIconW/2+8, b.r.Min.Y, b.r.Max.X, b.r.Max.Y), b.label, Black, AlignLeft)
+			box.IconX, box.IconW, box.Label = winIconPad+winIconW/2, winIconW, b.label
 		}
+		st.Boxes = append(st.Boxes, box)
 		t.Max.X = b.r.Min.X - 16
 	}
 	if f := p.Fold; !f.Empty() {
-		c.Fill(f, White)
-		c.Frame(f, 2, Black)
-		m := f.Min.Add(f.Max).Div(2)
-		c.Fill(image.Rect(m.X-9, m.Y-1, m.X+10, m.Y+2), Black) // −
-		if p.Folded {
-			c.Fill(image.Rect(m.X-1, m.Y-9, m.X+2, m.Y+10), Black) // +
-		}
+		st.Boxes = append(st.Boxes, theme.StripBox{R: f.Sub(o), Plus: p.Folded, Minus: !p.Folded})
 		t.Max.X = f.Min.X - 16
 	}
 	if p.ButtonLabel != "" {
-		c.Fill(p.Button, White)
-		c.Frame(p.Button, 2, Black)
-		c.Text(a.F.Small, p.Button, p.ButtonLabel, Black, AlignCenter)
+		st.Boxes = append(st.Boxes, theme.StripBox{R: p.Button.Sub(o), Label: p.ButtonLabel})
 		t.Max.X = p.Button.Min.X - 16
 	}
 	nameW := min(TextWidth(a.F.Panel, p.Name), max(0, t.Dx()-2)) // shortened if it would run into the buttons
-	c.Text(a.F.Panel, image.Rect(t.Min.X, t.Min.Y, t.Min.X+nameW+2, t.Max.Y), p.Name, ink, AlignLeft)
+	st.NameR = image.Rect(t.Min.X, t.Min.Y, t.Min.X+nameW+2, t.Max.Y).Sub(o)
 	if n := p.New; !n.Empty() {
-		box(n)
-		m := n.Min.Add(n.Max).Div(2)
-		c.Fill(image.Rect(m.X-9, m.Y-1, m.X+10, m.Y+2), Black) // +
-		c.Fill(image.Rect(m.X-1, m.Y-9, m.X+2, m.Y+10), Black)
+		st.Boxes = append(st.Boxes, theme.StripBox{R: n.Sub(o), Plus: true})
 		nameW = n.Max.X - t.Min.X - 12
 	}
-	c.Text(a.F.Small, image.Rect(t.Min.X+nameW+28, t.Min.Y, t.Max.X, t.Max.Y), status, dim, AlignRight)
+	st.StatusR = image.Rect(t.Min.X+nameW+28, t.Min.Y, t.Max.X, t.Max.Y).Sub(o)
+	PaintInk(a.C.Gray, p.Title, func(gtx ink.Ctx) ink.Dims { return st.Layout(gtx, frameTheme) })
 	a.Mark(p.Title, true)
 }
 

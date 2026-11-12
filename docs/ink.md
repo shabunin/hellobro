@@ -138,11 +138,14 @@ screen (a pane for each size of key), a book's note or word looked
 up, a cut's buttons, a pinch's zoom, the notebook's pen and paper
 choices, its selection's buttons and its pages small.
 
-Still the old way: the window manager's bar, title strips, tabbed
-containers' tabs and notices. They're `kobo`'s, shared with brotools and
-the gallery, and laid out there for kobo's fonts, which are ink's own
-Go fonts at the same sizes. The bodies themselves (terminal cells, book
-pages, notebook ink) stay drawn their own way for speed.
+The frame is ink's too (`ink/theme/frame.go`): the bar (its tabs, the
+**+** for a new one, the status), a window's title strip and its
+buttons, a tabbed container's tabs, the toast. `kobo` still lays the
+frame out and takes its taps, as brotools and the gallery share it;
+`kobo.PaintInk` paints each part with its widget where the layout puts
+it, one Dp a pixel, so the letters are the sizes they were. The bodies
+themselves (terminal cells, book pages, notebook ink) stay drawn their
+own way for speed, and so do brotools' header and footer (no bar).
 
 ```sh
 make gallery              # the ARM build

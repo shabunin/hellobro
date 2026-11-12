@@ -87,6 +87,8 @@ type Config struct {
 	// Program's Key, for an app with keys of its own making, and Esc
 	// doesn't quit: quitting is the Program's to do (App.Quit).
 	OwnKeys bool
+	// Plus puts a + after Config.Bar's tabs: a new one (TabAdder).
+	Plus bool
 }
 
 // Gesture is one contact, from down to up.
@@ -463,6 +465,12 @@ func (a *App) SetTabNames(names, hints, info []string, cur int) {
 // the tab's place in the bar.
 type TabTapper interface {
 	TabTap(i int)
+}
+
+// TabAdder is a Program with a + after its tabs (Config.Plus): a tap on
+// it makes a new tab.
+type TabAdder interface {
+	NewTab()
 }
 
 // SetFooter has the footer say tabs on the tabs' keys ("tabs: tap or
@@ -931,6 +939,10 @@ func (a *App) tapAt(p image.Point) {
 			}
 			return
 		}
+	}
+	if t, ok := a.prog.(TabAdder); ok && !a.L.plus.Empty() && p.In(a.L.plus) {
+		t.NewTab()
+		return
 	}
 	switch {
 	case Hit(p, a.L.btnExit):

@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"hellobro/ink"
+	"hellobro/ink/theme"
 	"hellobro/kobo"
 	"hellobro/wm"
 )
@@ -693,6 +695,21 @@ func radioNote(unread, busy, on bool, network string) string {
 	return "off"
 }
 
+// NewTab is the bar's +: a new workspace, the first number not taken,
+// gone to.
+func (a *bro) NewTab() {
+	taken := map[int]bool{}
+	for _, w := range a.wm.tree.Workspaces() {
+		taken[w.Num] = true
+	}
+	n := 1
+	for taken[n] {
+		n++
+	}
+	log.Printf("wm: a new workspace, %d", n)
+	a.wmRun(fmt.Sprintf("workspace number %d", n))
+}
+
 // TabTap goes to the workspace tapped in the bar.
 func (a *bro) TabTap(i int) {
 	if i < len(a.wm.names) {
@@ -964,24 +981,12 @@ func (a *bro) drawTabs() {
 		r, n := tb.r, tb.n
 		shown := n.Visible
 		in := focus != nil && within(focus, n)
-		bg, ink := uint8(kobo.Light), uint8(kobo.Dark)
-		switch {
-		case shown && in:
-			bg, ink = kobo.Black, kobo.White
-		case shown:
-			bg, ink = kobo.White, kobo.Black
-		}
-		c.Fill(r, bg)
-		c.Frame(r, 2, kobo.Black)
 		name := wm.Name(n)
 		if w := a.wm.wins[n]; w != nil {
 			name = w.Title()
 		}
-		f := a.F.Small
-		if shown {
-			f = a.F.Panel
-		}
-		c.Text(f, r.Inset(10), name, ink, kobo.AlignCenter)
+		t := theme.WinTab{Look: kobo.FrameLook(), Name: name, Shown: shown, In: in}
+		kobo.PaintInk(c.Gray, r, func(gtx ink.Ctx) ink.Dims { return t.Layout(gtx, kobo.FrameTheme()) })
 		a.Mark(r, true)
 	}
 }

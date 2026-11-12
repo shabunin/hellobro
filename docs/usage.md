@@ -77,8 +77,9 @@ tile).
 windows' titles after its number (`1 Alpine · Wi-Fi · Battery`), the one
 shown in white: Mod+1…Mod+0 go to one (made as you go there; an empty
 one goes once you leave it), Mod+Shift+1…0 send the window in focus to
-one, and a tap on one goes there. An empty workspace lists the keys (as
-they are, keys.conf's too), and a tap on it opens a window.
+one, and a tap on one goes there; **+** after them makes a new one (the
+first number not taken) and goes there. An empty workspace lists the
+keys (as they are, keys.conf's too), and a tap on it opens a window.
 
 A tap on the bar away from the workspaces, or two fingers swiped down
 from the screen's top (full screen, they leave it first), or three

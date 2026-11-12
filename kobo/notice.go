@@ -4,6 +4,9 @@ import (
 	"image"
 	"log"
 	"time"
+
+	"hellobro/ink"
+	"hellobro/ink/theme"
 )
 
 // Notices for the Program to get the reader's eye: the light on a moment,
@@ -67,9 +70,8 @@ func (a *App) Toast(text string, d time.Duration) {
 	w := min(page.Dx()-6*Pad, TextWidth(a.F.Body, text)+56)
 	r := image.Rect(page.Max.X-3*Pad-w, page.Max.Y-3*Pad-toastH, page.Max.X-3*Pad, page.Max.Y-3*Pad) // in off the panels' frames
 	c := Canvas{image.NewGray(r.Inset(-toastHalo))}
-	c.Fill(c.Rect, White) // a margin, to stand apart from what's under it
-	c.Frame(r, 2*border, Black)
-	c.Text(a.F.Body, r.Inset(24), text, Black, AlignLeft)
+	n := theme.Corner{Text: text, Size: 26, Margin: toastHalo, Thick: 2 * border} // a margin, to stand apart from what's under it
+	PaintInk(c.Gray, c.Rect, func(gtx ink.Ctx) ink.Dims { return n.Layout(gtx, frameTheme) })
 	a.toast = &toast{c.Gray, time.Now().Add(d)}
 	a.Mark(r, true)
 }
