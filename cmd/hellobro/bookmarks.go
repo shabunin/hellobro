@@ -154,7 +154,7 @@ func (w *bookWin) deleteMark(a *bro, i int) {
 	}
 	w.marks = slices.Delete(w.marks, i, i+1)
 	w.save(a)
-	w.draw(a)
+	w.update(a)
 }
 
 // --- the bar along the top (toolbar.go) ---
@@ -384,6 +384,13 @@ func (w *bookWin) showList(a *bro, marks bool) {
 // tabs, the contents, the bookmarks, a PDF's pages (bookpages.go); and
 // at their right the way back to the page.
 func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
+	h := a.drawLibHeader(r, "All Books", false, func() { w.toShelf(a) }, "back to the book", func() { w.list = false; w.draw(a) }, w.listTabs(a))
+	w.rows = append(w.rows, h.rows...)
+}
+
+// listTabs are the list's tabs: the contents, the bookmarks, a PDF's
+// pages.
+func (w *bookWin) listTabs(a *bro) []libTab {
 	names := []string{"Contents", fmt.Sprintf("Bookmarks (%d)", len(w.marks))}
 	if w.pdf != nil {
 		names = append(names, "Pages")
@@ -403,8 +410,7 @@ func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
 		}
 		tabs = append(tabs, libTab{name, k == on, show})
 	}
-	h := a.drawLibHeader(r, "All Books", false, func() { w.toShelf(a) }, "back to the book", func() { w.list = false; w.draw(a) }, tabs)
-	w.rows = append(w.rows, h.rows...)
+	return tabs
 }
 
 // markCorner is the page's top right, where its ribbon hangs: a tap

@@ -52,14 +52,18 @@ func (p *Pane) Draw(c *image.Gray) {
 // Flush lays it out if it's due and puts what changed on a's canvas,
 // marked: grays as the App's UI, black and white in the fast waveform.
 // It says if any of it was ink written (the pen's waveform wanted).
-func (p *Pane) Flush(a *kobo.App) (pen bool) {
+func (p *Pane) Flush(a *kobo.App) (pen bool) { return p.FlushTo(a.C.Gray, a.Mark) }
+
+// FlushTo is Flush onto c, each change marked by mark: a host whose
+// marks do more (draw what floats over the pane again).
+func (p *Pane) FlushTo(c *image.Gray, mark func(r image.Rectangle, ui bool)) (pen bool) {
 	if p.At.Empty() {
 		return false
 	}
 	for _, u := range together(p.Win.Frame(time.Now())) {
 		r := u.R.Add(p.At.Min)
-		kobo.CopyGray(a.C.Gray, r, p.Win.Image(), u.R.Min)
-		a.Mark(r, u.Gray || u.Full)
+		kobo.CopyGray(c, r, p.Win.Image(), u.R.Min)
+		mark(r, u.Gray || u.Full)
 		pen = pen || u.Pen
 	}
 	return pen

@@ -100,7 +100,7 @@ func (w *inkWin) flush(a *bro, focused bool) {
 	if s := w.ui.Status(); s != w.status {
 		w.drawTitle(a, focused)
 	}
-	w.pane.Flush(a.App)
+	a.flushPane(w.pane)
 }
 
 // inkMods are the modifiers held, as ink has them.
@@ -144,22 +144,45 @@ func (a *bro) inkTick() {
 	for _, g := range a.inkWins() {
 		g.ink.flush(a, a.focusedWin() == window(g))
 	}
-	for _, u := range a.launchers() {
-		u.pane.Flush(a.App)
-		u.take()
+	for _, b := range a.bodies() {
+		a.flushPane(b.inkPane())
+		b.take()
 	}
 }
 
-// launchers are the launchers' panes that show their tiles.
-func (a *bro) launchers() []*launchUI {
-	var us []*launchUI
+// inkBody is an ink pane in a window that isn't a settings' window: the
+// launcher's tiles, a list of books or notebooks.
+type inkBody interface {
+	inkPane() *inkkobo.Pane
+	take() // what the frame picked, done
+}
+
+// bodied is a window that may show one.
+type bodied interface {
+	inkBody(a *bro) inkBody // nil: none shows
+}
+
+// bodies are the ink bodies that show.
+func (a *bro) bodies() []inkBody {
+	var bs []inkBody
 	for _, w := range a.wm.wins {
-		if t, ok := w.(*termSession); ok && t.pane.launch != nil && t.pane.launch.shows(a) {
-			us = append(us, t.pane.launch)
+		if bw, ok := w.(bodied); ok {
+			if b := bw.inkBody(a); b != nil {
+				bs = append(bs, b)
+			}
 		}
 	}
-	return us
+	return bs
 }
+
+func (t *termSession) inkBody(a *bro) inkBody {
+	if u := t.pane.launch; u != nil && u.shows(a) {
+		return u
+	}
+	return nil
+}
+
+func (u *launchUI) inkPane() *inkkobo.Pane { return u.pane }
 
 // inkRedraw asks key's window, if it's ink's and shows, for a frame.
 func (a *bro) inkRedraw(key string) {
@@ -178,9 +201,9 @@ func (a *bro) inkDown(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 		if w.ink != nil {
 			pane = w.ink.pane
 		}
-	case *termSession:
-		if u := w.pane.launch; u != nil && u.shows(a) {
-			pane = u.pane
+	case bodied:
+		if b := w.inkBody(a); b != nil {
+			pane = b.inkPane()
 		}
 	}
 	if pane == nil || !pane.Down(ev, p, g, ownPane) {
@@ -206,8 +229,8 @@ func (a *bro) inkMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 			return true
 		}
 	}
-	for _, u := range a.launchers() {
-		if u.pane.Move(ev, p, g) {
+	for _, b := range a.bodies() {
+		if b.inkPane().Move(ev, p, g) {
 			break
 		}
 	}
@@ -226,8 +249,10 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 		if gw, ok := w.(*guiWin); ok && gw.ink != nil && gw.ink.pane.Lift(g) {
 			break
 		}
-		if t, ok := w.(*termSession); ok && t.pane.launch != nil && t.pane.launch.pane.Lift(g) {
-			break
+		if bw, ok := w.(bodied); ok {
+			if b := bw.inkBody(a); b != nil && b.inkPane().Lift(g) {
+				break
+			}
 		}
 	}
 	a.inkTick()
@@ -247,3 +272,7 @@ func (a *bro) updateRing() {
 	}
 	a.SetRing(r)
 }
+
+// flushPane puts what changed of p on the panel: a window's, so the
+// floating windows over it are drawn again where it changed.
+func (a *bro) flushPane(p *inkkobo.Pane) { p.FlushTo(a.C.Gray, a.Mark) }

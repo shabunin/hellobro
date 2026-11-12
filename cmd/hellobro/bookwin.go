@@ -220,6 +220,7 @@ type bookWin struct {
 	found      *bookFind    // the word looked for last
 	finding    *atomic.Bool // set, the look going on is no longer wanted
 	edit       *noteEdit    // a shelf's book's name being typed: key its path
+	lib        *libUI       // the lists, in ink: the shelf, the contents, the bookmarks
 }
 
 func (w *bookWin) Title() string {
@@ -751,7 +752,7 @@ func (w *bookWin) shelfGo(a *bro, tab int, dir string) {
 	w.shelfTab, w.shelfDir, w.sel, w.top = tab, dir, 0, 0
 	a.mem.ShelfTab, a.mem.ShelfDir = tab, dir
 	a.mem.save()
-	w.draw(a)
+	w.update(a)
 }
 
 // toShelf puts the shelf where the book is, to come back to it.
@@ -822,106 +823,93 @@ func (w *bookWin) listOpen(a *bro, i int) {
 }
 
 func (w *bookWin) drawList(a *bro) {
-	if w.path == "" {
-		w.drawShelf(a)
+	if w.inkList() {
+		w.libOf(a).put(a, w.p.Body, true)
 		return
 	}
-	lines := w.listLines()
-	f := a.F.Body
-	rowH := max(64, kobo.TextWidth(f, "M")*2+10) // room for a finger
 	area := w.p.Body.Inset(kobo.Pad)
+	rowH := a.libRowH()
 	w.rows = nil
-	if w.b != nil {
-		w.drawTabs(a, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH))
-		area.Min.Y += rowH + 12
-	}
-	if w.listPages {
-		w.drawThumbs(a, area)
-		return
-	}
-	n := max(1, area.Dy()/rowH)
-	w.listN = n
-	if len(lines) == 0 {
-		msg := "no contents in this book"
-		if w.listMks {
-			msg = "no bookmarks yet: b, or the ribbon over the page"
-		}
-		a.C.Text(f, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), msg, kobo.Dark, kobo.AlignLeft)
-		return
-	}
-	w.sel = max(0, min(w.sel, len(lines)-1))
-	if w.sel < w.top {
-		w.top = w.sel
-	} else if w.sel >= w.top+n {
-		w.top = w.sel - n + 1
-	}
-	w.top = max(0, min(w.top, len(lines)-n))
-	for k := 0; k < n && w.top+k < len(lines); k++ {
-		i := w.top + k
-		r := image.Rect(area.Min.X, area.Min.Y+k*rowH, area.Max.X, area.Min.Y+(k+1)*rowH)
-		ink := uint8(kobo.Black)
-		if i == w.sel {
-			a.C.Fill(r, kobo.Black)
-			ink = kobo.White
-		}
-		text := r.Inset(8)
-		if w.listMks { // a box to take it away, at the right
-			x := image.Rect(r.Max.X-rowH, r.Min.Y, r.Max.X, r.Max.Y).Inset(6)
-			a.C.Frame(x, 2, ink)
-			a.C.Text(f, x, "×", ink, kobo.AlignCenter)
-			text.Max.X = x.Min.X - 12
-			w.rows = append(w.rows, bookRow{x, func() { w.deleteMark(a, i) }})
-		}
-		a.C.Text(f, text, lines[i], ink, kobo.AlignLeft)
-		w.rows = append(w.rows, bookRow{r, func() { w.listOpen(a, i) }})
-	}
+	w.drawTabs(a, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH))
+	area.Min.Y += rowH + 12
+	w.drawThumbs(a, area)
 }
 
-// drawShelf draws the shelf: the header, its tab's rows.
-func (w *bookWin) drawShelf(a *bro) {
-	rowH := a.libRowH()
-	area := w.p.Body.Inset(kobo.Pad)
-	back := ""
-	if w.back != "" {
-		back = "back to the book"
+// inkList says the list shows, in ink: all but a PDF's pages, small.
+func (w *bookWin) inkList() bool { return w.list && !w.listPages && !w.styling }
+
+// libOf is the lists' ink, made the first time.
+func (w *bookWin) libOf(a *bro) *libUI {
+	if w.lib == nil {
+		w.lib = newLibUI(a, func() libSpec { return w.libSpec(a) })
 	}
-	h := a.drawLibHeader(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), "All Books", true,
-		func() { w.shelfGo(a, w.shelfTab, "") }, back, func() { w.fromShelf(a) },
-		libTabs(w.shelfTab, func(k int) { w.shelfGo(a, k, w.shelfDir) }))
-	w.rows = h.rows
-	area.Min.Y += rowH + 12
-	items := w.shelfItems()
-	n := max(1, area.Dy()/rowH)
-	w.listN = n
-	if len(items) == 0 {
-		msg := "no books here: put EPUBs or PDFs on the Kobo (anywhere but its dot folders)"
-		if w.looking {
-			msg = "looking for books…"
-		}
-		a.C.Text(a.F.Body, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), msg, kobo.Dark, kobo.AlignLeft)
+	return w.lib
+}
+
+func (w *bookWin) inkBody(a *bro) inkBody {
+	if w.lib != nil && w.inkList() && !w.p.Outer.Empty() && a.shows(w) && w.lib.pane.At == w.p.Body {
+		return w.lib
+	}
+	return nil
+}
+
+// update draws what changed of the list, if it shows; else all of it.
+func (w *bookWin) update(a *bro) {
+	if b := w.inkBody(a); b != nil && w.ex == nil && !a.overlay() {
+		w.lib.put(a, w.p.Body, false)
 		return
 	}
-	w.sel = max(0, min(w.sel, len(items)-1))
-	if w.sel < w.top {
-		w.top = w.sel
-	} else if w.sel >= w.top+n {
-		w.top = w.sel - n + 1
-	}
-	w.top = max(0, min(w.top, len(items)-n))
-	for k := 0; k < n && w.top+k < len(items); k++ {
-		i := w.top + k
-		r := image.Rect(area.Min.X, area.Min.Y+k*rowH, area.Max.X, area.Min.Y+(k+1)*rowH)
-		it := items[i]
-		if e := w.edit; e != nil && e.key == it.key && !it.dir {
-			w.rows = append(w.rows, a.drawNameEdit(r, "name: ", e.text, func() { w.endRename(a, true) }, func() { w.endRename(a, false) })...)
-			continue
+	w.draw(a)
+}
+
+// libSpec is the list as it is: the shelf, or the book's contents or
+// its bookmarks.
+func (w *bookWin) libSpec(a *bro) libSpec {
+	s := libSpec{sel: &w.sel, shown: &w.listN, edit: -1, open: func(i int) { w.listOpen(a, i) }}
+	if w.path == "" {
+		s.id = fmt.Sprint("shelf ", w.shelfTab, w.shelfDir)
+		back := ""
+		if w.back != "" {
+			back = "back to the book"
 		}
-		var btns []libTab
-		if !it.dir {
-			btns = []libTab{{"rename", false, func() { w.startRename(a, it.key, it.name) }}}
+		s.head = libHeadSpec{all: "All Books", here: true, toAll: func() { w.shelfGo(a, w.shelfTab, "") },
+			back: back, toBack: func() { w.fromShelf(a) }, tabs: libTabs(w.shelfTab, func(k int) { w.shelfGo(a, k, w.shelfDir) })}
+		s.items = w.shelfItems()
+		s.empty = "no books here: put EPUBs or PDFs on the Kobo (anywhere but its dot folders)"
+		if w.looking {
+			s.empty = "looking for books…"
 		}
-		w.rows = append(w.rows, a.drawLibRow(r, it, i == w.sel, func() { w.listOpen(a, i) }, btns...)...)
+		if e := w.edit; e != nil {
+			for i, it := range s.items {
+				if it.key == e.key && !it.dir {
+					s.edit = i
+				}
+			}
+			s.prompt, s.typed = "name:", e.text
+			s.editOK, s.editNo = func() { w.endRename(a, true) }, func() { w.endRename(a, false) }
+		}
+		s.buttons = func(_ int, it libItem) []libTab {
+			if it.dir {
+				return nil
+			}
+			return []libTab{{"rename", false, func() { w.startRename(a, it.key, it.name) }}}
+		}
+		return s
 	}
+	s.head = libHeadSpec{all: "All Books", toAll: func() { w.toShelf(a) },
+		back: "back to the book", toBack: func() { w.list = false; w.draw(a) }, tabs: w.listTabs(a)}
+	for _, l := range w.listLines() {
+		s.items = append(s.items, libItem{name: l})
+	}
+	s.empty, s.id = "no contents in this book", "contents"
+	if w.listMks {
+		s.id = "marks"
+		s.empty = "no bookmarks yet: b, or the ribbon over the page"
+		s.buttons = func(i int, _ libItem) []libTab {
+			return []libTab{{"×", false, func() { w.deleteMark(a, i) }}}
+		}
+	}
+	return s
 }
 
 // openBook puts the book at path in the shelf's window.
@@ -1092,7 +1080,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		if done, ok := nameKey(&e.text, code, ch); done {
 			w.endRename(a, ok)
 		} else {
-			w.draw(a)
+			w.update(a)
 		}
 		return true
 	}
@@ -1190,7 +1178,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		default:
 			return false
 		}
-		w.draw(a)
+		w.update(a)
 		return true
 	}
 	if n := w.note; n != nil { // Enter goes there (a word's: its next page), Esc closes it, another key too and goes on

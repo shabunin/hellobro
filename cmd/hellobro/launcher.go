@@ -289,7 +289,7 @@ func (a *bro) drawMenu(t *termSession) {
 		return
 	}
 	u.pane.Win.Invalidate()
-	u.pane.Flush(a.App)
+	a.flushPane(u.pane)
 	u.take()
 }
 
