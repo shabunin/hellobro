@@ -133,6 +133,7 @@ func TestChecksRadiosSliders(t *testing.T) {
 		t.Errorf("radio: %q", g.finger.Value)
 	}
 	// The slider: a touch at its far end is the most.
+	must(t, it.TapText("Pickers"))
 	p, err := it.Find("Light")
 	must(t, err)
 	w := it.W.Size().X
@@ -196,8 +197,8 @@ func TestListPages(t *testing.T) {
 func TestTiles(t *testing.T) {
 	for name, size := range sizes {
 		g, it := start(t, size)
-		must(t, it.TapText("Tiles"))
-		save(t, it, name+"-tiles")
+		must(t, it.TapText("Grid"))
+		save(t, it, name+"-grid")
 		must(t, it.TapText("Bluetooth"))
 		if g.Said != "tile: Bluetooth" {
 			t.Errorf("%s: said %q", name, g.Said)

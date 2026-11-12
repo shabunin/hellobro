@@ -19,8 +19,8 @@ var (
 	models    = []string{"as ai.conf says", "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2",
 		"gpt-5.5", "gpt-5.5-mini", "gemini-3-pro", "gemini-3-flash", "qwen-4-coder", "kimi-k3", "glm-5", "deepseek-v4", "grok-5"}
 	actions = []string{"rename…", "duplicate", "export as PDF", "move to a folder…", "forget it…"}
-	tabs    = []string{"controls", "text", "lists", "tiles", "popups", "about"}
-	tabName = []string{"Controls", "Text", "Lists", "Tiles", "Popups", "About"}
+	tabs    = []string{"controls", "pickers", "text", "lists", "scroll", "table", "tree", "grid", "popups", "about"}
+	tabName = []string{"Controls", "Pickers", "Text", "Lists", "Scroll", "Table", "Tree", "Grid", "Popups", "About"}
 )
 
 // Gallery is its state.
@@ -38,14 +38,31 @@ type Gallery struct {
 	size, pause, model widget.Select
 	erase, confirm     widget.Bool
 	finger             widget.Enum
-	light, letters     widget.Float
+	// Pickers
+	picks          layout.List
+	day            widget.Date
+	alarm          widget.Clock
+	light, letters widget.Float
+	pages          widget.Range
 	// Text
 	name, search widget.Editor
 	rename, clr  widget.Clickable
-	// Lists, tiles
-	list  layout.List
-	rows  []widget.Clickable
-	tiles []widget.Clickable
+	// Lists, the scroll box, the strip
+	list       layout.List
+	live       widget.Bool
+	liveList   layout.Scroll
+	rows       []widget.Clickable
+	box, strip layout.Scroll
+	stripBtn   []widget.Clickable
+	// The table, the tree, the grid
+	table    widget.Table
+	find     widget.Editor
+	findClr  widget.Clickable
+	shown    []int // the books the table shows, in its order
+	tree     widget.Tree
+	covers   layout.List
+	coverBtn []widget.Clickable
+	tiles    []widget.Clickable
 	// Popups
 	ask, toastBtn widget.Clickable
 	asking        bool
@@ -56,14 +73,23 @@ type Gallery struct {
 
 // New is the gallery, in th.
 func New(th *theme.Theme) *Gallery {
-	g := &Gallery{Th: th, page: layout.List{Axis: layout.Vertical}, list: layout.List{Axis: layout.Vertical}}
+	v := layout.Vertical
+	g := &Gallery{Th: th, page: layout.List{Axis: v}, picks: layout.List{Axis: v}, list: layout.List{Axis: v},
+		liveList: layout.Scroll{Axis: v}, box: layout.Scroll{Axis: v}, strip: layout.Scroll{Axis: layout.Horizontal},
+		covers: layout.List{Axis: v}}
 	g.tab.Value = "controls"
 	g.finger.Value = "turns"
 	g.light = widget.Float{Value: 30, Min: 0, Max: 100, Step: 1}
-	g.letters = widget.Float{Value: 18, Min: 10, Max: 36, Step: 1}
+	g.letters = widget.Float{Value: 18, Min: 10, Max: 36, Step: 2}
+	g.pages = widget.Range{Low: 12, High: 40, Min: 1, Max: 120, Step: 1}
+	g.alarm = widget.Clock{Hour: 23, Minute: 30, Step: 5}
 	g.rows = make([]widget.Clickable, 40)
 	g.tiles = make([]widget.Clickable, 12)
+	g.stripBtn = make([]widget.Clickable, len(books))
+	g.coverBtn = make([]widget.Clickable, len(books))
+	g.tree.Open = map[string]bool{"nb": true}
 	g.name.SetText("Tom Riddle's diary")
+	g.sortBooks()
 	return g
 }
 
@@ -71,6 +97,12 @@ func New(th *theme.Theme) *Gallery {
 // what was done; a dialog or a toast over it all.
 func (g *Gallery) Layout(gtx ink.Ctx) ink.Dims {
 	th := g.Th
+	said := g.Said
+	defer func() {
+		if g.Said != said {
+			gtx.Invalidate() // the foot was laid out before the page said it
+		}
+	}()
 	for _, e := range gtx.Events(ink.Root) {
 		if k, ok := e.(ink.Key); ok {
 			switch k.Name {
@@ -80,12 +112,10 @@ func (g *Gallery) Layout(gtx ink.Ctx) ink.Dims {
 				} else {
 					g.Quit = true
 				}
-			case "PageDown":
-				g.list.ScrollBy(1)
-				g.page.ScrollBy(1)
-			case "PageUp":
-				g.list.ScrollBy(-1)
-				g.page.ScrollBy(-1)
+			case "PageDown", "PageUp":
+				if l := g.scroller(); l != nil {
+					l.ScrollBy(map[bool]int{true: 1, false: -1}[k.Name == "PageDown"])
+				}
 			}
 		}
 	}
@@ -106,12 +136,20 @@ func (g *Gallery) Layout(gtx ink.Ctx) ink.Dims {
 		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
 			return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
 				switch g.tab.Value {
+				case "pickers":
+					return g.pickPage(gtx)
 				case "text":
 					return g.textPage(gtx)
 				case "lists":
 					return g.listPage(gtx)
-				case "tiles":
-					return g.tilePage(gtx)
+				case "scroll":
+					return g.scrollPage(gtx)
+				case "table":
+					return g.tablePage(gtx)
+				case "tree":
+					return g.treePage(gtx)
+				case "grid":
+					return g.gridPage(gtx)
 				case "popups":
 					return g.popupPage(gtx)
 				case "about":
@@ -159,12 +197,6 @@ func (g *Gallery) controlsPage(gtx ink.Ctx) ink.Dims {
 	if g.finger.Update(gtx) {
 		g.Said = "a finger " + g.finger.Value
 	}
-	if g.light.Changed(gtx) {
-		g.Said = fmt.Sprintf("light %d%%", int(g.light.Value))
-	}
-	if g.letters.Changed(gtx) {
-		g.Said = fmt.Sprintf("letters %d px", int(g.letters.Value))
-	}
 	sub := func(w theme.ToggleStyle, s string) theme.ToggleStyle { w.Sub = s; return w }
 	rows := []ink.Widget{
 		theme.Section(th, "Switches"),
@@ -180,12 +212,41 @@ func (g *Gallery) controlsPage(gtx ink.Ctx) ink.Dims {
 		theme.Radio(th, &g.finger, "turns", "A finger turns pages").Layout,
 		theme.Radio(th, &g.finger, "writes", "A finger writes, as the pen").Layout,
 		theme.Radio(th, &g.finger, "pans", "A finger pans the page").Layout,
-		theme.Section(th, "Values"),
-		theme.Slider(th, &g.light, "Light", fmt.Sprintf("%d%%", int(g.light.Value))).Layout,
-		theme.Slider(th, &g.letters, "Letters' size", fmt.Sprintf("%d px", int(g.letters.Value))).Layout,
-		theme.Progress(th, g.light.Frac(), fmt.Sprintf("a download, as far as the light: %d%%", int(g.light.Value))).Layout,
 	}
 	return theme.List(th, &g.page).Layout(gtx, len(rows), func(gtx ink.Ctx, i int) ink.Dims { return rows[i](gtx) })
+}
+
+func (g *Gallery) pickPage(gtx ink.Ctx) ink.Dims {
+	th := g.Th
+	if g.day.Changed(gtx) {
+		g.Said = "backup on " + g.day.Value.Format("Mon 2 Jan")
+	}
+	if g.alarm.Changed(gtx) {
+		g.Said = fmt.Sprintf("sleeps at %02d:%02d", g.alarm.Hour, g.alarm.Minute)
+	}
+	if g.light.Changed(gtx) {
+		g.Said = fmt.Sprintf("light %d%%", int(g.light.Value))
+	}
+	if g.letters.Changed(gtx) {
+		g.Said = fmt.Sprintf("letters %d px", int(g.letters.Value))
+	}
+	if g.pages.Changed(gtx) {
+		g.Said = fmt.Sprintf("pages %d to %d", int(g.pages.Low), int(g.pages.High))
+	}
+	letters := theme.Slider(th, &g.letters, "Letters' size", fmt.Sprintf("%d px", int(g.letters.Value)))
+	letters.Ticks = true
+	rows := []ink.Widget{
+		theme.Section(th, "A day, a time"),
+		theme.Date(th, &g.day, "Next backup").Layout,
+		theme.Clock(th, &g.alarm, "Sleep at").Layout,
+		theme.Section(th, "Sliders"),
+		theme.Slider(th, &g.light, "Light", fmt.Sprintf("%d%%", int(g.light.Value))).Layout,
+		letters.Layout,
+		theme.RangeSlider(th, &g.pages, "Pages to export", fmt.Sprintf("%d to %d", int(g.pages.Low), int(g.pages.High))).Layout,
+		theme.Section(th, "Progress"),
+		theme.Progress(th, g.light.Frac(), fmt.Sprintf("a download, as far as the light: %d%%", int(g.light.Value))).Layout,
+	}
+	return theme.List(th, &g.picks).Layout(gtx, len(rows), func(gtx ink.Ctx, i int) ink.Dims { return rows[i](gtx) })
 }
 
 func (g *Gallery) textPage(gtx ink.Ctx) ink.Dims {
@@ -236,13 +297,51 @@ func (g *Gallery) listPage(gtx ink.Ctx) ink.Dims {
 			g.Said = fmt.Sprintf("held notebook %d", i+1)
 		}
 	}
-	return theme.List(th, &g.list).Layout(gtx, len(g.rows), func(gtx ink.Ctx, i int) ink.Dims {
-		r := theme.Row(th, &g.rows[i], fmt.Sprintf("Notebook %d", i+1))
-		r.Sub = fmt.Sprintf("%d pages", (i*7)%23+1)
-		r.Value = fmt.Sprintf("Nov %d", 12-i%12)
-		r.More = true
-		return r.Layout(gtx)
-	})
+	if g.live.Update(gtx) {
+		g.Said = "the list moves under the finger: " + onOff(g.live.Value)
+	}
+	toggle := theme.Toggle(th, &g.live, "Under the finger")
+	toggle.Sub = "on: it moves as the finger does; off: a swipe turns the page"
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(toggle.Layout),
+		layout.Rigid(theme.Divider(th)),
+		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+			return theme.List(th, g.listScroller()).Layout(gtx, len(g.rows), func(gtx ink.Ctx, i int) ink.Dims {
+				r := theme.Row(th, &g.rows[i], fmt.Sprintf("Notebook %d", i+1))
+				r.Sub = fmt.Sprintf("%d pages", (i*7)%23+1)
+				r.Value = fmt.Sprintf("Nov %d", 12-i%12)
+				r.More = true
+				return r.Layout(gtx)
+			})
+		}))
+}
+
+func (g *Gallery) listScroller() layout.Scroller {
+	if g.live.Value {
+		return &g.liveList
+	}
+	return &g.list
+}
+
+// scroller is what PageDown and PageUp move on the page that shows.
+func (g *Gallery) scroller() layout.Scroller {
+	switch g.tab.Value {
+	case "controls":
+		return &g.page
+	case "pickers":
+		return &g.picks
+	case "lists":
+		return g.listScroller()
+	case "scroll":
+		return &g.box
+	case "table":
+		return &g.table.Body
+	case "tree":
+		return &g.tree.Body
+	case "grid":
+		return &g.covers
+	}
+	return nil
 }
 
 var tileNames = [][2]string{
@@ -251,11 +350,16 @@ var tileNames = [][2]string{
 	{"Battery", "how long it lasts"}, {"Rotate", "the screen"}, {"Light", "on / off"}, {"Sleep", ""},
 }
 
-func (g *Gallery) tilePage(gtx ink.Ctx) ink.Dims {
+func (g *Gallery) gridPage(gtx ink.Ctx) ink.Dims {
 	th := g.Th
 	for i := range g.tiles {
 		if g.tiles[i].Clicked(gtx) {
 			g.Said = "tile: " + tileNames[i][0]
+		}
+	}
+	for i := range g.coverBtn {
+		if g.coverBtn[i].Clicked(gtx) {
+			g.Said = "opened " + books[i].Title
 		}
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
@@ -266,6 +370,14 @@ func (g *Gallery) tilePage(gtx ink.Ctx) ink.Dims {
 					t := theme.Tile(th, &g.tiles[i], tileNames[i][0], tileNames[i][1])
 					t.Icon = icon(th, i)
 					return t.Layout(gtx)
+				})
+			})
+		}),
+		layout.Rigid(theme.Section(th, "Covers, a page of them at a time")),
+		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+			return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+				return theme.GridList(th, &g.covers, layout.Grid{MinWidth: 130, Gap: th.Pad}).Layout(gtx, len(books), func(gtx ink.Ctx, i int) ink.Dims {
+					return g.cover(gtx, &g.coverBtn[i], i)
 				})
 			})
 		}),

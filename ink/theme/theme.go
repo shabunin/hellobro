@@ -426,40 +426,58 @@ func (h HeaderStyle) Layout(gtx ink.Ctx) ink.Dims {
 
 // --- lists ---
 
-// ListStyle is a List with a bar at its side: where the page is in it.
+// ListStyle is a list, by the page (layout.List) or under the finger
+// (layout.Scroll), with a bar at its side: where it is in it.
 type ListStyle struct {
 	Theme *Theme
-	List  *layout.List
+	List  layout.Scroller
 }
 
 // List is l with its bar.
-func List(th *Theme, l *layout.List) ListStyle { return ListStyle{th, l} }
+func List(th *Theme, l layout.Scroller) ListStyle { return ListStyle{th, l} }
 
-// Layout lays out a page of the n items, and the bar if they don't all
-// fit.
+// Layout lays out what shows of the n items, and the bar if they don't
+// all fit.
 func (l ListStyle) Layout(gtx ink.Ctx, n int, el func(gtx ink.Ctx, i int) ink.Dims) ink.Dims {
-	th := l.Theme
-	bar := gtx.Dp(4)
-	gap := gtx.Dp(th.Pad / 2)
-	full := l.List.Count() > 0 && l.List.Count() < n
+	bar := l.Theme.bar(gtx)
+	from, to := l.List.Span()
+	full := n > 0 && (from > 0 || to < 1)
 	cg := gtx
 	if full {
-		cg.Constraints.Max.X = max(gtx.Constraints.Max.X-bar-gap, 0)
+		cg.Constraints.Max.X = max(gtx.Constraints.Max.X-bar, 0)
 		cg.Constraints.Min.X = min(cg.Constraints.Min.X, cg.Constraints.Max.X)
 	}
 	d := l.List.Layout(cg, n, el)
-	if l.List.Count() > 0 && l.List.Count() < n {
-		h := gtx.Constraints.Max.Y
-		x := gtx.Constraints.Max.X - bar
-		y0, y1 := h*l.List.First()/n, h*(l.List.First()+l.List.Count())/n
-		ink.Fill(gtx.Ops, image.Rect(x+bar/2-1, 0, x+bar/2+1, h), th.Quiet)
-		ink.Fill(gtx.Ops, image.Rect(x, y0, x+bar, max(y1, y0+bar*2)), th.Fg)
+	if from, to = l.List.Span(); n > 0 && (from > 0 || to < 1) {
+		l.Theme.drawBar(gtx, gtx.Constraints.Max.X, gtx.Constraints.Max.Y, from, to)
 		if !full {
 			gtx.Invalidate() // it learned it doesn't all fit: again, narrower
 		}
 		d.Size.X = gtx.Constraints.Max.X
 	}
 	return d
+}
+
+// bar is the room a list's bar takes at its side, the gap before it too.
+func (th *Theme) bar(gtx ink.Ctx) int { return gtx.Dp(4) + gtx.Dp(th.Pad/2) }
+
+// drawBar draws a bar down the right of a box w by h: the part from to
+// to shows.
+func (th *Theme) drawBar(gtx ink.Ctx, w, h int, from, to float32) {
+	bar := gtx.Dp(4)
+	x := w - bar
+	y0, y1 := int(float32(h)*from), int(float32(h)*to)
+	ink.Fill(gtx.Ops, image.Rect(x+bar/2-1, 0, x+bar/2+1, h), th.Quiet)
+	ink.Fill(gtx.Ops, image.Rect(x, y0, x+bar, max(y1, y0+bar*2)), th.Fg)
+}
+
+// ScrollBox is w in a box it moves in under the finger, a bar at its
+// side when it's longer than the box.
+func ScrollBox(th *Theme, s *layout.Scroll, w ink.Widget) ink.Widget {
+	return func(gtx ink.Ctx) ink.Dims {
+		s.Axis = layout.Vertical
+		return List(th, s).Layout(gtx, 1, func(gtx ink.Ctx, _ int) ink.Dims { return w(gtx) })
+	}
 }
 
 // --- dialogs ---

@@ -83,8 +83,9 @@ type Ctx struct {
 	Now time.Time
 	Ops *Ops
 
-	w        *Window
-	disabled bool
+	w         *Window
+	disabled  bool
+	measuring bool
 }
 
 // Dp is v in pixels.
@@ -99,6 +100,16 @@ func (c Ctx) Disabled() Ctx {
 
 // IsDisabled says input is off.
 func (c Ctx) IsDisabled() bool { return c.disabled }
+
+// Measuring is gtx for laying out only to know the size: no events, no
+// areas, and widgets keep their state (a press stays a press).
+func (c Ctx) Measuring() Ctx {
+	c.disabled, c.measuring = true, true
+	return c
+}
+
+// IsMeasuring says it's only to know the size.
+func (c Ctx) IsMeasuring() bool { return c.measuring }
 
 // Events are tag's events since it last asked, oldest first. A
 // disabled Ctx has none.

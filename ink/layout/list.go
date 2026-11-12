@@ -125,7 +125,7 @@ func (l *List) Layout(gtx ink.Ctx, n int, el func(gtx ink.Ctx, i int) ink.Dims) 
 	fits := func(first int) int {
 		used, k := 0, 0
 		for i := first; i < n; i++ {
-			_, d := item(gtx.Disabled(), i)
+			_, d := item(gtx.Measuring(), i)
 			used += ax.main(d.Size)
 			if used > room && k > 0 {
 				break
@@ -142,7 +142,7 @@ func (l *List) Layout(gtx ink.Ctx, n int, el func(gtx ink.Ctx, i int) ink.Dims) 
 		used := 0
 		i := first
 		for i > 0 {
-			_, d := item(gtx.Disabled(), i-1)
+			_, d := item(gtx.Measuring(), i-1)
 			if used+ax.main(d.Size) > room && i < first {
 				break
 			}

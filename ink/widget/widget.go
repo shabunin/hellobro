@@ -159,7 +159,7 @@ func (b *Clickable) Layout(gtx ink.Ctx, w ink.Widget) ink.Dims {
 	call.Add(gtx.Ops)
 	if !gtx.IsDisabled() {
 		ink.Input(gtx.Ops, ink.Area{Rect: image.Rectangle{Max: d.Size}, Tag: b, Focus: !b.NoFocus, Keys: b.Keys})
-	} else {
+	} else if !gtx.IsMeasuring() {
 		b.pressed = false
 	}
 	b.focused = gtx.Focused(b)

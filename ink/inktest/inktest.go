@@ -84,6 +84,12 @@ func (t *T) Hold(p image.Point, d time.Duration) {
 	t.Release(p)
 }
 
+// Move moves the contact down to p, and a frame.
+func (t *T) Move(p image.Point) {
+	t.pointer(ink.Move, p)
+	t.Frame()
+}
+
 // Swipe goes from a to b in a few steps.
 func (t *T) Swipe(a, b image.Point) {
 	t.Press(a)

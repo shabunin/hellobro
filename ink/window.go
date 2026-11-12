@@ -25,6 +25,7 @@ type Window struct {
 	ring     bool                // the focus shows: the keys moved it, no touch since
 	again    bool                // another frame, at once
 	quick    bool                // this frame's changes in the fast waveform
+	bw       []Update            // what quick frames left in black and white, for the next frame to put back in grays
 	wake     time.Time           // and one then
 	input    bool                // input since the last frame
 	updates  []Update            // painted, not yet taken
@@ -64,6 +65,7 @@ func (w *Window) Resize(size image.Point) {
 	w.back = image.NewGray(image.Rectangle{Max: size})
 	w.painted = false
 	w.input = true
+	w.bw = nil
 }
 
 // Size is its size.
@@ -149,6 +151,14 @@ func (w *Window) frame(now time.Time) {
 			for i := range d {
 				d[i].Gray = false
 			}
+			w.bw = mergeUpdates(append(w.bw, d...))
+		} else {
+			// The quick frames' black and white back in grays, even if
+			// nothing changed since: a list dragged, then let go.
+			for _, u := range w.bw {
+				d = append(d, Update{R: u.R, Gray: true})
+			}
+			w.bw = nil
 		}
 		w.updates = mergeUpdates(append(w.updates, d...))
 	}

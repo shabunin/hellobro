@@ -13,41 +13,24 @@ import (
 // Enter, Space, ↓ in focus); a tap on an item picks it, a tap outside
 // closes it; open, ↑ ↓ go through the items, Enter picks, Esc closes.
 type Choice struct {
-	Field Clickable   // what opens it
+	Popover
 	Items []Clickable // as many as there are items, made as needed
 	List  layout.List // the items, a page at a time if they don't fit
 
-	open     bool
-	hi       int // the item ↑ ↓ got to
-	n        int // items, as last laid out
-	picked   []int
-	backdrop backdrop
+	hi     int // the item ↑ ↓ got to
+	n      int // items, as last laid out
+	picked []int
 }
-
-type backdrop struct{ _ byte }
-
-// IsOpen says its list shows.
-func (c *Choice) IsOpen() bool { return c.open }
 
 // Highlit is the item the keys are on, while it's open.
 func (c *Choice) Highlit() int { return c.hi }
 
 // Open opens it, the keys on item at.
 func (c *Choice) Open(gtx ink.Ctx, at int) {
-	c.open, c.hi = true, max(at, 0)
+	c.hi = max(at, 0)
 	c.List.Axis = layout.Vertical
 	c.List.ScrollTo(c.hi)
-	gtx.Focus(c)
-	gtx.Invalidate()
-}
-
-// Close closes it, the keys back on its field.
-func (c *Choice) Close(gtx ink.Ctx) {
-	if c.open {
-		c.open = false
-		gtx.Focus(&c.Field)
-		gtx.Invalidate()
-	}
+	c.Popover.Open(gtx)
 }
 
 // Picked is the item picked since the last frame, if one was: a menu's
@@ -67,32 +50,13 @@ func (c *Choice) Picked(gtx ink.Ctx, n int) (int, bool) {
 // Picked; the theme's Layout calls it, the program may before.
 func (c *Choice) Update(gtx ink.Ctx, n, current int) {
 	c.n = n
-	c.Field.Keys = choiceKeys
 	for len(c.Items) < n {
 		c.Items = append(c.Items, Clickable{NoFocus: true})
 	}
-	for c.Field.Clicked(gtx) {
-		if c.open {
-			c.Close(gtx)
-		} else {
-			c.Open(gtx, current)
-		}
+	if c.toggled(gtx) {
+		c.Open(gtx, current)
 	}
-	for _, k := range c.Field.TakeKeys(gtx) {
-		if k.Name == "Down" && !c.open {
-			c.Open(gtx, current)
-		}
-	}
-	for _, e := range gtx.Events(&c.backdrop) {
-		if p, ok := e.(ink.Pointer); ok && p.Kind == ink.Press {
-			c.Close(gtx)
-		}
-	}
-	for _, e := range gtx.Events(c) {
-		k, ok := e.(ink.Key)
-		if !ok {
-			continue
-		}
+	for _, k := range c.keys(gtx) {
 		switch k.Name {
 		case "Up":
 			c.hi = (c.hi - 1 + n) % max(n, 1)
@@ -115,8 +79,6 @@ func (c *Choice) Update(gtx ink.Ctx, n, current int) {
 				c.picked = append(c.picked, c.hi)
 			}
 			c.Close(gtx)
-		case "Esc", "Back":
-			c.Close(gtx)
 		}
 	}
 	for i := 0; i < n; i++ {
@@ -126,26 +88,6 @@ func (c *Choice) Update(gtx ink.Ctx, n, current int) {
 			c.Close(gtx)
 		}
 	}
-}
-
-var choiceKeys = []string{"Down"}
-
-// Popup lays out its open list by anchor (its field, where it is): w lays
-// out the list, size big at most.
-func (c *Choice) Popup(gtx ink.Ctx, anchor image.Rectangle, max image.Point, w ink.Widget) {
-	if !c.open {
-		return
-	}
-	cg := gtx
-	cg.Constraints = ink.Constraints{Min: image.Pt(max.X, 0), Max: max}
-	m := ink.Record(gtx.Ops)
-	d := w(cg)
-	items := m.Stop()
-	// Under the items, the list's own area: it has the keys.
-	m = ink.Record(gtx.Ops)
-	ink.Input(gtx.Ops, ink.Area{Rect: image.Rectangle{Max: d.Size}, Tag: c, Focus: true, Keys: []string{"*"}})
-	items.Add(gtx.Ops)
-	ink.Popup(gtx.Ops, anchor, d.Size, &c.backdrop, m.Stop())
 }
 
 // Select is a dropdown: a Choice whose pick is its Value.

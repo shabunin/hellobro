@@ -128,43 +128,14 @@ func Select(th *Theme, s *widget.Select, title string, options ...string) Select
 
 // Layout lays it out.
 func (s SelectStyle) Layout(gtx ink.Ctx) ink.Dims {
-	th := s.Theme
 	s.Select.Update(gtx, len(s.Options))
-	w := gtx.Constraints.Max.X
-	pad := gtx.Dp(th.Pad * 1.5)
-	h := gtx.Dp(th.Touch)
-	size := image.Pt(w, h+gtx.Dp(th.Pad))
-	box := image.Rect(0, (size.Y-h)/2, w, (size.Y+h)/2)
-	if s.Title != "" {
-		bw := min(w/2, gtx.Dp(300))
-		if s.BoxW > 0 {
-			bw = min(w/2, gtx.Dp(s.BoxW))
-		}
-		box.Min.X, box.Max.X = w-bw-pad/2, w-pad/2
-		ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
-		f := th.Face(gtx, th.TextSize, text.Regular)
-		cg := gtx
-		cg.Constraints = ink.Exact(image.Pt(max(box.Min.X-2*pad, 0), size.Y))
-		st := ink.Offset(gtx.Ops, image.Pt(pad, 0))
-		line(cg, f, s.Title, th.Fg, Left, size.Y)
-		st.Pop()
-	} else {
-		size.Y = h
-		box = image.Rectangle{Max: image.Pt(w, h)}
-	}
 	value := ""
 	if v := s.Select.Value; v >= 0 && v < len(s.Options) {
 		value = s.Options[v]
 	}
-	st := ink.Offset(gtx.Ops, box.Min)
-	cg := gtx
-	cg.Constraints = ink.Exact(box.Size())
-	s.Select.Field.Layout(cg, func(gtx ink.Ctx) ink.Dims {
-		return field(gtx, th, value, s.Select.Field.Pressed() || s.Select.IsOpen(), s.Select.Field.Focused())
-	})
-	st.Pop()
-	choiceList(gtx, th, &s.Select.Choice, box, s.Options, s.Select.Value)
-	return ink.Dims{Size: size, Baseline: size.Y / 3}
+	box, d := fieldRow(gtx, s.Theme, s.Title, s.BoxW, &s.Select.Field, value, s.Select.IsOpen())
+	choiceList(gtx, s.Theme, &s.Select.Choice, box, s.Options, s.Select.Value)
+	return d
 }
 
 // field draws a dropdown's box: its value, a ▾ at its end; black while
@@ -295,47 +266,40 @@ type SliderStyle struct {
 	Float *widget.Float
 	Title string
 	Value string // the value as it's said
+	Ticks bool   // a mark at each Step
 }
 
 // Slider is f as a slider saying title, its value value.
 func Slider(th *Theme, f *widget.Float, title, value string) SliderStyle {
-	return SliderStyle{th, f, title, value}
+	return SliderStyle{Theme: th, Float: f, Title: title, Value: value}
 }
 
 // Layout lays it out.
 func (s SliderStyle) Layout(gtx ink.Ctx) ink.Dims {
-	th := s.Theme
-	w := gtx.Constraints.Max.X
-	pad := gtx.Dp(th.Pad * 1.5)
-	f := th.Face(gtx, th.TextSize, text.Regular)
-	small := th.Face(gtx, th.TextSize*0.9, text.Regular)
-	lh := text.Height(f) + gtx.Dp(th.Pad/2)
-	cg := gtx
-	cg.Constraints = ink.Exact(image.Pt(max(w-2*pad, 0), lh))
-	st := ink.Offset(gtx.Ops, image.Pt(pad, 0))
-	line(cg, f, s.Title, th.Fg, Left, lh)
-	line(cg, small, s.Value, th.Quiet, Right, lh)
-	st.Pop()
-	th2 := gtx.Dp(th.Touch)
-	st = ink.Offset(gtx.Ops, image.Pt(pad, lh))
-	cg.Constraints = ink.Exact(image.Pt(max(w-2*pad, 0), th2))
-	s.Float.Layout(cg, func(gtx ink.Ctx) ink.Dims {
-		size := gtx.Constraints.Min
-		ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
-		b := th.border(gtx)
-		mid := size.Y / 2
-		x := int(float32(size.X) * s.Float.Frac())
-		ink.Fill(gtx.Ops, image.Rect(0, mid-b, size.X, mid+b), th.Quiet)
-		ink.Fill(gtx.Ops, image.Rect(0, mid-2*b, x, mid+2*b), th.Fg)
-		k := gtx.Dp(th.Touch * 0.3)
-		ink.Disc(gtx.Ops, image.Pt(min(max(x, k), size.X-k), mid), k, th.Fg)
-		if s.Float.Focused() {
-			ink.Disc(gtx.Ops, image.Pt(min(max(x, k), size.X-k), mid), k/2, th.Bg)
-		}
-		return ink.Dims{Size: size}
+	th, fl := s.Theme, s.Float
+	return sliderRow(gtx, th, s.Title, s.Value, func(gtx ink.Ctx) ink.Dims {
+		return fl.Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+			size := gtx.Constraints.Min
+			ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+			b := th.border(gtx)
+			mid := size.Y / 2
+			k := gtx.Dp(th.Touch * 0.3)
+			x := min(max(int(float32(size.X)*fl.Frac()), k), size.X-k)
+			ink.Fill(gtx.Ops, image.Rect(0, mid-b, size.X, mid+b), th.Quiet)
+			if steps := (fl.Max - fl.Min) / fl.Step; s.Ticks && fl.Step > 0 && steps <= 60 {
+				for i := 0; i <= int(steps+0.5); i++ {
+					tx := min(max(size.X*i/max(int(steps+0.5), 1), k), size.X-k) // where the thumb is at it
+					ink.Fill(gtx.Ops, image.Rect(tx-b/2, mid+3*b, tx-b/2+max(b, 1), mid+k), th.Quiet)
+				}
+			}
+			ink.Fill(gtx.Ops, image.Rect(0, mid-2*b, x, mid+2*b), th.Fg)
+			ink.Disc(gtx.Ops, image.Pt(x, mid), k, th.Fg)
+			if fl.Focused() {
+				ink.Disc(gtx.Ops, image.Pt(x, mid), k/2, th.Bg)
+			}
+			return ink.Dims{Size: size}
+		})
 	})
-	st.Pop()
-	return ink.Dims{Size: image.Pt(w, lh+th2)}
 }
 
 // ProgressStyle is a bar, filled as far as it's got, words under it.

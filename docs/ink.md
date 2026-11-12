@@ -31,16 +31,21 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
   `Text`, `Focus`); the `Window` a host owns (input in, `Frame` out:
   `Update`s).
 - `ink/layout`: `Flex` (`Rigid`, `Flexed`), `Stack`, `Inset`, `Spacer`,
-  `Direction`, `Grid`, and a paged `List`: no pixel scrolling, a swipe turns
-  the page.
+  `Direction`, `Grid`; lists: a paged `List` (a swipe turns the page)
+  and `Scroll`, which moves under the finger a pixel at a time. Both are
+  `Scroller`s, so a list, a table or a tree takes either.
 - `ink/widget`: the controls' state: `Clickable` (tap, Enter, long
   press), `Bool`, `Enum`, `Editor`, `Choice` (a list opening over the
-  rest: a menu), `Select` (a dropdown), `Float` (a slider), `Toast`.
+  rest: a menu), `Select` (a dropdown), `Float` (a slider), `Range`
+  (a span, two ends), `Date` (a calendar), `Clock` (hours and minutes),
+  `Table` (heads that sort), `Tree` (`Node`s that open), `Toast`; what
+  opens over the rest is a `Popover`.
 - `ink/theme`: how they look: `Label`/`Body`/`Small`/`Title`,
   `Button`, `Row`, `Toggle`, `CheckBox`, `Radio`, `Select`, `Menu`,
-  `Slider`, `Progress`, `Section`, `Tile`, `Editor` (framed, with a
-  ×), `Tabs`, `Header`, `List` with its bar, `Dialog`, `Toast`,
-  `Divider`.
+  `Slider` (with ticks), `RangeSlider`, `Date`, `Clock`, `Progress`,
+  `Section`, `Tile`, `Editor` (framed, with a ×), `Table` (a search
+  underlined in it), `Tree`, `Tabs`, `Header`, `List` with its bar,
+  `GridList`, `ScrollBox`, `Dialog`, `Toast`, `Divider`.
 - `ink/text`: faces by style and size, widths, wrapping, `Fit`.
 - `ink/inkkobo`: runs an ink UI as a Kobo app (a `kobo.Program`).
 - `ink/inktest`: drives a window without a screen: `Tap`, `Hold`,
@@ -61,6 +66,13 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 - A pointer goes to the topmost area under it; areas that `Watch` (a
   list) hear of it too, and may take it (`Ctx.Hand`): the others get a
   Cancel.
+- A `Scroll` takes a finger once it has gone a little along it (till
+  then the row under it is pressed, as ever). Each move is a quick frame,
+  in black and white at once; the window keeps what quick frames drew
+  and sends it again in grays with the next ordinary frame, the one
+  after the finger lifts, even if nothing changed by then.
+- Measuring (`Ctx.Measuring`) lays a widget out for its size only: no
+  events, no areas, and its state left alone (a press stays a press).
 - A popup (a dropdown's options, a menu) is painted last, under its
   field or over it where there's no room, and takes the keys: ↑ ↓
   Enter, Esc. A touch outside closes it and goes nowhere else.
