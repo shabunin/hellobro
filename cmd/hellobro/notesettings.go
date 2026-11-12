@@ -169,7 +169,19 @@ func (u *noteSetUI) take() {
 	}
 }
 
-func (w *noteWin) inkBody(a *bro) inkBody {
+// inkBodies are its settings' ink, or its bar's, whichever shows.
+func (w *noteWin) inkBodies(a *bro) []inkBody {
+	if b := w.setBody(a); b != nil {
+		return []inkBody{b}
+	}
+	if w.barUI != nil && !w.settings && a.shows(w) && w.barUI.shows(w.bar) {
+		return []inkBody{w.barUI}
+	}
+	return nil
+}
+
+// setBody is its settings' ink, if they show.
+func (w *noteWin) setBody(a *bro) inkBody {
 	if w.set != nil && w.settings && !w.p.Outer.Empty() && a.shows(w) && w.set.pane.At == w.p.Body {
 		return w.set
 	}
@@ -186,7 +198,7 @@ func (w *noteWin) drawSettings(a *bro) {
 
 // showSettings draws what changed of them.
 func (w *noteWin) showSettings(a *bro) {
-	if w.inkBody(a) == nil || a.overlay() {
+	if w.setBody(a) == nil || a.overlay() {
 		w.drawSettings(a)
 		a.Mark(w.p.Body, true)
 		return

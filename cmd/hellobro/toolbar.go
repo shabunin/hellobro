@@ -9,6 +9,9 @@ import (
 	"image"
 	"slices"
 
+	"hellobro/ink"
+	"hellobro/ink/inkkobo"
+	"hellobro/ink/widget"
 	"hellobro/kobo"
 )
 
@@ -129,11 +132,11 @@ func barCounter(btns []barBtn, bar image.Rectangle, side bool) image.Rectangle {
 	return image.Rect(prev.Max.X+6, bar.Min.Y+4, next.Min.X-6, bar.Max.Y-4)
 }
 
-// drawBarBtn draws b framed: black if it's on, its ink gray if it's
-// off. glyph draws its picture, if it has one of its own (true); else
-// its label, or the arrows' triangles. It says the ink and paper used.
-func drawBarBtn(a *bro, b barBtn, on, off bool, glyph func(r image.Rectangle, ink, bg uint8) bool) (ink, bg uint8) {
-	c := a.C
+// drawBarBtn draws b framed on c: black if it's on, its ink gray if
+// it's off. glyph draws its picture, if it has one of its own (true);
+// else its label, or the arrows' triangles. It says the ink and paper
+// used.
+func drawBarBtn(c kobo.Canvas, a *bro, b barBtn, on, off bool, glyph func(c kobo.Canvas, r image.Rectangle, ink, bg uint8) bool) (ink, bg uint8) {
 	bg, ink = kobo.White, kobo.Black
 	switch {
 	case on:
@@ -144,7 +147,7 @@ func drawBarBtn(a *bro, b barBtn, on, off bool, glyph func(r image.Rectangle, in
 	c.Fill(b.r, bg)
 	c.Frame(b.r, 2, kobo.Black)
 	switch {
-	case glyph != nil && glyph(b.r, ink, bg):
+	case glyph != nil && glyph(c, b.r, ink, bg):
 	case b.id == "prev" || b.id == "next": // the font has no arrows: a triangle
 		m, h := b.r.Min.Add(b.r.Max).Div(2), b.r.Dy()/4
 		for dy := -h; dy <= h; dy++ {
@@ -164,7 +167,7 @@ func drawBarBtn(a *bro, b barBtn, on, off bool, glyph func(r image.Rectangle, in
 }
 
 // drawBarCounter draws the counter in r, a button too: black if on.
-func drawBarCounter(a *bro, r image.Rectangle, text string, on bool) {
+func drawBarCounter(c kobo.Canvas, a *bro, r image.Rectangle, text string, on bool) {
 	if r.Empty() {
 		return
 	}
@@ -172,7 +175,112 @@ func drawBarCounter(a *bro, r image.Rectangle, text string, on bool) {
 	if on {
 		bg, ink = kobo.Black, kobo.White
 	}
-	a.C.Fill(r, bg)
-	a.C.Frame(r, 2, kobo.Black)
-	a.C.Text(a.F.Small, r, kobo.Fit(a.F.Small, text, r.Dx()-8), ink, kobo.AlignCenter)
+	c.Fill(r, bg)
+	c.Frame(r, 2, kobo.Black)
+	c.Text(a.F.Small, r, kobo.Fit(a.F.Small, text, r.Dx()-8), ink, kobo.AlignCenter)
+}
+
+// --- the bar in ink ---
+
+// barItem is a thing on a bar: a button (its id what a tap on it says),
+// or, id "", what's only said there. paint draws it in r.
+type barItem struct {
+	id    string
+	r     image.Rectangle // on the canvas
+	paint func(c kobo.Canvas, r image.Rectangle)
+}
+
+// barUI is a bar in ink, at the window's bar: its buttons as the window
+// lays them out (layTop) and draws them, each a Clickable, held down
+// inverted; what's tapped is done after the frame (tap). A change draws
+// only the buttons that changed.
+type barUI struct {
+	a     *bro
+	pane  *inkkobo.Pane
+	items func() []barItem
+	tap   func(id string)
+	clk   map[string]*widget.Clickable
+	do    func()
+}
+
+func newBarUI(a *bro, items func() []barItem, tap func(id string)) *barUI {
+	u := &barUI{a: a, items: items, tap: tap, clk: map[string]*widget.Clickable{}}
+	u.pane = inkkobo.NewPane(u.Layout)
+	return u
+}
+
+func (u *barUI) inkPane() *inkkobo.Pane { return u.pane }
+
+func (u *barUI) take() {
+	if do := u.do; do != nil {
+		u.do = nil
+		do()
+	}
+}
+
+// shows says it's placed at r: what changed of it can be put on the
+// panel.
+func (u *barUI) shows(r image.Rectangle) bool { return !r.Empty() && u.pane.At == r }
+
+// put draws u at r: all of it if it wasn't there, or all is asked for
+// (the caller marks it then); else what changed, marked.
+func (u *barUI) put(a *bro, r image.Rectangle, all bool) {
+	if r.Empty() {
+		u.pane.Place(r)
+		return
+	}
+	u.pane.Win.Invalidate()
+	if all || u.pane.At != r {
+		u.pane.Place(r)
+		u.pane.Draw(a.C.Gray)
+		return
+	}
+	a.flushPane(u.pane)
+	u.take()
+}
+
+func (u *barUI) Layout(gtx ink.Ctx) ink.Dims {
+	size := gtx.Constraints.Max
+	at := u.pane.At.Min
+	items := u.items()
+	for _, it := range items {
+		if it.id == "" {
+			continue
+		}
+		clk := u.clk[it.id]
+		if clk == nil {
+			clk = &widget.Clickable{NoFocus: true}
+			u.clk[it.id] = clk
+		}
+		if clk.Clicked(gtx) {
+			id := it.id
+			u.do = func() { u.tap(id) }
+		}
+	}
+	ink.Fill(gtx.Ops, image.Rectangle{Max: size}, ink.White)
+	for _, it := range items {
+		r := it.r.Sub(at)
+		paint := func(gtx ink.Ctx) {
+			ink.Draw(gtx.Ops, image.Rectangle{Max: r.Size()}, func(dst *image.Gray, dr image.Rectangle) {
+				it.paint(kobo.Canvas{Gray: dst}, image.Rectangle{Min: dr.Min, Max: dr.Min.Add(r.Size())})
+			})
+		}
+		st := ink.Offset(gtx.Ops, r.Min)
+		if it.id == "" {
+			paint(gtx)
+		} else {
+			cg := gtx
+			cg.Constraints = ink.Exact(r.Size())
+			clk := u.clk[it.id]
+			clk.Layout(cg, func(gtx ink.Ctx) ink.Dims {
+				paint(gtx)
+				if clk.Pressed() {
+					ink.Invert(gtx.Ops, image.Rectangle{Max: r.Size()})
+				}
+				return ink.Dims{Size: r.Size()}
+			})
+		}
+		st.Pop()
+	}
+	return ink.Dims{Size: size}
 }

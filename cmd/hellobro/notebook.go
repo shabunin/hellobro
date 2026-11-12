@@ -391,6 +391,7 @@ type noteWin struct {
 	opts       []barBtn
 	settings   bool // its settings shown, over it (notesettings.go)
 	set        *noteSetUI // and their ink
+	barUI      *barUI     // the bar's ink
 	pdf        *notePDF    // the PDF the pages are on, open (notepdf.go)
 	slotSize   image.Point // the page size the slots are for
 	exporting  bool        // a PDF of it being written (noteexport.go)
@@ -644,9 +645,21 @@ func (w *noteWin) drawTitle(a *bro) {
 	}
 }
 
-// drawBar draws the tools, the one in hand black, and which pages.
-func (w *noteWin) drawBar(a *bro) {
-	a.C.Fill(w.bar, kobo.White)
+// drawBar draws the tools, the one in hand black, and which pages: all
+// of it (the caller marks it).
+func (w *noteWin) drawBar(a *bro) { w.barOf(a).put(a, w.bar, true) }
+
+// barOf is the bar's ink, made the first time.
+func (w *noteWin) barOf(a *bro) *barUI {
+	if w.barUI == nil {
+		w.barUI = newBarUI(a, func() []barItem { return w.barItems(a) }, func(id string) { w.barPress(a, id) })
+	}
+	return w.barUI
+}
+
+// barItems are the bar's buttons, and the page counter.
+func (w *noteWin) barItems(a *bro) []barItem {
+	var items []barItem
 	for _, b := range w.btns {
 		on := b.id == "pen" && !w.erasing && !w.selecting && !w.texting || b.id == "eraser" && w.erasing || b.id == "select" && w.selecting || b.id == "text" && w.texting
 		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 ||
@@ -658,22 +671,30 @@ func (w *noteWin) drawBar(a *bro) {
 			b.label, on, off = "tap again", true, false
 		}
 		on = on || b.id == w.optsOf && b.id == "paper"
-		ink, bg := drawBarBtn(a, b, on, off, func(r image.Rectangle, ink, bg uint8) bool {
-			if b.id == "paper" { // a page as the paper is
-				drawIcon(a.C, paperIcon(w.nb.paper), r, ink, bg)
-				return true
+		paper := w.nb.paper
+		items = append(items, barItem{id: b.id, r: b.r, paint: func(c kobo.Canvas, r image.Rectangle) {
+			b.r = r
+			ink, bg := drawBarBtn(c, a, b, on, off, func(c kobo.Canvas, r image.Rectangle, ink, bg uint8) bool {
+				if b.id == "paper" { // a page as the paper is
+					drawIcon(c, paperIcon(paper), r, ink, bg)
+					return true
+				}
+				if icon := noteIcon(b.id); icon != nil {
+					drawIcon(c, icon, r, ink, bg)
+					return true
+				}
+				return false
+			})
+			if b.id == "pen" { // what it writes, under it
+				w.drawPenSample(c, a, r, ink, bg)
 			}
-			if icon := noteIcon(b.id); icon != nil {
-				drawIcon(a.C, icon, r, ink, bg)
-				return true
-			}
-			return false
-		})
-		if b.id == "pen" { // what it writes, under it
-			w.drawPenSample(a, b.r, ink, bg)
-		}
+		}})
 	}
-	drawBarCounter(a, w.counterRect(), w.counter(), w.overview) // a button too: the pages, small
+	counter, ov := w.counter(), w.overview // a button too: the pages, small
+	items = append(items, barItem{id: "counter", r: w.counterRect(), paint: func(c kobo.Canvas, r image.Rectangle) {
+		drawBarCounter(c, a, r, counter, ov)
+	}})
+	return items
 }
 
 // counterRect is the page counter's, between the arrows.
@@ -900,8 +921,7 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 		a.Mark(area, false)
 		w.clean, w.cleanDraw = w.clean.Union(area), true
 		a.nt.liftAt = time.Now()
-		w.drawBar(a)
-		a.Mark(w.bar, true)
+		w.showBar(a)
 		return
 	}
 	if pg := min(ops[0].page, len(w.nb.pages)-1); w.overview { // where it was: in sight
@@ -929,9 +949,14 @@ func (w *noteWin) clearUnask(a *bro) {
 	w.showBar(a)
 }
 
-// showBar draws the bar again, if the window shows.
+// showBar puts what changed of the bar on the panel, if the window
+// shows.
 func (w *noteWin) showBar(a *bro) {
-	if a.shows(w) {
+	switch {
+	case !a.shows(w):
+	case w.barUI != nil && w.barUI.shows(w.bar) && !a.overlay():
+		w.barUI.put(a, w.bar, false)
+	default:
 		w.drawBar(a)
 		a.Mark(w.bar, true)
 	}
@@ -949,7 +974,7 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		return
 	}
 	if kobo.Hit(p, w.counterRect()) {
-		w.overviewOn(a, !w.overview)
+		w.barPress(a, "counter")
 		return
 	}
 	// The pages, small, by the screen's edge: a finger there is left to
@@ -959,60 +984,68 @@ func (w *noteWin) tap(a *bro, p image.Point) {
 		return
 	}
 	for _, b := range w.btns {
-		if !kobo.Hit(p, b.r) {
-			continue
+		if kobo.Hit(p, b.r) {
+			w.barPress(a, b.id)
+			return
 		}
-		if b.id != "clear" {
-			w.clearUnask(a)
-		}
-		w.ovDelAt = time.Time{} // a page's × asking: the strip's buttons go on as if not
-		switch b.id {
-		case "all":
-			a.notesFrom(w)
-		case "pen", "eraser", "select", "text":
-			if b.id == "pen" && !w.erasing && !w.selecting && !w.texting { // in hand: its choices
-				w.toggleOpts(a, "pen")
-				break
-			}
-			w.closeOpts(a)
-			w.setTool(a, b.id)
-		case "paper":
-			w.toggleOpts(a, "paper")
-		case "undo", "redo":
-			w.doUndo(a, b.id == "undo")
-		case "clear":
-			if w.ovOff("clear") {
-				break
-			}
-			if !w.clearAsking() { // it asks first
-				asked := time.Now()
-				w.clearAsked = asked
-				w.showBar(a)
-				time.AfterFunc(noteClearAsk, func() {
-					a.Do(func() {
-						if w.clearAsked == asked {
-							w.clearUnask(a)
-						}
-					})
-				})
-				break
-			}
-			w.clearUnask(a)
-			w.pageAct(a, "clear")
-		case "settings":
-			w.settingsOn(a, true)
-		case "paste":
-			w.paste(a)
-		case "export":
-			w.export(a)
-		case "open", "new before", "new after", "copy page", "delete", "earlier", "later":
-			w.pageAct(a, b.id)
-		case "prev":
-			w.turn(a, -1)
-		case "next":
-			w.turn(a, 1)
-		}
+	}
+}
+
+// barPress does what the bar's button id asks.
+func (w *noteWin) barPress(a *bro, id string) {
+	if id == "counter" {
+		w.overviewOn(a, !w.overview)
 		return
+	}
+	if id != "clear" {
+		w.clearUnask(a)
+	}
+	w.ovDelAt = time.Time{} // a page's × asking: the strip's buttons go on as if not
+	switch id {
+	case "all":
+		a.notesFrom(w)
+	case "pen", "eraser", "select", "text":
+		if id == "pen" && !w.erasing && !w.selecting && !w.texting { // in hand: its choices
+			w.toggleOpts(a, "pen")
+			break
+		}
+		w.closeOpts(a)
+		w.setTool(a, id)
+	case "paper":
+		w.toggleOpts(a, "paper")
+	case "undo", "redo":
+		w.doUndo(a, id == "undo")
+	case "clear":
+		if w.ovOff("clear") {
+			break
+		}
+		if !w.clearAsking() { // it asks first
+			asked := time.Now()
+			w.clearAsked = asked
+			w.showBar(a)
+			time.AfterFunc(noteClearAsk, func() {
+				a.Do(func() {
+					if w.clearAsked == asked {
+						w.clearUnask(a)
+					}
+				})
+			})
+			break
+		}
+		w.clearUnask(a)
+		w.pageAct(a, "clear")
+	case "settings":
+		w.settingsOn(a, true)
+	case "paste":
+		w.paste(a)
+	case "export":
+		w.export(a)
+	case "open", "new before", "new after", "copy page", "delete", "earlier", "later":
+		w.pageAct(a, id)
+	case "prev":
+		w.turn(a, -1)
+	case "next":
+		w.turn(a, 1)
 	}
 }
 
@@ -1444,9 +1477,8 @@ func (a *bro) noteInkDone(k *noteInk) {
 		a.nt.liftAt = time.Now()
 		w.diaryWrote(a, k.page)
 	}
-	if k.erase && a.shows(w) {
-		w.drawBar(a) // undo can now
-		a.Mark(w.bar, true)
+	if k.erase {
+		w.showBar(a) // undo can now
 	}
 	a.noteFocus(w)
 }
@@ -1481,8 +1513,7 @@ func (a *bro) noteClean() {
 				w.drawPages(a, w.clean)
 			}
 			a.Mark(w.clean, true)
-			w.drawBar(a)
-			a.Mark(w.bar, true)
+			w.showBar(a)
 		}
 		w.clean, w.cleanDraw = image.Rectangle{}, false
 	}

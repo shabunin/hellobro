@@ -135,6 +135,13 @@ func (w *notesWin) libOf(a *bro) *libUI {
 	return w.lib
 }
 
+func (w *notesWin) inkBodies(a *bro) []inkBody {
+	if b := w.inkBody(a); b != nil {
+		return []inkBody{b}
+	}
+	return nil
+}
+
 func (w *notesWin) inkBody(a *bro) inkBody {
 	if w.lib != nil && !w.p.Outer.Empty() && a.shows(w) && w.lib.pane.At == w.p.Body {
 		return w.lib

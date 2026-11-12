@@ -219,104 +219,135 @@ func (w *bookWin) atEnd(d int) bool {
 	return w.spine+step >= len(w.b.Spine) && w.page >= last
 }
 
-// drawBar lays the bar out and draws it: the select tool black while
-// it's in hand, what can't be done now gray.
+// drawBar lays the bar out and draws it, all of it (the caller marks
+// it): the select tool black while it's in hand, what can't be done now
+// gray.
 func (w *bookWin) drawBar(a *bro) {
 	tools, drops := w.barTools()
 	cw := kobo.TextWidth(a.F.Small, "999 / 999")
 	if w.laid.two {
 		cw = kobo.TextWidth(a.F.Small, "999–999 / 999")
 	}
-	if w.bar.Empty() { // fullscreen, without it (barOff)
-		w.btns = nil
-		return
+	w.btns = nil
+	if !w.bar.Empty() { // else fullscreen, without it (barOff)
+		w.btns = layTop(a, w.bar, tools, drops, cw)
 	}
-	w.btns = layTop(a, w.bar, tools, drops, cw)
-	c := a.C
-	c.Fill(w.bar, kobo.White)
+	w.barOf(a).put(a, w.bar, true)
+}
+
+// barOf is the bar's ink, made the first time.
+func (w *bookWin) barOf(a *bro) *barUI {
+	if w.barUI == nil {
+		w.barUI = newBarUI(a, func() []barItem { return w.barItems(a) }, func(id string) { w.barPress(a, id) })
+	}
+	return w.barUI
+}
+
+// barItems are what the bar shows: the buttons, the counter, and
+// between the tools and the arrows, if there's room, the chapter and
+// how far in.
+func (w *bookWin) barItems(a *bro) []barItem {
+	var items []barItem
 	for _, b := range w.btns {
 		on := b.id == "select" && w.selecting
 		off := b.id == "prev" && w.atEnd(-1) || b.id == "next" && w.atEnd(1) ||
 			(b.id == "fit" || b.id == "zoom out") && w.zoom <= pdfZoomMin
-		drawBarBtn(a, b, on, off, func(r image.Rectangle, ink, bg uint8) bool {
-			m, s := r.Min.Add(r.Max).Div(2), r.Dy()/4
-			switch b.id {
-			case "toc": // ☰: three lines
-				for k := -1; k <= 1; k++ {
-					c.Fill(image.Rect(m.X-s, m.Y+k*s*2/3-1, m.X+s, m.Y+k*s*2/3+2), ink)
+		marked := len(w.pageMarks()) > 0
+		items = append(items, barItem{id: b.id, r: b.r, paint: func(c kobo.Canvas, r image.Rectangle) {
+			b.r = r
+			drawBarBtn(c, a, b, on, off, func(c kobo.Canvas, r image.Rectangle, ink, bg uint8) bool {
+				m, s := r.Min.Add(r.Max).Div(2), r.Dy()/4
+				switch b.id {
+				case "toc": // ☰: three lines
+					for k := -1; k <= 1; k++ {
+						c.Fill(image.Rect(m.X-s, m.Y+k*s*2/3-1, m.X+s, m.Y+k*s*2/3+2), ink)
+					}
+				case "style":
+					c.Text(a.F.Body, r, "Aa", ink, kobo.AlignCenter)
+				case "mark": // filled while the page has one
+					ribbon(c, image.Rect(m.X-s*2/3, m.Y-s, m.X+s*2/3, m.Y+s), marked, ink)
+				case "select":
+					drawIcon(c, noteIcon("select"), r, ink, bg)
+				case "zoom out", "zoom in": // −, +: bars, as ☰'s
+					c.Fill(image.Rect(m.X-s, m.Y-1, m.X+s, m.Y+2), ink)
+					if b.id == "zoom in" {
+						c.Fill(image.Rect(m.X-1, m.Y-s, m.X+2, m.Y+s), ink)
+					}
+				default:
+					return false
 				}
-			case "style":
-				c.Text(a.F.Body, r, "Aa", ink, kobo.AlignCenter)
-			case "mark": // filled while the page has one
-				ribbon(c, image.Rect(m.X-s*2/3, m.Y-s, m.X+s*2/3, m.Y+s), len(w.pageMarks()) > 0, ink)
-			case "select":
-				drawIcon(c, noteIcon("select"), r, ink, bg)
-			case "zoom out", "zoom in": // −, +: bars, as ☰'s
-				c.Fill(image.Rect(m.X-s, m.Y-1, m.X+s, m.Y+2), ink)
-				if b.id == "zoom in" {
-					c.Fill(image.Rect(m.X-1, m.Y-s, m.X+2, m.Y+s), ink)
-				}
-			default:
-				return false
-			}
-			return true
-		})
+				return true
+			})
+		}})
 	}
-	drawBarCounter(a, barCounter(w.btns, w.bar, false), w.counter(), false)
-	if n := len(w.btns); n > 2 { // between the tools and the arrows, if there's room: the chapter, how far in
+	counter := w.counter()
+	items = append(items, barItem{id: "counter", r: barCounter(w.btns, w.bar, false), paint: func(c kobo.Canvas, r image.Rectangle) {
+		drawBarCounter(c, a, r, counter, false)
+	}})
+	if n := len(w.btns); n > 2 {
 		gap := image.Rect(w.btns[n-3].r.Max.X+2*barGap, w.bar.Min.Y, w.btns[n-1].r.Min.X-2*barGap, w.bar.Max.Y)
 		text := fmt.Sprintf("%d%%", w.pct())
 		if name := w.chapterName(); name != "" {
 			text = name + " · " + text
 		}
 		if gap.Dx() >= 120 {
-			c.Text(a.F.Small, gap, kobo.Fit(a.F.Small, text, gap.Dx()), kobo.Mid, kobo.AlignCenter)
+			items = append(items, barItem{r: gap, paint: func(c kobo.Canvas, r image.Rectangle) {
+				c.Text(a.F.Small, r, kobo.Fit(a.F.Small, text, r.Dx()), kobo.Mid, kobo.AlignCenter)
+			}})
 		}
 	}
+	return items
 }
 
-// barTap does what a tap at p on the bar asks: true if it was on it.
-func (w *bookWin) barTap(a *bro, p image.Point) bool {
-	if p.In(barCounter(w.btns, w.bar, false)) { // the pages, small; an EPUB's contents
+// barPress does what the bar's button id asks.
+func (w *bookWin) barPress(a *bro, id string) {
+	switch id {
+	case "counter": // the pages, small; an EPUB's contents
 		if w.pdf != nil {
 			w.showPages(a)
 		} else {
 			w.openContents(a)
 		}
+	case "all":
+		w.toShelf(a)
+	case "back":
+		w.goBack(a)
+	case "toc":
+		w.openContents(a)
+	case "style":
+		w.openStyle(a)
+	case "mark":
+		w.toggleMark(a)
+	case "select":
+		w.selecting = !w.selecting
+		w.dropCut()
+		log.Printf("book: select tool %v", w.selecting)
+		w.draw(a)
+	case "zoom out":
+		w.zoomStep(a, -1)
+	case "zoom in":
+		w.zoomStep(a, 1)
+	case "fit":
+		w.setZoom(a, pdfZoomMin, w.area.Min.Add(w.area.Max).Div(2))
+	case "prev":
+		w.turn(a, -1)
+	case "next":
+		w.turn(a, 1)
+	}
+}
+
+// barTap does what a tap at p on the bar asks: true if it was on it.
+// (A finger's are the bar's ink's; this is for what isn't a contact.)
+func (w *bookWin) barTap(a *bro, p image.Point) bool {
+	if p.In(barCounter(w.btns, w.bar, false)) {
+		w.barPress(a, "counter")
 		return true
 	}
 	for _, b := range w.btns {
-		if !p.In(b.r) {
-			continue
+		if p.In(b.r) {
+			w.barPress(a, b.id)
+			return true
 		}
-		switch b.id {
-		case "all":
-			w.toShelf(a)
-		case "back":
-			w.goBack(a)
-		case "toc":
-			w.openContents(a)
-		case "style":
-			w.openStyle(a)
-		case "mark":
-			w.toggleMark(a)
-		case "select":
-			w.selecting = !w.selecting
-			w.dropCut()
-			log.Printf("book: select tool %v", w.selecting)
-			w.draw(a)
-		case "zoom out":
-			w.zoomStep(a, -1)
-		case "zoom in":
-			w.zoomStep(a, 1)
-		case "fit":
-			w.setZoom(a, pdfZoomMin, w.area.Min.Add(w.area.Max).Div(2))
-		case "prev":
-			w.turn(a, -1)
-		case "next":
-			w.turn(a, 1)
-		}
-		return true
 	}
 	return p.In(w.bar) // between the buttons: nothing
 }

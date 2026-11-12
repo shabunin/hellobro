@@ -8,6 +8,7 @@ package main
 
 import (
 	"image"
+	"slices"
 
 	"hellobro/ink"
 	"hellobro/ink/inkkobo"
@@ -157,9 +158,9 @@ type inkBody interface {
 	take() // what the frame picked, done
 }
 
-// bodied is a window that may show one.
+// bodied is a window that may show some.
 type bodied interface {
-	inkBody(a *bro) inkBody // nil: none shows
+	inkBodies(a *bro) []inkBody // those that show
 }
 
 // bodies are the ink bodies that show.
@@ -167,17 +168,15 @@ func (a *bro) bodies() []inkBody {
 	var bs []inkBody
 	for _, w := range a.wm.wins {
 		if bw, ok := w.(bodied); ok {
-			if b := bw.inkBody(a); b != nil {
-				bs = append(bs, b)
-			}
+			bs = append(bs, bw.inkBodies(a)...)
 		}
 	}
 	return bs
 }
 
-func (t *termSession) inkBody(a *bro) inkBody {
+func (t *termSession) inkBodies(a *bro) []inkBody {
 	if u := t.pane.launch; u != nil && u.shows(a) {
-		return u
+		return []inkBody{u}
 	}
 	return nil
 }
@@ -194,19 +193,19 @@ func (a *bro) inkRedraw(key string) {
 // inkDown gives a contact coming down on an ink window's body to it, and
 // focuses the window.
 func (a *bro) inkDown(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
-	var pane *inkkobo.Pane
+	var panes []*inkkobo.Pane
 	w := a.windowAt(p)
 	switch w := w.(type) {
 	case *guiWin:
 		if w.ink != nil {
-			pane = w.ink.pane
+			panes = append(panes, w.ink.pane)
 		}
 	case bodied:
-		if b := w.inkBody(a); b != nil {
-			pane = b.inkPane()
+		for _, b := range w.inkBodies(a) {
+			panes = append(panes, b.inkPane())
 		}
 	}
-	if pane == nil || !pane.Down(ev, p, g, ownPane) {
+	if !slices.ContainsFunc(panes, func(pn *inkkobo.Pane) bool { return pn.Down(ev, p, g, ownPane) }) {
 		return false
 	}
 	if a.focusedWin() != w {
@@ -249,10 +248,8 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 		if gw, ok := w.(*guiWin); ok && gw.ink != nil && gw.ink.pane.Lift(g) {
 			break
 		}
-		if bw, ok := w.(bodied); ok {
-			if b := bw.inkBody(a); b != nil && b.inkPane().Lift(g) {
-				break
-			}
+		if bw, ok := w.(bodied); ok && slices.ContainsFunc(bw.inkBodies(a), func(b inkBody) bool { return b.inkPane().Lift(g) }) {
+			break
 		}
 	}
 	a.inkTick()
@@ -271,8 +268,10 @@ func (a *bro) updateRing() {
 		r = g.ink.pane.Ring()
 	case !a.overlay():
 		if bw, ok := a.focusedWin().(bodied); ok {
-			if b := bw.inkBody(a); b != nil {
-				r = b.inkPane().Ring()
+			for _, b := range bw.inkBodies(a) {
+				if rr := b.inkPane().Ring(); !rr.Empty() {
+					r = rr
+				}
 			}
 		}
 	}

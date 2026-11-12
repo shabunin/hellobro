@@ -222,6 +222,7 @@ type bookWin struct {
 	edit       *noteEdit    // a shelf's book's name being typed: key its path
 	lib        *libUI       // the lists, in ink: the shelf, the contents, the bookmarks
 	style      *styleUI     // the style panel's ink
+	barUI      *barUI       // the bar's
 }
 
 func (w *bookWin) Title() string {
@@ -847,12 +848,24 @@ func (w *bookWin) libOf(a *bro) *libUI {
 	return w.lib
 }
 
-func (w *bookWin) inkBody(a *bro) inkBody {
+func (w *bookWin) inkBodies(a *bro) []inkBody {
+	var bs []inkBody
 	switch {
 	case w.p.Outer.Empty() || !a.shows(w):
+		return nil
 	case w.styling && w.style != nil && w.style.pane.At == w.p.Body:
-		return w.style
+		bs = append(bs, w.style)
 	case w.lib != nil && w.inkList() && w.lib.pane.At == w.p.Body:
+		bs = append(bs, w.lib)
+	case w.barUI != nil && w.barUI.shows(w.bar) && w.b != nil && !w.list && !w.styling:
+		bs = append(bs, w.barUI)
+	}
+	return bs
+}
+
+// inkBody is its list's ink, if that shows.
+func (w *bookWin) inkBody(a *bro) inkBody {
+	if w.lib != nil && w.inkList() && !w.p.Outer.Empty() && a.shows(w) && w.lib.pane.At == w.p.Body {
 		return w.lib
 	}
 	return nil

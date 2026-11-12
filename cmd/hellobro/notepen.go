@@ -47,7 +47,7 @@ func (a *bro) penInk() string {
 
 // drawPenSample draws a line as the pen writes now, at the foot of its
 // button r: its width and its gray.
-func (w *noteWin) drawPenSample(a *bro, r image.Rectangle, ink, bg uint8) {
+func (w *noteWin) drawPenSample(c kobo.Canvas, a *bro, r image.Rectangle, ink, bg uint8) {
 	half := map[string]float64{"fine": 0.5, "medium": 0.9, "bold": 1.5}[a.penWidth()]
 	g := ink
 	switch a.penInk() {
@@ -56,7 +56,7 @@ func (w *noteWin) drawPenSample(a *bro, r image.Rectangle, ink, bg uint8) {
 	case "marker":
 		g, half = noteMarker, 2.2
 	}
-	drawIcon(a.C, []iconPart{iconLine(half, 4, 23, 20, 23)}, r, g, bg)
+	drawIcon(c, []iconPart{iconLine(half, 4, 23, 20, 23)}, r, g, bg)
 }
 
 // newStroke is a stroke in ink, as penInk says or a pen's button.

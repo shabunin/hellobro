@@ -82,10 +82,7 @@ func (w *noteWin) setTool(a *bro, id string) {
 		w.show(a)
 		return
 	}
-	if a.shows(w) {
-		w.drawBar(a)
-		a.Mark(w.bar, true)
-	}
+	w.showBar(a)
 }
 
 // slotOf is where page n shows, if it does.
@@ -287,10 +284,7 @@ func (w *noteWin) redraw(a *bro, rs ...image.Rectangle) {
 // (before, its selArea), and where it is now.
 func (w *noteWin) selChanged(a *bro, before ...image.Rectangle) {
 	w.redraw(a, append(before, w.selArea(a))...)
-	if a.shows(w) {
-		w.drawBar(a) // undo
-		a.Mark(w.bar, true)
-	}
+	w.showBar(a) // undo
 }
 
 // near is whether p is within d px of q.

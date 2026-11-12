@@ -878,8 +878,7 @@ func (w *noteWin) diaryDone(a *bro) {
 	d.wrote = nil
 	if a != nil && !d.box.Empty() && a.shows(w) {
 		a.Mark(d.box, true)
-		w.drawBar(a)
-		a.Mark(w.bar, true)
+		w.showBar(a)
 	}
 	d.box = image.Rectangle{}
 }

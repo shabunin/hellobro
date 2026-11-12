@@ -336,7 +336,7 @@ func (w *bookWin) styleKey(a *bro, code uint16, ch string, value int32) bool {
 	}
 	u := w.styleOf(a)
 	if u.pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps) {
-		if w.inkBody(a) != nil {
+		if u.pane.At == w.p.Body && a.shows(w) && !a.overlay() {
 			u.pane.Win.Invalidate()
 			a.flushPane(u.pane)
 			u.take()
