@@ -10,9 +10,6 @@ package main
 import (
 	"image"
 	"time"
-
-	"hellobro/ink/inkkobo"
-	"hellobro/kobo"
 )
 
 // askOpt is one of the answers: its button, its key (a letter), and what
@@ -25,12 +22,11 @@ type askOpt struct {
 type askBox struct {
 	title, text string
 	opts        []askOpt
-	box         image.Rectangle // the card, on the canvas
-	sel         int             // the answer Enter picks
-	keysAt      time.Time       // the keys answer from then on (a tap at once)
-	want, typed string          // askTyped's: the words wanted, and what's typed so far
+	sel         int       // the answer Enter picks
+	keysAt      time.Time // the keys answer from then on (a tap at once)
+	want, typed string    // askTyped's: the words wanted, and what's typed so far
 	ui          *askUI
-	pane        *inkkobo.Pane
+	over        *inkOver
 }
 
 // ask puts a yes-or-no question up; do runs on a yes.
@@ -43,7 +39,12 @@ func (a *bro) ask(title, text, yes string, do func()) {
 func (a *bro) choose(title, text string, opts ...askOpt) {
 	q := &askBox{title: title, text: text, opts: opts}
 	q.ui = newAskUI(a, q)
-	q.pane = inkkobo.NewPane(q.ui.Layout)
+	q.over = newOver(q.ui.Layout, 1000)
+	q.over.take = func() {
+		if i, ok := q.ui.picked(); ok {
+			a.answer(i)
+		}
+	}
 	a.asking = q
 	a.drawAsk()
 }
@@ -66,30 +67,8 @@ func (a *bro) overlay() bool {
 	return !a.wm.offscreen && (a.picker != nil || a.asking != nil || a.info != nil || a.keyset != nil)
 }
 
-// drawAsk draws the question as it is now, all of it: laid out once to
-// know how tall it is, then where it goes.
-func (a *bro) drawAsk() {
-	q := a.asking
-	a.placeAsk()
-	q.pane.Win.Invalidate()
-	q.pane.Win.Frame(time.Now())
-	a.placeAsk()
-	q.pane.Draw(a.C.Gray)
-	a.Mark(q.box, true)
-}
-
-// askTick puts what changed of the question on the panel, and acts on an
-// answer picked.
-func (a *bro) askTick() {
-	q := a.asking
-	if q == nil {
-		return
-	}
-	q.pane.Flush(a.App)
-	if i, ok := q.ui.picked(); ok {
-		a.answer(i)
-	}
-}
+// drawAsk draws the question as it is now, all of it.
+func (a *bro) drawAsk() { a.drawOver(a.asking.over) }
 
 // answer takes the question down, and does what the answer i says (-1:
 // none).
@@ -99,7 +78,7 @@ func (a *bro) answer(i int) {
 		return
 	}
 	a.asking = nil
-	q.pane.Place(image.Rectangle{})
+	q.over.gone()
 	a.DrawPage()
 	if i >= 0 && q.opts[i].do != nil {
 		q.opts[i].do()
@@ -113,22 +92,12 @@ func (a *bro) askKey(code uint16, value int32) {
 	if value != 0 && time.Now().Before(a.asking.keysAt) {
 		return
 	}
-	a.asking.pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps)
-	a.askTick()
-}
-
-// askDown gives a contact coming down on the card to it.
-func (a *bro) askDown(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
-	if a.asking == nil || !a.asking.pane.Down(ev, p, g, ownPane) {
-		return false
-	}
-	a.askTick()
-	return true
+	a.overKey(a.asking.over, code, value)
 }
 
 // askTap: a tap outside the card is no. One on it was its pane's.
 func (a *bro) askTap(p image.Point) {
-	if !p.In(a.asking.box) {
+	if !p.In(a.asking.over.box) {
 		a.answer(-1)
 	}
 }

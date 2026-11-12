@@ -6,10 +6,7 @@ package main
 // and a tap outside it is no (askTap).
 
 import (
-	"image"
-
 	"hellobro/ink"
-	"hellobro/ink/inkkobo"
 	"hellobro/ink/layout"
 	"hellobro/ink/theme"
 	"hellobro/ink/widget"
@@ -22,7 +19,6 @@ type askUI struct {
 	btn   []widget.Clickable
 	typed widget.Editor
 	selAt int // the answer the keys were put on, -1: none yet
-	h     int // the card's height, as laid out
 	pick  int // the answer picked in the frame, -2: none (-1 is none of them, Esc)
 }
 
@@ -82,30 +78,22 @@ func (u *askUI) Layout(gtx ink.Ctx) ink.Dims {
 		}
 	}
 
-	size := gtx.Constraints.Max
-	b := max(gtx.Dp(2), 3)
-	r := image.Rectangle{Max: size}
-	ink.Fill(gtx.Ops, r, th.Bg)
-	ink.Frame(gtx.Ops, r, b, th.Fg)
-	ink.Input(gtx.Ops, ink.Area{Rect: r, Tag: u, Keep: true}) // a tap between its buttons leaves the keys where they are
-	cg := gtx
-	cg.Constraints = ink.Constraints{Max: image.Pt(size.X, 1<<20)}
-	d := layout.UniformInset(th.Pad*2.5).Layout(cg, func(gtx ink.Ctx) ink.Dims {
-		kids := []layout.FlexChild{layout.Rigid(theme.Title(th, q.title).Layout)}
-		if q.text != "" {
-			l := theme.Body(th, q.text)
-			l.Gray = th.Quiet
-			kids = append(kids, layout.Rigid(layout.Spacer{Height: th.Pad}.Layout), layout.Rigid(l.Layout))
-		}
-		if q.want != "" {
-			kids = append(kids, layout.Rigid(layout.Spacer{Height: th.Pad * 1.5}.Layout),
-				layout.Rigid(theme.Editor(th, &u.typed, "type: "+q.want).Layout))
-		}
-		kids = append(kids, layout.Rigid(layout.Spacer{Height: th.Pad * 2}.Layout), layout.Rigid(u.buttons))
-		return layout.Flex{Axis: layout.Vertical}.Layout(gtx, kids...)
+	return card(gtx, th, &q.over.h, func(gtx ink.Ctx) ink.Dims {
+		return layout.UniformInset(th.Pad*2.5).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+			kids := []layout.FlexChild{layout.Rigid(theme.Title(th, q.title).Layout)}
+			if q.text != "" {
+				l := theme.Body(th, q.text)
+				l.Gray = th.Quiet
+				kids = append(kids, layout.Rigid(layout.Spacer{Height: th.Pad}.Layout), layout.Rigid(l.Layout))
+			}
+			if q.want != "" {
+				kids = append(kids, layout.Rigid(layout.Spacer{Height: th.Pad * 1.5}.Layout),
+					layout.Rigid(theme.Editor(th, &u.typed, "type: "+q.want).Layout))
+			}
+			kids = append(kids, layout.Rigid(layout.Spacer{Height: th.Pad * 2}.Layout), layout.Rigid(u.buttons))
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, kids...)
+		})
 	})
-	u.h = d.Size.Y
-	return ink.Dims{Size: size}
 }
 
 // buttons are the answers: side by side at the right if two (the second
@@ -149,23 +137,4 @@ func (u *askUI) buttons(gtx ink.Ctx) ink.Dims {
 		}))
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, kids...)
-}
-
-// placeAsk puts the question's card in the middle of what the keyboard
-// leaves, as tall as its words and answers want.
-func (a *bro) placeAsk() {
-	q := a.asking
-	if q == nil {
-		return
-	}
-	b := a.screenFree()
-	w := min(int(1000*inkkobo.Metric().PxPerDp/1.42), b.Dx()-80)
-	h := q.ui.h
-	if h == 0 { // not laid out yet: as tall as it may be, then to size
-		h = b.Dy() - 80
-	}
-	h = min(h, b.Dy()-40)
-	top := b.Min.Y + (b.Dy()-h)/2
-	q.box = image.Rect(b.Min.X+(b.Dx()-w)/2, top, b.Min.X+(b.Dx()+w)/2, top+h)
-	q.pane.Place(q.box)
 }

@@ -12,6 +12,7 @@ import (
 func askOn(a *bro, title, text string, opts ...askOpt) (*askBox, *inktest.T) {
 	q := &askBox{title: title, text: text, opts: opts}
 	q.ui = newAskUI(a, q)
+	q.over = newOver(q.ui.Layout, 1000)
 	a.asking = q
 	return q, inktest.New(image.Pt(900, 500), inktest.ElipsaMetric, q.ui.Layout)
 }

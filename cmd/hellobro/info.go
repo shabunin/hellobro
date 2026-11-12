@@ -12,75 +12,45 @@ import (
 	"os"
 	"strings"
 
-	"hellobro/kobo"
 	"hellobro/radio"
 )
 
 type infoBox struct {
-	title         string
-	rows          [][2]string // a name and its value; a sheet's heading: {sheetHead, the heading}
-	box           image.Rectangle
-	copyR, closeR image.Rectangle
-	sheet         bool // a cheat sheet (sheet.go): rows in columns, any key closes it
+	title string
+	rows  [][2]string // a name and its value; a sheet's heading: {sheetHead, the heading}
+	sheet bool        // a cheat sheet (sheet.go): rows in columns, any key closes it
+	ui    *infoUI
+	over  *inkOver
 }
-
-const infoRowH = 46
 
 func (a *bro) showInfo(title string, rows [][2]string) {
-	b := a.screenFree()
-	w := min(1100, b.Dx()-80)
-	h := min(b.Dy()-80, 32+56+16+len(rows)*infoRowH+24+68+32)
-	top := b.Min.Y + (b.Dy()-h)/2
-	q := &infoBox{title: title, rows: rows}
-	q.box = image.Rect((b.Dx()-w)/2, top, (b.Dx()+w)/2, top+h)
-	bw, by := 240, q.box.Max.Y-100
-	q.closeR = image.Rect(q.box.Max.X-32-bw, by, q.box.Max.X-32, by+68)
-	q.copyR = image.Rect(q.closeR.Min.X-20-bw, by, q.closeR.Min.X-20, by+68)
-	a.info = q
-	a.drawInfo()
+	a.putInfo(&infoBox{title: title, rows: rows}, 1100)
 }
 
-func (a *bro) drawInfo() {
-	q, c := a.info, a.C
-	c.Fill(q.box, kobo.White)
-	c.Frame(q.box, 4, kobo.Black)
-	in := q.box.Inset(32)
-	c.Text(a.F.Panel, image.Rect(in.Min.X, in.Min.Y, in.Max.X, in.Min.Y+56), q.title, kobo.Black, kobo.AlignLeft)
-	if q.sheet {
-		a.drawSheet(in)
-		return
-	}
-	nameW := 0
-	for _, r := range q.rows {
-		nameW = max(nameW, kobo.TextWidth(a.F.Small, r[0]))
-	}
-	y := in.Min.Y + 56 + 16
-	for _, r := range q.rows {
-		if y+infoRowH > q.closeR.Min.Y-12 {
-			break // a short screen: the rest are in what's copied
+// putInfo puts q up, w wide (at the Elipsa's density) as the screen lets it.
+func (a *bro) putInfo(q *infoBox, w int) {
+	q.ui = &infoUI{a: a, q: q}
+	q.over = newOver(q.ui.Layout, w)
+	q.over.tall = q.sheet
+	q.over.take = func() {
+		act := q.ui.act
+		q.ui.act = ""
+		switch act {
+		case "close":
+			a.closeInfo()
+		case "copy":
+			a.copyText(infoText(q.rows), "the details")
 		}
-		c.Text(a.F.Small, image.Rect(in.Min.X, y, in.Min.X+nameW, y+infoRowH), r[0], kobo.Dark, kobo.AlignLeft)
-		c.Text(a.F.Small, image.Rect(in.Min.X+nameW+32, y, in.Max.X, y+infoRowH), r[1], kobo.Black, kobo.AlignLeft)
-		y += infoRowH
 	}
-	for _, b := range []struct {
-		r     image.Rectangle
-		label string
-		dark  bool
-	}{{q.copyR, "copy  (c)", false}, {q.closeR, "close  (Esc)", true}} {
-		fg := uint8(kobo.Black)
-		if b.dark {
-			c.Fill(b.r, kobo.Black)
-			fg = kobo.White
-		} else {
-			c.Frame(b.r, 2, kobo.Black)
-		}
-		c.Text(a.F.Small, b.r, b.label, fg, kobo.AlignCenter)
-	}
-	a.Mark(q.box, true)
+	a.info = q
+	a.drawOver(q.over)
 }
 
 func (a *bro) closeInfo() {
+	if a.info == nil {
+		return
+	}
+	a.info.over.gone()
 	a.info = nil
 	a.DrawPage()
 }
@@ -95,28 +65,20 @@ func infoText(rows [][2]string) string {
 }
 
 func (a *bro) infoKey(code uint16, value int32) {
-	if a.termMod(code, value) || value != 1 {
+	if a.termMod(code, value) {
 		return
 	}
-	ch, _ := kobo.KeyChar(code, false, false)
-	switch {
-	case a.info.sheet: // any key: read, and back to the page
+	if a.info.sheet && value == 1 { // any key: read, and back to the page
 		a.closeInfo()
-	case code == kobo.KeyEnter || code == kobo.KeyEsc || ch == "q":
-		a.closeInfo()
-	case ch == "c":
-		a.copyText(infoText(a.info.rows), "the details")
+		return
 	}
+	a.overKey(a.info.over, code, value)
 }
 
+// infoTap: a tap outside the box closes it; anywhere, a sheet. One on
+// the box was its pane's.
 func (a *bro) infoTap(p image.Point) {
-	q := a.info
-	switch {
-	case q.sheet: // anywhere
-		a.closeInfo()
-	case kobo.Hit(p, q.copyR):
-		a.copyText(infoText(q.rows), "the details")
-	case kobo.Hit(p, q.closeR), !p.In(q.box):
+	if q := a.info; q.sheet || !p.In(q.over.box) {
 		a.closeInfo()
 	}
 }

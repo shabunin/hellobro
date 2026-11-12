@@ -4,30 +4,15 @@ package main
 // ":" commands, in columns as many as the screen's width holds; any key,
 // or a tap, takes it down.
 
-import (
-	"image"
-	"strings"
-
-	"hellobro/kobo"
-)
+import "strings"
 
 const (
 	sheetHead = "\x00" // a row's name that makes it a heading
-	sheetRowH = 38
-	sheetColW = 560 // a column at least this wide
 )
 
 // showSheet puts up title's sheet: keys, then cmds as ":" would take them.
 func (a *bro) showSheet(title string, keys [][2]string, cmds []exCmd) {
-	b := a.screenFree()
-	box := b.Inset(40)
-	box.Max.X = box.Min.X + min(box.Dx(), 1800)
-	box = box.Add(image.Pt((b.Dx()-box.Dx())/2-box.Min.X+b.Min.X, 0))
-	q := &infoBox{title: title, rows: sheetRows(keys, cmds), box: box, sheet: true}
-	bw, by := 240, box.Max.Y-100
-	q.closeR = image.Rect(box.Max.X-32-bw, by, box.Max.X-32, by+68)
-	a.info = q
-	a.drawInfo()
+	a.putInfo(&infoBox{title: title, rows: sheetRows(keys, cmds), sheet: true}, 1800)
 }
 
 // sheetRows are keys under a heading, then the commands under theirs.
@@ -80,43 +65,6 @@ func sheetCols(rows [][2]string, per int) [][][2]string {
 		cols = append(cols, col)
 	}
 	return cols
-}
-
-// drawSheet draws the sheet's rows in in, under its title.
-func (a *bro) drawSheet(in image.Rectangle) {
-	q, c := a.info, a.C
-	area := image.Rect(in.Min.X, in.Min.Y+72, in.Max.X, q.closeR.Min.Y-12)
-	colsMax, gap := max(1, area.Dx()/sheetColW), 40
-	cols := sheetLayout(q.rows, area.Dy()/sheetRowH, colsMax)
-	n := min(len(cols), colsMax)
-	cw := (area.Dx() - (n-1)*gap) / n
-	for i, col := range cols {
-		if i >= n {
-			break // a short screen: the rest are left out
-		}
-		x := area.Min.X + i*(cw+gap)
-		nameW := 0
-		for _, r := range col {
-			if r[0] != sheetHead {
-				nameW = max(nameW, kobo.TextWidth(a.F.Small, r[0]))
-			}
-		}
-		nameW = min(nameW, cw*2/5)
-		y := area.Min.Y
-		for _, r := range col {
-			if r[0] == sheetHead {
-				c.Text(a.F.Body, image.Rect(x, y, x+cw, y+sheetRowH), r[1], kobo.Black, kobo.AlignLeft)
-				c.Fill(image.Rect(x, y+sheetRowH-4, x+cw, y+sheetRowH-2), kobo.Mid)
-			} else {
-				c.Text(a.F.Small, image.Rect(x, y, x+nameW, y+sheetRowH), r[0], kobo.Black, kobo.AlignLeft)
-				c.Text(a.F.Small, image.Rect(x+nameW+20, y, x+cw, y+sheetRowH), r[1], kobo.Dark, kobo.AlignLeft)
-			}
-			y += sheetRowH
-		}
-	}
-	c.Fill(q.closeR, kobo.Black)
-	c.Text(a.F.Small, q.closeR, "close  (any key)", kobo.White, kobo.AlignCenter)
-	a.Mark(q.box, true)
 }
 
 // bookKeys are a book's keys, for its sheet: an EPUB's, or a PDF's.

@@ -137,7 +137,7 @@ func (a *bro) inkTick() {
 	if a.Calibrating() {
 		return
 	}
-	a.askTick()
+	a.overTick()
 	if a.overlay() {
 		return
 	}
@@ -172,7 +172,7 @@ func (a *bro) inkMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if g.Owner != ownPane {
 		return false
 	}
-	if q := a.asking; q != nil && q.pane.Move(ev, p, g) {
+	if o := a.over(); o != nil && o.pane.Move(ev, p, g) {
 		return true
 	}
 	for _, gw := range a.inkWins() {
@@ -187,7 +187,7 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 	if g.Owner != ownPane {
 		return false
 	}
-	if q := a.asking; q != nil && q.pane.Lift(g) {
+	if o := a.over(); o != nil && o.pane.Lift(g) {
 		a.inkTick()
 		return true
 	}
@@ -206,8 +206,8 @@ func (a *bro) updateRing() {
 	var r image.Rectangle
 	switch g, ok := a.focusedWin().(*guiWin); {
 	case a.Calibrating():
-	case a.asking != nil && !a.wm.offscreen:
-		r = a.asking.pane.Ring()
+	case a.over() != nil && !a.wm.offscreen:
+		r = a.over().pane.Ring()
 	case ok && g.ink != nil && !a.overlay():
 		r = g.ink.pane.Ring()
 	}
