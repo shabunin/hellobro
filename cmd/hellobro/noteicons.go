@@ -105,6 +105,11 @@ func noteIcon(id string) []iconPart {
 		return []iconPart{iconLine(1, iconArc(12, 12, 7, 150, 420)...), iconHead(12+7*math.Cos(end), 12+7*math.Sin(end), -math.Sin(end), math.Cos(end))}
 	case "delete":
 		return iconBin
+	case "mark": // a bookmark's ribbon
+		return []iconPart{iconShut(0.9, 6, 3, 18, 3, 18, 21, 12, 16, 6, 21)}
+	case "link": // two links of a chain
+		return []iconPart{iconLine(0.9, append(iconArc(8.5, 15.5, 4.5, 45, 225), 12.5, 8.5)...), iconLine(0.9, append(iconArc(15.5, 8.5, 4.5, 225, 405), 11.5, 15.5)...),
+			iconLine(0.9, 9.5, 14.5, 14.5, 9.5)}
 	case "earlier":
 		return []iconPart{iconLine(1, 20, 12, 4, 12), iconHead(4, 12, -1, 0)}
 	case "later":

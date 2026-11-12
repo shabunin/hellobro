@@ -74,6 +74,15 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 			return nil
 		}},
 		{"settings", "", "its settings: a finger, export, the bar", func(string) error { w.settingsOn(a, true); return nil }},
+		{"mark", "", "what's taken (the select tool) marked, to link to", func(string) error {
+			if len(w.sel) == 0 {
+				return fmt.Errorf("take something with the select tool first")
+			}
+			w.markSel(a)
+			return nil
+		}},
+		{"link", "", "the marks: a link to one, put where you tap", func(string) error { w.marksOn(a); return nil }},
+		{"back", "", "back where a link was followed from", func(string) error { return a.goBack(w) }},
 		{"pages o", "", "the pages' view, on or off", func(string) error { w.overviewOn(a, !w.overview); return nil }},
 		{"export", "pdf|png", "export: a PDF of the pages, or this page as a PNG (none: asks)", func(arg string) error {
 			switch arg {

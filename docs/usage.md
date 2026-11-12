@@ -1037,12 +1037,26 @@ width, its gray.
   - the buttons under it: **copy** (two pages; Ctrl+C), **cut**
     (scissors; Ctrl+X), **duplicate** (two pages and a +; Ctrl+D: a
     copy down and right, taken), **turn** (an arrow round: a quarter,
-    clockwise), **delete** (a bin; Delete or Backspace).
+    clockwise), **mark** (a ribbon; `:mark`: to link to it, below),
+    **delete** (a bin; Delete or Backspace).
 
   What's done stays on the page; undo puts each back. A tap where
   nothing is lets go; another, with nothing taken, puts a cross where
   the next paste goes (tap the cross to take it away). **pen** or
   **eraser** puts the tool down.
+- **link** (two links of a chain, or `:link`) puts a link to a part
+  marked, in this notebook or another: it shows **Marks**, a tab by
+  the settings: each part marked, the last first (40 kept, in
+  `note-marks.json`), with its picture, its text if it has some, its
+  notebook and page. **link here**, then a tap on the page, puts the
+  link there: "→ the budget (plan, p. 3)", framed. A finger's tap on
+  a link opens its notebook in this window, at its page, the part
+  marked framed for 3 s; held (more than 0.6 s), in a window of its
+  own; open already, it's shown where it is. `:back` goes back where
+  the link was tapped. **go to** goes there from the list, **forget**
+  takes a mark away (links to it still go). The pen writes over a link
+  as over any text; the select tool takes it, to move or delete it. In
+  Xournal++ it's the text alone.
 - What's copied from a notebook is kept as `clipboard.xopp` next to
   hellobro: paste it (Ctrl+V, **paste**) on another page or in another
   notebook, where it was on its page, or at the cross. It comes in
@@ -1265,6 +1279,7 @@ and **?** its sheet of keys and commands too.
 | `:paper lines` | plain, lines, squares, dots, or one of them `-narrow` |
 | `:pagesize SIZE` | new pages' size (screen, landscape, a4, a5, letter, square, or W x H in mm), the blank page shown's too |
 | `:settings` | the notebook's settings |
+| `:mark`, `:link`, `:back` | what's taken marked; the marks, to put a link to one; back where a link was followed from |
 | `:o` | the pages' view, on or off |
 | `:w`, `:export [pdf\|png]` | written now; the export (asks, unless said) |
 | `:e NAME` | another notebook here: its name, or the one it begins; none so named, a new one beside this |

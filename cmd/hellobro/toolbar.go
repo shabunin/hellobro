@@ -58,11 +58,12 @@ func (a *bro) barOff(w window, kind string) bool {
 // fullBarWord is how the apps' settings say it.
 func fullBarWord(on bool) string { return map[bool]string{true: "shown", false: "hidden"}[on] }
 
-// barBtnWidth is b's width on bar: a picture's about square, words as
-// wide as they are.
+// barBtnWidth is b's width on bar: a picture's square (a notebook's
+// twelve tools fit an upright Elipsa's width so, for fingers too), words
+// as wide as they are.
 func barBtnWidth(a *bro, bar image.Rectangle, b barBtn) int {
 	if b.label == "" {
-		return bar.Dy() + 8
+		return bar.Dy()
 	}
 	return max(kobo.TextWidth(a.F.Small, b.label)+36, bar.Dy()+8)
 }

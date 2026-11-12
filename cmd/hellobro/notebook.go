@@ -387,8 +387,11 @@ type noteWin struct {
 	typing     *noteTyping   // a text being typed
 	sel        []*noteStroke // what it's taken, on selPage
 	selPage    int
-	mark       *noteMark // where the next paste goes
-	optsOf     string    // whose choices are out, under its button: "pen", "paper", "" none (notepen.go)
+	mark       *noteMark   // where the next paste goes
+	linking    *noteAnchor // a link to put where the page is tapped next (notelink.go)
+	back       *noteBack   // where a link was followed from
+	flash      *noteFlash  // a link's target, framed for a moment
+	optsOf     string      // whose choices are out, under its button: "pen", "paper", "" none (notepen.go)
 	opts       []barBtn
 	optsPane   *inkkobo.Pane // their paint
 	selPane    *inkkobo.Pane // the selection's buttons' paint
@@ -551,8 +554,8 @@ func barTools(overview bool) (tools []barBtn, drops []string) {
 		return []barBtn{all, {id: "open"}, {id: "new before"}, {id: "new after"}, {id: "copy page"}, {id: "clear", label: "clear page"}, {id: "delete"}, {id: "earlier"}, {id: "later"}, {id: "undo"}},
 			[]string{"undo", "copy page", "new before"}
 	}
-	return []barBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "paper"}, {id: "export"}, {id: "settings"}},
-		[]string{"export", "redo", "paste", "settings"}
+	return []barBtn{all, {id: "pen"}, {id: "eraser"}, {id: "select"}, {id: "text"}, {id: "undo"}, {id: "redo"}, {id: "paste"}, {id: "link"}, {id: "paper"}, {id: "export"}, {id: "settings"}},
+		[]string{"export", "link", "redo", "paste", "settings"}
 }
 
 // barNeed is how wide tools are along the top.
@@ -735,6 +738,7 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 		}
 	}
 	w.drawThinking(a, clip) // the diary at work (notediary.go)
+	w.drawFlash(a, clip)
 	w.drawSel(a, clip)
 	w.drawOpts(a, clip)
 }
@@ -779,6 +783,9 @@ func (w *noteWin) drawStroke(a *bro, s *noteStroke, at, clip image.Rectangle) {
 			pos = k.pos
 		}
 		drawNoteText(a.C, s, at.Min, w.scale, pos, clip)
+		if _, ok := linkOf(s); ok {
+			w.drawLink(a, s, at, clip)
+		}
 		return
 	}
 	prev := w.toScreen(s.pts[0], at)
@@ -1040,7 +1047,10 @@ func (w *noteWin) barPress(a *bro, id string) {
 		w.clearUnask(a)
 		w.pageAct(a, "clear")
 	case "settings":
+		w.setOf(a).marks = false
 		w.settingsOn(a, true)
+	case "link":
+		w.marksOn(a)
 	case "paste":
 		w.paste(a)
 	case "export":
@@ -1096,6 +1106,11 @@ func (w *noteWin) press(a *bro, code uint16, value int32) bool {
 	}
 	if ch == ":" && !m.ctrl {
 		w.exOpen(a, "")
+		return true
+	}
+	if w.linking != nil && code == kobo.KeyEsc {
+		w.linking = nil
+		a.Notify("no link put")
 		return true
 	}
 	if ch == "q" && !m.ctrl { // the notebook put away: All Notebooks
@@ -1256,6 +1271,14 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if !ev.Pen && !a.vk.on && p.Y >= a.C.Bounds().Max.Y-vkFoot { // the foot's: two fingers there bring the keyboard
 		return false
 	}
+	if w.linking != nil { // a tap puts the link there (noteLift)
+		g.Owner = ownLeaf
+		return true
+	}
+	if !ev.Pen && !w.selecting && !w.texting && w.linkAt(w.cur+slot, w.toPage(p, w.slots[slot])) != nil {
+		g.Owner = ownLink // a finger's tap follows it (noteLift)
+		return true
+	}
 	if w.selecting {
 		return a.noteSelTouch(w, slot, p, g)
 	}
@@ -1318,7 +1341,7 @@ func (a *bro) noteMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 			g.Owner = ownTop // down from the top, full screen: the bar (kobo's own doesn't see a finger we took)
 		}
 		return true
-	case ownNoteOv:
+	case ownNoteOv, ownLink:
 		return true
 	case ownNoteSel:
 		a.noteDragTo(p, g)
@@ -1414,7 +1437,9 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 			a.noteFocus(w)
 			dx, dy := g.Last.X-g.Start.X, g.Last.Y-g.Start.Y
 			i := w.slotAt(g.Start)
-			if tap := i >= 0 && kobo.Abs(dx) < noteSwipe && kobo.Abs(dy) < noteSwipe; tap && w.texting {
+			if tap := i >= 0 && kobo.Abs(dx) < noteSwipe && kobo.Abs(dy) < noteSwipe; tap && w.linking != nil {
+				w.putLink(a, w.cur+i, w.toPage(g.Start, w.slots[i]))
+			} else if tap && w.texting {
 				w.textAt(a, w.cur+i, w.toPage(g.Start, w.slots[i]))
 			} else if tap {
 				a.diaryTap(w, w.cur+i, g.Start)
@@ -1435,6 +1460,15 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		return true
 	case ownNoteSel:
 		a.noteDragEnd(g)
+		return true
+	case ownLink:
+		if w, ok := a.windowAt(g.Start).(*noteWin); ok && g.Moved < noteSwipe {
+			if i := w.slotAt(g.Start); i >= 0 {
+				if an, ok := linkOf(w.linkAt(w.cur+i, w.toPage(g.Start, w.slots[i]))); ok {
+					a.followLink(w, an, g.Dur >= linkHold)
+				}
+			}
+		}
 		return true
 	case ownNoteOv:
 		if w, ok := a.windowAt(g.Start).(*noteWin); ok && w.overview {

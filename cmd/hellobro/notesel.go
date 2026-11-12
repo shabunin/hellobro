@@ -79,6 +79,7 @@ type noteMark struct {
 func (w *noteWin) setTool(a *bro, id string) {
 	w.endTyping(a)
 	w.erasing, w.selecting, w.texting = id == "eraser", id == "select", id == "text"
+	w.linking = nil
 	if !w.selecting && (len(w.sel) > 0 || w.mark != nil) {
 		w.sel, w.mark = nil, nil
 		w.show(a)
@@ -150,7 +151,7 @@ func (w *noteWin) selButtons(a *bro) []barBtn {
 	h := 48
 	var bs []barBtn
 	x := 0
-	for _, id := range []string{"copy", "cut", "duplicate", "turn", "delete"} {
+	for _, id := range []string{"copy", "cut", "duplicate", "turn", "mark", "delete"} {
 		b := barBtn{id: id, r: image.Rect(x, 0, x+h+16, h)}
 		bs = append(bs, b)
 		x = b.r.Max.X + 8
@@ -725,6 +726,9 @@ func (w *noteWin) selAct(a *bro, id string) {
 		return
 	case "delete":
 		w.deleteSel(a)
+		return
+	case "mark":
+		w.markSel(a)
 		return
 	case "duplicate":
 		w.duplicateSel()

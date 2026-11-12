@@ -8,8 +8,11 @@ package main
 // to the notebook" goes back.
 
 import (
+	"bytes"
 	"fmt"
 	"image"
+	"image/draw"
+	"image/png"
 	"strings"
 	"time"
 
@@ -152,6 +155,18 @@ type noteSetUI struct {
 	act  []widget.Clickable
 	list layout.Scroll
 	do   func()
+
+	marks               bool // the Marks tab: the parts marked, to link to (notelink.go)
+	anc                 []noteAnchor
+	thumbs              map[int64]*image.Gray
+	here, goto_, forget []widget.Clickable
+}
+
+// marksOn shows the marks, over the notebook.
+func (w *noteWin) marksOn(a *bro) {
+	u := w.setOf(a)
+	u.marks, u.anc = true, loadAnchors()
+	w.settingsOn(a, true)
 }
 
 // setOf is w's settings' ink, made the first time.
@@ -215,9 +230,14 @@ func (w *noteWin) showSettings(a *bro) {
 func (u *noteSetUI) Layout(gtx ink.Ctx) ink.Dims {
 	a, w, th := u.a, u.w, u.a.theme()
 	hs := libHeadSpec{all: "All Notebooks", toAll: func() { w.settings = false; a.notesFrom(w) },
-		back: "back to the notebook", toBack: func() { w.settingsOn(a, false) }, tabs: []libTab{{"Settings", true, func() {}}}}
+		back: "back to the notebook", toBack: func() { w.settingsOn(a, false) }, tabs: []libTab{
+			{"Settings", !u.marks, func() { u.marks = false; u.list = layout.Scroll{}; w.showSettings(a) }},
+			{"Marks", u.marks, func() { u.marks, u.anc = true, loadAnchors(); u.list = layout.Scroll{}; w.showSettings(a) }}}}
 	if do := u.head.taps(gtx, hs); do != nil {
 		u.do = do
+	}
+	if u.marks {
+		return u.marksLayout(gtx, hs)
 	}
 	for i, s := range noteSettings {
 		if s.opts == nil {
@@ -288,4 +308,121 @@ func (w *noteWin) settingsKey(a *bro, code uint16, ch string, value int32) bool 
 		return true
 	}
 	return false
+}
+
+// marksLayout is the Marks tab: each part marked, the last first, its
+// picture, what it says, where it is; a link to it put here, or gone to.
+func (u *noteSetUI) marksLayout(gtx ink.Ctx, hs libHeadSpec) ink.Dims {
+	a, w, th := u.a, u.w, u.a.theme()
+	for len(u.here) < len(u.anc) {
+		u.here, u.goto_, u.forget = append(u.here, widget.Clickable{}), append(u.goto_, widget.Clickable{}), append(u.forget, widget.Clickable{})
+	}
+	for i, an := range u.anc {
+		switch {
+		case u.here[i].Clicked(gtx):
+			u.do = func() { w.settingsOn(a, false); w.linkHere(a, an) }
+		case u.goto_[i].Clicked(gtx):
+			u.do = func() { w.settingsOn(a, false); a.followLink(w, an, false) }
+		case u.forget[i].Clicked(gtx):
+			u.do = func() {
+				if err := forgetAnchor(an.At); err != nil {
+					a.Notify("can't forget it: " + err.Error())
+				}
+				u.anc = loadAnchors()
+				w.showSettings(a)
+			}
+		}
+	}
+	size := gtx.Constraints.Max
+	ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+	rowH := libRowHeight(gtx, th)
+	rows := []ink.Widget{func(gtx ink.Ctx) ink.Dims {
+		say := "mark a part of a page with the select tool (its ribbon), then put a link to it here: link here, and tap the page. " +
+			"A finger's tap on a link goes there; held, in a window of its own"
+		return layout.Inset{Left: th.Pad, Bottom: th.Pad}.Layout(gtx, theme.Small(th, say).Layout)
+	}}
+	if len(u.anc) == 0 {
+		rows = append(rows, func(gtx ink.Ctx) ink.Dims {
+			return layout.Inset{Left: th.Pad, Top: th.Pad}.Layout(gtx, theme.Body(th, "nothing marked yet").Layout)
+		})
+	}
+	for i, an := range u.anc {
+		rows = append(rows, func(gtx ink.Ctx) ink.Dims { return u.markRow(gtx, i, an) })
+	}
+	return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(func(gtx ink.Ctx) ink.Dims { return u.head.layout(gtx, th, hs, rowH) }),
+			layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
+			layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+				u.list.Axis = layout.Vertical
+				return theme.List(th, &u.list).Layout(gtx, len(rows), func(gtx ink.Ctx, i int) ink.Dims { return rows[i](gtx) })
+			}))
+	})
+}
+
+// markRow is a mark: its picture at the left, what it says and where it
+// is, its buttons under them; a line under it all.
+func (u *noteSetUI) markRow(gtx ink.Ctx, i int, an noteAnchor) ink.Dims {
+	th := u.a.theme()
+	m := u.thumb(an)
+	pic := func(gtx ink.Ctx) ink.Dims {
+		if m == nil {
+			return ink.Dims{}
+		}
+		sz := m.Bounds().Size()
+		k := min(1, float64(gtx.Dp(180))/float64(sz.X), float64(gtx.Dp(70))/float64(sz.Y))
+		r := image.Rectangle{Max: image.Pt(int(float64(sz.X)*k), int(float64(sz.Y)*k))}
+		ink.Draw(gtx.Ops, r, func(dst *image.Gray, dr image.Rectangle) {
+			for y := dr.Min.Y; y < dr.Max.Y; y++ {
+				for x := dr.Min.X; x < dr.Max.X; x++ {
+					sx, sy := m.Bounds().Min.X+int(float64(x-dr.Min.X)/k), m.Bounds().Min.Y+int(float64(y-dr.Min.Y)/k)
+					dst.SetGray(x, y, m.GrayAt(sx, sy))
+				}
+			}
+		})
+		ink.Frame(gtx.Ops, r, 1, th.Quiet)
+		return ink.Dims{Size: r.Size()}
+	}
+	title := an.Label
+	if title == "" {
+		title = "a part of " + an.where()
+	}
+	when := an.At.Format("Jan 2, 15:04")
+	link := theme.Button(th, &u.here[i], "link here")
+	link.Strong = true
+	return layout.Inset{Top: th.Pad, Bottom: th.Pad}.Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+		d := layout.Flex{Alignment: layout.Start}.Layout(gtx,
+			layout.Rigid(func(gtx ink.Ctx) ink.Dims { return layout.Inset{Left: th.Pad, Right: th.Pad * 1.5}.Layout(gtx, pic) }),
+			layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					layout.Rigid(theme.Body(th, title).Layout),
+					layout.Rigid(theme.Small(th, an.where()+" · marked "+when).Layout),
+					layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
+					layout.Rigid(func(gtx ink.Ctx) ink.Dims {
+						return layout.Flex{}.Layout(gtx,
+							layout.Rigid(link.Layout), layout.Rigid(layout.Spacer{Width: th.Pad}.Layout),
+							layout.Rigid(theme.Button(th, &u.goto_[i], "go to").Layout), layout.Rigid(layout.Spacer{Width: th.Pad}.Layout),
+							layout.Rigid(theme.Button(th, &u.forget[i], "forget").Layout))
+					}))
+			}))
+		ink.Fill(gtx.Ops, image.Rect(0, d.Size.Y+gtx.Dp(th.Pad)-1, d.Size.X, d.Size.Y+gtx.Dp(th.Pad)), th.Quiet)
+		return d
+	})
+}
+
+// thumb is an's picture, read once.
+func (u *noteSetUI) thumb(an noteAnchor) *image.Gray {
+	if m, ok := u.thumbs[an.At.UnixNano()]; ok {
+		return m
+	}
+	if u.thumbs == nil {
+		u.thumbs = map[int64]*image.Gray{}
+	}
+	var g *image.Gray
+	if im, err := png.Decode(bytes.NewReader(an.Thumb)); err == nil {
+		g = image.NewGray(im.Bounds())
+		draw.Draw(g, g.Bounds(), im, im.Bounds().Min, draw.Src)
+	}
+	u.thumbs[an.At.UnixNano()] = g
+	return g
 }
