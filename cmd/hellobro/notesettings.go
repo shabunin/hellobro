@@ -158,6 +158,7 @@ type noteSetUI struct {
 
 	marks               bool // the Marks tab: the parts marked, to link to (notelink.go)
 	anc                 []noteAnchor
+	only                widget.Bool // this notebook's marks only: on at first
 	thumbs              map[int64]*image.Gray
 	here, goto_, forget []widget.Clickable
 }
@@ -172,7 +173,7 @@ func (w *noteWin) marksOn(a *bro) {
 // setOf is w's settings' ink, made the first time.
 func (w *noteWin) setOf(a *bro) *noteSetUI {
 	if w.set == nil {
-		u := &noteSetUI{a: a, w: w, sel: make([]widget.Select, len(noteSettings)), act: make([]widget.Clickable, len(noteSettings))}
+		u := &noteSetUI{a: a, w: w, sel: make([]widget.Select, len(noteSettings)), act: make([]widget.Clickable, len(noteSettings)), only: widget.Bool{Value: true}}
 		u.pane = inkkobo.NewPane(u.Layout)
 		w.set = u
 	}
@@ -333,6 +334,9 @@ func (u *noteSetUI) marksLayout(gtx ink.Ctx, hs libHeadSpec) ink.Dims {
 			}
 		}
 	}
+	if u.only.Update(gtx) {
+		u.list = layout.Scroll{}
+	}
 	size := gtx.Constraints.Max
 	ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
 	rowH := libRowHeight(gtx, th)
@@ -340,14 +344,25 @@ func (u *noteSetUI) marksLayout(gtx ink.Ctx, hs libHeadSpec) ink.Dims {
 		say := "mark a part of a page with the select tool (its ribbon), then put a link to it here: link here, and tap the page. " +
 			"A finger's tap on a link goes there; held, in a window of its own"
 		return layout.Inset{Left: th.Pad, Bottom: th.Pad}.Layout(gtx, theme.Small(th, say).Layout)
+	}, func(gtx ink.Ctx) ink.Dims {
+		return layout.Inset{Left: th.Pad, Bottom: th.Pad}.Layout(gtx, theme.CheckBox(th, &u.only, "only this notebook's").Layout)
 	}}
-	if len(u.anc) == 0 {
-		rows = append(rows, func(gtx ink.Ctx) ink.Dims {
-			return layout.Inset{Left: th.Pad, Top: th.Pad}.Layout(gtx, theme.Body(th, "nothing marked yet").Layout)
-		})
-	}
+	n := 0
 	for i, an := range u.anc {
+		if u.only.Value && an.Note != w.nb.name {
+			continue
+		}
+		n++
 		rows = append(rows, func(gtx ink.Ctx) ink.Dims { return u.markRow(gtx, i, an) })
+	}
+	if n == 0 {
+		none := "nothing marked yet"
+		if len(u.anc) > 0 {
+			none = "nothing marked in this notebook: take the tick away for the others'"
+		}
+		rows = append(rows, func(gtx ink.Ctx) ink.Dims {
+			return layout.Inset{Left: th.Pad, Top: th.Pad}.Layout(gtx, theme.Body(th, none).Layout)
+		})
 	}
 	return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
 		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,

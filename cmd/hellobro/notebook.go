@@ -415,13 +415,16 @@ type noteWin struct {
 	cleanDraw  bool            // a marker among them: drawn again in its gray first
 	diary      *noteDiary      // its diary at work, if it's on (notediary.go)
 
-	p     kobo.Panel
-	bar   image.Rectangle // the tools' strip
-	side  bool            // it stands along the left: a narrow window (layBar)
-	ex    *exLine         // a ":" command being typed (noteex.go)
-	btns  []barBtn
-	slots []image.Rectangle // the pages on screen, left to right: cur, cur+1
-	scale float64           // screen px a page unit
+	p        kobo.Panel
+	bar      image.Rectangle // the tools' strip
+	side     bool            // it stands along the left: a narrow window (layBar)
+	ex       *exLine         // a ":" command being typed (noteex.go)
+	btns     []barBtn
+	slots    []image.Rectangle // the pages on screen, left to right: cur, cur+1
+	scale    float64           // screen px a page unit
+	zoom     float64           // the pages this many times as big as they fit (notezoom.go); 0, 1: as they fit
+	pan      image.Point       // zoomed, how far they're moved: px
+	zoomPane *inkkobo.Pane     // a pinch's zoom, said
 }
 
 func (w *noteWin) Title() string    { return "Notebook " + w.nb.name }
@@ -444,15 +447,16 @@ type noteInk struct {
 
 type noteState struct {
 	ink      *noteInk
-	drag     *noteDrag     // the select tool's
-	unsaved  []*notebook   // closed but not kept (a full card, say): kept when they can be; opened, from here
-	triedAt  time.Time     // when they were last tried
-	lookedAt time.Time     // when the open ones' files were last looked at
-	liftAt   time.Time     // the last stroke's end, for noteClean
-	hoverAt  time.Time     // the pen last seen in the air, over the screen
-	taps     diaryTapper   // a finger's taps on a page, for the diary (notediary.go)
-	wizDir   string        // the folder the new notebook's wizard makes it in (notewizard.go)
-	hold     *kobo.Gesture // a finger on a page, where fingers turn them: held, it selects (notesel.go)
+	drag     *noteDrag   // the select tool's
+	unsaved  []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here
+	triedAt  time.Time   // when they were last tried
+	lookedAt time.Time   // when the open ones' files were last looked at
+	liftAt   time.Time   // the last stroke's end, for noteClean
+	hoverAt  time.Time   // the pen last seen in the air, over the screen
+	taps     diaryTapper // a finger's taps on a page, for the diary (notediary.go)
+	wizDir   string      // the folder the new notebook's wizard makes it in (notewizard.go)
+	pinch    *notePinch  // two fingers zooming (notezoom.go)
+	pan      *notePan    // a finger moving the pages zoomed
 }
 
 const (
@@ -507,6 +511,7 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 	} else {
 		w.slots, w.scale = noteSlots(w.paperArea().Inset(kobo.Pad/2), w.slotSize, w.pageSize(w.cur+1) != w.slotSize)
 	}
+	w.applyZoom()
 	if !w.bar.Empty() {
 		w.layBar(a)
 	}
@@ -717,7 +722,8 @@ func (w *noteWin) drawPages(a *bro, clip image.Rectangle) {
 		return
 	}
 	c := a.C
-	area := w.paperArea().Intersect(clip)
+	clip = clip.Intersect(w.paperArea()) // zoomed, the pages go on past it
+	area := clip
 	c.Fill(area, kobo.White)
 	for i, pg := range w.slots {
 		if cl := clip.Intersect(pg); !cl.Empty() {
@@ -899,6 +905,10 @@ func (w *noteWin) turnPage(a *bro, by int) {
 		return
 	}
 	w.cur, w.scroll = n, 0
+	if w.zoomed() { // zoomed, from their top left
+		w.pan = image.Point{}
+		w.place(a, w.p)
+	}
 	w.show(a)
 	if a.shows(w) {
 		a.MarkFlash(w.pages().Intersect(w.paperArea())) // other pages: no ghost of these
@@ -1289,7 +1299,6 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	}
 	if !ev.Pen && a.fingerTurns() {
 		g.Owner = ownLeaf
-		a.nt.hold = g // held still, it takes what's there (noteHoldTick)
 		return true
 	}
 	if a.nt.ink != nil {
@@ -1341,6 +1350,10 @@ func (a *bro) noteMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	case ownLeaf:
 		if d := p.Sub(g.Start); a.Full && g.Start.Y < kobo.TopEdge && d.Y > kobo.TopMove && d.Y > 2*kobo.Abs(d.X) && a.topSwipe(g.Start) {
 			g.Owner = ownTop // down from the top, full screen: the bar (kobo's own doesn't see a finger we took)
+			return true
+		}
+		if w, ok := a.windowAt(g.Start).(*noteWin); ok && w.zoomed() && a.shows(w) && (a.nt.pan != nil && a.nt.pan.g == g || g.Moved >= noteSelStill) {
+			a.notePanMove(w, g, p, false) // zoomed: the finger moves the pages
 		}
 		return true
 	case ownNoteOv, ownLink:
@@ -1435,6 +1448,14 @@ func (a *bro) noteCut() {
 func (a *bro) noteLift(g *kobo.Gesture) bool {
 	switch g.Owner {
 	case ownLeaf:
+		if pn := a.nt.pan; pn != nil && pn.g == g {
+			if w, ok := a.windowAt(g.Start).(*noteWin); ok {
+				a.notePanMove(w, g, g.Last, true)
+				a.noteFocus(w)
+			}
+			a.nt.pan = nil
+			return true
+		}
 		if w, ok := a.windowAt(g.Start).(*noteWin); ok {
 			a.noteFocus(w)
 			dx, dy := g.Last.X-g.Start.X, g.Last.Y-g.Start.Y

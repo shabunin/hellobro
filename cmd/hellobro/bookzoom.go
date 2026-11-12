@@ -209,6 +209,10 @@ func (a *bro) pairMove() {
 		return
 	}
 	d1 := dist(f.Last, g.Last)
+	if a.nt.pinch != nil || a.notePinchStart(f, g, dist(f.Start, g.Start), d1) {
+		a.notePinchMove(d1)
+		return
+	}
 	if a.pinch == nil {
 		w, ok := a.windowAt(f.Start).(*bookWin)
 		d0 := dist(f.Start, g.Start)

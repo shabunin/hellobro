@@ -882,6 +882,16 @@ func (a *App) onTouch(ev TouchEv) {
 	}
 }
 
+// Touching says g is still on the screen (or the pen near it): not lifted.
+func (a *App) Touching(g *Gesture) bool {
+	for _, o := range a.gestures {
+		if o == g {
+			return true
+		}
+	}
+	return false
+}
+
 // Fingers are the fingers on the screen now (not the pen).
 func (a *App) Fingers() []*Gesture {
 	var fs []*Gesture

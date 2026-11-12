@@ -201,7 +201,6 @@ func (a *bro) Tick() {
 	a.ipcTick()
 	a.noteTick()
 	a.holdTick()
-	a.noteHoldTick()
 	a.inkTick()
 	a.wmSettle(false)
 	a.wmKeep(false)
@@ -572,6 +571,9 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	if a.pair[0] == g || a.pair[1] == g {
 		if a.pinch != nil {
 			a.pinchEnd()
+		}
+		if a.nt.pinch != nil {
+			a.notePinchEnd()
 		}
 		a.pair = [2]*kobo.Gesture{}
 	}

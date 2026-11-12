@@ -603,8 +603,14 @@ func (w *noteWin) diaryAsk(a *bro, now bool) {
 // diaryAnswer takes the model's answer to what's in below on page.
 func (w *noteWin) diaryAnswer(a *bro, page int, below image.Rectangle, out string, err error, style string, size float64, md bool) {
 	if err != nil {
+		// Said on the page, where the answer would be: a notice goes by
+		// unseen while the eyes are on the page. Not part of the talk.
 		log.Printf("diary %s: %v", w.nb.name, err)
-		a.Notify("diary: " + err.Error())
+		if style == diaryHand {
+			style = famGentium
+		}
+		w.diaryLay(page, below, diaryReply{Status: "error", Answer: "(no answer: " + diaryErrText(err) + ")"}, time.Now().UnixNano(), style, size)
+		w.diary.nextAt = time.Now()
 		return
 	}
 	var r diaryReply
@@ -669,9 +675,10 @@ func (w *noteWin) diaryLay(page int, below image.Rectangle, r diaryReply, seed i
 			}
 			as := []xml.Attr{{Name: xml.Name{Local: "font"}, Value: fam}, {Name: xml.Name{Local: "color"}, Value: "#000000ff"},
 				{Name: xml.Name{Local: diaryAttr}, Value: "diary"}}
-			if first {
-				as, first = append(as, talkAttrs(r)...), false
+			if first && r.Status != "error" {
+				as = append(as, talkAttrs(r)...)
 			}
+			first = false
 			line := textStroke(&noteText{size: pt, attrs: as}, image.Pt(left, y))
 			for j := 1; j <= n; j++ {
 				d.writing = append(d.writing, diaryWord{page: page, line: line, text: strings.Join(words[:j], " "), first: j == 1})
@@ -679,6 +686,15 @@ func (w *noteWin) diaryLay(page int, below image.Rectangle, r diaryReply, seed i
 			words, y = words[n:], y+lineH
 		}
 	}
+}
+
+// diaryErrText is what went wrong asking, short enough for a page.
+func diaryErrText(err error) string {
+	s := strings.Join(strings.Fields(err.Error()), " ")
+	if r := []rune(s); len(r) > 300 {
+		s = string(r[:300]) + "…"
+	}
+	return s
 }
 
 // talkAttrs are what an answer's first stroke keeps of it, for the

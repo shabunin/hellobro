@@ -969,6 +969,12 @@ width, its gray.
   last page, if it has something on it, a new page. Once a pen has
   written (or as the settings say, below), a finger swiped across the page turns it too (leftward: the
   next, as pages turn).
+- Where a finger turns pages, two fingers zoom them: apart, bigger (up
+  to 300%; a frame shows what will fill the window, and the zoom),
+  together, back to as they fit. Zoomed, a finger moves the pages
+  about instead of turning them; the pen writes on them as ever, the
+  arrows turn them (from their top left). Only the select tool's
+  finger takes what's on the page.
 - **Page size (new pages)**: **the screen, upright** (as pages have
   always been), **the screen, across** (a landscape page: it fills a
   landscape screen, one page, not two side by side), **A4**, **A5**,
@@ -1011,12 +1017,7 @@ width, its gray.
   remembered (`pen` in `hellobro.json`). The notebook's settings, **A
   finger**, chooses instead: **writes** (fingers always write, as
   the pen does) or **turns** (fingers only turn pages, so a hand resting
-  on the screen writes nothing; only the pen writes). Where fingers
-  turn pages, a finger held still on the page for 0.6 s picks up the
-  select tool: what's under it is taken (its frame and buttons show),
-  and the same finger dragged on moves it; held where nothing is and
-  dragged, it draws the rectangle that takes what's in it (below).
-  The pen, P, puts the select tool down again. Near the left and
+  on the screen writes nothing; only the pen writes). Near the left and
   right edges a finger writes nothing: those are the light's and the
   workspaces' swipes. Full screen, the right edge is still the menu's
   (it's everywhere), and the left edge is the light's unless the settings' **Light by the
@@ -1061,7 +1062,9 @@ width, its gray.
   marked, in this notebook or another: it shows **Marks**, a tab by
   the settings: each part marked, the last first (40 kept, in
   `note-marks.json`), with its picture, its text if it has some, its
-  notebook and page. **link here**, then a tap on the page, puts the
+  notebook and page; this notebook's only, at first (**only this
+  notebook's**: take the tick away for the others'). **link here**,
+  then a tap on the page, puts the
   link there: "→ the budget (plan, p. 3)", framed. A finger's tap on
   a link opens its notebook in this window, at its page, the part
   marked framed for 3 s; held (more than 0.6 s), in a window of its
@@ -1160,7 +1163,9 @@ a finger turns pages) ask at once, finished or not (**AI asks on
 taps**: three, two, or off). With the pause off, only taps ask. A full
 page goes on on the next one if it's empty, else on one put in after
 it, and the pages turn with it; in a roll (below) the page grows
-instead, and the roll follows the answer down.
+instead, and the roll follows the answer down. If it can't answer (no
+network, a bad key, the service's error), that's written there instead,
+"(no answer: ...)", and it isn't sent back as part of the talk.
 
 It answers in Markdown (**AI answers**, below), laid out as it says:
 headings, **bold** and *italic*, lists, quotes with a bar, tables in

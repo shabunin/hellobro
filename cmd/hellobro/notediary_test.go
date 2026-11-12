@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"image"
 	"slices"
 	"strconv"
@@ -225,5 +226,25 @@ func TestDiaryTitle(t *testing.T) {
 	nb.name = "Physics"
 	if strings.Contains(diarySystem(nb, nil, "md"), `"title"`) {
 		t.Error("named by hand: a title asked for")
+	}
+}
+
+// An answer that didn't come is said on the page, where it'd be, and
+// isn't part of the talk.
+func TestDiaryError(t *testing.T) {
+	q := lineAt(300, false)
+	w := &noteWin{nb: &notebook{pages: [][]*noteStroke{{q}}}, diary: &noteDiary{}}
+	w.nb.padMeta()
+	a := &bro{}
+	w.diaryAnswer(a, 0, q.box, "", errors.New("ai: 401 Unauthorized: {\"error\": \"bad key\"}"), diaryHand, 15, true)
+	for len(w.diary.writing) > 0 {
+		w.diaryWriteWord(a)
+	}
+	pg := w.nb.pages[0]
+	if last := pg[len(pg)-1]; last.txt == nil || !strings.Contains(last.txt.s, "401 Unauthorized") || !strings.HasPrefix(pg[1].txt.s, "(no answer:") {
+		t.Fatalf("the page: %d strokes, the last %+v", len(pg), last.txt)
+	}
+	if talk, _ := diaryTalk(w.nb); len(talk) != 0 {
+		t.Errorf("the error is in the talk: %+v", talk)
 	}
 }
