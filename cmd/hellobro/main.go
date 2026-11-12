@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"hellobro/ink/inkkobo"
 	"hellobro/ink/theme"
 	"hellobro/kobo"
 	"hellobro/radio"
@@ -179,6 +180,7 @@ func (a *bro) Tap(p image.Point) {
 	case a.picker != nil:
 		a.pickerTap(p)
 	case a.topTap(p):
+	case a.edgeTap(p):
 	case !a.lay.Full && !a.BarOff && a.nowPlaying() != "" && p.In(a.StatusNote()): // what's playing, in the bar
 		a.mediaKey(kobo.KeyPlayPause)
 	case !a.lay.Full && p.Y < a.lay.Page.Min.Y: // the bar, not a workspace's name in it
@@ -362,17 +364,43 @@ func (a *bro) topTap(p image.Point) bool {
 	if !a.fullTop(kobo.TouchEv{}, p) {
 		return false
 	}
-	w := a.windowAt(p).(*noteWin)
-	for _, b := range w.inkBodies(a) {
-		g := &kobo.Gesture{Start: p, Last: p, Tap: true}
-		if b.inkPane().Down(kobo.TouchEv{Kind: kobo.TouchDown}, p, g, ownPane) {
-			a.inkTick()
-			b.inkPane().Lift(g)
-			a.inkTick()
-			break
+	a.inkTap(p)
+	return true
+}
+
+// edgeTap hands a tap at the right edge, which the menu's swipe holds
+// (the finger may yet go along it), to what's there in ink: a button
+// by the edge (the models' "use it", a dialog's) is a button there too.
+func (a *bro) edgeTap(p image.Point) bool {
+	if p.X < a.C.Bounds().Dx()-kobo.EdgeWidth || a.overlay() {
+		return false
+	}
+	return a.inkTap(p)
+}
+
+// inkTap is a tap at p on the ink there, as if it had been its all along.
+func (a *bro) inkTap(p image.Point) bool {
+	var panes []*inkkobo.Pane
+	switch w := a.windowAt(p).(type) {
+	case *guiWin:
+		if w.ink != nil {
+			panes = append(panes, w.ink.pane)
+		}
+	case bodied:
+		for _, b := range w.inkBodies(a) {
+			panes = append(panes, b.inkPane())
 		}
 	}
-	return true
+	for _, pn := range panes {
+		g := &kobo.Gesture{Start: p, Last: p, Tap: true}
+		if pn.Down(kobo.TouchEv{Kind: kobo.TouchDown}, p, g, ownPane) {
+			a.inkTick()
+			pn.Lift(g)
+			a.inkTick()
+			return true
+		}
+	}
+	return false
 }
 
 // trioUp makes g and the two fingers already down three together, if

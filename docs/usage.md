@@ -121,7 +121,8 @@ it, the windows taking its room, and shows it again (Settings, Terminal,
 The bar; remembered in `bar`); a full-screen window has none either.
 
 A swipe up or down along the right edge of the screen opens the menu,
-full screen too, over anything,
+full screen too, over anything (a tap there is still the window's: a
+button by the edge works),
 tiles big enough for a finger, each an icon, a word and its keys: rotate
 the screen, auto-rotate (on or off, where it is), a screenshot, touch calibration, the on-screen keyboard, the light,
 Wi-Fi, Bluetooth, Settings, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to

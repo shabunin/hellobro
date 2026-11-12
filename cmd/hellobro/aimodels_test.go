@@ -1,10 +1,15 @@
 package main
 
 import (
+	"image"
 	"strings"
 	"testing"
+	"time"
 
 	"hellobro/ai"
+	"hellobro/ink/inktest"
+	"hellobro/kobo"
+	"hellobro/wm"
 )
 
 // TestModelsTable: the window's rows, searched, filtered and sorted.
@@ -53,5 +58,28 @@ func TestModelsTable(t *testing.T) {
 	}
 	if dollars(-1) != "—" || dollars(0) != "free" || dollars(0.15) != "$0.15" {
 		t.Error("dollars")
+	}
+}
+
+// TestModelsUse: a row tapped, then "use it": the model's the setting's.
+func TestModelsUse(t *testing.T) {
+	i := settingIndex("ai-model")
+	was := settingList[i]
+	defer func() { settingList[i] = was }()
+	a := &bro{App: &kobo.App{}, set: settings{}}
+	a.wm.tree = wm.New(image.Rect(0, 0, 1000, 800), kobo.FoldH)
+	a.nt.models = modelsState{loaded: true, V: modelsV, At: time.Now(), List: []ai.Model{
+		{ID: "cheap", Known: true, Images: true, In: 0.5, Out: 3, Proto: "openai"},
+		{ID: "dear", Known: true, Images: true, In: 15, Out: 75, Proto: "anthropic"},
+	}}
+	a.applyModels()
+	it := inktest.New(image.Pt(1404, 1800), inktest.ElipsaMetric, newModelsUI(a).Layout)
+	it.Frame()
+	must(t, it.TapText("dear"))
+	it.Frame()
+	must(t, it.TapText("use it"))
+	it.Frame()
+	if got := a.setting("ai-model"); got != "dear" {
+		t.Errorf("used: %q", got)
 	}
 }
