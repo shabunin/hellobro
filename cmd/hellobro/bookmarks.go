@@ -411,14 +411,6 @@ func (w *bookWin) showList(a *bro, marks bool) {
 	w.draw(a)
 }
 
-// drawTabs draws the list's header in r (library.go): All Books, the
-// tabs, the contents, the bookmarks, a PDF's pages (bookpages.go); and
-// at their right the way back to the page.
-func (w *bookWin) drawTabs(a *bro, r image.Rectangle) {
-	h := a.drawLibHeader(r, "All Books", false, func() { w.toShelf(a) }, "back to the book", func() { w.list = false; w.draw(a) }, w.listTabs(a))
-	w.rows = append(w.rows, h.rows...)
-}
-
 // listTabs are the list's tabs: the contents, the bookmarks, a PDF's
 // pages.
 func (w *bookWin) listTabs(a *bro) []libTab {

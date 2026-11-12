@@ -312,36 +312,6 @@ func (a *bro) launchUnask(t *termSession) {
 	}
 }
 
-// drawTile draws tile tl in r, lit (black) or not; compact, its name
-// alone.
-func (a *bro) drawTile(r image.Rectangle, tl launchTile, lit, compact bool) {
-	c := a.C
-	bg, ink, gray := uint8(kobo.White), uint8(kobo.Black), uint8(kobo.Mid)
-	if lit {
-		bg, ink, gray = kobo.Black, kobo.White, kobo.Light
-	}
-	c.Fill(r, bg)
-	c.Frame(r, 2, kobo.Black)
-	side := min(r.Dy()-16, 80)
-	ir := image.Rect(r.Min.X+8, r.Min.Y+(r.Dy()-side)/2, r.Min.X+8+side, r.Min.Y+(r.Dy()+side)/2)
-	drawIcon(c, appIcon(tl.icon), ir, ink, bg)
-	text := image.Rect(ir.Max.X+8, r.Min.Y+6, r.Max.X-10, r.Max.Y-6)
-	name := text
-	if tl.num > 0 {
-		nw := kobo.TextWidth(a.F.Small, "9")
-		c.Text(a.F.Small, image.Rect(r.Max.X-10-nw, r.Min.Y+6, r.Max.X-10, r.Min.Y+6+a.F.Small.Metrics().Height.Ceil()), fmt.Sprint(tl.num), gray, kobo.AlignRight)
-		name.Max.X -= nw + 8
-	}
-	if compact || tl.note == "" {
-		c.Text(a.F.Body, name, tl.name, ink, kobo.AlignLeft)
-		return
-	}
-	mid := text.Min.Y + text.Dy()*11/20
-	name.Max.Y = mid
-	c.Text(a.F.Body, name, tl.name, ink, kobo.AlignLeft)
-	c.Text(a.F.Small, image.Rect(text.Min.X, mid, text.Max.X, text.Max.Y-4), tl.note, gray, kobo.AlignLeft)
-}
-
 // menuKey moves the lit tile by the arrows, or opens it (Enter); false
 // if code is neither, or nothing's lit for Enter.
 func (a *bro) menuKey(t *termSession, code uint16) bool {

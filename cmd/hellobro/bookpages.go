@@ -1,9 +1,9 @@
 package main
 
 // A PDF's pages, small: the contents' third tab (Pages; o, or Tab from
-// the bookmarks), a screenful at a time, the page being read framed.
-// Tap one, or Enter, to read it; the arrows move the choice, PgUp and
-// PgDn or a finger swiped up and down go a screenful. Each is drawn by
+// the bookmarks), in the list's grid (libui.go), the page being read
+// framed. Tap one, or Enter, to read it; the arrows move the choice,
+// PgUp and PgDn go a screenful, a finger scrolls them. Each is drawn by
 // MuPDF away from the main loop, one at a time, those showing first,
 // then the next screenful's; a few screenfuls are kept.
 
@@ -13,13 +13,6 @@ import (
 	"log"
 
 	"hellobro/book"
-	"hellobro/kobo"
-)
-
-const (
-	thumbW   = 240 // px a page is at least, small
-	thumbGap = 24
-	thumbLab = 36 // px under it for its number
 )
 
 // pdfThumbs are the pages drawn small.
@@ -30,82 +23,31 @@ type pdfThumbs struct {
 	aspect float64
 }
 
-// thumbLayout is where the pages show small in area: a tile each, as
-// many as fit, and how many across.
-func (w *bookWin) thumbLayout(area image.Rectangle) ([]image.Rectangle, int) {
+// pageGrid is the pages small, for the list (libui.go's grid): as it
+// lays them out, those wanted are drawn (thumbNext).
+func (w *bookWin) pageGrid(a *bro) *libGrid {
 	if w.thumbs == nil {
 		w.thumbs = &pdfThumbs{drawn: map[int]*image.Gray{}, aspect: 1.3}
 		if sz, err := w.pdf.Size(0); err == nil && sz.W > 0 {
 			w.thumbs.aspect = sz.H / sz.W
 		}
 	}
-	k := w.thumbs.aspect
-	cols := max(2, (area.Dx()+thumbGap)/(thumbW+thumbGap))
-	tw := (area.Dx() - (cols-1)*thumbGap) / cols
-	th := int(float64(tw) * k)
-	if th+thumbLab > area.Dy() { // a short window: one row, as tall as it goes
-		th = area.Dy() - thumbLab
-		tw = int(float64(th) / k)
-		cols = max(1, (area.Dx()+thumbGap)/(tw+thumbGap))
-	}
-	rows := max(1, (area.Dy()+thumbGap)/(th+thumbLab+thumbGap))
-	x0 := area.Min.X + (area.Dx()-cols*tw-(cols-1)*thumbGap)/2
-	var tiles []image.Rectangle
-	for r := range rows {
-		for c := range cols {
-			x, y := x0+c*(tw+thumbGap), area.Min.Y+r*(th+thumbLab+thumbGap)
-			tiles = append(tiles, image.Rect(x, y, x+tw, y+th))
-		}
-	}
-	return tiles, cols
-}
-
-// drawThumbs draws the pages small in area, the choice (w.sel) in the
-// screenful (from w.top).
-func (w *bookWin) drawThumbs(a *bro, area image.Rectangle) {
-	tiles, cols := w.thumbLayout(area)
-	per, n := len(tiles), len(w.b.Spine)
-	w.listN, w.listCols, w.thumbTiles = per, cols, tiles
-	if per == 0 {
-		return
-	}
-	if w.thumbs.width != tiles[0].Dx() { // another size: drawn again
-		w.thumbs.width, w.thumbs.drawn = tiles[0].Dx(), map[int]*image.Gray{}
-	}
-	w.sel = max(0, min(w.sel, n-1))
-	w.top = w.sel / per * per
-	for i, t := range tiles {
-		pg := w.top + i
-		if pg >= n {
-			break
-		}
-		w.drawThumb(a, pg, t)
-		lab := image.Rect(t.Min.X-thumbGap/2, t.Min.Y-thumbGap/2, t.Max.X+thumbGap/2, t.Max.Y+thumbLab)
-		w.rows = append(w.rows, bookRow{lab, func() { w.listOpen(a, pg) }})
-	}
-	w.thumbNext(a)
-}
-
-// drawThumb draws page pg small in t: drawn, or blank till it is; its
-// frame, thick if it's the choice; its number under it.
-func (w *bookWin) drawThumb(a *bro, pg int, t image.Rectangle) {
-	c := a.C
-	c.Fill(image.Rect(t.Min.X-8, t.Min.Y-8, t.Max.X+8, t.Max.Y+thumbLab), kobo.White)
-	if m := w.thumbs.drawn[pg]; m != nil {
-		kobo.CopyGray(c.Gray, t.Intersect(m.Bounds().Add(t.Min)), m, image.Point{})
-	}
-	frame, ink := 1, uint8(kobo.Mid)
-	if pg == w.sel {
-		frame, ink = 5, kobo.Black
-	}
-	for _, s := range frameStrips(t.Inset(-frame), frame) {
-		c.Fill(s, ink)
-	}
-	num := fmt.Sprint(pg + 1)
-	if pg == w.spine {
-		num += " · reading"
-	}
-	c.Text(a.F.Small, image.Rect(t.Min.X, t.Max.Y, t.Max.X, t.Max.Y+thumbLab), num, kobo.Black, kobo.AlignCenter)
+	th := w.thumbs
+	return &libGrid{n: len(w.b.Spine), aspect: th.aspect,
+		thumb: func(i int) *image.Gray { return th.drawn[i] },
+		label: func(i int) string {
+			if i == w.spine {
+				return fmt.Sprint(i+1, " · reading")
+			}
+			return fmt.Sprint(i + 1)
+		},
+		laid: func(width, cols, first, per int) {
+			w.listCols, w.listN, w.top = cols, per, first
+			if th.width != width { // another size: drawn again
+				th.width, th.drawn = width, map[int]*image.Gray{}
+			}
+			w.thumbNext(a)
+		}}
 }
 
 // thumbNext draws the next page wanted small, away from the main loop:
@@ -115,7 +57,7 @@ func (w *bookWin) thumbNext(a *bro) {
 	if th == nil || th.busy || !w.list || !w.listPages {
 		return
 	}
-	per, n := len(w.thumbTiles), len(w.b.Spine)
+	per, n := max(1, w.listN), len(w.b.Spine)
 	pg := -1
 	for i := w.top; i < min(n, w.top+2*per); i++ {
 		if th.drawn[i] == nil {
@@ -145,12 +87,9 @@ func (w *bookWin) thumbNext(a *bro) {
 					delete(th.drawn, k)
 				}
 			}
-			// The tiles as they are now: fewer, if the window got shorter
-			// while the page was drawn.
-			if i := pg - w.top; i >= 0 && i < len(w.thumbTiles) && w.list && w.listPages && a.shows(w) {
-				t := w.thumbTiles[i]
-				w.drawThumb(a, pg, t)
-				a.Mark(image.Rect(t.Min.X-8, t.Min.Y-8, t.Max.X+8, t.Max.Y+thumbLab), true)
+			if w.list && w.listPages && a.shows(w) {
+				w.update(a) // it's laid out again: the next is asked for then
+				return
 			}
 			w.thumbNext(a)
 		})

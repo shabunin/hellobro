@@ -1,7 +1,8 @@
 package main
 
 // The lists of them all, in ink (library.go has what's in them): the
-// books' shelf, a book's contents and bookmarks, the notebooks. The
+// books' shelf, a book's contents and bookmarks, a PDF's pages small (a
+// grid), the notebooks. The
 // header, the tools under it, the rows, a name typed in its row. The
 // keys are the windows' own, as they were: they move sel, and the list
 // follows it; a finger scrolls it. What a tap picked is done after the
@@ -45,7 +46,20 @@ type libSpec struct {
 	editNo   func()
 	buttons  func(i int, it libItem) []libTab
 	open     func(i int)
-	shown    *int // how many rows show, for PgUp and PgDn
+	shown    *int     // how many rows show, for PgUp and PgDn
+	grid     *libGrid // pages small instead of items, if not nil
+}
+
+// libGrid is a grid of pages drawn small, as many across as fit: a
+// PDF's (bookpages.go).
+type libGrid struct {
+	n      int
+	aspect float64                 // a page's height over its width
+	thumb  func(i int) *image.Gray // page i small, nil till it's drawn
+	label  func(i int) string      // under it
+	// laid says how they're laid out: how wide (they're drawn so), how
+	// many across, the first that shows and how many show.
+	laid func(width, cols, first, per int)
 }
 
 // libHeadUI is a header's taps.
@@ -117,7 +131,7 @@ func (u *libUI) Layout(gtx ink.Ctx) ink.Dims {
 	if s.id != u.id {
 		u.id, u.sel, u.list = s.id, -1, layout.Scroll{}
 	}
-	if s.sel != nil {
+	if s.sel != nil && s.grid == nil { // the grid follows it by its rows
 		*s.sel = max(0, min(*s.sel, len(s.items)-1))
 		if *s.sel != u.sel {
 			u.sel = *s.sel
@@ -135,6 +149,9 @@ func (u *libUI) Layout(gtx ink.Ctx) ink.Dims {
 				layout.Rigid(layout.Spacer{Height: th.Pad}.Layout))
 		}
 		kids = append(kids, layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+			if s.grid != nil {
+				return u.grid(gtx, s)
+			}
 			if s.shown != nil {
 				*s.shown = max(1, gtx.Constraints.Max.Y/rowH)
 			}
@@ -165,16 +182,20 @@ func (u *libUI) taps(gtx ink.Ctx, s libSpec) {
 			u.do = t.do
 		}
 	}
-	for len(u.rows) < len(s.items) {
+	n := len(s.items)
+	if s.grid != nil {
+		n = s.grid.n
+	}
+	for len(u.rows) < n {
 		u.rows = append(u.rows, widget.Clickable{NoFocus: true})
 		u.btns = append(u.btns, nil)
 	}
-	for i := range s.items {
+	for i := range n {
 		if u.rows[i].Clicked(gtx) && s.open != nil {
 			u.do = func() { s.open(i) }
 		}
 		for k := range u.btns[i] {
-			if u.btns[i][k].Clicked(gtx) && s.buttons != nil {
+			if u.btns[i][k].Clicked(gtx) && s.buttons != nil && i < len(s.items) {
 				if bs := s.buttons(i, s.items[i]); k < len(bs) {
 					u.do = bs[k].do
 				}
@@ -416,6 +437,84 @@ func (u *libUI) editRow(gtx ink.Ctx, s libSpec, w, rowH int) ink.Dims {
 	cx := x + text.Width(f, t) + gtx.Dp(1)
 	ink.Fill(gtx.Ops, image.Rect(cx, box.Min.Y+box.Dy()/4, cx+max(gtx.Dp(2), 3), box.Max.Y-box.Dy()/4), th.Fg) // the caret
 	return ink.Dims{Size: image.Pt(w, rowH)}
+}
+
+// Pages small: at least thumbW px wide, thumbGap between, thumbLab under
+// each for its number.
+const (
+	thumbW   = 240
+	thumbGap = 24
+	thumbLab = 36
+)
+
+// grid lays the pages out small, as many across as fit (on a short
+// window one row, as tall as it goes), in a list of their rows that
+// follows the selection; the one chosen framed thick.
+func (u *libUI) grid(gtx ink.Ctx, s libSpec) ink.Dims {
+	g, th := s.grid, u.a.theme()
+	w, room := gtx.Constraints.Max.X, gtx.Constraints.Max.Y
+	if g.n == 0 || w <= 0 || room <= 0 {
+		return ink.Dims{Size: gtx.Constraints.Max}
+	}
+	cols := max(2, (w+thumbGap)/(thumbW+thumbGap))
+	tw := (w - (cols-1)*thumbGap) / cols
+	ph := int(float64(tw) * g.aspect)
+	if ph+thumbLab+thumbGap > room {
+		ph = max(1, room-thumbLab-thumbGap)
+		tw = max(1, int(float64(ph)/g.aspect))
+		cols = max(1, (w+thumbGap)/(tw+thumbGap))
+	}
+	rowH := ph + thumbLab + thumbGap
+	x0 := (w - cols*tw - (cols-1)*thumbGap) / 2
+	sel := 0
+	if s.sel != nil {
+		*s.sel = max(0, min(*s.sel, g.n-1))
+		sel = *s.sel
+	}
+	if sel != u.sel {
+		u.sel = sel
+		u.list.ScrollTo(sel / cols)
+	}
+	small := th.Face(gtx, th.TextSize*0.85, text.Regular)
+	u.list.Axis = layout.Vertical
+	d := theme.List(th, &u.list).Layout(gtx, (g.n+cols-1)/cols, func(gtx ink.Ctx, row int) ink.Dims {
+		for c := range cols {
+			i := row*cols + c
+			if i >= g.n {
+				break
+			}
+			at := image.Pt(x0+c*(tw+thumbGap), thumbGap/2)
+			st := ink.Offset(gtx.Ops, at)
+			cg := gtx
+			cg.Constraints = ink.Exact(image.Pt(tw, ph+thumbLab))
+			clk := &u.rows[i]
+			clk.Layout(cg, func(gtx ink.Ctx) ink.Dims {
+				r := image.Rect(0, 0, tw, ph)
+				ink.Fill(gtx.Ops, image.Rect(0, 0, tw, ph+thumbLab), th.Bg)
+				if m := g.thumb(i); m != nil {
+					ink.Image(gtx.Ops, r, m, m.Rect.Min)
+				}
+				frame, gray := 1, uint8(ink.Mid)
+				if i == sel {
+					frame, gray = 5, th.Fg
+				}
+				ink.Frame(gtx.Ops, r.Inset(-frame), frame, gray)
+				l := text.Fit(small, g.label(i), tw)
+				ink.TextAt(gtx.Ops, small, (tw-text.Width(small, l))/2, ph+(thumbLab-text.Height(small))/2+text.Ascent(small), l, th.Fg)
+				if clk.Pressed() {
+					ink.Invert(gtx.Ops, r)
+				}
+				return ink.Dims{Size: cg.Constraints.Max}
+			})
+			st.Pop()
+		}
+		return ink.Dims{Size: image.Pt(w, rowH)}
+	})
+	if s.shown != nil {
+		*s.shown = cols * max(1, room/rowH)
+	}
+	g.laid(tw, cols, u.list.First()*cols, cols*max(1, room/rowH))
+	return d
 }
 
 // drawFolderInk draws a folder's sign in the middle of r, in g.

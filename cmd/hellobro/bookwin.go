@@ -196,33 +196,32 @@ type bookWin struct {
 	savedAt time.Time
 	pics    map[string]*image.Gray // the page's pictures, scaled
 
-	marks      []bookMark
-	list       bool              // the contents (or the shelf) show
-	listMks    bool              // the list is the bookmarks, not the contents
-	listPages  bool              // a PDF's pages, small (bookpages.go)
-	listCols   int               // how many across, then
-	thumbs     *pdfThumbs        // the pages drawn small
-	thumbTiles []image.Rectangle // where they show
-	styling    bool              // the style panel shows (bookstyle.go)
-	sel        int
-	top        int
-	listN      int // the rows the list has room for
-	rows       []bookRow
-	shelf      []shelfBook
-	looking    bool         // the shelf is being looked for
-	shelfTab   int          // its tab: libRecent, libAll, libFolders
-	shelfDir   string       // the folder it shows, under booksRoot
-	back       string       // the book it was opened from, to go back to
-	named      string       // the name it was given, if it was (bookrename.go)
-	note       *bookNote    // a link's target over the page (booknote.go)
-	from       *bookFrom    // where a link was followed from
-	ex         *exLine      // a ":" command being typed (bookex.go)
-	found      *bookFind    // the word looked for last
-	finding    *atomic.Bool // set, the look going on is no longer wanted
-	edit       *noteEdit    // a shelf's book's name being typed: key its path
-	lib        *libUI       // the lists, in ink: the shelf, the contents, the bookmarks
-	style      *styleUI     // the style panel's ink
-	barUI      *barUI       // the bar's
+	marks     []bookMark
+	list      bool       // the contents (or the shelf) show
+	listMks   bool       // the list is the bookmarks, not the contents
+	listPages bool       // a PDF's pages, small (bookpages.go)
+	listCols  int        // how many across, then
+	thumbs    *pdfThumbs // the pages drawn small
+	styling   bool       // the style panel shows (bookstyle.go)
+	sel       int
+	top       int
+	listN     int // the rows the list has room for
+	rows      []bookRow
+	shelf     []shelfBook
+	looking   bool         // the shelf is being looked for
+	shelfTab  int          // its tab: libRecent, libAll, libFolders
+	shelfDir  string       // the folder it shows, under booksRoot
+	back      string       // the book it was opened from, to go back to
+	named     string       // the name it was given, if it was (bookrename.go)
+	note      *bookNote    // a link's target over the page (booknote.go)
+	from      *bookFrom    // where a link was followed from
+	ex        *exLine      // a ":" command being typed (bookex.go)
+	found     *bookFind    // the word looked for last
+	finding   *atomic.Bool // set, the look going on is no longer wanted
+	edit      *noteEdit    // a shelf's book's name being typed: key its path
+	lib       *libUI       // the lists, in ink: the shelf, the contents, the bookmarks
+	style     *styleUI     // the style panel's ink
+	barUI     *barUI       // the bar's
 }
 
 func (w *bookWin) Title() string {
@@ -825,20 +824,11 @@ func (w *bookWin) listOpen(a *bro, i int) {
 }
 
 func (w *bookWin) drawList(a *bro) {
-	if w.inkList() {
-		w.libOf(a).put(a, w.p.Body, true)
-		return
-	}
-	area := w.p.Body.Inset(kobo.Pad)
-	rowH := a.libRowH()
-	w.rows = nil
-	w.drawTabs(a, image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH))
-	area.Min.Y += rowH + 12
-	w.drawThumbs(a, area)
+	w.libOf(a).put(a, w.p.Body, true)
 }
 
-// inkList says the list shows, in ink: all but a PDF's pages, small.
-func (w *bookWin) inkList() bool { return w.list && !w.listPages && !w.styling }
+// inkList says the list shows, in ink.
+func (w *bookWin) inkList() bool { return w.list && !w.styling }
 
 // libOf is the lists' ink, made the first time.
 func (w *bookWin) libOf(a *bro) *libUI {
@@ -920,6 +910,10 @@ func (w *bookWin) libSpec(a *bro) libSpec {
 		s.items = append(s.items, libItem{name: l})
 	}
 	s.empty, s.id = "no contents in this book", "contents"
+	if w.listPages {
+		s.id, s.grid, s.items = "pages", w.pageGrid(a), nil
+		return s
+	}
 	if w.listMks {
 		s.id = "marks"
 		s.empty = "no bookmarks yet: b, or the ribbon over the page"
@@ -1149,7 +1143,7 @@ func (w *bookWin) press(a *bro, code uint16, value int32) bool {
 		default:
 			return false
 		}
-		w.draw(a)
+		w.update(a)
 		return true
 	}
 	if w.list {

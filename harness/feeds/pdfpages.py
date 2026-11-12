@@ -1,7 +1,7 @@
 # A PDF's pages, small (bookpages.go): the first book, a PDF, in
 # fullscreen; o: the pages, drawn one by one; → → Enter: the third read.
-# A tap at the top (fullscreen, a PDF has no bar): the contents; the Pages tab; a finger swiped up: the
-# next screenful; a tap on its second page reads it.
+# A tap at the top (fullscreen, a PDF has no bar): the contents; o, the
+# Pages tab; a finger swiped up scrolls them; a tap on its second page reads it.
 # HELLOBRO_BOOKS: a directory with a PDF first by name.
 # app: hellobro
 import os, sys
@@ -16,7 +16,7 @@ key(24); time.sleep(12)                            # o: the pages, small
 key(RIGHT); time.sleep(2); key(RIGHT); time.sleep(2)
 key(ENTER); time.sleep(6)                          # page 3
 tap(W // 2, 40); time.sleep(3)                     # the contents
-tap(170 + (W - 450) * 5 // 6, 40); time.sleep(10)  # the Pages tab
+key(24); time.sleep(10)                            # o: the Pages tab
 stroke([(W // 2, H * 3 // 4 - i * 40) for i in range(12)]); time.sleep(10)  # swiped up: the next screenful
 tap(W // 2, 250); time.sleep(6)                    # its first row's middle page
 fullscreen(); time.sleep(3)

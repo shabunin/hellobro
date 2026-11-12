@@ -12,7 +12,6 @@ package main
 import (
 	"cmp"
 	"fmt"
-	"image"
 	"path"
 	"slices"
 	"strings"
@@ -36,59 +35,10 @@ type libTab struct {
 	do   func()
 }
 
-// libHead is where the header put its buttons.
-type libHead struct {
-	all, back image.Rectangle
-	rows      []bookRow
-}
-
 // libRowH is a list's row: room for a finger.
 func (a *bro) libRowH() int { return max(libRowMin, kobo.TextWidth(a.F.Body, "M")*2+10) }
 
 var libRowMin = 64 // sizes.go: taller for fingers
-
-// drawLibHeader draws the header in r: all ("All Books"), lit if here;
-// back ("back to the book"), if there's somewhere to go back to; the
-// tabs between.
-func (a *bro) drawLibHeader(r image.Rectangle, all string, here bool, toAll func(), back string, toBack func(), tabs []libTab) libHead {
-	c := a.C
-	var h libHead
-	h.all = image.Rect(r.Min.X, r.Min.Y, r.Min.X+min(230, r.Dx()/5), r.Max.Y-6)
-	if here {
-		c.Fill(h.all, kobo.Black)
-		c.Text(a.F.Panel, h.all, all, kobo.White, kobo.AlignCenter)
-	} else {
-		c.Frame(h.all, 2, kobo.Black)
-		c.Text(a.F.Panel, h.all, "‹ "+all, kobo.Black, kobo.AlignCenter)
-	}
-	h.rows = append(h.rows, bookRow{h.all, toAll})
-	h.back = image.Rect(r.Max.X-min(300, r.Dx()/4), r.Min.Y, r.Max.X, r.Max.Y-6)
-	if back != "" {
-		if kobo.TextWidth(a.F.Panel, back)+24 > h.back.Dx() { // a narrow window
-			back = "back"
-		}
-		c.Frame(h.back, 2, kobo.Black)
-		c.Text(a.F.Panel, h.back, back, kobo.Black, kobo.AlignCenter)
-		h.rows = append(h.rows, bookRow{h.back, toBack})
-	}
-	r.Min.X, r.Max.X = h.all.Max.X+16, h.back.Min.X-16
-	c.Fill(image.Rect(r.Min.X, r.Max.Y-2, r.Max.X, r.Max.Y), kobo.Light)
-	if len(tabs) == 0 {
-		return h
-	}
-	each := r.Dx() / len(tabs)
-	for k, t := range tabs {
-		tr := image.Rect(r.Min.X+k*each, r.Min.Y, r.Min.X+(k+1)*each, r.Max.Y)
-		ink := uint8(kobo.Mid)
-		if t.on {
-			ink = kobo.Black
-			c.Fill(image.Rect(tr.Min.X, tr.Max.Y-5, tr.Max.X, tr.Max.Y), kobo.Black)
-		}
-		c.Text(a.F.Body, tr, t.name, ink, kobo.AlignCenter)
-		h.rows = append(h.rows, bookRow{tr, t.do})
-	}
-	return h
-}
 
 // libTabs are the tabs of a list of them all, tab on; pick takes one.
 func libTabs(tab int, pick func(int)) []libTab {
