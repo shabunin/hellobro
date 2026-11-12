@@ -735,7 +735,9 @@ and centred text; and for PDFs, drawn by MuPDF (below).
   on the bar, after ‹ All Books: a tap on it comes back.
   A link to a whole chapter goes there at once.
 - **s**, or a tap on **Aa**, opens the style panel, the reader's own: the fonts, each shown in itself
-  (tap one), the size, the lines' spacing, the margins (± each),
+  (tap one), the size (a slider: the book's set again when the finger
+  lifts; the sample under the panel follows it meanwhile, and + and −
+  still step it), the lines' spacing and the margins (± each),
   justified and hyphenation (on / off), **Pages** (this book's own,
   kept with its place: one page, two side by side, or two if wide: two
   when the window is wider than tall, a landscape screen), **Bar,
@@ -1159,7 +1161,7 @@ prompts" in the switcher): tap one to read it whole and change it
 A notebook can answer what's written in it, as Tom Riddle's diary did.
 Turn **AI diary (this notebook)** on in its settings (each notebook
 its own; it's kept in the file). Write, and rest the pen: after about
-3 seconds (**AI asks after a pause**: 2, 3, 5 or 10 s, or off) what's
+3 seconds (**AI asks after a pause**: 2, 3, 5, 10 or 30 s, 1 min, or off) what's
 been written since the diary's last answer on that page goes to a
 language model as a picture: the handwriting, typed
 text, and pictures pasted there (a book's cut, say: sent as sharp as
@@ -1270,15 +1272,18 @@ Its settings, under the notebook's:
   how it's asked; **use it**, or **as ai.conf says**. The list is
   fetched when it's a day old (or ai.conf's `base` changed), or on
   **refresh**, and kept in `ai-models.json`, so it's there offline.
-- **AI font (this notebook)**: a tap lists them: **Gentium Book**
-  (first: Latin, Cyrillic and Greek, polytonic too, in all four
-  styles; it comes with hellobro), Go, the fonts the books are read in
-  (the Kobo's own: Georgia, Amasis and the rest), or **handwriting**
-  (the Hershey script, drawn as strokes; plain text only).
+- **AI letters (this notebook's font)**: a tap opens their page: the
+  answers' **Size** (a slider, 10 to 32 pt, every notebook's, from the
+  next answer), then the fonts, each showing English, Russian and Greek
+  in itself at that size; a tap picks this notebook's. **Gentium Book**
+  (first: Latin, Cyrillic and Greek, polytonic too, in all four styles;
+  it comes with hellobro), Go, the fonts the books are read in (the
+  Kobo's own: Georgia, Amasis and the rest), or **handwriting** (the
+  Hershey script, drawn as strokes; plain text only). Esc or
+  **‹ settings** goes back.
 - **AI answers**: **Markdown** (code, formulas, tables, diagrams, as above) or
   **plain text**.
-- **AI letters' size**: medium (15 pt), small, large, huge.
-- **AI asks after a pause**: when the pen rests 3 s (or 2, 5, 10), or
+- **AI asks after a pause**: when the pen rests 3 s (or 2, 5, 10, 30 s, 1 min), or
   **off**: only taps ask.
 - **AI asks on taps**: **three quick taps**, **two quick taps**, or
   **off**: only the pause asks.

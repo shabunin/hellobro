@@ -74,7 +74,7 @@ type mdSeg struct {
 // fam's font, its letters pt points.
 func (w *noteWin) diaryLayMD(page int, below image.Rectangle, r diaryReply, fam string, pt float64) {
 	if pt == 0 {
-		pt = diarySizes["m"]
+		pt = diaryPt
 	}
 	size := w.pageSize(page)
 	l := &mdLay{w: w, page: page, fam: fam, pt: pt, talk: talkAttrs(r)}

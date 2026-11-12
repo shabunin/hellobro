@@ -120,14 +120,14 @@ func noteSetRows() []noteSet {
 			}
 			return "as ai.conf says: " + a.diaryConfModel()
 		}, open: func(a *bro, _ *noteWin) { a.openGUI(modelsKey) }},
-		{label: "AI font (this notebook)", value: func(a *bro, w *noteWin) string {
-			if f := w.nb.diaryFont(); f != diaryHand {
-				return f
+		{label: "AI letters (this notebook's font)", value: func(a *bro, w *noteWin) string {
+			f := w.nb.diaryFont()
+			if f == diaryHand {
+				f = "handwriting (the Hershey script)"
 			}
-			return "handwriting (the Hershey script)"
-		}, open: func(a *bro, w *noteWin) { w.chooseFont(a) }},
+			return fmt.Sprintf("%s, %g pt", f, a.diarySize())
+		}, open: func(a *bro, w *noteWin) { w.lettersOn(a) }},
 		own("AI answers", "ai-format"),
-		own("AI letters' size", "ai-size"),
 		own("AI asks after a pause", "ai-pause"),
 		own("AI asks on taps", "ai-taps"),
 		{label: "AI usage", value: func(a *bro, _ *noteWin) string { return a.usageShown() }},
@@ -139,7 +139,7 @@ func (w *noteWin) settingsOn(a *bro, on bool) {
 	w.endTyping(a)
 	w.optsOf, w.settings = "", on
 	if w.set != nil {
-		w.set.list = layout.Scroll{}
+		w.set.list, w.set.letters = layout.Scroll{}, false
 	}
 	w.place(a, w.p) // the bar fullscreen may be another now
 	w.draw(a)
@@ -159,6 +159,8 @@ type noteSetUI struct {
 	do   func()
 
 	marks               bool // the Marks tab: the parts marked, to link to (notelink.go)
+	letters             bool // the AI letters' page (noteletters.go)
+	lt                  lettersUI
 	anc                 []noteAnchor
 	only                widget.Bool // this notebook's marks only: on at first
 	thumbs              map[int64]*image.Gray
@@ -234,13 +236,20 @@ func (u *noteSetUI) Layout(gtx ink.Ctx) ink.Dims {
 	a, w, th := u.a, u.w, u.a.theme()
 	hs := libHeadSpec{all: "All Notebooks", toAll: func() { w.settings = false; a.notesFrom(w) },
 		back: "back to the notebook", toBack: func() { w.settingsOn(a, false) }, tabs: []libTab{
-			{"Settings", !u.marks, func() { u.marks = false; u.list = layout.Scroll{}; w.showSettings(a) }},
-			{"Marks", u.marks, func() { u.marks, u.anc = true, loadAnchors(); u.list = layout.Scroll{}; w.showSettings(a) }}}}
+			{"Settings", !u.marks, func() { u.marks, u.letters = false, false; u.list = layout.Scroll{}; w.showSettings(a) }},
+			{"Marks", u.marks, func() {
+				u.marks, u.letters, u.anc = true, false, loadAnchors()
+				u.list = layout.Scroll{}
+				w.showSettings(a)
+			}}}}
 	if do := u.head.taps(gtx, hs); do != nil {
 		u.do = do
 	}
 	if u.marks {
 		return u.marksLayout(gtx, hs)
+	}
+	if u.letters {
+		return u.lettersLayout(gtx, hs)
 	}
 	for i, s := range noteSettings {
 		if s.opts == nil {
@@ -303,6 +312,11 @@ func (w *noteWin) settingsKey(a *bro, code uint16, ch string, value int32) bool 
 		code = keyUp
 	}
 	if u.pane.Key(code, value, inkMods(a.tv.mods), a.tv.mods.caps) {
+		w.showSettings(a)
+		return true
+	}
+	if value == 1 && (code == kobo.KeyEsc || ch == "q") && u.letters { // back to the settings
+		u.letters, u.list = false, layout.Scroll{}
 		w.showSettings(a)
 		return true
 	}

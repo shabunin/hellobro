@@ -80,12 +80,12 @@ func TestSettingsUINarrow(t *testing.T) {
 // lifts; each setting with a help line under it; the notebooks' and the
 // AI's settings in the app's too.
 func TestSettingsUISliders(t *testing.T) {
-	a := &bro{App: &kobo.App{}, set: settings{"text-size": 1, "ai-size": 1}}
+	a := &bro{App: &kobo.App{}, set: settings{"text-size": 1, "ai-size": 5}}
 	u := inkUIs["settings"](a)
 	it := inktest.New(image.Pt(900, 7000), inktest.ElipsaMetric, u.Layout)
 	inkSave(t, it, "settings-all")
 	for _, s := range []string{"Text size", "as it comes, 100%", "how tall the strips, rows and buttons are", "Notebooks", "A finger in a notebook",
-		"AI notebooks", "Letters of an answer", "medium, 15 pt", "Your prompts"} {
+		"AI notebooks", "Letters of an answer", "15 pt", "Your prompts"} {
 		if _, err := it.Find(s); err != nil {
 			t.Fatal(err)
 		}
@@ -96,18 +96,18 @@ func TestSettingsUISliders(t *testing.T) {
 	it.Press(image.Pt(60, y))
 	it.Move(image.Pt(880, y))
 	it.Frame()
-	if a.set["ai-size"] != 1 {
+	if a.set["ai-size"] != 5 {
 		t.Errorf("picked while held: %d", a.set["ai-size"])
 	}
 	it.Release(image.Pt(880, y))
 	it.Frame()
-	if a.setting("ai-size") != "xl" {
+	if a.setting("ai-size") != "32" {
 		t.Errorf("dragged to the end: %q", a.setting("ai-size"))
 	}
-	if _, err := it.Find("huge, 24 pt"); err != nil {
+	if _, err := it.Find("32 pt"); err != nil {
 		t.Error(err)
 	}
-	a.set["ai-size"] = 1
+	a.set["ai-size"] = 5
 	a.set.save()
 
 	a.set["text-size"] = 4

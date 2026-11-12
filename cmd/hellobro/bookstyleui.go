@@ -31,6 +31,8 @@ type styleUI struct {
 	fonts []widget.Clickable
 	minus [3]widget.Clickable // size, spacing, margins; a PDF's zoom the first
 	plus  [3]widget.Clickable
+	size  widget.Float // the letters': picked when the finger lifts (the book's laid out again)
+	held  bool
 	just  widget.Bool
 	hyph  widget.Bool
 	trim  widget.Bool
@@ -132,6 +134,21 @@ func (u *styleUI) Layout(gtx ink.Ctx) ink.Dims {
 				u.do = step(i, 1)
 			}
 		}
+		u.size.Min, u.size.Max, u.size.Step = bookPxMin, bookPxMax, bookPxStep
+		if u.size.Changed(gtx) {
+			u.held = true
+		}
+		if u.held && !u.size.Dragging() {
+			u.held = false
+			if px := int(u.size.Value + 0.5); px != st.px {
+				u.do = func() { st := a.bookStyle(); st.px = px; a.setBookStyle(st) }
+			}
+		}
+		if !u.held {
+			u.size.Value = float32(st.px)
+		} else {
+			st.px = int(u.size.Value + 0.5) // the sample at it while the finger's on it
+		}
 		if u.just.Update(gtx) {
 			u.do = step(styleJustify, 0)
 		}
@@ -182,9 +199,13 @@ func (u *styleUI) Layout(gtx ink.Ctx) ink.Dims {
 	} else {
 		rows = append(rows, func(gtx ink.Ctx) ink.Dims { return u.fontTiles(gtx, fams) })
 		vals := st.values()
-		for k, i := range []int{styleSize, styleLeading, styleMargin} {
+		rows = append(rows, func(gtx ink.Ctx) ink.Dims {
+			sl := theme.Slider(th, &u.size, styleLabels[styleSize], fmt.Sprintf("%d px", int(u.size.Value+0.5)))
+			return layout.Inset{Top: th.Pad / 2, Left: th.Pad / 2, Right: th.Pad / 2}.Layout(gtx, sl.Layout)
+		})
+		for k, i := range []int{styleLeading, styleMargin} {
 			rows = append(rows, func(gtx ink.Ctx) ink.Dims {
-				return u.stepper(gtx, styleLabels[i], vals[i], &u.minus[k], &u.plus[k])
+				return u.stepper(gtx, styleLabels[i], vals[i], &u.minus[k+1], &u.plus[k+1])
 			})
 		}
 		rows = append(rows, theme.Toggle(th, &u.just, styleLabels[styleJustify]).Layout,

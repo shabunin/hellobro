@@ -240,8 +240,27 @@ func (a *bro) diaryConf() (ai.Config, error) {
 	return c, err
 }
 
-// diarySizes are the answer's letters, points, as "ai-size" has them.
-var diarySizes = map[string]float64{"s": 12, "m": 15, "l": 19, "xl": 24}
+// The answer's letters, points: "ai-size" is one of these, 15 at first.
+var (
+	diarySizeValues = []string{"10", "11", "12", "13", "14", "15", "16", "17", "19", "21", "24", "28", "32"}
+	diarySizeShown  = func() []string {
+		var ss []string
+		for _, v := range diarySizeValues {
+			ss = append(ss, v+" pt")
+		}
+		return ss
+	}()
+)
+
+const diaryPt = 15 // the answer's letters, if nothing says
+
+// diarySize is the answers' letters, points, as the setting says.
+func (a *bro) diarySize() float64 {
+	if f, err := strconv.ParseFloat(a.setting("ai-size"), 64); err == nil && f > 0 {
+		return f
+	}
+	return diaryPt
+}
 
 // The answer's font is the notebook's own: Gentium Book (Latin, Greek
 // and Cyrillic whole), Go's, one of the reader's; or the Hershey
@@ -270,28 +289,11 @@ func (nb *notebook) diaryFont() string {
 	return famGentium
 }
 
-// chooseFont lists the fonts to choose from.
-func (w *noteWin) chooseFont(a *bro) {
-	cur, sel := w.nb.diaryFont(), 0
-	var opts []askOpt
-	for i, f := range diaryFonts() {
-		if f == cur {
-			sel = i
-		}
-		label := f
-		if f == diaryHand {
-			label = "handwriting (the Hershey script)"
-		}
-		opts = append(opts, askOpt{label, "", func() {
-			w.nb.attrs = slices.DeleteFunc(w.nb.attrs, func(a xml.Attr) bool { return a.Name.Local == diaryFontAttr })
-			w.nb.attrs = append(w.nb.attrs, xml.Attr{Name: xml.Name{Local: diaryFontAttr}, Value: f})
-			w.changed = time.Now()
-			w.show(a)
-		}})
-	}
-	a.choose("The AI diary's font", "this notebook's answers: the reader's fonts, or a hand", append(opts, askOpt{"cancel", "", nil})...)
-	a.asking.sel = sel
-	a.drawAsk()
+// setDiaryFont makes f this notebook's answers' font.
+func (w *noteWin) setDiaryFont(f string) {
+	w.nb.attrs = slices.DeleteFunc(w.nb.attrs, func(a xml.Attr) bool { return a.Name.Local == diaryFontAttr })
+	w.nb.attrs = append(w.nb.attrs, xml.Attr{Name: xml.Name{Local: diaryFontAttr}, Value: f})
+	w.changed = time.Now()
 }
 
 // noteDiary is a notebook's diary at work.
@@ -663,7 +665,7 @@ func (w *noteWin) diaryAsk(a *bro, now bool) {
 	system := diarySystem(w.nb, prompts, format)
 	msgs := append(talk[max(0, len(talk)-diaryHistory):],
 		ai.Msg{Role: "user", Parts: []ai.Part{{Text: say}, {PNG: pic}}})
-	style, size := w.nb.diaryFont(), diarySizes[a.setting("ai-size")]
+	style, size := w.nb.diaryFont(), a.diarySize()
 	ctx, cancel := context.WithCancel(context.Background())
 	d.asked++
 	n, page, below := d.asked, d.page, boxOf(q)
@@ -728,7 +730,7 @@ func (w *noteWin) diaryAnswer(a *bro, page int, below image.Rectangle, out strin
 // text at a time; or the hand.
 func (w *noteWin) diaryLay(page int, below image.Rectangle, r diaryReply, seed int64, fam string, pt float64) {
 	if pt == 0 {
-		pt = diarySizes["m"]
+		pt = diaryPt
 	}
 	if fam == diaryHand {
 		w.diaryLayHand(page, below, r, seed, pt/notePt72)
@@ -982,7 +984,7 @@ func diaryLeft(below image.Rectangle, size image.Point) int {
 // to go, for letters size high.
 func (w *noteWin) diaryThink(a *bro, page int, below image.Rectangle, size float64) {
 	if size == 0 {
-		size = diarySizes["m"]
+		size = diaryPt
 	}
 	d := w.diary
 	x, y := float64(diaryLeft(below, w.pageSize(page))), float64(below.Max.Y)+hand.LineHeight(size)*0.5+size*0.75

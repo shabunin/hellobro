@@ -124,11 +124,11 @@ var settingList = []setting{
 		values: []string{"md", "plain"}, shown: []string{"Markdown: formulas, code, diagrams", "plain text"}},
 	{key: "ai-size", label: "Letters of an answer", title: "AI notebooks: letters of an answer", slider: true,
 		help:   "how big an answer is written in a notebook (from the next answer)",
-		values: []string{"s", "m", "l", "xl"}, shown: []string{"small, 12 pt", "medium, 15 pt", "large, 19 pt", "huge, 24 pt"}},
+		values: diarySizeValues, shown: diarySizeShown},
 	{key: "ai-pause", label: "Asks after a pause", title: "AI notebooks: asks after a pause",
 		help:   "once the pen rests this long, what's written goes to the model",
-		values: []string{"3", "2", "5", "10", "off"},
-		shown:  []string{"the pen rests 3 s", "the pen rests 2 s", "the pen rests 5 s", "the pen rests 10 s", "off: only taps ask"}},
+		values: []string{"3", "2", "5", "10", "30", "60", "off"},
+		shown:  []string{"the pen rests 3 s", "the pen rests 2 s", "the pen rests 5 s", "the pen rests 10 s", "the pen rests 30 s", "the pen rests 1 min", "off: only taps ask"}},
 	{key: "ai-taps", label: "Asks on taps", title: "AI notebooks: asks on taps",
 		help:   "quick taps of a finger on the page ask at once, finished or not",
 		values: []string{"3", "2", "off"},
@@ -217,11 +217,12 @@ func settingLine(i int) int {
 var settingRenamed = map[string]string{"alpine-sound": "alpine-bus"}
 
 // valueRenamed are values that mean another now: the on-screen
-// keyboard's "off" showed it for a text field.
-var valueRenamed = map[string]string{"vkbd=off": "fields"}
+// keyboard's "off" showed it for a text field; the AI answers' sizes
+// were four words, now points.
+var valueRenamed = map[string]string{"vkbd=off": "fields", "ai-size=s": "12", "ai-size=m": "15", "ai-size=l": "19", "ai-size=xl": "24"}
 
 // The defaults, by key: the index of a value.
-var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2, "text-size": 1, "ai-size": 1}
+var settingDefault = map[string]int{"light-idle": 1, "sleep-battery": 2, "text-size": 1, "ai-size": 5}
 
 // settingCommands step the settings from the switcher, each to its next
 // value, as a tap on its row does, and a toast says what it is now. The
