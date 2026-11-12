@@ -38,6 +38,7 @@ type calUI struct {
 
 	view                              widget.Enum
 	todayB, prevB, nextB, addB, syncB widget.Clickable
+	calsB                             widget.Clickable
 	at                                time.Time // a day in what's shown
 	hours, agenda, tasks              layout.Scroll
 	scrolled                          bool
@@ -48,7 +49,8 @@ type calUI struct {
 	showDone                          widget.Bool
 	quick                             widget.Editor // a task, typed
 
-	ed *calEdit // the dialog: an item being changed
+	ed   *calEdit // the dialog: an item being changed
+	cals *calPick // the dialog: which calendars show
 
 	wantSync bool
 	typing   bool // an editor had the focus at the last frame
@@ -179,6 +181,7 @@ func (u *calUI) Layout(gtx ink.Ctx) ink.Dims {
 					layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
 						return layout.Inset{Left: th.Pad * 2}.Layout(gtx, theme.Label(th, th.TextSize*1.3, title).Layout)
 					}),
+					layout.Rigid(theme.Button(th, &u.calsB, "calendars").Layout), sp,
 					layout.Rigid(theme.Button(th, &u.syncB, syncL).Layout), sp,
 					layout.Rigid(func(gtx ink.Ctx) ink.Dims {
 						b := theme.Button(th, &u.addB, "+ new")
@@ -213,6 +216,8 @@ func (u *calUI) Layout(gtx ink.Ctx) ink.Dims {
 	}
 	if u.ed != nil {
 		u.ed.layout(gtx, th, u)
+	} else if u.cals != nil {
+		u.cals.layout(gtx, th, u)
 	}
 	if u.toast.Showing(gtx) {
 		theme.Toast(th, &u.toast).Layout(gtx)
@@ -241,6 +246,9 @@ func (u *calUI) events(gtx ink.Ctx) {
 	if u.syncB.Clicked(gtx) {
 		u.wantSync = true
 	}
+	if u.calsB.Clicked(gtx) {
+		u.pickCals()
+	}
 	if u.addB.Clicked(gtx) {
 		u.startNew(gtx)
 	}
@@ -262,7 +270,7 @@ func (u *calUI) events(gtx ink.Ctx) {
 		case ink.Key:
 			switch e.Name {
 			case "Esc":
-				u.ed = nil
+				u.ed, u.cals = nil, nil
 			case "PgUp":
 				u.step(-1)
 			case "PgDn":
@@ -273,6 +281,12 @@ func (u *calUI) events(gtx ink.Ctx) {
 				break
 			}
 			switch e.Text {
+			case "c":
+				if u.cals == nil {
+					u.pickCals()
+				} else {
+					u.cals = nil
+				}
 			case "t":
 				u.at, u.scrolled = dayOf(gtx.Now), false
 			case "n":

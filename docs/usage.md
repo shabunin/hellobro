@@ -1346,9 +1346,14 @@ it's done. Those with a day due come first, the soonest first; **the
 done ones too** shows those. A task due on a day shows on it, over
 the hours.
 
+**calendars** lists them, ticked when shown: untick one to hide it,
+from the views, the tasks and the [sleep screen](#sleep)'s agenda. A
+hidden one is still synced, and new events and tasks go to one that
+shows.
+
 Keys, while nothing's being typed: **1**–**5** the views, **t**
 today, **,** and **.** (or PgUp and PgDn) back and on, **n** a new one,
-**s** sync, Esc closes the dialog.
+**s** sync, **c** the calendars, Esc closes the dialog.
 
 It's all kept in `calendar/` in the app's folder, so it works without a
 server. With `calendar.conf` there, it's synced with a CalDAV server

@@ -41,7 +41,8 @@ type Folder struct {
 	Sub     bool              `json:"sub,omitempty"`  // subscribed to: an .ics at Href, read only (its items in feed.ics)
 	Hash    string            `json:"hash,omitempty"` // a subscription's, as last fetched
 	CTag    string            `json:"ctag,omitempty"`
-	Entries map[string]*Entry `json:"entries"` // by file name
+	Hidden  bool              `json:"hidden,omitempty"` // not shown: kept and synced, but not in Between or Tasks
+	Entries map[string]*Entry `json:"entries"`          // by file name
 }
 
 // Holds says the calendar takes items of kind.
@@ -187,21 +188,39 @@ func (s *Store) Folders() []Folder {
 	return out
 }
 
-// Home is the calendar new items of kind go to: the first that holds it.
+// Home is the calendar new items of kind go to: the first shown that
+// holds it (an item put in a hidden one would seem lost).
 func (s *Store) Home(kind string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, f := range s.cals {
-		if f.Holds(kind) && !f.Sub {
-			return f.ID
-		}
-	}
-	for _, f := range s.cals {
-		if !f.Sub {
-			return f.ID
+	for _, ok := range []func(f *Folder) bool{
+		func(f *Folder) bool { return f.Holds(kind) && !f.Hidden },
+		func(f *Folder) bool { return !f.Hidden },
+		func(f *Folder) bool { return f.Holds(kind) },
+		func(f *Folder) bool { return true },
+	} {
+		for _, f := range s.cals {
+			if !f.Sub && ok(f) {
+				return f.ID
+			}
 		}
 	}
 	return ""
+}
+
+// SetHidden hides the calendar id, or shows it again.
+func (s *Store) SetHidden(id string, hidden bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f := s.folder(id)
+	if f == nil {
+		return fmt.Errorf("no calendar %q", id)
+	}
+	if f.Hidden == hidden {
+		return nil
+	}
+	f.Hidden = hidden
+	return s.saveState()
 }
 
 // Occurrence is an item at one of its times. Its Entry is a copy, as
@@ -230,6 +249,9 @@ func (s *Store) Between(from, to time.Time) []Occurrence {
 	}
 	out := []Occurrence{}
 	for _, f := range s.cals {
+		if f.Hidden {
+			continue
+		}
 		for _, e := range f.Entries {
 			if e.Gone || e.Item.Kind == Task && (e.Item.Done || e.Item.End.IsZero()) {
 				continue
@@ -261,6 +283,9 @@ func (s *Store) Tasks() []*Entry {
 	defer s.mu.Unlock()
 	var out []*Entry
 	for _, f := range s.cals {
+		if f.Hidden {
+			continue
+		}
 		for _, e := range f.Entries {
 			if !e.Gone && e.Item.Kind == Task {
 				cp := *e

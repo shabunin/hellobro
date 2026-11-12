@@ -256,3 +256,43 @@ func TestSubscribe(t *testing.T) {
 		t.Errorf("unsubscribed: %v %s", r, summaries(st2))
 	}
 }
+
+// TestHidden: a hidden calendar's items aren't shown, and new ones go to
+// another; it stays hidden through syncs and reopening.
+func TestHidden(t *testing.T) {
+	_, c, st, ck := setup(t)
+	sync(t, st, c, ck)
+	home := st.Home(cal.Event)
+	it := cal.New(cal.Event)
+	it.Summary, it.Start = "lunch", time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	it.End = it.Start.Add(time.Hour)
+	if _, err := st.Save(home, it, ck.now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetHidden(home, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := summaries(st); got != "" {
+		t.Errorf("hidden, shown: %s", got)
+	}
+	if other := st.Home(cal.Event); other == home || other == "" {
+		t.Errorf("new ones into the hidden one: %q", other)
+	}
+	sync(t, st, c, ck)
+	st2, _ := cal.Open(st.Dir)
+	hidden := 0
+	for _, f := range st2.Folders() {
+		if f.Hidden {
+			hidden++
+		}
+	}
+	if hidden != 1 || summaries(st2) != "" {
+		t.Errorf("synced and reopened: %d hidden, %q", hidden, summaries(st2))
+	}
+	if err := st2.SetHidden(home, false); err != nil || summaries(st2) != "lunch" {
+		t.Errorf("shown again: %v %q", err, summaries(st2))
+	}
+	if st2.SetHidden("nonesuch", true) == nil {
+		t.Error("hid a calendar that isn't")
+	}
+}
