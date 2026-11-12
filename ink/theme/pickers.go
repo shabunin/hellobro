@@ -10,17 +10,35 @@ import (
 	"hellobro/ink/widget"
 )
 
+// stackUnder is the width, in Dp, under which a field's title goes over
+// it rather than beside it.
+const stackUnder = 480
+
 // fieldRow lays a row out as a dropdown's is: title at its start, a box
 // at its end (bw wide at most; 0: half the row, to 300 Dp) with value
-// and a ▾, which clk taps. "" title: only the box. It gives the box's
-// place, for a popup to open under it.
+// and a ▾, which clk taps; in a narrow row, the title over the box. ""
+// title: only the box. It gives the box's place, for a popup to open
+// under it.
 func fieldRow(gtx ink.Ctx, th *Theme, title string, bw ink.Dp, clk *widget.Clickable, value string, open bool) (image.Rectangle, ink.Dims) {
 	w := gtx.Constraints.Max.X
 	pad := gtx.Dp(th.Pad * 1.5)
 	h := gtx.Dp(th.Touch)
 	size := image.Pt(w, h+gtx.Dp(th.Pad))
 	box := image.Rect(0, (size.Y-h)/2, w, (size.Y+h)/2)
-	if title != "" {
+	if title != "" && w < gtx.Dp(stackUnder) {
+		// No room for both side by side: the title, the box under it as
+		// wide as the row.
+		f := th.Face(gtx, th.TextSize, text.Regular)
+		lh := text.Height(f) + gtx.Dp(th.Pad)
+		size = image.Pt(w, lh+h+gtx.Dp(th.Pad))
+		ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+		cg := gtx
+		cg.Constraints = ink.Exact(image.Pt(max(w-2*pad, 0), lh))
+		st := ink.Offset(gtx.Ops, image.Pt(pad, 0))
+		line(cg, f, title, th.Fg, Left, lh)
+		st.Pop()
+		box = image.Rect(pad/2, lh, w-pad/2, lh+h)
+	} else if title != "" {
 		b := min(w/2, gtx.Dp(300))
 		if bw > 0 {
 			b = min(w/2, gtx.Dp(bw))

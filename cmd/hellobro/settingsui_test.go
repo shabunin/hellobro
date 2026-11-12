@@ -61,3 +61,17 @@ func TestSettingsUIKeys(t *testing.T) {
 		t.Errorf("round in %d with all showing, in %d in a short window", all, short)
 	}
 }
+
+// In a narrow window a setting's name goes over its dropdown, whole.
+func TestSettingsUINarrow(t *testing.T) {
+	a := &bro{App: &kobo.App{}, set: settings{}}
+	it := inktest.New(image.Pt(560, 1300), inktest.ElipsaMetric, inkUIs["settings"](a).Layout)
+	inkSave(t, it, "settings-narrow")
+	name, err := it.Find("Light off when idle")
+	must(t, err)
+	value, err := it.Find("after 10 s untouched")
+	must(t, err)
+	if value.Y <= name.Y {
+		t.Errorf("the value at %v, its name at %v: not under it", value, name)
+	}
+}
