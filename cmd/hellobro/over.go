@@ -1,7 +1,7 @@
 package main
 
 // A card over the page, in ink: a question (ask.go), facts or a cheat
-// sheet (info.go). It's a pane of its own in the middle of what the
+// sheet (info.go), a command's new key (keyset.go). It's a pane of its own in the middle of what the
 // keyboard leaves, as tall as its UI says it wants (laid out once to
 // know, then placed). What a frame picked (an answer, close) is done
 // after the frame, by its take: the page drawn again under a frame still
@@ -37,6 +37,8 @@ func (a *bro) over() *inkOver {
 		return a.asking.over
 	case a.info != nil:
 		return a.info.over
+	case a.keyset != nil:
+		return a.keyset.over
 	}
 	return nil
 }
