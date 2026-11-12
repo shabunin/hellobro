@@ -77,3 +77,25 @@ func TestNoteSelTransform(t *testing.T) {
 		t.Errorf("duplicated: %v, taken %v", w.nb.pages[0], w.sel)
 	}
 }
+
+func TestTakenByCrossing(t *testing.T) {
+	line := func(x0, y0, x1, y1 int16) *noteStroke {
+		s := &noteStroke{pts: []notePt{{x0, y0, 20}, {x1, y1, 20}}}
+		s.bound()
+		return s
+	}
+	in := line(110, 110, 190, 190)    // wholly in
+	across := line(50, 150, 250, 150) // through it, both ends out
+	corner := line(0, 0, 400, 20)     // its box overlaps, its line doesn't
+	diag := line(120, 60, 260, 200)   // in at the top, out at the right
+	far := line(500, 500, 600, 600)   // nowhere near
+	ss := []*noteStroke{in, across, corner, diag, far}
+	r := image.Rect(100, 100, 200, 200)
+	if got := takenBy(ss, r, false); len(got) != 1 || got[0] != in {
+		t.Errorf("window took %d, want only the one inside", len(got))
+	}
+	got := takenBy(ss, r, true)
+	if len(got) != 3 || got[0] != in || got[1] != across || got[2] != diag {
+		t.Errorf("crossing took %v", got)
+	}
+}

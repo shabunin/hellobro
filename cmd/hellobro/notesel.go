@@ -1,7 +1,9 @@
 package main
 
 // The notebook's select tool: a tap on a stroke or a picture takes it, a
-// rectangle drawn round some takes all that are wholly in it. A dashed
+// rectangle drawn round some takes them, as in AutoCAD: drawn left to
+// right (a window, its outline whole) all that are wholly in it; right
+// to left (crossing, its outline dashed) all it touches too. A dashed
 // frame goes round what's taken, a dot at each corner, one over it:
 //
 //   - dragged inside the frame, it moves, onto the page beside it too
@@ -395,9 +397,14 @@ func (a *bro) noteDragTo(p image.Point, g *kobo.Gesture) {
 	}
 	pts := w.outline(d, p)
 	d.shown = nil
+	crossing := d.kind == dragRect && p.X < d.from.X
 	for i, q := range pts {
 		n := pts[(i+1)%len(pts)]
-		a.C.Line(q, n, 1, kobo.Black, cl)
+		if crossing {
+			dashedLine(a.C, q, n, cl)
+		} else {
+			a.C.Line(q, n, 1, kobo.Black, cl)
+		}
 		r := image.Rectangle{q, n}.Canon().Inset(-3)
 		if d.kind == dragTurn && r.Dx() > 40 && r.Dy() > 40 { // a slanted side: its box, in pieces
 			for j := range 8 {
@@ -455,16 +462,86 @@ func (a *bro) noteDragEnd(g *kobo.Gesture) {
 		w.turnSel(w.angleTo(d, g.Last))
 	default:
 		r := image.Rectangle{w.toPage(d.from, d.at), w.toPage(g.Last, d.at)}.Canon()
-		w.sel, w.selPage, w.mark = nil, d.page, nil
-		for _, s := range w.strokes(d.page) {
-			if s.box.In(r) {
-				w.sel = append(w.sel, s)
-			}
-		}
-		log.Printf("notebook %s: %d taken", w.nb.name, len(w.sel))
+		crossing := g.Last.X < d.from.X
+		w.sel, w.selPage, w.mark = takenBy(w.strokes(d.page), r, crossing), d.page, nil
+		log.Printf("notebook %s: %d taken (crossing %v)", w.nb.name, len(w.sel), crossing)
 	}
 	_, after := w.markScreen()
 	w.selChanged(a, append(d.shown, before, mark, after)...)
+}
+
+// takenBy is what of ss a rectangle r (page units) takes: those wholly
+// in it, or, crossing, those it touches too.
+func takenBy(ss []*noteStroke, r image.Rectangle, crossing bool) []*noteStroke {
+	var out []*noteStroke
+	for _, s := range ss {
+		if s.box.In(r) || crossing && s.touches(r) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// touches says whether s has some of it in r (page units): a picture
+// or a text its box, a stroke a piece of its line, as wide as the pen.
+func (s *noteStroke) touches(r image.Rectangle) bool {
+	if !s.box.Overlaps(r) {
+		return false
+	}
+	if s.pic != nil || s.txt != nil || len(s.pts) == 0 {
+		return true
+	}
+	pt := func(i int) image.Point { return image.Pt(int(s.pts[i].x), int(s.pts[i].y)) }
+	for i := range s.pts {
+		w := int(s.pts[i].r)/10 + 1
+		if segInRect(pt(max(0, i-1)), pt(i), r.Inset(-w)) {
+			return true
+		}
+	}
+	return false
+}
+
+// segInRect says whether the segment p q has a point in r (Liang–Barsky).
+func segInRect(p, q image.Point, r image.Rectangle) bool {
+	if p.In(r) || q.In(r) {
+		return true
+	}
+	t0, t1 := 0.0, 1.0
+	dx, dy := float64(q.X-p.X), float64(q.Y-p.Y)
+	for _, e := range [4][2]float64{
+		{-dx, float64(p.X - r.Min.X)}, {dx, float64(r.Max.X - 1 - p.X)},
+		{-dy, float64(p.Y - r.Min.Y)}, {dy, float64(r.Max.Y - 1 - p.Y)},
+	} {
+		pp, qq := e[0], e[1]
+		if pp == 0 {
+			if qq < 0 {
+				return false
+			}
+			continue
+		}
+		t := qq / pp
+		if pp < 0 {
+			t0 = max(t0, t)
+		} else {
+			t1 = min(t1, t)
+		}
+		if t0 > t1 {
+			return false
+		}
+	}
+	return true
+}
+
+// dashedLine draws p to q in dashes, a crossing rectangle's outline.
+func dashedLine(c kobo.Canvas, p, q image.Point, clip image.Rectangle) {
+	l := math.Hypot(float64(q.X-p.X), float64(q.Y-p.Y))
+	for s := 0.0; s < l; s += 16 {
+		e := min(l, s+10)
+		at := func(t float64) image.Point {
+			return image.Pt(p.X+int(float64(q.X-p.X)*t/l), p.Y+int(float64(q.Y-p.Y)*t/l))
+		}
+		c.Line(at(s), at(e), 1, kobo.Black, clip)
+	}
 }
 
 // selectAt takes what's at p (page units) on page: the ink over a
