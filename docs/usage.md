@@ -81,7 +81,9 @@ one, and a tap on one goes there. An empty workspace lists the keys (as
 they are, keys.conf's too), and a tap on it opens a window.
 
 A tap on the bar away from the workspaces, or two fingers swiped down
-from the screen's top (full screen, they leave it first), or Mod+O, or the menu's
+from the screen's top (full screen, they leave it first), or three
+fingers swiped down from the screen's top third (anywhere, full screen
+too, over any window), or Mod+O, or the menu's
 **Workspaces**, shows them all as tiles over the whole screen, each a
 small drawing of its windows as they're laid out, the one shown framed.
 What's in the windows shows too, as it is now, and again every few
@@ -118,6 +120,7 @@ it, the windows taking its room, and shows it again (Settings, Terminal,
 The bar; remembered in `bar`); a full-screen window has none either.
 
 A swipe up or down along the right edge of the screen opens the menu,
+full screen too, over anything,
 tiles big enough for a finger, each an icon, a word and its keys: rotate
 the screen, auto-rotate (on or off, where it is), a screenshot, touch calibration, the on-screen keyboard, the light,
 Wi-Fi, Bluetooth, Settings, sleep, lock, the workspaces, the switcher (Go to…), and quit, back to
@@ -999,8 +1002,8 @@ width, its gray.
   the pen does) or **turns** (fingers only turn pages, so a hand resting
   on the screen writes nothing; only the pen writes). Near the left and
   right edges a finger writes nothing: those are the light's and the
-  workspaces' swipes. Full screen, the right edge is the page's too,
-  and the left edge is the light's unless the settings' **Light by the
+  workspaces' swipes. Full screen, the right edge is still the menu's
+  (it's everywhere), and the left edge is the light's unless the settings' **Light by the
   left edge** is off.
 - A page is the screen's shape, upright, fitted into the window. Where
   two side by side are nearly as big as one alone would be (landscape,

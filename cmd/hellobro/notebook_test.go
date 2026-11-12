@@ -483,7 +483,7 @@ func TestNoteEdge(t *testing.T) {
 		{false, false, right, true},
 		{false, false, mid, false},
 		{true, false, left, true}, // full screen: the light still
-		{true, false, right, false},
+		{true, false, right, true}, // full screen: the menu still
 		{true, true, left, false}, // the light off: the page's
 		{false, true, left, true}, // out of full screen, still the workspaces'
 	} {

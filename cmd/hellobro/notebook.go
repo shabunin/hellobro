@@ -1676,5 +1676,5 @@ func (a *bro) noteExit() {
 // workspaces' and the menu's by both.
 func (a *bro) noteEdge(p image.Point) bool {
 	left, right := p.X < kobo.EdgeWidth, p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth
-	return left && (!a.Full || a.setting("note-light") != "off") || right && !a.Full
+	return left && (!a.Full || a.setting("note-light") != "off") || right // the right edge's menu, full screen too
 }

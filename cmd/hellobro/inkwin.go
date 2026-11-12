@@ -257,6 +257,23 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 	return true
 }
 
+// inkCancel lets g go from whichever pane has it, no click.
+func (a *bro) inkCancel(g *kobo.Gesture) {
+	if o := a.over(); o != nil && o.pane.Cancel(g) {
+		return
+	}
+	for _, gw := range a.inkWins() {
+		if gw.ink.pane.Cancel(g) {
+			return
+		}
+	}
+	for _, b := range a.bodies() {
+		if b.inkPane().Cancel(g) {
+			return
+		}
+	}
+}
+
 // updateRing puts the focus ring where the ink window in focus has it,
 // if it shows: Tab moved the focus, and no touch since.
 func (a *bro) updateRing() {

@@ -133,6 +133,18 @@ func (p *Pane) Lift(g *kobo.Gesture) bool {
 	return true
 }
 
+// Cancel: one of the pane's contacts is someone else's now (three
+// fingers swiped, say): it's let go, no click; false if it wasn't one.
+func (p *Pane) Cancel(g *kobo.Gesture) bool {
+	id, ok := p.contacts[g]
+	if !ok {
+		return false
+	}
+	delete(p.contacts, g)
+	p.Win.Pointer(ink.Pointer{Kind: ink.Cancel, ID: id, Pos: g.Last.Sub(p.At.Min), Time: time.Now()})
+	return true
+}
+
 // Has says g is one of its contacts.
 func (p *Pane) Has(g *kobo.Gesture) bool { _, ok := p.contacts[g]; return ok }
 

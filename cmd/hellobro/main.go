@@ -58,16 +58,18 @@ type bro struct {
 	net    netState // the header's network
 	pw     powerState
 	kbd    kbdState
-	vk     vkbdState    // the on-screen keyboard (vkbd.go)
-	bk     bookState    // the reader's fonts (bookwin.go)
-	nt     noteState    // the notebooks' pen (notebook.go)
-	lay    kobo.Layout  // the last layout, to lay out again
-	th     *theme.Theme // the ink windows' look (inkwin.go)
-	shot   *shot        // a screenshot being taken (shot.go)
+	vk     vkbdState        // the on-screen keyboard (vkbd.go)
+	bk     bookState        // the reader's fonts (bookwin.go)
+	nt     noteState        // the notebooks' pen (notebook.go)
+	lay    kobo.Layout      // the last layout, to lay out again
+	th     *theme.Theme     // the ink windows' look (inkwin.go)
+	shot   *shot            // a screenshot being taken (shot.go)
+	trio   [3]*kobo.Gesture // three fingers together: may become the workspaces' swipe
 }
 
 const (
 	ownMenu   = 1   // a gesture that is a menu swipe
+	ownTrio   = 22  // one of three fingers together: maybe the workspaces' swipe
 	ownPair   = 4   // one of two fingers together: maybe a workspace swipe
 	ownEdge   = 5   // one in from an edge: a workspace swipe
 	menuSwipe = 100 // px along the right edge it takes
@@ -172,6 +174,7 @@ func (a *bro) Tap(p image.Point) {
 		a.keySetTap(p)
 	case a.picker != nil:
 		a.pickerTap(p)
+	case a.topTap(p):
 	case !a.lay.Full && !a.BarOff && a.nowPlaying() != "" && p.In(a.StatusNote()): // what's playing, in the bar
 		a.mediaKey(kobo.KeyPlayPause)
 	case !a.lay.Full && p.Y < a.lay.Page.Min.Y: // the bar, not a workspace's name in it
@@ -302,17 +305,18 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		if a.vkTouch(p, g) {
 			return
 		}
-		if !ev.Pen && a.pairUp(g) {
+		if !ev.Pen && (a.trioUp(g) || a.pairUp(g)) {
 			return
 		}
 		a.holdStart(p, g)
-		if !ev.Pen && !a.overlay() && !a.Full && (p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) {
+		if !ev.Pen && !a.overlay() && (!a.Full && p.X < kobo.EdgeWidth || p.X >= a.C.Bounds().Dx()-kobo.EdgeWidth) { // the right edge's menu, full screen too
 			a.edge = g
 		}
 		switch {
 		case a.overDown(ev, p, g):
 		case a.overlay():
 		case a.edge == g && p.X >= kobo.EdgeWidth: // the right edge is ours
+		case a.fullTop(ev, p): // the top's swipes', full screen; a tap there is the bar's (topTap)
 		case a.wmTouch(p, g):
 		case a.inkDown(ev, p, g):
 		case a.noteTouch(ev, p, g):
@@ -321,6 +325,8 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 			a.selStart(p, g)
 		}
 	case a.shotMove(p, g):
+	case g.Owner == ownTrio:
+		a.trioMove()
 	case a.inkMove(ev, p, g):
 	case a.noteMove(ev, p, g):
 	case a.vkMove(p, g):
@@ -332,6 +338,80 @@ func (a *bro) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 	case g.Owner == ownPair:
 		a.pairMove()
 	}
+}
+
+// fullTop says a finger coming down at p is the top's, full screen over
+// a notebook: its swipes (one finger: the bar, topSwipe; two: out of
+// full screen) go before the bar's buttons there, which have its tap.
+func (a *bro) fullTop(ev kobo.TouchEv, p image.Point) bool {
+	if !a.Full || ev.Pen || p.Y >= kobo.TopEdge || a.overlay() {
+		return false
+	}
+	_, ok := a.windowAt(p).(*noteWin)
+	return ok
+}
+
+// topTap hands a tap there to what's there in ink (the bar's buttons, the
+// settings' header), as if it had been its all along.
+func (a *bro) topTap(p image.Point) bool {
+	if !a.fullTop(kobo.TouchEv{}, p) {
+		return false
+	}
+	w := a.windowAt(p).(*noteWin)
+	for _, b := range w.inkBodies(a) {
+		g := &kobo.Gesture{Start: p, Last: p, Tap: true}
+		if b.inkPane().Down(kobo.TouchEv{Kind: kobo.TouchDown}, p, g, ownPane) {
+			a.inkTick()
+			b.inkPane().Lift(g)
+			a.inkTick()
+			break
+		}
+	}
+	return true
+}
+
+// trioUp makes g and the two fingers already down three together, if
+// they all came down in the screen's top third and aren't writing: three
+// fingers swiped down from there bring the workspaces up, anywhere.
+func (a *bro) trioUp(g *kobo.Gesture) bool {
+	fs := a.Fingers()
+	top := a.C.Bounds().Min.Y + a.C.Bounds().Dy()/3
+	if len(fs) != 3 || a.Locked() || a.picker != nil {
+		return false
+	}
+	for _, f := range fs {
+		if f.Start.Y >= top || f.Owner == ownInk || f.Owner == ownNoteSel || f.Owner == ownShot {
+			return false
+		}
+	}
+	for i, f := range fs {
+		if f.Owner == ownPane {
+			a.inkCancel(f)
+		}
+		if a.tv.sel != nil && a.tv.sel.g == f {
+			a.tv.sel = nil
+		}
+		f.Owner = ownTrio
+		a.trio[i] = f
+	}
+	a.pair, a.edge = [2]*kobo.Gesture{}, nil
+	return true
+}
+
+// trioMove brings the workspaces up once the three have gone down far
+// enough together.
+func (a *bro) trioMove() {
+	for _, f := range a.trio {
+		if f == nil { // done, or one lifted
+			return
+		}
+		if d := f.Last.Sub(f.Start); d.Y < pairSwipe || d.Y < 2*kobo.Abs(d.X) {
+			return
+		}
+	}
+	a.trio = [3]*kobo.Gesture{} // once: they stay three till they lift
+	log.Print("three-finger swipe: the workspaces")
+	a.openWorkspaces()
 }
 
 // topSwipe takes a finger swiped down from the top, full screen, over a
@@ -481,6 +561,10 @@ func (a *bro) Lift(g *kobo.Gesture) {
 	}
 	if a.edge == g {
 		a.edge = nil
+	}
+	if g.Owner == ownTrio {
+		a.trio = [3]*kobo.Gesture{}
+		return
 	}
 	if a.pair[0] == g || a.pair[1] == g {
 		if a.pinch != nil {
