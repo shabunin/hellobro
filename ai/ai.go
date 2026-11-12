@@ -36,7 +36,7 @@ type Config struct {
 	Agent   string // the User-Agent: the app's, as OpenCode asks
 	Session string // a stable id for the session header
 	MaxOut  int    // tokens an answer may have
-	Proto   string // "anthropic" or "openai": how the model's reached; "" as OpenCode Go's table has it
+	Proto   string // "anthropic", "openai" or "responses": how the model's reached; "" as OpenCode Go's table has it
 }
 
 // Load reads path's config; os.ErrNotExist if there's none.
@@ -97,8 +97,25 @@ func (c Config) anthropic() bool {
 	if c.Proto != "" {
 		return c.Proto == "anthropic"
 	}
+	if c.plain() {
+		return false // OpenRouter's and the like: OpenAI's, for every model
+	}
 	m := c.Model
 	return strings.HasPrefix(m, "claude-") || strings.HasPrefix(m, "qwen3.") || m == "minimax-m3"
+}
+
+// plain says Base is an API's /v1 itself (OpenRouter's
+// https://openrouter.ai/api/v1, say), not OpenCode's with a path for
+// each protocol under it.
+func (c Config) plain() bool { return strings.HasSuffix(c.Base, "/v1") }
+
+// url is path (/chat/completions, /messages, /models) on the API: under
+// the protocol's own path on OpenCode's.
+func (c Config) url(proto, path string) string {
+	if c.plain() {
+		return c.Base + path
+	}
+	return c.Base + "/" + proto + "/v1" + path
 }
 
 // Answer is what a model said, and what it cost.
@@ -139,12 +156,15 @@ func (c Config) Ask(ctx context.Context, system string, msgs []Msg) (Answer, err
 	var url string
 	var body any
 	hdr := http.Header{}
-	if c.anthropic() {
-		url, body = c.Base+"/anthropic/v1/messages", anthropicBody(c, system, msgs)
+	switch {
+	case c.anthropic():
+		url, body = c.url("anthropic", "/messages"), anthropicBody(c, system, msgs)
 		hdr.Set("x-api-key", c.Key)
 		hdr.Set("anthropic-version", "2023-06-01")
-	} else {
-		url, body = c.Base+"/openai/v1/chat/completions", openaiBody(c, system, msgs)
+	case c.Proto == "responses":
+		url, body = c.url("openai", "/responses"), responsesBody(c, system, msgs)
+	default:
+		url, body = c.url("openai", "/chat/completions"), openaiBody(c, system, msgs)
 	}
 	hdr.Set("Authorization", "Bearer "+c.Key)
 	data, err := json.Marshal(body)
@@ -176,9 +196,12 @@ func (c Config) Ask(ctx context.Context, system string, msgs []Msg) (Answer, err
 		return Answer{}, fmt.Errorf("%s: %s", resp.Status, errorText(out))
 	}
 	var a Answer
-	if c.anthropic() {
+	switch {
+	case c.anthropic():
 		a.Text, err = anthropicText(out)
-	} else {
+	case c.Proto == "responses":
+		a.Text, err = responsesText(out)
+	default:
 		a.Text, err = openaiText(out)
 	}
 	usageOf(out, &a)
@@ -259,6 +282,57 @@ func openaiText(body []byte) (string, error) {
 		return b.String(), nil
 	}
 	return "", errors.New("an answer of nothing")
+}
+
+// responsesBody is a question in OpenAI's Responses API: the models
+// that have only it (OpenCode Go's GPTs, Grok).
+func responsesBody(c Config, system string, msgs []Msg) map[string]any {
+	var in []map[string]any
+	for _, m := range msgs {
+		var parts []map[string]any
+		for _, p := range m.Parts {
+			switch {
+			case p.PNG != nil:
+				parts = append(parts, map[string]any{"type": "input_image", "image_url": dataURL(p.PNG)})
+			case m.Role == "assistant":
+				parts = append(parts, map[string]any{"type": "output_text", "text": p.Text})
+			default:
+				parts = append(parts, map[string]any{"type": "input_text", "text": p.Text})
+			}
+		}
+		in = append(in, map[string]any{"role": m.Role, "content": parts})
+	}
+	return map[string]any{"model": c.Model, "instructions": system, "input": in, "max_output_tokens": c.MaxOut}
+}
+
+func responsesText(body []byte) (string, error) {
+	var r struct {
+		Output []struct {
+			Type    string `json:"type"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(body, &r); err != nil {
+		return "", fmt.Errorf("its answer: %v", err)
+	}
+	var b strings.Builder
+	for _, o := range r.Output {
+		if o.Type != "message" {
+			continue // its reasoning
+		}
+		for _, p := range o.Content {
+			if p.Type == "output_text" {
+				b.WriteString(p.Text)
+			}
+		}
+	}
+	if b.Len() == 0 {
+		return "", errors.New("an answer of nothing")
+	}
+	return b.String(), nil
 }
 
 func anthropicBody(c Config, system string, msgs []Msg) map[string]any {

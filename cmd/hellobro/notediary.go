@@ -54,92 +54,161 @@ const (
 	diaryMaxOut     = 4000                   // tokens: a model that thinks first needs room
 )
 
-// diaryModel is a model the diary can ask: one that reads a picture
-// (tried, 2026-11-11), and its monthly limit on OpenCode Go's Go plan,
-// in dollars (a fifth of it in 5 hours, half in a week).
-type diaryModel struct {
-	id, note string
-	limit    float64
-	tried    string // what a question cost, and took, when it was tried
+// The models to choose from are the API's own list (ai.Models), those
+// that read pictures, kept in ai-models.json and fetched again when it's
+// a day old and the models are looked at (the notebook's settings, the
+// Settings). What we know of a few besides: the Go plan's monthly limit
+// on each, in dollars (a fifth of it in 5 hours, half in a week), and
+// what a question cost and took when tried (2026-11-11).
+var (
+	diaryLimits = map[string]float64{
+		"claude-haiku-5-5": 15, "glm-5.3-flash": 60, "minimax-m3": 60, "qwen3.8-flash": 30, "mimo-v2.6-flash": 60,
+		"qwen3.7-plus": 60, "kimi-k2.7-code": 60, "mimo-v2.6-pro": 15, "qwen3.8-max": 15, "kimi-k3": 15,
+	}
+	diaryTried = map[string]string{
+		"claude-haiku-5-5": "reads well", "minimax-m3": "quick", "kimi-k2.7-code": "for code",
+	}
+)
+
+const (
+	modelsFile  = "ai-models.json"
+	modelsStale = 24 * time.Hour
+)
+
+// modelsState is the models' list, as last fetched.
+type modelsState struct {
+	List     []ai.Model `json:"models"`
+	At       time.Time  `json:"at"`
+	Base     string     `json:"base"` // the API it's of
+	loaded   bool
+	fetching bool
+	err      string
 }
 
-var diaryModels = []diaryModel{
-	{"conf", "as ai.conf says", 0, ""},
-	{"claude-haiku-5-5", "reads well", 15, "$0.0008, 2 s"},
-	{"glm-5.3-flash", "cheapest", 60, "$0.0001, 2 s"},
-	{"minimax-m3", "quick", 60, "$0.0002, 1 s"},
-	{"qwen3.8-flash", "", 30, "$0.0003, 4 s"},
-	{"mimo-v2.6-flash", "", 60, "$0.0001, 7 s"},
-	{"qwen3.7-plus", "", 60, "$0.0008, 8 s"},
-	{"longcat-2.0", "", 60, "$0.0004, 7 s"},
-	{"kimi-k2.7-code", "for code", 60, "$0.0012, 5 s"},
-	{"mimo-v2.6-pro", "", 15, "$0.0016, 5 s"},
-	{"qwen3.8-max", "strong", 15, "$0.0095, 8 s"},
-	{"kimi-k3", "strong", 15, "$0.025, 4 s"},
+// models is the list, read from its file the first time.
+func (a *bro) models() *modelsState {
+	ms := &a.nt.models
+	if !ms.loaded {
+		ms.loaded = true
+		if b, err := os.ReadFile(kobo.AppFile(modelsFile)); err == nil {
+			json.Unmarshal(b, ms)
+		}
+	}
+	return ms
 }
 
-// label is how the model's listed: its name, what it's good for, what a
-// question cost.
-func (m diaryModel) label(conf string) string {
-	l := m.id
-	if m.id == "conf" {
-		return "as ai.conf says: " + conf
+// modelsWant fetches the list again if it's old, or of another API than
+// ai.conf's now, off the loop; the setting's choices are its then.
+func (a *bro) modelsWant() {
+	ms := a.models()
+	c, err := ai.Load(kobo.AppFile("ai.conf"))
+	if err != nil || ms.fetching || ms.Base == c.Base && time.Since(ms.At) < modelsStale {
+		return
 	}
-	if m.note != "" {
-		l += ", " + m.note
+	ms.fetching = true
+	c.Agent = "hellobro/" + version
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		list, err := c.Models(ctx)
+		a.Do(func() {
+			ms.fetching = false
+			if err != nil {
+				log.Printf("ai: the models' list: %v", err)
+				ms.err = err.Error()
+				return
+			}
+			ms.List, ms.At, ms.Base, ms.err = list, time.Now(), c.Base, ""
+			if b, err := json.MarshalIndent(ms, "", " "); err == nil {
+				writeAtomic(kobo.AppFile(modelsFile), b)
+			}
+			log.Printf("ai: %d models listed", len(list))
+			a.applyModels()
+			a.noteSettingsRedraw()
+			a.inkRedraw("settings")
+		})
+	}()
+}
+
+// diaryCan says the diary can ask m: it reads pictures (if the list
+// says), by a protocol we speak.
+func diaryCan(m ai.Model) bool { return (m.Images || !m.Known) && m.Proto != "-" }
+
+// applyModels makes the list the "ai-model" setting's choices: as
+// ai.conf says first, then those the diary can ask, cheapest first; the
+// one chosen stays, listed or not.
+func (a *bro) applyModels() {
+	i := settingIndex("ai-model")
+	st := &settingList[i]
+	cur := st.values[a.set["ai-model"]]
+	values, shown := []string{"conf"}, []string{"as ai.conf says"}
+	for _, m := range a.models().List {
+		if diaryCan(m) {
+			values, shown = append(values, m.ID), append(shown, modelLabel(m))
+		}
 	}
-	if m.tried != "" {
-		l += " · " + m.tried
+	if !slices.Contains(values, cur) {
+		values, shown = append(values, cur), append(shown, cur+", not listed now")
+	}
+	st.values, st.shown = values, shown
+	a.set["ai-model"] = slices.Index(values, cur)
+}
+
+// modelLabel is how a model's listed: its id, what it's good for, its
+// price in and out, a million tokens.
+func modelLabel(m ai.Model) string {
+	l := m.ID
+	if n := diaryTried[m.ID]; n != "" {
+		l += ", " + n
+	}
+	switch {
+	case m.In == 0 && m.Out == 0:
+		l += " · free"
+	case m.In >= 0:
+		l += fmt.Sprintf(" · $%s / $%s", price(m.In), price(m.Out))
 	}
 	return l
 }
 
-// chooseModel lists the models to choose from, the one asked now first
-// in focus.
-func (w *noteWin) chooseModel(a *bro) {
+// price is dollars, as few figures as say it.
+func price(f float64) string {
+	s := strconv.FormatFloat(f, 'f', 2, 64)
+	if f >= 10 {
+		s = strconv.FormatFloat(f, 'f', 0, 64)
+	}
+	if strings.Contains(s, ".") {
+		s = strings.TrimSuffix(strings.TrimSuffix(s, "0"), ".0")
+	}
+	return s
+}
+
+// modelProto is how the list says model is reached; "" if it doesn't.
+func (a *bro) modelProto(model string) string {
+	for _, m := range a.models().List {
+		if m.ID == model && m.Proto != "-" {
+			return m.Proto
+		}
+	}
+	return ""
+}
+
+// diaryConfModel is the model ai.conf names (or the default).
+func (a *bro) diaryConfModel() string {
 	c, _ := ai.Load(kobo.AppFile("ai.conf"))
-	cur, sel := a.setting("ai-model"), 0
-	var opts []askOpt
-	for i, m := range diaryModels {
-		if m.id == cur {
-			sel = i
-		}
-		opts = append(opts, askOpt{m.label(c.Model), "", func() { a.setSettingTo("ai-model", m.id); w.show(a) }})
+	if c.Model == "" {
+		return ai.DefaultModel
 	}
-	a.choose("The AI diary's model", "those that read handwriting on OpenCode Go; a question cost, and took, when tried", append(opts, askOpt{"cancel", "", nil})...)
-	a.asking.sel = sel
-	a.drawAsk()
+	return c.Model
 }
 
-func diaryModelIDs() []string {
-	var ids []string
-	for _, m := range diaryModels {
-		ids = append(ids, m.id)
-	}
-	return ids
-}
-
-// diaryModelsShown are the models as the Settings list them: the cost,
-// how long it took.
-func diaryModelsShown() []string {
-	var ls []string
-	for _, m := range diaryModels {
-		if m.id == "conf" {
-			ls = append(ls, "as ai.conf says")
-			continue
-		}
-		ls = append(ls, m.label(""))
-	}
-	return ls
-}
-
-func diaryModelOf(id string) diaryModel {
-	for _, m := range diaryModels {
-		if m.id == id {
-			return m
+// noteSettingsRedraw draws the notebooks' settings again where they
+// show: a choice's list may have changed under them.
+func (a *bro) noteSettingsRedraw() {
+	for _, w := range a.noteWins() {
+		if w.setBody(a) != nil {
+			w.showSettings(a)
 		}
 	}
-	return diaryModel{id: id}
 }
 
 // diaryConf is ai.conf, with the model the settings choose.
@@ -147,6 +216,9 @@ func (a *bro) diaryConf() (ai.Config, error) {
 	c, err := ai.Load(kobo.AppFile("ai.conf"))
 	if m := a.setting("ai-model"); m != "conf" && m != "" {
 		c.Model, c.Proto = m, ""
+	}
+	if c.Proto == "" {
+		c.Proto = a.modelProto(c.Model)
 	}
 	c.MaxOut = max(c.MaxOut, diaryMaxOut)
 	c.Agent = "hellobro/" + version // as OpenCode asks of the apps calling it
@@ -1038,7 +1110,7 @@ func (a *bro) usageShown() string {
 	data, _ := os.ReadFile(diaryUsagePath())
 	m := a.diaryModelNow()
 	h5, week, month := diaryUsage(data, m, time.Now())
-	lim := diaryModelOf(m).limit
+	lim := diaryLimits[m]
 	if lim == 0 {
 		return fmt.Sprintf("5 h $%.3f · week $%.3f · month $%.3f", h5, week, month)
 	}
@@ -1057,7 +1129,7 @@ func (a *bro) usageNote() string {
 	m := a.diaryModelNow()
 	data, _ := os.ReadFile(diaryUsagePath())
 	_, _, month := diaryUsage(data, m, time.Now())
-	if lim := diaryModelOf(m).limit; lim > 0 {
+	if lim := diaryLimits[m]; lim > 0 {
 		return fmt.Sprintf("AI usage: %s's, $%.3f this month, of the Go plan's $%.0f (a fifth in 5 h, half a week); this Kobo's only", m, month, lim)
 	}
 	return fmt.Sprintf("AI usage: %s's, in dollars, this Kobo's questions only", m)

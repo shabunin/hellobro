@@ -1258,9 +1258,12 @@ Its settings, under the notebook's:
   on, answer in French", "call me Harry", "be my Latin teacher". It
   says it will, and keeps it on that answer: shown here, and gone if
   that answer's undone or erased.
-- **AI model**: a tap lists them: the models that read handwriting on
-  OpenCode Go, each with what a question cost and how long it took
-  when tried (on 2026-11-11), or **as ai.conf says**.
+- **AI model**: a tap lists them: **as ai.conf says** first, then the
+  models the API lists that read pictures (handwriting), cheapest
+  first, with their price a million tokens in / out. The list is
+  fetched when the settings show and it's a day old (or ai.conf's
+  `base` changed), and kept in `ai-models.json` in the app's folder, so
+  it's there offline. The same choice is in Settings, AI notebooks.
 - **AI font (this notebook)**: a tap lists them: **Gentium Book**
   (first: Latin, Cyrillic and Greek, polytonic too, in all four
   styles; it comes with hellobro), Go, the fonts the books are read in
@@ -1288,11 +1291,23 @@ key = YOUR_KEY
 model = claude-haiku-5-5   # for "as ai.conf says"
 ```
 
-`base = URL` points it at another API that speaks Anthropic's messages
-or OpenAI's chat completions (models whose names start with `claude-`,
-`qwen3.` or `minimax-m3` go by Anthropic's, the rest by OpenAI's;
-`protocol = anthropic` or `openai` says which). Without Wi-Fi it says
-why, and waits for the next thing written.
+Each model is asked the way the list says it's reached: Anthropic's
+messages, OpenAI's chat completions, or OpenAI's Responses API (the
+`gpt-` ones); `protocol = anthropic`, `openai` or `responses` says it
+for one the list doesn't know.
+
+`base = URL` points it at another API. One ending in `/v1` is taken as
+OpenRouter-like: its models from `URL/models`, all asked by OpenAI's
+chat completions. For [OpenRouter](https://openrouter.ai), with its
+own key:
+
+```
+key = YOUR_OPENROUTER_KEY
+base = https://openrouter.ai/api/v1
+model = anthropic/claude-haiku-5-5
+```
+
+Without Wi-Fi it says why, and waits for the next thing written.
 
 ### ":" commands in a notebook
 

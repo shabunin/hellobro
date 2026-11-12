@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"hellobro/ai"
 )
 
 func lineAt(y int16, diary bool) *noteStroke {
@@ -105,12 +107,34 @@ func TestDiaryUsage(t *testing.T) {
 }
 
 func TestDiaryModels(t *testing.T) {
-	ids := diaryModelIDs()
-	if ids[0] != "conf" || !slices.Contains(ids, "claude-haiku-5-5") {
-		t.Errorf("models %v", ids)
+	i := settingIndex("ai-model")
+	was := settingList[i]
+	defer func() { settingList[i] = was }()
+	a := &bro{set: map[string]int{"ai-model": 1}} // the default model
+	a.nt.models = modelsState{loaded: true, List: []ai.Model{
+		{ID: "cheap", Images: true, Known: true, In: 0.5, Out: 3},
+		{ID: "blind", Known: true, In: 0.1, Out: 0.2},               // no pictures: not listed
+		{ID: "gemini-x", Images: true, Known: true, Proto: "-"},     // can't be asked
+		{ID: "unknown", Proto: "openai", In: -1, Out: -1},           // OpenRouter's, say: tried
+		{ID: "free-one", Images: true, Known: true},                 // free
+		{ID: "dear", Images: true, Known: true, In: 15, Out: 75.25}, // big
+	}}
+	a.applyModels()
+	st := settingList[i]
+	want := []string{"conf", "cheap", "unknown", "free-one", "dear", ai.DefaultModel}
+	if !slices.Equal(st.values, want) {
+		t.Fatalf("values %v, want %v", st.values, want)
 	}
-	if diaryModelOf("glm-5.3-flash").limit != 60 || diaryModelOf("nonesuch").limit != 0 {
-		t.Error("limits")
+	if st.values[a.set["ai-model"]] != ai.DefaultModel || !strings.HasSuffix(st.shown[5], "not listed now") {
+		t.Errorf("the one chosen: %d, %q", a.set["ai-model"], st.shown[5])
+	}
+	for k, w := range map[int]string{1: "cheap · $0.5 / $3", 2: "unknown", 3: "free-one · free", 4: "dear · $15 / $75"} {
+		if st.shown[k] != w {
+			t.Errorf("shown %q, want %q", st.shown[k], w)
+		}
+	}
+	if a.modelProto("unknown") != "openai" || a.modelProto("gemini-x") != "" || diaryLimits["glm-5.3-flash"] != 60 || price(10) != "10" {
+		t.Error("proto, limits or price")
 	}
 }
 

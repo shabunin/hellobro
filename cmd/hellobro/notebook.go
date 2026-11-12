@@ -446,6 +446,7 @@ type noteInk struct {
 }
 
 type noteState struct {
+	models   modelsState // the AI models to choose from (notediary.go)
 	ink      *noteInk
 	drag     *noteDrag   // the select tool's
 	unsaved  []*notebook // closed but not kept (a full card, say): kept when they can be; opened, from here

@@ -106,7 +106,8 @@ func main() {
 	a := &bro{media: mediaState{kick: make(chan struct{}, 1)}}
 	a.vk = vkbdState{held: map[*kobo.Gesture]vkHeld{}, latched: map[uint16]bool{}, since: time.Now()}
 	a.set = loadSettings()
-	a.applySizes() // before anything is laid out
+	a.applyModels() // the models' list, as last fetched
+	a.applySizes()  // before anything is laid out
 	a.applyTextSize()
 	a.vk.on = a.setting("vkbd") == "on"
 	kobo.SetTyping(a.langs()[0])

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"hellobro/ai"
 	"hellobro/ink"
 	"hellobro/kobo"
 )
@@ -116,8 +117,8 @@ var settingList = []setting{
 		values: []string{"on", "off"},
 		shown:  []string{"a finger up or down the left edge sets it", "off: a finger there is the page's (full screen)"}},
 	{key: "ai-model", group: "AI notebooks", label: "Model",
-		help:   "the model an AI notebook asks, on OpenCode Go (the key in ai.conf); each with its cost when tried",
-		values: diaryModelIDs(), shown: diaryModelsShown()},
+		help:   "the model an AI notebook asks (the key in ai.conf): those the API lists that read pictures, and their price a million tokens in / out",
+		values: []string{"conf", ai.DefaultModel}, shown: []string{"as ai.conf says", ai.DefaultModel}}, // the API's list, once it's had (applyModels)
 	{key: "ai-format", label: "Answers", title: "AI notebooks: answers",
 		help:   "Markdown has headings, tables, code, formulas in LaTeX, diagrams and graphs",
 		values: []string{"md", "plain"}, shown: []string{"Markdown: formulas, code, diagrams", "plain text"}},
@@ -291,6 +292,12 @@ func loadSettings() settings {
 				if sv == v {
 					s[k] = i
 				}
+			}
+			if k == "ai-model" && !slices.Contains(st.values, v) && v != "" { // the list's comes later: kept till then
+				i := settingIndex(k)
+				settingList[i].values = append(settingList[i].values, v)
+				settingList[i].shown = append(settingList[i].shown, v)
+				s[k] = len(settingList[i].values) - 1
 			}
 		}
 	}

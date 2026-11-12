@@ -6,6 +6,8 @@ package main
 // at once (pickSetting).
 
 import (
+	"slices"
+
 	"hellobro/ink"
 	"hellobro/ink/layout"
 	"hellobro/ink/theme"
@@ -89,6 +91,11 @@ func (u *settingsUI) Layout(gtx ink.Ctx) ink.Dims {
 			sl := theme.Slider(th, &u.fl[i], label, v)
 			sl.Ticks = true
 			row = func(gtx ink.Ctx) ink.Dims { return layout.Inset{Top: th.Pad}.Layout(gtx, sl.Layout) } // as a dropdown's row has
+		case st.key == "ai-model": // the API's list, fetched when it's old
+			a.modelsWant()
+			shown := slices.Clone(st.shown)
+			shown[0] = "as ai.conf says: " + a.diaryConfModel()
+			row = theme.Select(th, &u.sel[i], label, shown...).Layout
 		default:
 			row = theme.Select(th, &u.sel[i], label, st.shown...).Layout
 		}
