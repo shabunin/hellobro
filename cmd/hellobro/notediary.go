@@ -39,8 +39,7 @@ import (
 )
 
 const (
-	diaryPause      = 3 * time.Second // the pen rested this long: what's written goes
-	diaryAttr       = "hellobro"      // a stroke's attribute in the file, "diary" on its own
+	diaryAttr       = "hellobro" // a stroke's attribute in the file, "diary" on its own
 	diaryOnAttr     = "hellobro-diary"
 	diaryRadius     = 22  // its pen, tenths of a unit
 	diaryMargin     = 90  // from the page's edges
@@ -48,7 +47,6 @@ const (
 	diaryHistory    = 12  // messages of the talk before, sent with a question
 	diaryWordTime   = 60 * time.Millisecond
 	diaryStrokeTime = 22 * time.Millisecond
-	diaryTaps       = 3                      // taps of a finger, quick, to ask now
 	diaryTapGap     = 450 * time.Millisecond // between them, at most
 	diaryMaxOut     = 4000                   // tokens: a model that thinks first needs room
 )
@@ -212,8 +210,8 @@ type noteDiary struct {
 
 const diaryDotEvery = 700 * time.Millisecond
 
-// diaryTaps are a finger's taps on a page, the last few: three quick
-// ones ask the diary at once.
+// diaryTapper has a finger's taps on a page, the last few: quick ones
+// ask the diary at once ("ai-taps").
 type diaryTapper struct {
 	at   []time.Time
 	last image.Point
@@ -322,7 +320,7 @@ func (a *bro) diaryTick() {
 				d.dots, d.dotAt = d.dots%3+1, time.Now()
 				w.diaryShowDots(a, false)
 			}
-		case d.asked == 0 && !d.wroteAt.IsZero() && time.Since(d.wroteAt) >= diaryPause &&
+		case d.asked == 0 && !d.wroteAt.IsZero() && a.diaryPause() > 0 && time.Since(d.wroteAt) >= a.diaryPause() &&
 			time.Since(a.nt.hoverAt) >= noteHoverGone && w.typing == nil:
 			d.wroteAt = time.Time{}
 			w.diaryAsk(a, false)
@@ -389,7 +387,9 @@ var diaryFormats = map[string]string{
 	"plain": "plain text, no Markdown, no LaTeX: write formulas plainly, with Unicode's signs where they help: x² + 1, √2, π, ≤, →; new lines only between paragraphs",
 	"md": "Markdown where it helps: **bold**, *italic*, lists, tables, `code` and fenced code blocks (```), a heading only in a long answer; " +
 		"formulas in LaTeX, $...$ in a line and $$...$$ on a line of their own; a diagram, where one helps, as a ```mermaid block " +
-		"(flowchart, sequenceDiagram, stateDiagram-v2 or pie; labels with brackets or punctuation in quotes). In the JSON, escape each backslash (\\\\frac, \\\\alpha) and write new lines as \\n",
+		"(flowchart, sequenceDiagram, stateDiagram-v2, classDiagram, erDiagram, gantt, timeline, mindmap, pie or xychart-beta; labels with brackets or punctuation in quotes); " +
+		"a graph of functions as a ```plot block, a line each: title Name, x: -5 .. 5, y: -2 .. 2 if it matters, then each function as y = x^2 - 1 : name " +
+		"(+ - * / ^, sqrt, sin, cos, tan, exp, ln, log10, abs, pi), points: (1, 2) (3, 4) : name, x = 2 for an upright line, xlabel: t, s. In the JSON, escape each backslash (\\\\frac, \\\\alpha) and write new lines as \\n",
 }
 
 // diaryVoices are the manners it can answer in, by name: a notebook's
@@ -501,12 +501,13 @@ func (a *bro) diaryTap(w *noteWin, page int, p image.Point) {
 		t.at = nil
 	}
 	t.at, t.last = append(t.at, now), p
-	if len(t.at) < diaryTaps {
+	taps := a.diaryTaps()
+	if taps == 0 || len(t.at) < taps {
 		return
 	}
 	t.at = nil
 	if !w.nb.diaryOn() {
-		a.Notify("three taps ask the AI diary: it's off (the notebook's settings)")
+		a.Notify(map[int]string{2: "two", 3: "three"}[taps] + " taps ask the AI diary: it's off (the notebook's settings)")
 		return
 	}
 	if w.diary == nil {
@@ -526,6 +527,23 @@ func (a *bro) diaryTap(w *noteWin, page int, p image.Point) {
 	}
 	d.page, d.wroteAt = page, time.Time{}
 	w.diaryAsk(a, true)
+}
+
+// diaryPause is how long the pen rests before what's written is asked
+// ("ai-pause"); 0: it isn't, only taps ask.
+func (a *bro) diaryPause() time.Duration {
+	n, err := strconv.Atoi(a.setting("ai-pause"))
+	if err != nil {
+		return 0
+	}
+	return time.Duration(n) * time.Second
+}
+
+// diaryTaps is how many quick taps of a finger ask now ("ai-taps"); 0:
+// taps don't.
+func (a *bro) diaryTaps() int {
+	n, _ := strconv.Atoi(a.setting("ai-taps"))
+	return n
 }
 
 // diaryAsk sends what's been written since the last answer; now, it's
@@ -652,7 +670,7 @@ func (w *noteWin) diaryLay(page int, below image.Rectangle, r diaryReply, seed i
 			for n < len(words) && font.MeasureString(f, strings.Join(words[:n+1], " ")).Ceil() <= width {
 				n++
 			}
-			if y+lineH > size.Y-diaryMargin/2 {
+			if y+lineH > size.Y-diaryMargin/2 && !w.rollRoom(page, y+lineH) {
 				page = w.diaryPage(page)
 				size, y = w.pageSize(page), diaryMargin
 			}
@@ -725,7 +743,7 @@ func (w *noteWin) diaryLayHand(page int, below image.Rectangle, r diaryReply, se
 	for _, wd := range wr.Words {
 		if wd.Base != base { // a line begins: is there room for it?
 			base = wd.Base
-			if dy+base+diarySize*0.5 > float64(size.Y-diaryMargin/2) {
+			if foot := dy + base + diarySize*0.5; foot > float64(size.Y-diaryMargin/2) && !w.rollRoom(page, int(foot)) {
 				page = w.diaryPage(page)
 				size = w.pageSize(page)
 				dy = diaryMargin - (base - diarySize)
@@ -800,7 +818,14 @@ func (w *noteWin) diaryWriteWord(a *bro) {
 	d.nextAt = time.Now().Add(diaryWordTime + time.Duration(min(long, 8))*diaryStrokeTime) // as long a word, whatever the hand
 	w.changed = time.Now()                                                                 // kept, should the window close before it's done
 	if !w.p.Outer.Empty() && a.shows(w) && !w.overview && !w.settings {
-		if wd.page == w.cur+w.shown() && a.nt.ink == nil && a.nt.drag == nil && w.typing == nil {
+		idle := a.nt.ink == nil && a.nt.drag == nil && w.typing == nil
+		if w.roll() && idle { // the roll follows it, a screenful at a time
+			box := boxOf(wd.strokes)
+			if wd.line != nil {
+				box = wd.line.box
+			}
+			w.rollShow(a, wd.page, box.Min.Y, box.Max.Y)
+		} else if wd.page == w.cur+w.shown() && idle {
 			w.cur = wd.page
 			w.show(a)
 			a.MarkFlash(w.pages())

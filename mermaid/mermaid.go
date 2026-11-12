@@ -1,6 +1,9 @@
 // Package mermaid draws the diagrams a language model writes in
-// Mermaid's language: flowcharts (graph, flowchart), state diagrams,
-// sequence diagrams and pies. Not Mermaid itself: its language as
+// Mermaid's language: flowcharts (graph, flowchart), state, sequence,
+// class and entity-relationship diagrams, Gantt charts, timelines,
+// mind maps, pies and xychart-beta's bars and lines; and plots of
+// functions in a little language of our own (chart.go). Not Mermaid
+// itself: its language as
 // models write it, laid out by our own rules (a flowchart in ranks, as
 // dagre lays them out) and drawn black on white, for e-ink. Labels are
 // Markdown (bold, italic, code, <br>) with formulas in TeX (package
@@ -36,14 +39,15 @@ type Options struct {
 }
 
 // Result is a diagram drawn, black on white; Kind is what it was:
-// "flowchart", "state", "sequence", "pie".
+// "flowchart", "state", "sequence", "class", "er", "gantt",
+// "timeline", "mindmap", "pie", "xychart", "plot".
 type Result struct {
 	Img  *image.Gray
 	Kind string
 }
 
-// ErrUnknown is a diagram it doesn't draw (a Gantt chart, a class
-// diagram...) or nothing it can read.
+// ErrUnknown is a diagram it doesn't draw (a quadrant chart, a
+// journey...) or nothing it can read.
 var ErrUnknown = errors.New("mermaid: not a diagram it draws")
 
 // maxSide is the most pixels a side has: a runaway diagram is cut there.
@@ -84,6 +88,48 @@ func Render(src string, o Options) (Result, error) {
 			return Result{}, ErrUnknown
 		}
 		kind, p = "sequence", s.draw(d)
+	case kw == "classDiagram" || kw == "classDiagram-v2":
+		g := parseClass(lines)
+		if len(g.nodes) == 0 {
+			return Result{}, ErrUnknown
+		}
+		kind, p = "class", g.draw(d)
+	case kw == "erDiagram":
+		g := parseER(lines)
+		if len(g.nodes) == 0 {
+			return Result{}, ErrUnknown
+		}
+		kind, p = "er", g.draw(d)
+	case kw == "plot":
+		pl := parsePlot(lines)
+		if len(pl.fns) == 0 && len(pl.pts) == 0 {
+			return Result{}, ErrUnknown
+		}
+		kind, p = "plot", pl.draw(d)
+	case kw == "xychart-beta" || kw == "xychart":
+		c := parseXY(lines)
+		if len(c.series) == 0 {
+			return Result{}, ErrUnknown
+		}
+		kind, p = "xychart", c.draw(d)
+	case kw == "gantt":
+		g := parseGantt(lines)
+		if len(g.tasks) == 0 {
+			return Result{}, ErrUnknown
+		}
+		kind, p = "gantt", g.draw(d)
+	case kw == "timeline":
+		tl := parseTimeline(lines)
+		if len(tl.periods) == 0 {
+			return Result{}, ErrUnknown
+		}
+		kind, p = "timeline", tl.draw(d)
+	case kw == "mindmap":
+		r := parseMindmap(rawLines(src))
+		if r == nil {
+			return Result{}, ErrUnknown
+		}
+		kind, p = "mindmap", r.draw(d)
 	case kw == "pie":
 		pc := parsePie(lines)
 		if len(pc.slices) == 0 {
@@ -587,6 +633,42 @@ func (p *picture) head(kind byte, tip, dir pt, s, lw float64) {
 		k := s * 0.3
 		p.stroke([]pt{c.add(dir.add(n).mul(k)), c.sub(dir.add(n).mul(k))}, lw*1.3, 0, 0)
 		p.stroke([]pt{c.add(dir.sub(n).mul(k)), c.sub(dir.sub(n).mul(k))}, lw*1.3, 0, 0)
+	case 't': // UML's inheritance: a hollow triangle
+		b := tip.sub(dir.mul(s))
+		tri := []pt{tip, b.add(n.mul(s * 0.5)), b.sub(n.mul(s * 0.5))}
+		p.fill(tri, 0xff)
+		p.stroke(closed(tri), lw, 0, 0)
+	case 'D', 'd': // composition, filled; aggregation, hollow
+		m := tip.sub(dir.mul(s * 0.65))
+		dia := []pt{tip, m.add(n.mul(s * 0.36)), tip.sub(dir.mul(s * 1.3)), m.sub(n.mul(s * 0.36))}
+		p.fill(dia, map[byte]uint8{'D': 0, 'd': 0xff}[kind])
+		p.stroke(closed(dia), lw, 0, 0)
+	case '1', 'z', 'M', 'm': // crow's feet: one, zero or one, one or more, zero or more
+		bar := func(at float64) {
+			c := tip.sub(dir.mul(at))
+			p.stroke([]pt{c.add(n.mul(s * 0.4)), c.sub(n.mul(s * 0.4))}, lw, 0, 0)
+		}
+		ring := func(at float64) {
+			c := tip.sub(dir.mul(at))
+			p.fill(circle(c, s*0.22, 16), 0xff)
+			p.stroke(closed(circle(c, s*0.22, 16)), lw, 0, 0)
+		}
+		if kind == 'M' || kind == 'm' {
+			f := tip.sub(dir.mul(s * 0.7))
+			p.stroke([]pt{tip.add(n.mul(s * 0.42)), f, tip.sub(n.mul(s * 0.42))}, lw, 0, 0)
+		}
+		switch kind {
+		case '1':
+			bar(s * 0.35)
+			bar(s * 0.6)
+		case 'z':
+			bar(s * 0.35)
+			ring(s * 0.85)
+		case 'M':
+			bar(s * 0.95)
+		case 'm':
+			ring(s * 1.0)
+		}
 	}
 }
 
@@ -597,6 +679,10 @@ func headRoom(kind byte, s float64) float64 {
 		return s * 0.8
 	case 'o':
 		return s * 0.6
+	case 't':
+		return s
+	case 'D', 'd':
+		return s * 1.3
 	}
 	return 0
 }

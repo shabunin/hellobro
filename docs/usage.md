@@ -930,13 +930,28 @@ width, its gray.
   (below), **Pen buttons** (above), **Export** (below), **Light by
   the left edge** (on: a finger up or down it sets the light, full
   screen too; off: full screen, a finger there is the page's), **Bar,
-  fullscreen** (below), **AI diary (this notebook)** (below): a tap on a
+  fullscreen** (below), **Pages (this notebook)** (below), **AI diary
+  (this notebook)** and the rest of the AI's (below): a tap on a
   value, or ↑ ↓ and Enter, ← →, steps it. They're the notebooks' own:
   the app's Settings don't have them.
 - The arrows turn the page, as do Left, Right, PgUp, PgDn; past the
   last page, if it has something on it, a new page. Once a pen has
   written (or as the settings say, below), a finger swiped across the page turns it too (leftward: the
   next, as pages turn).
+- **Pages (this notebook)**: **one by one**, or **a roll: scrolled up
+  and down**. A roll shows the page as wide as the window (no wider
+  than it is, landscape), and the arrows and keys scroll it a
+  screenful at a time (most of one, so a line or two stays in sight),
+  as does a finger swiped up or down. Where the page ends, it grows
+  for the scroll, if there's something written on the screen or under
+  it: write on, there's always more paper. On a blank screen at its
+  foot, it's the next page's top (a new page if this one's written on),
+  and back past a page's top, the one before's foot. The diary answers
+  only what's written under its last answer, so write on down the roll. A finger swiped across still turns
+  the pages. In the `.xopp` they're pages, only taller (up to about 17
+  screens; then the next page goes on from there): Xournal++ shows
+  them so, and the PDF has them as tall pages. The AI diary's answers
+  grow the page as they go, and the roll follows them.
 - The page counter between the arrows (or O) shows all the pages
   small, a screenful at a time (the arrows, PgUp, PgDn or a finger
   swiped across for more), and a **+ new page** tile after the last.
@@ -1042,17 +1057,20 @@ width, its gray.
 A notebook can answer what's written in it, as Tom Riddle's diary did.
 Turn **AI diary (this notebook)** on in its settings (each notebook
 its own; it's kept in the file). Write, and rest the pen: after about
-3 seconds what's been written since the diary's last answer on that
-page goes to a language model as a picture: the handwriting, typed
+3 seconds (**AI asks after a pause**: 2, 3, 5 or 10 s, or off) what's
+been written since the diary's last answer on that page goes to a
+language model as a picture: the handwriting, typed
 text, and pictures pasted there (a book's cut, say: sent as sharp as
 the screen shows it). If it reads as finished (it ends with a question
 mark, a full stop or an exclamation mark) the answer is written under
 it, a word at a time; if not, it waits for more, and writing on sends
 it all again. While it thinks, three dots under the question say so.
 Three quick taps of a finger on the page (once a pen has written, when
-a finger turns pages) ask at once, finished or not. A full page goes
-on on the next one if it's empty, else on one put in after it, and the
-pages turn with it.
+a finger turns pages) ask at once, finished or not (**AI asks on
+taps**: three, two, or off). With the pause off, only taps ask. A full
+page goes on on the next one if it's empty, else on one put in after
+it, and the pages turn with it; in a roll (below) the page grows
+instead, and the roll follows the answer down.
 
 It answers in Markdown (**AI answers**, below), laid out as it says:
 headings, **bold** and *italic*, lists, quotes with a bar, tables in
@@ -1072,12 +1090,38 @@ is drawn: flowcharts (`graph`, `flowchart`: its shapes, `-->` `-.->`
 `==>` and labeled edges, subgraphs, any direction), state diagrams
 (`stateDiagram-v2`: `[*]`, composite states, choices, forks), sequence
 diagrams (`sequenceDiagram`: participants and actors, the arrows,
-notes, `loop`/`alt`/`opt`/`par` frames, `autonumber`) and pies. Laid
-out in ranks as Mermaid's own (dagre) does, its labels in the
-notebook's font, Markdown and `$...$` formulas in them too. It's a
-picture, made smaller where it'd be wider than the text or higher than
-a page, its source kept in the `.xopp` (`hellobro-mermaid`). Other
-kinds (Gantt, class diagrams...) stay code.
+notes, `loop`/`alt`/`opt`/`par` frames, `autonumber`), class diagrams
+(`classDiagram`: members, annotations, generics, UML's arrows and
+multiplicities), entity-relationship diagrams (`erDiagram`: attributes
+with their keys, crow's feet), Gantt charts (`gantt`: sections, `after`,
+lengths, done/active/crit tasks, milestones), timelines (`timeline`,
+drawn down the page), mind maps (`mindmap`: its shapes, growing to
+both sides), pies, and bar and line charts (`xychart-beta`). Flowcharts,
+state, class and ER diagrams are laid out in ranks as Mermaid's own
+(dagre) does, their labels in the notebook's font, Markdown and `$...$`
+formulas in them too. It's a picture, made smaller where it'd be wider
+than the text or higher than a page (a screen, in a roll), its source
+kept in the `.xopp` (`hellobro-mermaid`). Other kinds (quadrant
+charts, journeys...) stay code.
+
+A graph of functions comes as a ` ```plot ` block, a line each:
+
+```
+title The parabola
+x: -1 .. 6
+y = x^2 - 5x + 6 : f
+g(x) = sin 2x
+x = 2 : an upright line
+points: (2, 0) (3, 0) : roots
+xlabel: t, s
+```
+
+Formulas as they're written by hand or in code: `2x`, `(x+1)(x-1)`,
+`x^2` or `x²`, `sin x`, `sqrt`, `exp`, `ln`, `log10`, `abs`, `pi`. The x
+range is −10 to 10 if it's not said; the y range as far as the curves
+go (a tan's poles left out) unless `y: -2 .. 2` says. Round numbers on
+the axes, a grid, the zero lines darker; each curve its own dashes,
+named in a legend.
 
 What it's sent: the picture, and the talk so far as text: each
 question as it read it and its answer, the last six, from all the
@@ -1109,6 +1153,10 @@ Its settings, under the notebook's:
 - **AI answers**: **Markdown** (code, formulas, tables, diagrams, as above) or
   **plain text**.
 - **AI letters' size**: medium (15 pt), small, large, huge.
+- **AI asks after a pause**: when the pen rests 3 s (or 2, 5, 10), or
+  **off**: only taps ask.
+- **AI asks on taps**: **three quick taps**, **two quick taps**, or
+  **off**: only the pause asks.
 - **AI usage**: what this Kobo's questions to the model cost, over 5
   hours, a week and 30 days, as a share of the Go plan's limits for it
   (a fifth of the month's in 5 hours, half in a week); the line under

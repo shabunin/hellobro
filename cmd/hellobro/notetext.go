@@ -307,7 +307,7 @@ func (w *noteWin) typed(a *bro, box image.Rectangle) {
 		if page >= 0 && w.cur+i != page {
 			continue
 		}
-		r := w.toScreenRect(box.Inset(-12), slot).Intersect(slot)
+		r := w.toScreenRect(box.Inset(-12), slot).Intersect(slot).Intersect(w.paperArea())
 		if r.Empty() {
 			continue
 		}

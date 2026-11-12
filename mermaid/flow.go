@@ -20,9 +20,10 @@ type node struct {
 	w, h     float64
 
 	dummy  bool
-	labels int  // a dummy that's edge labels' place: the edge's index+1
-	border int  // a dummy at a subgraph's left (-1) or right (1)
-	set    bool // its shape or text written
+	labels int     // a dummy that's edge labels' place: the edge's index+1
+	border int     // a dummy at a subgraph's left (-1) or right (1)
+	set    bool    // its shape or text written
+	rec    *record // a class's or an entity's box of rows (class.go)
 	rank   int
 	order  int
 	x, y   float64 // the layout's: x across the ranks, y along them
@@ -38,6 +39,9 @@ type edge struct {
 	lab        *label
 	subFrom    int // from a subgraph (its box), not a node: its index+1
 	subTo      int
+
+	fromText, toText string // written at its ends (a class's multiplicity)
+	fromLab, toLab   *label
 }
 
 type subgraph struct {

@@ -12,7 +12,7 @@ import (
 const mdAnswer = "## Solving\n\nThe roots of $ax^2+bx+c=0$ are **two**:\n\n$$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$\n\n" +
 	"- one *item*\n- two `code`\n  1. deeper\n\n```go\nfunc f(x float64) float64 {\n\treturn x*x // a long comment that goes on and on past the frame's edge for sure\n}\n```\n\n" +
 	"| a | b |\n|---|--:|\n| Привет | αβγ |\n\n> a quote\n\n```mermaid\ngraph LR\n  A[Начало] -->|да| B{$x > 0$?}\n```\n\n" +
-	"```mermaid\ngantt\n  title not drawn: code\n```\n\n---\nThe end."
+	"```mermaid\ngantt\n  title not drawn: no tasks, so code\n```\n\n```plot\nx: -2 .. 2\ny = x^2 : square\n```\n\n---\nThe end."
 
 func TestDiaryLayMD(t *testing.T) {
 	q := lineAt(300, false)
@@ -57,7 +57,7 @@ func TestDiaryLayMD(t *testing.T) {
 			t.Errorf("no %q in %s", want, all)
 		}
 	}
-	if pics != 3 || diagrams != 1 || lines < 4 {
+	if pics != 4 || diagrams != 2 || lines < 4 {
 		t.Errorf("%d pictures, %d diagrams, %d lines (frame, rules, bar)", pics, diagrams, lines)
 	}
 	if talk, _ := diaryTalk(w.nb); len(talk) != 2 {

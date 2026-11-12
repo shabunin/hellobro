@@ -20,6 +20,10 @@ func (g *graph) horizontal() bool { return g.dir == "LR" || g.dir == "RL" }
 func (g *graph) size(d *drawer) {
 	em := d.em
 	for _, n := range g.nodes {
+		if n.rec != nil {
+			d.sizeRecord(n)
+			continue
+		}
 		n.lab = d.label(n.text, em*14)
 		lw, lh := n.lab.w, n.lab.h
 		px, py := em*0.8, em*0.5
@@ -65,6 +69,12 @@ func (g *graph) size(d *drawer) {
 	for _, e := range g.edges {
 		if e.text != "" {
 			e.lab = d.label(e.text, em*12)
+		}
+		if e.fromText != "" {
+			e.fromLab = d.label(e.fromText, em*6)
+		}
+		if e.toText != "" {
+			e.toLab = d.label(e.toText, em*6)
 		}
 	}
 	for _, s := range g.subs {

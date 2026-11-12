@@ -79,6 +79,83 @@ var samples = []struct{ name, src string }{
     "Cats" : 85
     "Rats" : 15`},
 	{"cycle", "graph LR\nA-->B-->C-->A\nC-->D\nD-->D"},
+	{"class", `classDiagram
+    direction TB
+    class Animal {
+        <<abstract>>
+        +String name
+        +int age
+        +makeSound()* void
+        +isMammal() bool
+    }
+    class Duck {
+        +String beakColor
+        +swim()
+        +quack()
+    }
+    class List~T~
+    class Fish
+    Animal <|-- Duck
+    Animal <|-- Fish : is a
+    Animal "1" *-- "many" Leg : has
+    Zoo o-- Animal
+    Duck ..> List~T~ : uses
+    Fish ..|> Swimmer
+    <<interface>> Swimmer
+    Leg : +int length`},
+	{"plot", `plot
+    title Damped wave
+    x: -2pi .. 4pi
+    y = sin(x)/x : sinc
+    y = exp(-x/5) cos x : "damped"
+    y = tan(x) / 4
+    x = 3.5 : a line
+    points: (0, 1) (pi, 0) : marks
+    xlabel: t, s`},
+	{"plotauto", "plot\nf(x) = x^2 - 3\ng(x) = 2x + 1"},
+	{"xy", `xychart-beta
+    title "Sales Revenue"
+    x-axis [jan, feb, mar, apr, may, jun, jul, aug]
+    y-axis "Revenue (in $)" 4000 --> 11000
+    bar [5000, 6000, 7500, 8200, 9500, 10500, 11000, 10200]
+    line [5000, 6000, 7500, 8200, 9500, 10500, 11000, 10200]`},
+	{"gantt", `gantt
+    title A Gantt Diagram
+    dateFormat YYYY-MM-DD
+    section Section
+    A task           :a1, 2014-01-01, 30d
+    Another task     :after a1, 20d
+    section Another
+    Task in sec      :2014-01-12, 12d
+    another task     :24d
+    Done thing       :done, des1, 2014-01-06, 2014-01-08
+    Active one       :active, des2, 2014-01-09, 3d
+    Critical         :crit, 2014-02-01, 5d
+    Release          :milestone, m1, 2014-02-20, 0d`},
+	{"timeline", `timeline
+    title History of Social Media Platform
+    section The beginning
+    2002 : LinkedIn
+    2004 : Facebook : Google
+    section Video
+    2005 : YouTube
+         : and more
+    2006 : Twitter`},
+	{"mindmap", "mindmap\n  root((mindmap))\n    Origins\n      Long history\n      ::icon(fa fa-book)\n      Popularisation\n        British popular psychology author Tony Buzan\n    Research\n      On effectiveness<br/>and features\n      On Automatic creation\n        Uses\n            Creative techniques\n            Strategic planning\n            Argument mapping\n    Tools\n      Pen and paper\n      Mermaid\n    id)Cloud(\n    id2{{Hexagon}}"},
+	{"er", `erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE-ITEM : contains
+    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses
+    PRODUCT |o--o{ LINE-ITEM : "ordered in"
+    CUSTOMER {
+        string name
+        string custNumber PK "the number"
+        string email UK
+    }
+    ORDER {
+        int orderNumber PK
+        string customer FK
+    }`},
 }
 
 func TestRender(t *testing.T) {
@@ -111,7 +188,7 @@ func TestRender(t *testing.T) {
 }
 
 func TestUnknown(t *testing.T) {
-	for _, src := range []string{"", "gantt\n title x", "classDiagram\n A <|-- B", "graph TD\n"} {
+	for _, src := range []string{"", "quadrantChart\n title x", "journey\n title x", "graph TD\n", "classDiagram\n", "erDiagram\n"} {
 		if _, err := Render(src, Options{Em: 20}); err == nil {
 			t.Errorf("%q drawn", src)
 		}

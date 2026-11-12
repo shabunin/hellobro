@@ -20,7 +20,7 @@ func (w *noteWin) exCmds(a *bro) []exCmd {
 				w.ovSel = w.cur
 			}
 			if w.pageEdit(id) {
-				w.cur = min(w.ovSel, len(w.nb.pages)-1)
+				w.cur, w.scroll = min(w.ovSel, len(w.nb.pages)-1), 0
 				w.ovShow()
 				w.place(a, w.p) // the counter
 			}

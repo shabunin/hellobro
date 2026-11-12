@@ -47,6 +47,12 @@ func noteSetRows() []noteSet {
 		{"Export", ownShown("note-export"), stepOwn("note-export")},
 		{"Light by the left edge", ownShown("note-light"), stepOwn("note-light")},
 		{"Bar, fullscreen", func(a *bro, _ *noteWin) string { return fullBarWord(a.fullBar("note")) }, func(a *bro, _ *noteWin, _ int) { a.flipFullBar("note") }},
+		{"Pages (this notebook)", func(a *bro, w *noteWin) string {
+			if w.nb.rollOn() {
+				return "a roll: scrolled up and down"
+			}
+			return "one by one"
+		}, func(a *bro, w *noteWin, _ int) { w.flipRoll(a) }},
 		{"AI diary (this notebook)", func(a *bro, w *noteWin) string { return onOff(w.nb.diaryOn()) }, func(a *bro, w *noteWin, _ int) { w.flipDiary(a) }},
 		{"AI voice (this notebook)", func(a *bro, w *noteWin) string { return diaryVoices[w.nb.diaryVoice()].label }, func(a *bro, w *noteWin, d int) { w.stepVoice(d) }},
 		{"AI instructions (written)", func(a *bro, w *noteWin) string {
@@ -70,6 +76,8 @@ func noteSetRows() []noteSet {
 		}, func(a *bro, w *noteWin, _ int) { w.chooseFont(a) }},
 		{"AI answers", ownShown("ai-format"), stepOwn("ai-format")},
 		{"AI letters' size", ownShown("ai-size"), stepOwn("ai-size")},
+		{"AI asks after a pause", ownShown("ai-pause"), stepOwn("ai-pause")},
+		{"AI asks on taps", ownShown("ai-taps"), stepOwn("ai-taps")},
 		{"AI usage", func(a *bro, _ *noteWin) string { return a.usageShown() }, func(*bro, *noteWin, int) {}},
 	}
 }
@@ -98,9 +106,10 @@ func (w *noteWin) drawSettings(a *bro) {
 		c.Frame(h.back.Inset(-4), 3, kobo.Dark)
 	}
 	y, boxW := area.Min.Y+rowH+16, min(area.Dx()/2, 560)
+	step := min(72, (area.Max.Y-88-y)/len(noteSettings)) // closer, where they'd go off the foot (landscape)
 	for i, s := range noteSettings {
-		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+64)
-		y += 72
+		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+step-8)
+		y += step
 		if i == w.setSel {
 			c.Frame(r.Inset(-4), 3, kobo.Dark)
 		}

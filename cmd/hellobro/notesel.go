@@ -452,10 +452,8 @@ func (a *bro) noteDragEnd(g *kobo.Gesture) {
 		w.selectAt(d.page, w.toPage(d.from, d.at))
 	case d.kind == dragMove:
 		page, at := d.page, d.at
-		for i, s := range w.slots {
-			if g.Last.In(s) {
-				page, at = w.cur+i, s
-			}
+		if i := w.slotAt(g.Last); i >= 0 {
+			page, at = w.cur+i, w.slots[i]
 		}
 		w.moveSel(page, w.toPage(g.Last, at).Sub(w.toPage(d.from, d.at)))
 	case d.kind == dragScale:

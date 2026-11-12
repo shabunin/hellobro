@@ -122,7 +122,7 @@ func (w *noteWin) overviewOn(a *bro, on bool) {
 
 // openPage shows page n, from the overview.
 func (w *noteWin) openPage(a *bro, n int) {
-	w.cur = n
+	w.cur, w.scroll = n, 0
 	log.Printf("notebook %s: page %d opened", w.nb.name, n+1)
 	w.overviewOn(a, false)
 	if a.shows(w) {

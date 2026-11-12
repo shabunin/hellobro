@@ -184,6 +184,21 @@ func (g *graph) draw(d *drawer) *picture {
 		ps = clipStart(ps, from)
 		ps = reverse(clipStart(reverse(ps), to))
 		g.drawEdge(p, e, ps, w, dash, hs, lw)
+		if len(ps) >= 2 { // what's written at its ends, beside them
+			for _, end := range []struct {
+				lab *label
+				ps  []pt
+			}{{e.fromLab, ps}, {e.toLab, reverse(ps)}} {
+				if end.lab == nil {
+					continue
+				}
+				tip, dir := endOf(reverse(end.ps), 0)
+				dir = dir.mul(-1)
+				nrm := pt{-dir.y, dir.x}
+				at := tip.add(dir.mul(em*0.6 + end.lab.h/2)).add(nrm.mul(em*0.4 + end.lab.w/2))
+				tags = append(tags, tag{end.lab, at})
+			}
+		}
 	}
 	for _, t := range tags {
 		r := []pt{{t.at.x - t.lab.w/2 - em*0.2, t.at.y - t.lab.h/2 - em*0.1}, {t.at.x + t.lab.w/2 + em*0.2, t.at.y - t.lab.h/2 - em*0.1},
@@ -195,6 +210,10 @@ func (g *graph) draw(d *drawer) *picture {
 	// Nodes.
 	for i, n := range g.nodes[:L.n] {
 		c := at(n)
+		if n.rec != nil {
+			p.drawRecord(n, c, em, lw)
+			continue
+		}
 		fill := uint8(0xff)
 		switch n.shape {
 		case "start", "fork":

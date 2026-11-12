@@ -135,7 +135,9 @@ func (w *noteWin) paste(a *bro) {
 	w.nb.apply(op, false)
 	w.edited(op)
 	w.pasted(page, op.add[0])
-	if page >= w.cur+w.shown() {
+	if w.roll() {
+		w.rollShow(a, page, box.Min.Y, box.Max.Y)
+	} else if page >= w.cur+w.shown() {
 		w.cur = page
 	}
 	log.Printf("notebook %s: a picture pasted on page %d", w.nb.name, page+1)
@@ -157,7 +159,7 @@ func (w *noteWin) pastePlace(size image.Point) (int, image.Rectangle) {
 	for _, s := range w.strokes(page) {
 		top = max(top, s.box.Max.Y+margin/2)
 	}
-	if top+size.Y > notePageH-margin && len(w.strokes(page)) > 0 {
+	if top+size.Y > w.pageSize(page).Y-margin && len(w.strokes(page)) > 0 && !w.rollRoom(page, top+size.Y) { // a roll grows for it
 		page, top = page+1, 2*margin
 		for _, s := range w.strokes(page) { // a page after it with something on it already: under that
 			top = max(top, s.box.Max.Y+margin/2)

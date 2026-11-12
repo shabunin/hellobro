@@ -127,7 +127,7 @@ func (w *noteWin) diaryLayMD(page int, below image.Rectangle, r diaryReply, fam 
 			lines[0] = append([]mdPlaced{{a: mk, x: -mw, grp: -1}}, lines[0]...)
 			l.lines(lines, ix+mw, x0+width-ix-mw)
 		case md.Code:
-			if !isDiagram(b) || !l.diagram(b.Text, x0, width) {
+			if src, ok := diagramSrc(b); !ok || !l.diagram(src, x0, width) {
 				l.code(b.Text, x0, width)
 			}
 		case md.Math:
@@ -157,7 +157,7 @@ func (l *mdLay) bottom() int { return l.w.pageSize(l.page).Y - diaryMargin/2 }
 
 // need makes room for h more: a new page if there's none on this one.
 func (l *mdLay) need(h int) {
-	if l.y+h <= l.bottom() || l.y <= diaryMargin {
+	if l.y+h <= l.bottom() || l.y <= diaryMargin || l.w.rollRoom(l.page, l.y+h) {
 		return
 	}
 	for _, s := range l.segs {
@@ -430,24 +430,28 @@ func (l *mdLay) line(ln []mdPlaced, x0, width int) {
 	l.y = base + desc + lead - lead/2
 }
 
-// isDiagram says if a block of code is a diagram in Mermaid's language:
-// marked so, or unmarked and starting as one does.
-func isDiagram(b md.Block) bool {
-	if strings.EqualFold(b.Lang, "mermaid") {
-		return true
-	}
-	if b.Lang != "" {
-		return false
+// diagramSrc is a block of code's diagram, if it is one: in Mermaid's
+// language, marked so or unmarked and starting as one does; or a plot
+// (```plot), which Render knows by its first word.
+func diagramSrc(b md.Block) (string, bool) {
+	switch {
+	case strings.EqualFold(b.Lang, "mermaid"):
+		return b.Text, true
+	case strings.EqualFold(b.Lang, "plot"):
+		return "plot\n" + b.Text, true
+	case b.Lang != "":
+		return "", false
 	}
 	f := strings.Fields(b.Text)
 	if len(f) == 0 {
-		return false
+		return "", false
 	}
 	switch f[0] {
-	case "graph", "flowchart", "sequenceDiagram", "stateDiagram", "stateDiagram-v2", "pie":
-		return true
+	case "graph", "flowchart", "sequenceDiagram", "stateDiagram", "stateDiagram-v2", "pie", "classDiagram", "erDiagram",
+		"gantt", "timeline", "mindmap", "xychart-beta":
+		return b.Text, true
 	}
-	return false
+	return "", false
 }
 
 // diagram draws a diagram (package mermaid), centered, a picture that
@@ -457,6 +461,9 @@ func isDiagram(b md.Block) bool {
 func (l *mdLay) diagram(src string, x0, width int) bool {
 	em := float64(l.em()) * 0.85
 	maxH := l.bottom() - diaryMargin
+	if l.w.nb.rollOn() { // a screen's, not the roll's
+		maxH = notePageH - 2*diaryMargin
+	}
 	var r mermaid.Result
 	for try := 0; try < 4; try++ {
 		var err error

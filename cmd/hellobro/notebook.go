@@ -379,6 +379,7 @@ func (s *noteStroke) hits(p image.Point) bool {
 type noteWin struct {
 	nb         *notebook
 	cur        int // the page shown, the left one of two
+	scroll     int // a roll's: how far down it it shows, units (noteroll.go)
 	erasing    bool
 	selecting  bool          // the select tool in hand (notesel.go)
 	texting    bool          // the text tool (notetext.go)
@@ -489,7 +490,14 @@ func (w *noteWin) place(a *bro, p kobo.Panel) {
 		w.side, w.bar = false, image.Rect(b.Min.X, p.Body.Min.Y, b.Max.X, p.Body.Min.Y)
 	}
 	w.slotSize = w.pageSize(w.cur)
-	w.slots, w.scale = noteSlots(w.paperArea().Inset(kobo.Pad/2), w.slotSize)
+	if w.roll() {
+		_, w.scale = rollSlot(w.paperArea(), w.slotSize, 0) // first, for rollView
+		w.scroll = max(0, min(w.scroll, w.rollEnd(w.cur)))
+		slot, _ := rollSlot(w.paperArea(), w.slotSize, w.scroll)
+		w.slots = []image.Rectangle{slot}
+	} else {
+		w.slots, w.scale = noteSlots(w.paperArea().Inset(kobo.Pad/2), w.slotSize)
+	}
 	if !w.bar.Empty() {
 		w.layBar(a)
 	}
@@ -643,7 +651,7 @@ func (w *noteWin) drawBar(a *bro) {
 	for _, b := range w.btns {
 		on := b.id == "pen" && !w.erasing && !w.selecting && !w.texting || b.id == "eraser" && w.erasing || b.id == "select" && w.selecting || b.id == "text" && w.texting
 		off := b.id == "undo" && len(w.undo) == 0 || b.id == "redo" && len(w.redo) == 0 ||
-			b.id == "prev" && w.cur == 0 || b.id == "next" && w.turnTo(1) < 0
+			b.id == "prev" && w.cantTurn(-1) || b.id == "next" && w.cantTurn(1)
 		if w.overview && b.id != "undo" && b.id != "all" {
 			off = w.ovOff(b.id)
 		}
@@ -816,7 +824,31 @@ func (w *noteWin) turnTo(by int) int {
 	return -1
 }
 
+// cantTurn is whether the arrow that turns by can't: a roll's scroll.
+func (w *noteWin) cantTurn(by int) bool {
+	if w.roll() {
+		_, _, ok := w.rollTo(by, false)
+		return !ok
+	}
+	if by < 0 {
+		return w.cur == 0
+	}
+	return w.turnTo(1) < 0
+}
+
+// turn turns the pages by (the arrows, the keys): a roll scrolls.
 func (w *noteWin) turn(a *bro, by int) {
+	if w.roll() {
+		w.endTyping(a)
+		w.rollBy(a, by)
+		return
+	}
+	w.turnPage(a, by)
+}
+
+// turnPage turns the pages by, a roll's too (swiped across): to their
+// tops.
+func (w *noteWin) turnPage(a *bro, by int) {
 	w.endTyping(a)
 	if w.overview {
 		w.ovTurn(a, by)
@@ -826,10 +858,10 @@ func (w *noteWin) turn(a *bro, by int) {
 	if n < 0 {
 		return
 	}
-	w.cur = n
+	w.cur, w.scroll = n, 0
 	w.show(a)
 	if a.shows(w) {
-		a.MarkFlash(w.pages()) // other pages: no ghost of these
+		a.MarkFlash(w.pages().Intersect(w.paperArea())) // other pages: no ghost of these
 	}
 }
 
@@ -871,7 +903,7 @@ func (w *noteWin) doUndo(a *bro, undo bool) {
 		w.ovShow()
 		w.place(a, w.p)
 	} else if pg < w.cur || pg >= w.cur+w.shown() {
-		w.cur = pg
+		w.cur, w.scroll = pg, 0
 	}
 	w.changed = time.Now()
 	w.show(a)
@@ -1166,7 +1198,7 @@ func (a *bro) noteTouch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	if w.selecting && p.In(w.selArea(a)) { // what's taken: its dots and buttons, by the edges too
 		return a.noteSelTouch(w, -1, p, g)
 	}
-	slot := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return p.In(r) })
+	slot := w.slotAt(p)
 	if slot < 0 {
 		return false
 	}
@@ -1287,8 +1319,9 @@ func (a *bro) noteInkTo(k *noteInk, p image.Point, pressure int32) {
 	if k.s.gray != kobo.Black { // the fast waveform has no grays: dark till it lifts
 		ink = kobo.Dark
 	}
-	a.C.Line(from, p, r, ink, k.at)
-	box := image.Rectangle{from, from}.Union(image.Rectangle{p, p}).Inset(-r - 1).Intersect(k.at)
+	clip := k.at.Intersect(w.paperArea()) // a roll's page goes on under the bar
+	a.C.Line(from, p, r, ink, clip)
+	box := image.Rectangle{from, from}.Union(image.Rectangle{p, p}).Inset(-r - 1).Intersect(clip)
 	k.marked = k.marked.Union(box)
 	k.last = p
 	a.Mark(box, false)
@@ -1314,7 +1347,7 @@ func (a *bro) noteErase(k *noteInk, p image.Point) {
 		r = r.Union(w.toScreenRect(s.box, k.at))
 	}
 	w.drawPages(a, r)
-	a.Mark(r.Intersect(k.at), true)
+	a.Mark(r.Intersect(k.at).Intersect(w.paperArea()), true)
 }
 
 // noteLift ends what the pen or the finger did.
@@ -1337,7 +1370,7 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 		if w, ok := a.windowAt(g.Start).(*noteWin); ok {
 			a.noteFocus(w)
 			dx, dy := g.Last.X-g.Start.X, g.Last.Y-g.Start.Y
-			i := slices.IndexFunc(w.slots, func(r image.Rectangle) bool { return g.Start.In(r) })
+			i := w.slotAt(g.Start)
 			if tap := i >= 0 && kobo.Abs(dx) < noteSwipe && kobo.Abs(dy) < noteSwipe; tap && w.texting {
 				w.textAt(a, w.cur+i, w.toPage(g.Start, w.slots[i]))
 			} else if tap {
@@ -1347,7 +1380,13 @@ func (a *bro) noteLift(g *kobo.Gesture) bool {
 				if dx > 0 {
 					by = -1
 				}
-				w.turn(a, by)
+				w.turnPage(a, by)
+			} else if w.roll() && kobo.Abs(dy) > noteSwipe && kobo.Abs(dy) > 2*kobo.Abs(dx) {
+				by := 1 // upward: on down the roll
+				if dy > 0 {
+					by = -1
+				}
+				w.rollBy(a, by)
 			}
 		}
 		return true

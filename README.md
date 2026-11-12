@@ -73,11 +73,12 @@ leave. It's built for the Kobo Elipsa (N604) and written in Go.
   typed from a keyboard; a select
   tool to move, scale, turn, copy and duplicate strokes and pasted PDF
   clips; all the pages small, to add, copy, move and delete them; two
-  pages side by side in landscape; exported as a PDF, or a page as a PNG. All Notebooks
+  pages side by side in landscape, or a roll scrolled up and down that grows
+  as you write; exported as a PDF, or a page as a PNG. All Notebooks
   lists them (recent, all, in folders) to open, rename and delete. Kept as
   Xournal++ files, to go on with on a computer. An AI diary, if you
   like: write a question, rest the pen, and the answer comes back
-  under it, formulas, code, tables and diagrams laid out (a language model, over
+  under it, formulas, code, tables, diagrams and plots drawn (a language model, over
   your OpenCode Go key).
 - **Power**: the battery (draw, time left, drain rate, a 12 h graph) and
   what's using it, powertop style.
