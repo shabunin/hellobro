@@ -4,6 +4,9 @@ import (
 	"image"
 	"strings"
 	"testing"
+	"time"
+
+	"hellobro/ink"
 )
 
 // The calendar: a week of hours, an event opened and closed, a day of
@@ -125,6 +128,7 @@ func TestDraw(t *testing.T) {
 		}
 		it.Release(at.Add(image.Pt(320, 8*(10+i*15))))
 	}
+	it.Wait(ink.LiveRest + 100*time.Millisecond) // the frame after the pen rests: grays, and the count
 	save(t, it, "portrait-draw")
 	if g.canvas.Strokes() != 3 || g.Said != "3 strokes" {
 		t.Fatalf("%d strokes, said %q", g.canvas.Strokes(), g.Said)

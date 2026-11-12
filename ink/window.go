@@ -34,6 +34,45 @@ type Window struct {
 	painted  bool                // a frame's been painted at this size
 	lastPos  map[int]image.Point // the contacts' last places, in the window
 	byTag    map[Tag]image.Point // each area's origin, as last painted
+	live     map[int]liveTo      // the contacts a Live widget has, drawn as they come
+	liveR    image.Rectangle     // what they drew since the last frame
+	rest     time.Time           // a frame then, if no contact's live: what they drew, in grays
+}
+
+// Live is a widget that takes its contacts as they come, not at the
+// next frame: a sheet the pen writes on, where waiting for the frame
+// (all the window laid out and painted again) would leave the line far
+// behind the pen. Live gets each of its contact's events (Pos its own);
+// it paints what changes into dst, the window as the host has it, at
+// off (its origin) and within clip, and gives where (in dst). At a
+// Press, ok false leaves the contact to the usual way: a finger, where
+// only the pen draws, moves the list it's in.
+type Live interface {
+	Live(e Pointer, dst *image.Gray, off image.Point, clip image.Rectangle) (changed image.Rectangle, ok bool)
+}
+
+// LiveRest is how long after a live contact lifts the frame comes that
+// puts what it drew in grays (and lets the program know): a word's next
+// letter, coming sooner, keeps it waiting.
+const LiveRest = 800 * time.Millisecond
+
+type liveTo struct {
+	l    Live
+	off  image.Point
+	clip image.Rectangle
+}
+
+// Inking says a live contact is down: ink being written, the host's pen
+// mode wanted.
+func (w *Window) Inking() bool { return len(w.live) > 0 }
+
+// liveDrawn notes r, drawn by a live contact, for the host.
+func (w *Window) liveDrawn(r image.Rectangle) {
+	if r.Empty() {
+		return
+	}
+	w.updates = append(w.updates, Update{R: r, Pen: true})
+	w.liveR = w.liveR.Union(r)
 }
 
 type contactTo struct {
@@ -83,11 +122,17 @@ func (w *Window) Invalidate() { w.input = true }
 // Due says a frame is: input came, it was asked for, or a time asked for
 // came.
 func (w *Window) Due(now time.Time) bool {
-	return w.input || !w.painted || !w.wake.IsZero() && !now.Before(w.wake)
+	return w.input || !w.painted || !w.wake.IsZero() && !now.Before(w.wake) ||
+		len(w.live) == 0 && !w.rest.IsZero() && !now.Before(w.rest)
 }
 
 // Wake is when it next wants a frame by itself, if ever.
-func (w *Window) Wake() time.Time { return w.wake }
+func (w *Window) Wake() time.Time {
+	if len(w.live) == 0 && !w.rest.IsZero() && (w.wake.IsZero() || w.rest.Before(w.wake)) {
+		return w.rest
+	}
+	return w.wake
+}
 
 func (w *Window) wakeAt(t time.Time) {
 	if w.wake.IsZero() || t.Before(w.wake) {
@@ -113,6 +158,11 @@ func (w *Window) frame(now time.Time) {
 	}
 	clear(w.asked)
 	w.quick, w.pen = false, false
+	w.rest = time.Time{}
+	if !w.liveR.Empty() { // drawn in black and white: back in grays
+		w.bw = append(w.bw, Update{R: w.liveR})
+		w.liveR = image.Rectangle{}
+	}
 	w.layout(now)
 	if step := w.wrapTo; step != 0 {
 		// The focus came round a list's end: the list's at its other end
@@ -212,6 +262,20 @@ func (w *Window) send(t Tag, e Event) {
 
 // Pointer takes a contact's event, at its place in the window.
 func (w *Window) Pointer(p Pointer) {
+	if lt, ok := w.live[p.ID]; ok {
+		q := p
+		q.Pos = p.Pos.Sub(lt.off)
+		r, _ := lt.l.Live(q, w.front, lt.off, lt.clip)
+		w.liveDrawn(r)
+		if p.Kind == Release || p.Kind == Cancel {
+			delete(w.live, p.ID)
+			w.rest = p.Time.Add(LiveRest)
+			if p.Time.IsZero() {
+				w.rest = time.Now().Add(LiveRest)
+			}
+		}
+		return
+	}
 	switch p.Kind {
 	case Press:
 		w.ring = false
@@ -244,6 +308,21 @@ func (w *Window) Pointer(p Pointer) {
 			hit = true
 			if a.Tag == nil {
 				break // a backdrop: nothing under it hears
+			}
+			if l, ok := a.Tag.(Live); ok && w.painted { // watchers over it miss it: it's the sheet's
+				q := p
+				q.Pos = p.Pos.Sub(a.off)
+				if r, ok := l.Live(q, w.front, a.off, a.r); ok {
+					if w.live == nil {
+						w.live = map[int]liveTo{}
+					}
+					w.live[p.ID] = liveTo{l, a.off, a.r}
+					w.liveDrawn(r)
+					if a.Focus {
+						w.setFocus(a.Tag)
+					}
+					return
+				}
 			}
 			to = append([]contactTo{{a.Tag, a.off}}, to...)
 			if a.Focus {

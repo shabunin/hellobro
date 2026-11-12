@@ -9,8 +9,11 @@ import (
 // Canvas is a sheet to draw on: the pen draws (its button or eraser end
 // rubs out), a finger too if FingerDraws, else a finger's left to what
 // it's in (a list moves). The pen's pressure makes its line thicker.
-// Each move is drawn at once, in the pen's waveform; the strokes are
-// kept, to Undo.
+// Each move is drawn at once, in the pen's waveform: it's Live, so the
+// window hands it its contacts as they come, and it paints them into
+// the window itself, with no frame between (a frame lays all the window
+// out again: the line would lag behind the pen). The strokes are kept,
+// to Undo.
 type Canvas struct {
 	FingerDraws bool
 	Erasing     bool   // what's drawn rubs out
@@ -70,18 +73,65 @@ func (c *Canvas) redraw() {
 	}
 }
 
-// paint draws s's segments from point from on.
-func (c *Canvas) paint(s *stroke, from int) {
+// paint draws s's segments from point from on, and says where.
+func (c *Canvas) paint(s *stroke, from int) image.Rectangle {
 	g := uint8(ink.Black)
 	if s.erase {
 		g = ink.White
 	}
+	var r image.Rectangle
 	if len(s.pts) == 1 {
 		dot(c.img, s.pts[0], s.ws[0], g)
+		r = image.Rectangle{s.pts[0], s.pts[0].Add(image.Pt(1, 1))}.Inset(-s.ws[0])
 	}
 	for i := max(from, 1); i < len(s.pts); i++ {
 		seg(c.img, s.pts[i-1], s.pts[i], s.ws[i], g)
+		sr := image.Rectangle{s.pts[i-1], s.pts[i]}.Canon()
+		sr.Max = sr.Max.Add(image.Pt(1, 1))
+		r = r.Union(sr.Inset(-s.ws[i]))
 	}
+	return r.Intersect(c.img.Rect)
+}
+
+// Live takes the sheet's contacts as they come (ink.Live): each one's
+// line drawn at once, on the sheet and in the window.
+func (c *Canvas) Live(e ink.Pointer, dst *image.Gray, off image.Point, clip image.Rectangle) (image.Rectangle, bool) {
+	if c.img == nil {
+		return image.Rectangle{}, false
+	}
+	var r image.Rectangle // on the sheet
+	switch e.Kind {
+	case ink.Press:
+		if c.cur != nil || e.Source == ink.Finger && !c.FingerDraws {
+			return image.Rectangle{}, false
+		}
+		erase := c.Erasing || e.Eraser
+		c.strokes = append(c.strokes, stroke{pts: []image.Point{e.Pos}, ws: []int{c.width(e, erase)}, erase: erase})
+		c.cur, c.contact = &c.strokes[len(c.strokes)-1], e.ID
+		r = c.paint(c.cur, 0)
+	case ink.Move:
+		if c.cur == nil || e.ID != c.contact {
+			return image.Rectangle{}, true
+		}
+		n := len(c.cur.pts)
+		if e.Pos == c.cur.pts[n-1] {
+			return image.Rectangle{}, true
+		}
+		c.cur.pts = append(c.cur.pts, e.Pos)
+		c.cur.ws = append(c.cur.ws, c.width(e, c.cur.erase))
+		r = c.paint(c.cur, n)
+	case ink.Release, ink.Cancel:
+		if c.cur != nil && e.ID == c.contact {
+			c.cur, c.changed = nil, true
+		}
+		return image.Rectangle{}, true
+	}
+	out := r.Add(off).Intersect(clip).Intersect(dst.Rect)
+	for y := out.Min.Y; y < out.Max.Y; y++ {
+		src := c.img.PixOffset(out.Min.X-off.X, y-off.Y)
+		copy(dst.Pix[dst.PixOffset(out.Min.X, y):dst.PixOffset(out.Max.X, y)], c.img.Pix[src:src+out.Dx()])
+	}
+	return out, true
 }
 
 func (c *Canvas) width(e ink.Pointer, erase bool) int {

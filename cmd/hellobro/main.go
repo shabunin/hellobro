@@ -33,38 +33,39 @@ import (
 // players' remote control.
 type bro struct {
 	*kobo.App
-	wm     wmState
-	ipc    ipcState
-	tv     termView
-	edge   *kobo.Gesture    // a contact along the right edge, which may become a menu swipe
-	pair   [2]*kobo.Gesture // two fingers together: may become a workspace swipe
-	pinch  *pinch           // or a PDF zoomed (bookzoom.go)
-	media  mediaState
-	stat   statBar  // the terminal tabs' status bar
-	picker *picker  // the switcher, while it's up
-	exUI   *exUI    // the ":" line, drawn in ink (excmd.go)
-	asking *askBox  // a question, while it's up
-	info   *infoBox // facts to read, while they're up
-	keys   keyMap
-	keyset *keySet // Settings' Keys: a key being asked for
-	rs     radioState
-	slp    sleepState
-	set    settings
-	mem    remembered // hellobro.json
-	mnt    mountState // the hosts' files, mounted (mount.go)
-	share  shareState
-	relay  relayState
-	upd    updateState
-	net    netState // the header's network
-	pw     powerState
-	kbd    kbdState
-	vk     vkbdState        // the on-screen keyboard (vkbd.go)
-	bk     bookState        // the reader's fonts (bookwin.go)
-	nt     noteState        // the notebooks' pen (notebook.go)
-	lay    kobo.Layout      // the last layout, to lay out again
-	th     *theme.Theme     // the ink windows' look (inkwin.go)
-	shot   *shot            // a screenshot being taken (shot.go)
-	trio   [3]*kobo.Gesture // three fingers together: may become the workspaces' swipe
+	wm      wmState
+	ipc     ipcState
+	tv      termView
+	edge    *kobo.Gesture    // a contact along the right edge, which may become a menu swipe
+	inkLive *kobo.Gesture    // the pen (or a finger) writing on an ink window's sheet: drawn as it comes
+	pair    [2]*kobo.Gesture // two fingers together: may become a workspace swipe
+	pinch   *pinch           // or a PDF zoomed (bookzoom.go)
+	media   mediaState
+	stat    statBar  // the terminal tabs' status bar
+	picker  *picker  // the switcher, while it's up
+	exUI    *exUI    // the ":" line, drawn in ink (excmd.go)
+	asking  *askBox  // a question, while it's up
+	info    *infoBox // facts to read, while they're up
+	keys    keyMap
+	keyset  *keySet // Settings' Keys: a key being asked for
+	rs      radioState
+	slp     sleepState
+	set     settings
+	mem     remembered // hellobro.json
+	mnt     mountState // the hosts' files, mounted (mount.go)
+	share   shareState
+	relay   relayState
+	upd     updateState
+	net     netState // the header's network
+	pw      powerState
+	kbd     kbdState
+	vk      vkbdState        // the on-screen keyboard (vkbd.go)
+	bk      bookState        // the reader's fonts (bookwin.go)
+	nt      noteState        // the notebooks' pen (notebook.go)
+	lay     kobo.Layout      // the last layout, to lay out again
+	th      *theme.Theme     // the ink windows' look (inkwin.go)
+	shot    *shot            // a screenshot being taken (shot.go)
+	trio    [3]*kobo.Gesture // three fingers together: may become the workspaces' swipe
 }
 
 const (

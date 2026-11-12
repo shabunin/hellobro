@@ -208,8 +208,13 @@ func (a *bro) inkDown(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 			panes = append(panes, b.inkPane())
 		}
 	}
-	if !slices.ContainsFunc(panes, func(pn *inkkobo.Pane) bool { return pn.Down(ev, p, g, ownPane) }) {
+	i := slices.IndexFunc(panes, func(pn *inkkobo.Pane) bool { return pn.Down(ev, p, g, ownPane) })
+	if i < 0 {
 		return false
+	}
+	if panes[i].Win.Inking() { // a sheet took it: ink, as a notebook's (the pen's waveform, each move sent at once)
+		a.inkLive = g
+		a.Ink(true)
 	}
 	if a.focusedWin() != w {
 		a.wm.tree.Focus(a.nodeOf(w))
@@ -228,6 +233,9 @@ func (a *bro) inkMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 	}
 	for _, gw := range a.inkWins() {
 		if gw.ink.pane.Move(ev, p, g) {
+			if a.inkLive == g { // drawn already: on the panel now, not at the next tick
+				a.flushPane(gw.ink.pane)
+			}
 			return true
 		}
 	}
@@ -242,6 +250,10 @@ func (a *bro) inkMove(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) bool {
 func (a *bro) inkLift(g *kobo.Gesture) bool {
 	if g.Owner != ownPane {
 		return false
+	}
+	if a.inkLive == g {
+		a.inkLive = nil
+		a.Ink(false)
 	}
 	if o := a.over(); o != nil && o.pane.Lift(g) {
 		a.inkTick()
@@ -261,6 +273,10 @@ func (a *bro) inkLift(g *kobo.Gesture) bool {
 
 // inkCancel lets g go from whichever pane has it, no click.
 func (a *bro) inkCancel(g *kobo.Gesture) {
+	if a.inkLive == g {
+		a.inkLive = nil
+		a.Ink(false)
+	}
 	if o := a.over(); o != nil && o.pane.Cancel(g) {
 		return
 	}

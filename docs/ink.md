@@ -90,6 +90,14 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
   there for what wants pages.
 - Ink drawn (`Ctx.Pen`, a `Canvas`) is a quick frame marked `Pen`: the
   host may send it in its quickest waveform.
+- A `Canvas` is `Live`: the window hands it its contacts as they come,
+  not at the next frame, and it paints each move into the window
+  itself, updates marked `Pen`. A frame lays the whole window out
+  again, too slow for the line to keep up with the pen. `Inking` says
+  one's down (the host's pen mode, each move sent at once, as
+  hellobro's notebooks do); the frame that puts the line in grays, and
+  lets the program see the stroke, comes `LiveRest` after the pen
+  lifts, unless it writes on.
 - Measuring (`Ctx.Measuring`) lays a widget out for its size only: no
   events, no areas, and its state left alone (a press stays a press).
 - A popup (a dropdown's options, a menu) is painted last, under its
