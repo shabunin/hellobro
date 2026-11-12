@@ -24,11 +24,13 @@ import (
 	"log"
 	"math"
 	"os"
+	"path"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/image/font"
@@ -475,6 +477,9 @@ func (a *bro) diaryFormat(nb *notebook) string {
 func diarySystem(nb *notebook, prompts []string, format string) string {
 	var b strings.Builder
 	b.WriteString(diaryVoices[nb.diaryVoice()].text + "\n\n" + strings.Replace(diaryRules, "FORMAT", diaryFormats[format], 1))
+	if autoNamed(nb.name) {
+		b.WriteString("\n- The notebook has no name yet: with your answer, add \"title\":\"<one to three words naming what it's about, in the writer's language, no punctuation>\".")
+	}
 	if len(prompts) > 0 {
 		b.WriteString("\n\nThe writer's standing instructions (follow them; a later one wins over an earlier):")
 		for _, p := range prompts {
@@ -490,6 +495,7 @@ type diaryReply struct {
 	Question string `json:"question"`
 	Answer   string `json:"answer"`
 	Prompt   string `json:"prompt,omitempty"`
+	Title    string `json:"title,omitempty"` // the notebook's name, asked for with its first question
 }
 
 // diaryTap takes a finger's tap at p on page: the third quick one asks
@@ -628,6 +634,7 @@ func (w *noteWin) diaryAnswer(a *bro, page int, below image.Rectangle, out strin
 	if r.Prompt != "" {
 		log.Printf("diary %s: an instruction: %q", w.nb.name, r.Prompt)
 	}
+	w.diaryName(a, r.Title)
 	if md {
 		w.diaryLayMD(page, below, r, style, size)
 	} else {
@@ -1026,4 +1033,55 @@ func (a *bro) usageNote() string {
 		return fmt.Sprintf("AI usage: %s's, $%.3f this month, of the Go plan's $%.0f (a fifth in 5 h, half a week); this Kobo's only", m, month, lim)
 	}
 	return fmt.Sprintf("AI usage: %s's, in dollars, this Kobo's questions only", m)
+}
+
+// autoNamedRE is a new notebook's name, as newNoteName gives it.
+var autoNamedRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}\.\d{2}( \(\d+\))?$`)
+
+// autoNamed is whether a notebook still has the name it was made with
+// (its date): the diary names it, then, by its first question.
+func autoNamed(name string) bool { return autoNamedRE.MatchString(path.Base(name)) }
+
+// titleName is a model's title as a notebook's name: one to three
+// words, no signs a file's name can't have, not too long.
+func titleName(t string) string {
+	t = strings.Map(func(r rune) rune {
+		if strings.ContainsRune(`/\:*?"<>|`, r) || unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, t)
+	f := strings.Fields(strings.Trim(t, " .'`«»"))
+	if len(f) > 3 {
+		f = f[:3]
+	}
+	t = strings.TrimLeft(strings.Join(f, " "), ".")
+	for len([]rune(t)) > 40 {
+		t = string([]rune(t)[:40])
+	}
+	return strings.TrimSpace(t)
+}
+
+// diaryName names the notebook by title, the model's for its first
+// question, if it still has its date for a name: in its folder, a
+// number after it if the name's taken.
+func (w *noteWin) diaryName(a *bro, title string) {
+	name := titleName(title)
+	if name == "" || !autoNamed(w.nb.name) {
+		return
+	}
+	if dir := path.Dir(w.nb.name); dir != "." {
+		name = dir + "/" + name
+	}
+	to := name
+	for i := 2; fileExists(notePath(to)) || a.noteWindow(to) != nil; i++ {
+		to = fmt.Sprintf("%s (%d)", name, i)
+	}
+	from := w.nb.name
+	if err := renameNotebook(a, from, to); err != nil {
+		log.Printf("diary %s: naming it %q: %v", from, to, err)
+		return
+	}
+	log.Printf("diary %s: named %q", from, to)
+	a.Notify("named it: " + path.Base(to))
 }

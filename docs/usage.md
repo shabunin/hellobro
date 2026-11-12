@@ -1123,6 +1123,13 @@ go (a tan's poles left out) unless `y: -2 .. 2` says. Round numbers on
 the axes, a grid, the zero lines darker; each curve its own dashes,
 named in a legend.
 
+A notebook that still has the name it was made with (its date and
+time) is named by its first question: the model gives a title of one
+to three words with its answer, in the language it was asked in, and
+the notebook (its file, its exports) is renamed so, in its folder
+("named it: …" says so; a number after it if that name's taken). One
+named by hand keeps its name.
+
 What it's sent: the picture, and the talk so far as text: each
 question as it read it and its answer, the last six, from all the
 notebook's pages. The talk is kept on the answers' strokes in the

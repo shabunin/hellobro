@@ -201,3 +201,29 @@ func TestDiaryLayText(t *testing.T) {
 		t.Errorf("the last line: %q", w.nb.pages[0][len(w.nb.pages[0])-1].txt.s)
 	}
 }
+
+// A notebook with its date for a name is named by its first question's
+// title, one to three words a file's name can have; one named by hand
+// isn't, and isn't asked for one.
+func TestDiaryTitle(t *testing.T) {
+	for name, want := range map[string]bool{"2026-11-12 09.21": true, "2026-11-12 09.21 (2)": true, "school/2026-11-12 09.21": true,
+		"Physics": false, "2026-11-12 09.21 notes": false} {
+		if autoNamed(name) != want {
+			t.Errorf("%q: auto-named %v", name, !want)
+		}
+	}
+	for in, want := range map[string]string{"Quadratic equations": "Quadratic equations", " «Tom: the diary» ": "Tom the diary",
+		"one two three four": "one two three", "a/b?": "a b", "...": "", "Квадратные уравнения": "Квадратные уравнения"} {
+		if got := titleName(in); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+	nb := &notebook{name: "2026-11-12 09.21"}
+	if !strings.Contains(diarySystem(nb, nil, "md"), `"title"`) {
+		t.Error("a date for a name: no title asked for")
+	}
+	nb.name = "Physics"
+	if strings.Contains(diarySystem(nb, nil, "md"), `"title"`) {
+		t.Error("named by hand: a title asked for")
+	}
+}
