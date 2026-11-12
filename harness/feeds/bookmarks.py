@@ -23,6 +23,6 @@ key(UP); key(ENTER); time.sleep(3)                   # the first one's page
 keys("t"); time.sleep(2); key(TAB); time.sleep(3)    # the bookmarks again
 keys("d"); time.sleep(3)                             # the first taken away
 tap(W - 140, 40); time.sleep(3)                      # back to the book, by finger
-tap(*barbtn(1)); time.sleep(3)                       # Aa: the style panel
+keys("s"); time.sleep(3)                             # s: the style panel
 key(ESC); time.sleep(3)
 exit_app()

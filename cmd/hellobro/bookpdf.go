@@ -14,7 +14,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"image"
 	"log"
 	"path/filepath"
@@ -379,78 +378,4 @@ func (w *bookWin) pdfStyleStep(a *bro, i, d int) {
 		return
 	}
 	a.setBookStyle(st)
-}
-
-func (w *bookWin) drawPDFStyle(a *bro) {
-	st := a.bookStyle()
-	area := w.p.Body.Inset(kobo.Pad)
-	c := a.C
-	w.rows = nil
-	head := w.styleHeader(a, &area, func() { w.pdfStyleStep(a, pdfStyleDone, 0) })
-	fit := map[bool]string{false: "whole page", true: "page width"}
-	onOff := map[bool]string{true: "on", false: "off"}
-	labels := [pdfStyleN]string{"Fit", "Zoom", "Trim white margins", "Pages", "Bar, fullscreen", ""}
-	w.sel = max(0, min(w.sel, pdfStyleN-1))
-	y, rowH, boxW := area.Min.Y+4, 72, 72
-	for i := range pdfStyleN {
-		if i == pdfStyleDone { // in the header, at its right
-			if i == w.sel {
-				c.Frame(head.Inset(-4), 3, kobo.Dark)
-			}
-			continue
-		}
-		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+rowH-8)
-		y += rowH
-		if i == w.sel {
-			c.Frame(r.Inset(-4), 3, kobo.Dark)
-		}
-		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X, r.Max.Y), labels[i], kobo.Black, kobo.AlignLeft)
-		box := func(b image.Rectangle, label string, d int) {
-			c.Frame(b, 2, kobo.Black)
-			c.Text(a.F.Panel, b, label, kobo.Black, kobo.AlignCenter)
-			w.rows = append(w.rows, bookRow{b, func() { w.sel = i; w.pdfStyleStep(a, i, d) }})
-		}
-		switch i {
-		case pdfStyleZoom:
-			box(image.Rect(r.Max.X-boxW, r.Min.Y, r.Max.X, r.Max.Y), "+", 1)
-			vr := image.Rect(r.Max.X-boxW-160, r.Min.Y, r.Max.X-boxW, r.Max.Y)
-			c.Text(a.F.Body, vr, fmt.Sprintf("%d%%", w.zoom), kobo.Black, kobo.AlignCenter)
-			box(image.Rect(vr.Min.X-boxW, r.Min.Y, vr.Min.X, r.Max.Y), "−", -1)
-		case pdfStyleFit:
-			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), fit[st.pdfWidth], 0)
-		case pdfStyleTrim:
-			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), onOff[!st.pdfNoTrim], 0)
-		case pdfStylePages:
-			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), bookPageWords[w.pageMode], 0)
-		case pdfStyleBar:
-			box(image.Rect(r.Max.X-260, r.Min.Y, r.Max.X, r.Max.Y), fullBarWord(a.fullBar("pdf")), 0)
-		}
-	}
-	c.Text(a.F.Small, image.Rect(area.Min.X+18, y+8, area.Max.X, y+48), "a page bigger than the screen is read in screenfuls, across then down; + and - zoom too; two side by side are whole", kobo.Mid, kobo.AlignLeft)
-}
-
-func (w *bookWin) pdfStyleKey(a *bro, code uint16, ch string) bool {
-	switch {
-	case code == 103 || ch == "k": // up
-		w.sel = max(0, w.sel-1)
-		w.draw(a)
-	case code == 108 || ch == "j" || code == kobo.KeyTab:
-		w.sel = min(pdfStyleN-1, w.sel+1)
-		w.draw(a)
-	case code == 105 || ch == "h": // left
-		w.pdfStyleStep(a, w.sel, -1)
-	case code == 106 || ch == "l":
-		w.pdfStyleStep(a, w.sel, 1)
-	case code == kobo.KeyEnter || code == kobo.KeySpace:
-		w.pdfStyleStep(a, w.sel, 0)
-	case ch == "+" || ch == "=":
-		w.zoomStep(a, 1)
-	case ch == "-":
-		w.zoomStep(a, -1)
-	case code == kobo.KeyEsc || ch == "s" || ch == "q":
-		w.closeStyle(a)
-	default:
-		return false
-	}
-	return true
 }

@@ -221,6 +221,7 @@ type bookWin struct {
 	finding    *atomic.Bool // set, the look going on is no longer wanted
 	edit       *noteEdit    // a shelf's book's name being typed: key its path
 	lib        *libUI       // the lists, in ink: the shelf, the contents, the bookmarks
+	style      *styleUI     // the style panel's ink
 }
 
 func (w *bookWin) Title() string {
@@ -847,7 +848,11 @@ func (w *bookWin) libOf(a *bro) *libUI {
 }
 
 func (w *bookWin) inkBody(a *bro) inkBody {
-	if w.lib != nil && w.inkList() && !w.p.Outer.Empty() && a.shows(w) && w.lib.pane.At == w.p.Body {
+	switch {
+	case w.p.Outer.Empty() || !a.shows(w):
+	case w.styling && w.style != nil && w.style.pane.At == w.p.Body:
+		return w.style
+	case w.lib != nil && w.inkList() && w.lib.pane.At == w.p.Body:
 		return w.lib
 	}
 	return nil
@@ -1065,16 +1070,16 @@ func (a *bro) restyle(px int, font string) {
 }
 
 func (w *bookWin) press(a *bro, code uint16, value int32) bool {
-	if value == 0 {
-		return false
-	}
 	m := &a.tv.mods
 	if m.ctrl || m.alt || m.meta {
 		return false
 	}
 	ch, _ := kobo.KeyChar(code, m.shift, m.caps)
 	if w.styling {
-		return w.styleKey(a, code, ch)
+		return w.styleKey(a, code, ch, value) || value == 0
+	}
+	if value == 0 {
+		return false
 	}
 	if e := w.edit; e != nil {
 		if done, ok := nameKey(&e.text, code, ch); done {

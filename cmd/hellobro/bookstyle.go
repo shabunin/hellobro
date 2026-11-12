@@ -19,7 +19,6 @@ import (
 	"golang.org/x/image/font/opentype"
 
 	"hellobro/book"
-	"hellobro/kobo"
 )
 
 // The controls after the fonts, in order.
@@ -175,36 +174,6 @@ func (w *bookWin) styleStep(a *bro, i, d int) {
 	a.setBookStyle(st)
 }
 
-func (w *bookWin) styleKey(a *bro, code uint16, ch string) bool {
-	if w.pdf != nil {
-		return w.pdfStyleKey(a, code, ch)
-	}
-	n := len(w.fontNames(a)) + styleN
-	switch {
-	case code == 103 || ch == "k": // up
-		w.sel = (w.sel - 1 + n) % n
-		w.draw(a)
-	case code == 108 || ch == "j" || code == kobo.KeyTab:
-		w.sel = (w.sel + 1) % n
-		w.draw(a)
-	case code == 105 || ch == "h": // left
-		w.styleStep(a, w.sel, -1)
-	case code == 106 || ch == "l":
-		w.styleStep(a, w.sel, 1)
-	case code == kobo.KeyEnter || code == kobo.KeySpace:
-		w.styleStep(a, w.sel, 0)
-	case ch == "+" || ch == "=":
-		w.styleStep(a, len(w.fontNames(a))+styleSize, 1)
-	case ch == "-":
-		w.styleStep(a, len(w.fontNames(a))+styleSize, -1)
-	case code == kobo.KeyEsc || ch == "s" || ch == "q":
-		w.closeStyle(a)
-	default:
-		return false
-	}
-	return true
-}
-
 func (st bookStyle) values() [styleN]string {
 	onOff := map[bool]string{true: "on", false: "off"}
 	return [styleN]string{
@@ -222,108 +191,4 @@ func (st bookStyle) values() [styleN]string {
 // settings are the layout's, for a page of size in a book in lang.
 func (st bookStyle) settings(size image.Point, lang string) book.Settings {
 	return book.Settings{W: size.X, H: size.Y, Px: st.px, Leading: float64(st.leading) / 100, Ragged: st.ragged, NoHyph: st.noHyphs, Lang: lang}
-}
-
-// styleHeader draws the style panel's header at the top of area (as the
-// lists', library.go), done its "back to the book"; area is what's under
-// it then. It gives back where that button is, for the keys' frame.
-func (w *bookWin) styleHeader(a *bro, area *image.Rectangle, done func()) image.Rectangle {
-	rowH := a.libRowH()
-	h := a.drawLibHeader(image.Rect(area.Min.X, area.Min.Y, area.Max.X, area.Min.Y+rowH), "All Books", false,
-		func() { w.styling = false; w.toShelf(a) }, "back to the book", done, []libTab{{"Style", true, func() {}}})
-	w.rows = append(w.rows, h.rows...)
-	area.Min.Y += rowH + 12
-	return h.back
-}
-
-func (w *bookWin) drawStyle(a *bro) {
-	if w.pdf != nil {
-		w.drawPDFStyle(a)
-		return
-	}
-	faces := w.bookFaces(a)
-	fams := w.fontNames(a)
-	st := a.bookStyle()
-	area := w.p.Body.Inset(kobo.Pad)
-	c := a.C
-	w.rows = nil
-	head := w.styleHeader(a, &area, func() { w.styleStep(a, len(fams)+styleDone, 0) })
-	focus := func(i int, r image.Rectangle) {
-		if i == w.sel {
-			c.Frame(r.Inset(-4), 3, kobo.Dark)
-		}
-	}
-	// the fonts, each in itself, two columns if there's room
-	cols := 1
-	if area.Dx() >= 760 {
-		cols = 2
-	}
-	nameH := 56
-	colW := area.Dx() / cols
-	y := area.Min.Y + 4
-	for i, f := range fams {
-		col, row := i%cols, i/cols
-		r := image.Rect(area.Min.X+col*colW+6, y+row*nameH, area.Min.X+(col+1)*colW-6, y+(row+1)*nameH-6)
-		ink := uint8(kobo.Black)
-		if w.fontPicked(a, f) {
-			c.Fill(r, kobo.Black)
-			ink = kobo.White
-		} else {
-			c.Frame(r, 2, kobo.Black)
-		}
-		focus(i, r)
-		c.Text(w.tileFace(a, f), r.Inset(12), f.name, ink, kobo.AlignLeft)
-		w.rows = append(w.rows, bookRow{r, func() { w.sel = i; w.styleStep(a, i, 0) }})
-	}
-	y += (len(fams)+cols-1)/cols*nameH + 14
-	// the rest: a label, then − value + or a switch
-	rowH, boxW := 64, 72
-	vals := st.values()
-	for k := range styleN {
-		i := len(fams) + k
-		if k == styleDone { // in the header, at its right
-			focus(i, head)
-			break
-		}
-		r := image.Rect(area.Min.X+6, y, area.Max.X-6, y+rowH-8)
-		y += rowH
-		focus(i, r)
-		box := func(b image.Rectangle, label string, do func()) {
-			c.Fill(b, kobo.White)
-			c.Frame(b, 2, kobo.Black)
-			c.Text(a.F.Panel, b, label, kobo.Black, kobo.AlignCenter)
-			w.rows = append(w.rows, bookRow{b, func() { w.sel = i; do() }})
-		}
-		c.Text(a.F.Body, image.Rect(r.Min.X+12, r.Min.Y, r.Max.X, r.Max.Y), styleLabels[k], kobo.Black, kobo.AlignLeft)
-		right := r.Max.X
-		if k == stylePages {
-			box(image.Rect(right-260, r.Min.Y, right, r.Max.Y), bookPageWords[w.pageMode], func() { w.styleStep(a, i, 0) })
-			continue
-		}
-		if k == styleBar {
-			box(image.Rect(right-260, r.Min.Y, right, r.Max.Y), fullBarWord(a.fullBar("epub")), func() { w.styleStep(a, i, 0) })
-			continue
-		}
-		if k == styleJustify || k == styleHyph {
-			box(image.Rect(right-2*boxW, r.Min.Y, right, r.Max.Y), vals[k], func() { w.styleStep(a, i, 0) })
-			continue
-		}
-		box(image.Rect(right-boxW, r.Min.Y, right, r.Max.Y), "+", func() { w.styleStep(a, i, 1) })
-		vr := image.Rect(right-boxW-160, r.Min.Y, right-boxW, r.Max.Y)
-		c.Text(a.F.Body, vr, vals[k], kobo.Black, kobo.AlignCenter)
-		box(image.Rect(vr.Min.X-boxW, r.Min.Y, vr.Min.X, r.Max.Y), "−", func() { w.styleStep(a, i, -1) })
-	}
-	// a paragraph as the books will be, in the page's own margins
-	if y+8+2*st.px > area.Max.Y { // no room: image.Rect would turn it round
-		return
-	}
-	pv := image.Rect(w.area.Min.X, y+8, w.area.Max.X, area.Max.Y)
-	c.Fill(image.Rect(area.Min.X, y, area.Max.X, y+2), kobo.Light)
-	sample, lang := w.sample()
-	pages := book.Layout(sample, st.settings(pv.Size(), lang), faces, nil)
-	for _, it := range pages[0].Items {
-		if it.Kind == book.ItemText {
-			c.TextAt(faces.Face(it.Style, it.Px), pv.Min.X+it.X, pv.Min.Y+it.Y, it.Text, kobo.Black, pv)
-		}
-	}
 }
