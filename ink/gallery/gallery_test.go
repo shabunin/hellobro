@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,13 +22,15 @@ func save(t *testing.T, it *inktest.T, name string) {
 	}
 }
 
-func start(t *testing.T, size image.Point) (*Demo, *inktest.T) {
-	d := New(theme.New())
-	it := inktest.New(size, inktest.ElipsaMetric, d.Layout)
+var sizes = map[string]image.Point{"portrait": inktest.Elipsa, "landscape": {1872, 1404}}
+
+func start(t *testing.T, size image.Point) (*Gallery, *inktest.T) {
+	g := New(theme.New())
+	it := inktest.New(size, inktest.ElipsaMetric, g.Layout)
 	if u := it.Updates; len(u) != 1 || !u[0].Full {
 		t.Fatalf("the first frame: %v", u)
 	}
-	return d, it
+	return g, it
 }
 
 func must(t *testing.T, err error) {
@@ -39,139 +40,223 @@ func must(t *testing.T, err error) {
 	}
 }
 
-func TestSettings(t *testing.T) {
-	for _, size := range []image.Point{inktest.Elipsa, {1872, 1404}} {
-		name := "portrait"
-		if size.X > size.Y {
-			name = "landscape"
-		}
+func TestControls(t *testing.T) {
+	for name, size := range sizes {
 		t.Run(name, func(t *testing.T) {
-			d, it := start(t, size)
-			save(t, it, name+"-settings")
-			// A tap on the switch's row flips it; held, it shows inverted.
+			g, it := start(t, size)
+			save(t, it, name+"-controls")
+			// A switch: held, it's inverted, quickly; let go, flipped.
 			p, err := it.Find("Wi-Fi")
 			must(t, err)
 			it.Press(p)
-			if !d.wifi.Pressed() {
-				t.Error("not pressed")
-			}
-			pressed := it.Updates
-			save(t, it, name+"-pressed")
-			it.Release(p)
-			if !d.wifi.Value || d.Said != "Wi-Fi on" {
-				t.Errorf("Wi-Fi %v, said %q", d.wifi.Value, d.Said)
-			}
-			for _, u := range pressed {
-				if u.Gray && u.R.Dy() > it.W.Size().Y/2 {
+			for _, u := range it.Updates {
+				if u.Gray {
 					t.Errorf("a press updated %v in grays", u.R)
 				}
 			}
-			// The stepper: › on, ‹ back, the value on.
-			must(t, it.TapText("›"))
-			if d.Said != "page size: the screen, across" {
-				t.Errorf("› said %q", d.Said)
+			it.Release(p)
+			if !g.wifi.Value || g.Said != "Wi-Fi on" {
+				t.Errorf("Wi-Fi %v, said %q", g.wifi.Value, g.Said)
 			}
-			must(t, it.TapText("‹"))
-			must(t, it.TapText("‹"))
-			if d.Said != "page size: Letter" {
-				t.Errorf("‹‹ said %q", d.Said)
+			// A dropdown: a tap opens it under its box, a tap on an
+			// option picks it and closes it.
+			must(t, it.TapText("the screen, upright"))
+			if !g.size.IsOpen() {
+				t.Fatal("not open")
 			}
-			// The keys: Tab to the editor, type, Enter.
-			for range 20 {
+			save(t, it, name+"-select")
+			box, _ := it.W.FindText("the screen, upright")
+			must(t, it.TapText("A5"))
+			if g.size.IsOpen() || g.size.Value != 3 || g.Said != "page size: A5" {
+				t.Errorf("open %v, value %d, said %q", g.size.IsOpen(), g.size.Value, g.Said)
+			}
+			// Open, a tap outside closes it, and goes nowhere else.
+			must(t, it.TapText("A5"))
+			before := g.wifi.Value
+			wp, _ := it.Find("Wi-Fi")
+			it.Tap(wp)
+			if g.size.IsOpen() || g.wifi.Value != before {
+				t.Errorf("open %v; Wi-Fi flipped through it: %v", g.size.IsOpen(), g.wifi.Value != before)
+			}
+			// By keys: ↓ in focus opens it, ↓ ↓ Enter picks, Esc closes.
+			for range 30 {
 				it.Key("Tab", 0)
-				if d.name.Focused() {
+				if g.pause.Field.Focused() {
 					break
 				}
 			}
-			if !d.name.Focused() {
-				t.Fatal("Tab never got to the name")
+			if !g.pause.Field.Focused() {
+				t.Fatal("Tab never got to the pause's dropdown")
 			}
-			if it.W.Ring().Empty() {
-				t.Error("no focus ring")
-			}
-			it.Key("End", 0)
-			for range len("diary") {
-				it.Key("Back", 0)
-			}
-			it.Type("notes")
 			it.Key("Enter", 0)
-			if d.Said != "named it: Tom Riddle's notes" {
-				t.Errorf("typed: %q", d.Said)
+			if !g.pause.IsOpen() {
+				t.Fatal("Enter didn't open it")
 			}
-			save(t, it, name+"-typed")
+			it.Key("Down", 0)
+			it.Key("Down", 0)
+			save(t, it, name+"-select-keys")
+			it.Key("Enter", 0)
+			if g.pause.IsOpen() || g.pause.Value != 2 || !g.pause.Field.Focused() {
+				t.Errorf("open %v, value %d, focus back %v", g.pause.IsOpen(), g.pause.Value, g.pause.Field.Focused())
+			}
+			it.Key("Down", 0)
+			if !g.pause.IsOpen() || !it.Key("Esc", 0) || g.pause.IsOpen() || g.Quit {
+				t.Errorf("↓ then Esc: open %v, quit %v", g.pause.IsOpen(), g.Quit)
+			}
+			// More options than fit: paged, its bar there.
+			must(t, it.TapText("as ai.conf says"))
+			if !g.model.IsOpen() {
+				t.Fatal("not open")
+			}
+			if n := g.model.List.Count(); n > 0 && n < len(models) { // paged: they don't all fit
+				save(t, it, name+"-select-long")
+				p, _ := it.Find(models[1])
+				it.Swipe(p.Add(image.Pt(0, 200)), p.Sub(image.Pt(0, 200)))
+				if g.model.List.First() == 0 || !g.model.IsOpen() {
+					t.Errorf("swiped: from %d, open %v", g.model.List.First(), g.model.IsOpen())
+				}
+			}
+			it.Key("Esc", 0)
+			_ = box
+		})
+	}
+}
+
+func TestChecksRadiosSliders(t *testing.T) {
+	g, it := start(t, inktest.Elipsa)
+	must(t, it.TapText("The pen's button erases"))
+	if !g.erase.Value {
+		t.Error("checkbox not ticked")
+	}
+	must(t, it.TapText("A finger pans the page"))
+	if g.finger.Value != "pans" {
+		t.Errorf("radio: %q", g.finger.Value)
+	}
+	// The slider: a touch at its far end is the most.
+	p, err := it.Find("Light")
+	must(t, err)
+	w := it.W.Size().X
+	q := image.Pt(w-30, p.Y+60)
+	it.Swipe(image.Pt(w/2, q.Y), q)
+	if g.light.Value < 90 {
+		t.Errorf("light %v after a drag to the end", g.light.Value)
+	}
+	save(t, it, "portrait-values")
+}
+
+func TestText(t *testing.T) {
+	g, it := start(t, inktest.Elipsa)
+	must(t, it.TapText("Text"))
+	p, err := it.Find("find a notebook, a book…")
+	must(t, err)
+	it.Tap(p)
+	it.Type("riddle")
+	if g.search.Text() != "riddle" || g.Said != "looking for “riddle”" {
+		t.Errorf("typed %q, said %q", g.search.Text(), g.Said)
+	}
+	save(t, it, "portrait-text")
+	// The ×: a tap empties it.
+	r, _ := it.W.FindText("riddle")
+	it.Tap(image.Pt(it.W.Size().X-60, r.Min.Y+r.Dy()/2))
+	if g.search.Text() != "" {
+		t.Errorf("× left %q", g.search.Text())
+	}
+}
+
+func TestListPages(t *testing.T) {
+	g, it := start(t, inktest.Elipsa)
+	must(t, it.TapText("Lists"))
+	save(t, it, "portrait-list")
+	first, n := g.list.First(), g.list.Count()
+	if first != 0 || n < 5 || n >= len(g.rows) {
+		t.Fatalf("page: %d from %d", n, first)
+	}
+	p, _ := it.Find("Notebook 3")
+	g.Said = ""
+	it.Swipe(p, p.Sub(image.Pt(0, 600)))
+	if g.list.First() != n || g.Said != "" {
+		t.Errorf("swiped: from %d, want %d; said %q", g.list.First(), n, g.Said)
+	}
+	p, _ = it.Find("Notebook " + strconv.Itoa(n+2))
+	it.Swipe(p, p.Add(image.Pt(0, 600)))
+	if g.list.First() != 0 {
+		t.Errorf("swiped back: from %d", g.list.First())
+	}
+	must(t, it.TapText("Notebook 2"))
+	if g.Said != "opened notebook 2" {
+		t.Errorf("tap said %q", g.Said)
+	}
+	p, _ = it.Find("Notebook 4")
+	it.Hold(p, time.Second)
+	if g.Said != "held notebook 4" {
+		t.Errorf("hold said %q", g.Said)
+	}
+}
+
+func TestTiles(t *testing.T) {
+	for name, size := range sizes {
+		g, it := start(t, size)
+		must(t, it.TapText("Tiles"))
+		save(t, it, name+"-tiles")
+		must(t, it.TapText("Bluetooth"))
+		if g.Said != "tile: Bluetooth" {
+			t.Errorf("%s: said %q", name, g.Said)
+		}
+	}
+}
+
+func TestPopups(t *testing.T) {
+	for name, size := range sizes {
+		t.Run(name, func(t *testing.T) {
+			g, it := start(t, size)
+			must(t, it.TapText("Popups"))
+			// The menu: its actions under it; one picked, a toast says it.
+			must(t, it.TapText("Notebook"))
+			if !g.menu.IsOpen() {
+				t.Fatal("the menu's not open")
+			}
+			save(t, it, name+"-menu")
+			must(t, it.TapText("export as PDF"))
+			if g.Said != "the menu: export as PDF" {
+				t.Errorf("said %q", g.Said)
+			}
+			if _, err := it.Find("export as PDF"); err != nil {
+				t.Error("no toast")
+			}
+			save(t, it, name+"-toast")
+			it.Wait(4 * time.Second)
+			if _, err := it.Find("export as PDF"); err == nil {
+				t.Error("the toast stayed")
+			}
 			// The dialog: a tap under it does nothing; its buttons do.
 			must(t, it.TapText("forget the notebook…"))
-			if !d.asking {
+			if !g.asking {
 				t.Fatal("no dialog")
 			}
 			save(t, it, name+"-dialog")
-			before := d.wifi.Value
-			wp, _ := it.Find("Page size (new pages)")
-			it.Tap(wp)
-			if d.Said == "page size: the screen, across" || d.wifi.Value != before {
-				t.Error("a tap went under the dialog")
+			p, _ := it.Find("keep it")
+			it.Tap(image.Pt(20, it.W.Size().Y-20))
+			if !g.asking {
+				t.Error("a tap under it closed it")
 			}
-			must(t, it.TapText("keep it"))
-			if d.asking || d.Said != "kept" {
-				t.Errorf("asking %v, said %q", d.asking, d.Said)
+			it.Tap(p)
+			if g.asking || g.Said != "kept" {
+				t.Errorf("asking %v, said %q", g.asking, g.Said)
 			}
 		})
 	}
 }
 
-func TestListPages(t *testing.T) {
-	d, it := start(t, inktest.Elipsa)
-	must(t, it.TapText("A list"))
-	if d.tab.Value != "list" {
-		t.Fatalf("tab %q", d.tab.Value)
-	}
-	save(t, it, "portrait-list")
-	first, n := d.list.First(), d.list.Count()
-	if first != 0 || n < 5 || n >= len(d.rows) {
-		t.Fatalf("page: %d from %d", n, first)
-	}
-	// A swipe up: the next page, and no row opened.
-	p, _ := it.Find("Notebook 3")
-	d.Said = ""
-	it.Swipe(p, p.Sub(image.Pt(0, 600)))
-	if d.list.First() != n {
-		t.Errorf("swiped: from %d, want %d", d.list.First(), n)
-	}
-	if d.Said != "" {
-		t.Errorf("a swipe said %q", d.Said)
-	}
-	save(t, it, "portrait-list2")
-	// Back down, and a tap opens one; held, it's held.
-	p, _ = it.Find("Notebook " + strconv.Itoa(n+2))
-	it.Swipe(p, p.Add(image.Pt(0, 600)))
-	if d.list.First() != 0 {
-		t.Errorf("swiped back: from %d", d.list.First())
-	}
-	must(t, it.TapText("Notebook 2"))
-	if d.Said != "opened notebook 2" {
-		t.Errorf("tap said %q", d.Said)
-	}
-	p, _ = it.Find("Notebook 4")
-	it.Hold(p, time.Second)
-	if d.Said != "held notebook 4" {
-		t.Errorf("hold said %q", d.Said)
-	}
-	it.Key("PageDown", 0)
-	if d.list.First() != n {
-		t.Errorf("PageDown: from %d", d.list.First())
-	}
-}
-
 // Only what changed goes to the panel: a switch flipped is a small
-// black-and-white update, not the window.
+// update, not the window.
 func TestDamage(t *testing.T) {
-	d, it := start(t, inktest.Elipsa)
+	g, it := start(t, inktest.Elipsa)
 	if u := it.Frame(); len(u) != 0 {
 		t.Errorf("nothing changed, yet %v", u)
 	}
 	p, _ := it.Find("Sync notebooks")
 	it.Tap(p)
-	if !d.sync.Value {
+	if !g.sync.Value {
 		t.Fatal("not flipped")
 	}
 	total := 0
@@ -185,19 +270,23 @@ func TestDamage(t *testing.T) {
 }
 
 func TestAbout(t *testing.T) {
-	_, it := start(t, inktest.Elipsa)
+	g, it := start(t, inktest.Elipsa)
 	must(t, it.TapText("About"))
 	save(t, it, "portrait-about")
-	found := false
-	for _, s := range it.W.Texts() {
-		if strings.HasPrefix(s, "An immediate-mode UI") {
-			found = true
-		}
+	if !it.Key("Esc", 0) || !g.Quit {
+		t.Error("Esc didn't quit")
 	}
-	if !found {
-		t.Errorf("the words: %q", it.W.Texts())
-	}
-	if !it.Key("Esc", 0) {
-		t.Error("Esc not taken")
+}
+
+// A touch on a popup's row keeps the keys in the popup: Esc closes it,
+// and doesn't quit.
+func TestPopupKeepsKeys(t *testing.T) {
+	g, it := start(t, image.Pt(1872, 1404))
+	must(t, it.TapText("as ai.conf says"))
+	p, err := it.Find(models[2])
+	must(t, err)
+	it.Swipe(p.Add(image.Pt(0, 150)), p.Sub(image.Pt(0, 150)))
+	if !it.Key("Esc", 0) || g.model.IsOpen() || g.Quit {
+		t.Errorf("Esc after a swipe in it: open %v, quit %v", g.model.IsOpen(), g.Quit)
 	}
 }

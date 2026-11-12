@@ -27,9 +27,17 @@ type textBox struct {
 }
 
 type painter struct {
-	dst   *image.Gray
-	areas []placed
-	texts []textBox
+	dst    *image.Gray
+	areas  []placed
+	texts  []textBox
+	popups []popup // painted after the rest, in order
+}
+
+type popup struct {
+	anchor image.Rectangle // on the image
+	size   image.Point
+	tag    Tag
+	ops    []op
 }
 
 func (p *painter) run(ops []op, off image.Point, clip image.Rectangle) {
@@ -78,8 +86,123 @@ func (p *painter) run(ops []op, off image.Point, clip image.Rectangle) {
 			if !r.Empty() {
 				p.areas = append(p.areas, placed{o.area, r, off})
 			}
+		case opLine:
+			for k := 1; k < len(o.pts); k++ {
+				line(p.dst, o.pts[k-1].Add(off), o.pts[k].Add(off), o.t, o.gray, clip)
+			}
+		case opDisc:
+			disc(p.dst, o.off.Add(off), o.t, o.r.Dx(), o.gray, clip)
+		case opPoly:
+			pts := make([]image.Point, len(o.pts))
+			for k, q := range o.pts {
+				pts[k] = q.Add(off)
+			}
+			poly(p.dst, pts, o.gray, clip)
+		case opPopup:
+			p.popups = append(p.popups, popup{o.r.Add(off), o.sp, o.tag, o.call})
 		}
 	}
+}
+
+// paint runs the ops, then the popups over them: each at its place,
+// its backdrop under it.
+func (p *painter) paint(ops []op) {
+	p.run(ops, image.Point{}, p.dst.Rect)
+	for i := 0; i < len(p.popups); i++ { // a popup may open another
+		pp := p.popups[i]
+		win := p.dst.Rect
+		at := image.Pt(pp.anchor.Min.X, pp.anchor.Max.Y)
+		if at.Y+pp.size.Y > win.Max.Y && pp.anchor.Min.Y-pp.size.Y >= win.Min.Y {
+			at.Y = pp.anchor.Min.Y - pp.size.Y // no room under it: over it
+		}
+		at.X = max(win.Min.X, min(at.X, win.Max.X-pp.size.X))
+		at.Y = max(win.Min.Y, min(at.Y, win.Max.Y-pp.size.Y))
+		p.areas = append(p.areas, placed{Area{Rect: win, Tag: pp.tag, Block: true}, win, image.Point{}})
+		p.run(pp.ops, at, win)
+	}
+}
+
+// line draws a w thick line from a to b: a square pen stamped along it.
+func line(img *image.Gray, a, b image.Point, w int, g uint8, clip image.Rectangle) {
+	d := b.Sub(a)
+	steps := max(abs(d.X), abs(d.Y), 1)
+	h := w / 2
+	for i := 0; i <= steps; i++ {
+		q := image.Pt(a.X+d.X*i/steps, a.Y+d.Y*i/steps)
+		fill(img, image.Rect(q.X-h, q.Y-h, q.X-h+w, q.Y-h+w).Intersect(clip), g)
+	}
+}
+
+// disc fills a circle of radius r about c, or only its edge, w thick
+// (w 0: all of it).
+func disc(img *image.Gray, c image.Point, r, w int, g uint8, clip image.Rectangle) {
+	r2 := r*r + r
+	in := -1
+	if w > 0 && w < r {
+		ri := r - w
+		in = ri*ri + ri
+	}
+	for y := -r; y <= r; y++ {
+		x0, x1 := 1, 0 // the run across, and the hole in it
+		for x := -r; x <= r; x++ {
+			if x*x+y*y <= r2 {
+				if x0 > x1 {
+					x0 = x
+				}
+				x1 = x
+			}
+		}
+		if x0 > x1 {
+			continue
+		}
+		if in < 0 {
+			fill(img, image.Rect(c.X+x0, c.Y+y, c.X+x1+1, c.Y+y+1).Intersect(clip), g)
+			continue
+		}
+		for x := x0; x <= x1; x++ {
+			if x*x+y*y > in {
+				fill(img, image.Rect(c.X+x, c.Y+y, c.X+x+1, c.Y+y+1).Intersect(clip), g)
+			}
+		}
+	}
+}
+
+// poly fills pts, even-odd, a row at a time.
+func poly(img *image.Gray, pts []image.Point, g uint8, clip image.Rectangle) {
+	if len(pts) < 3 {
+		return
+	}
+	b := image.Rectangle{Min: pts[0], Max: pts[0]}
+	for _, q := range pts {
+		b = b.Union(image.Rectangle{Min: q, Max: q.Add(image.Pt(1, 1))})
+	}
+	var xs []int
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		xs = xs[:0]
+		fy := float64(y) + 0.5
+		for i := range pts {
+			a, c := pts[i], pts[(i+1)%len(pts)]
+			if (float64(a.Y) <= fy) != (float64(c.Y) <= fy) {
+				x := float64(a.X) + (fy-float64(a.Y))*float64(c.X-a.X)/float64(c.Y-a.Y)
+				xs = append(xs, int(x+0.5))
+			}
+		}
+		for i := 1; i < len(xs); i++ { // few: an insertion sort
+			for j := i; j > 0 && xs[j] < xs[j-1]; j-- {
+				xs[j], xs[j-1] = xs[j-1], xs[j]
+			}
+		}
+		for i := 0; i+1 < len(xs); i += 2 {
+			fill(img, image.Rect(xs[i], y, xs[i+1], y+1).Intersect(clip), g)
+		}
+	}
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
 
 // matchPop is the index of the pop that ends ops[i]'s push (len(ops) if

@@ -1,7 +1,7 @@
 // Package theme is how ink's controls look: black on white, framed,
 // pressed ones inverted (the fast black-and-white waveform shows it at
 // once), grays only for what's quiet. Each is a Style made by a function
-// (Button, Toggle, Stepper, …) and laid out with its Layout, as Gio's
+// (Button, Toggle, Select, …) and laid out with its Layout, as Gio's
 // material package does.
 package theme
 
@@ -309,79 +309,6 @@ func (t ToggleStyle) Layout(gtx ink.Ctx) ink.Dims {
 		}
 		return ink.Dims{Size: size, Baseline: d.Baseline}
 	})
-}
-
-// --- a value stepped ---
-
-// StepperStyle is a row: what it is, then its value in a box with ‹ and
-// › at its ends. A tap on ‹ steps it back, on the rest on.
-type StepperStyle struct {
-	Theme   *Theme
-	Stepper *widget.Stepper
-	Title   string
-	Value   string
-	BoxW    ink.Dp // the value's box, at most; 0: half the row, to 300
-}
-
-// Stepper is s as a row saying title, its value value.
-func Stepper(th *Theme, s *widget.Stepper, title, value string) StepperStyle {
-	return StepperStyle{Theme: th, Stepper: s, Title: title, Value: value}
-}
-
-// Layout lays it out.
-func (s StepperStyle) Layout(gtx ink.Ctx) ink.Dims {
-	th := s.Theme
-	w := gtx.Constraints.Max.X
-	pad := gtx.Dp(th.Pad * 1.5)
-	f := th.Face(gtx, th.TextSize, text.Regular)
-	small := th.Face(gtx, th.TextSize*0.85, text.Regular)
-	h := gtx.Dp(th.Touch)
-	bw := min(w/2, gtx.Dp(300))
-	if s.BoxW > 0 {
-		bw = min(w/2, gtx.Dp(s.BoxW))
-	}
-	size := image.Pt(w, h+gtx.Dp(th.Pad))
-	box := image.Rect(w-bw-pad/2, (size.Y-h)/2, w-pad/2, (size.Y+h)/2)
-	ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
-	in := gtx
-	in.Constraints = ink.Exact(image.Pt(max(box.Min.X-2*pad, 0), size.Y))
-	st := ink.Offset(gtx.Ops, image.Pt(pad, 0))
-	line(in, f, s.Title, th.Fg, Left, size.Y)
-	st.Pop()
-	// The box: ‹ | value | ›, each its own Clickable, the value's the
-	// one in focus (← → step it).
-	aw := min(h, bw/4)
-	parts := []struct {
-		r   image.Rectangle
-		clk *widget.Clickable
-		s   string
-		f   font.Face
-	}{
-		{image.Rect(box.Min.X, box.Min.Y, box.Min.X+aw, box.Max.Y), &s.Stepper.Less, "‹", f},
-		{image.Rect(box.Min.X+aw, box.Min.Y, box.Max.X-aw, box.Max.Y), &s.Stepper.Body, s.Value, small},
-		{image.Rect(box.Max.X-aw, box.Min.Y, box.Max.X, box.Max.Y), &s.Stepper.More, "›", f},
-	}
-	b := th.border(gtx)
-	for i, p := range parts {
-		st := ink.Offset(gtx.Ops, p.r.Min)
-		cg := gtx
-		cg.Constraints = ink.Exact(p.r.Size())
-		focusable := i == 1
-		lay := func(gtx ink.Ctx) ink.Dims {
-			r := image.Rectangle{Max: p.r.Size()}
-			ink.Fill(gtx.Ops, r, th.Bg)
-			ink.Frame(gtx.Ops, r, b, th.Fg)
-			line(gtx, p.f, p.s, th.Fg, Center, r.Dy())
-			if p.clk.Pressed() {
-				ink.Invert(gtx.Ops, r)
-			}
-			return ink.Dims{Size: r.Size()}
-		}
-		p.clk.NoFocus = !focusable // the arrows aren't Tab's stops: the value takes ← →
-		p.clk.Layout(cg, lay)
-		st.Pop()
-	}
-	return ink.Dims{Size: size, Baseline: size.Y / 3}
 }
 
 // --- tabs ---

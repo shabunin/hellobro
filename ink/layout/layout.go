@@ -377,3 +377,45 @@ func Exact(gtx ink.Ctx, size image.Point, w ink.Widget) ink.Dims {
 	gtx.Constraints = ink.Exact(gtx.Constraints.Constrain(size))
 	return w(gtx)
 }
+
+// Grid lays items out in rows of equal cells, as many across as fit
+// MinWidth each (or Columns, if set), Gap between them.
+type Grid struct {
+	Columns  int
+	MinWidth ink.Dp
+	Gap      ink.Dp
+}
+
+// Layout lays out n items, el laying out item i in its cell's width; a
+// row is as high as its highest.
+func (g Grid) Layout(gtx ink.Ctx, n int, el func(gtx ink.Ctx, i int) ink.Dims) ink.Dims {
+	w, gap := gtx.Constraints.Max.X, gtx.Dp(g.Gap)
+	cols := g.Columns
+	if cols <= 0 {
+		cols = max(1, (w+gap)/max(gtx.Dp(g.MinWidth)+gap, 1))
+	}
+	cw := max((w-gap*(cols-1))/cols, 0)
+	y := 0
+	for r := 0; r*cols < n; r++ {
+		if r > 0 {
+			y += gap
+		}
+		calls := make([]ink.CallOp, 0, cols)
+		h := 0
+		for c := 0; c < cols && r*cols+c < n; c++ {
+			cg := gtx
+			cg.Constraints = ink.Constraints{Min: image.Pt(cw, 0), Max: image.Pt(cw, max(gtx.Constraints.Max.Y-y, 0))}
+			m := ink.Record(gtx.Ops)
+			d := el(cg, r*cols+c)
+			calls = append(calls, m.Stop())
+			h = max(h, d.Size.Y)
+		}
+		for c, call := range calls {
+			st := ink.Offset(gtx.Ops, image.Pt(c*(cw+gap), y))
+			call.Add(gtx.Ops)
+			st.Pop()
+		}
+		y += h
+	}
+	return ink.Dims{Size: gtx.Constraints.Constrain(image.Pt(w, y))}
+}

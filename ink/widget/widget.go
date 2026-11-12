@@ -1,7 +1,8 @@
 // Package widget is the state of ink's controls, and what input does to
 // it: a thing to press (Clickable), a switch (Bool), a choice of one
-// (Enum), a value stepped (Stepper), a line of text (Editor). How they
-// look is the theme's.
+// (Enum), a dropdown or a menu (Choice, Select), a value along a line
+// (Float), a line of text (Editor), a word for a moment (Toast). How
+// they look is the theme's.
 package widget
 
 import (
@@ -23,7 +24,7 @@ type Clickable struct {
 	// Keys are more keys it takes in focus, past Enter and Space: they
 	// come out of TakeKeys.
 	Keys []string
-	// NoFocus: Tab passes it by (a stepper's arrows: its value takes the
+	// NoFocus: Tab passes it by (a popup's rows: the popup takes the
 	// keys).
 	NoFocus bool
 
@@ -103,6 +104,7 @@ func (b *Clickable) events(gtx ink.Ctx) {
 			switch e.Kind {
 			case ink.Press:
 				if !b.pressed {
+					gtx.Quick() // held down: inverted at once
 					b.pressed, b.contact, b.at, b.from, b.longDone = true, e.ID, e.Time, e.Pos, false
 					if e.Time.IsZero() {
 						b.at = gtx.Now
@@ -149,11 +151,7 @@ func (b *Clickable) events(gtx ink.Ctx) {
 
 // Layout lays w out and makes it pressable: its area, focusable.
 func (b *Clickable) Layout(gtx ink.Ctx, w ink.Widget) ink.Dims {
-	was := b.pressed
 	b.events(gtx)
-	if b.pressed != was && b.pressed {
-		gtx.Quick() // held down: inverted at once
-	}
 	m := ink.Record(gtx.Ops)
 	d := w(gtx)
 	call := m.Stop()
@@ -236,34 +234,3 @@ func (e *Enum) Layout(gtx ink.Ctx, key string, w ink.Widget) ink.Dims {
 	}
 	return c.Layout(gtx, w)
 }
-
-// Stepper is a value stepped back and on: its ‹ and ›, a tap on the
-// rest (on), or ← → while it has the focus.
-type Stepper struct {
-	Less, More, Body Clickable
-}
-
-// Stepped is how far it was stepped since the last frame: -1, 1, more.
-func (s *Stepper) Stepped(gtx ink.Ctx) int {
-	s.Body.Keys = stepKeys
-	n := 0
-	for s.Less.Clicked(gtx) {
-		n--
-	}
-	for s.More.Clicked(gtx) {
-		n++
-	}
-	for s.Body.Clicked(gtx) {
-		n++
-	}
-	for _, k := range s.Body.TakeKeys(gtx) {
-		if k.Name == "Left" {
-			n--
-		} else {
-			n++
-		}
-	}
-	return n
-}
-
-var stepKeys = []string{"Left", "Right"}

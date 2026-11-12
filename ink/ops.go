@@ -31,6 +31,10 @@ const (
 	opPop
 	opCall
 	opArea
+	opLine
+	opDisc
+	opPoly
+	opPopup
 )
 
 type op struct {
@@ -46,7 +50,9 @@ type op struct {
 	draw  func(dst *image.Gray, r image.Rectangle)
 	call  []op
 	area  Area
-	clips bool // push: r clips
+	pts   []image.Point // line, poly
+	tag   Tag           // popup: its backdrop's
+	clips bool          // push: r clips
 }
 
 // Gray levels the panel shows cleanly: multiples of 0x11. Black and
@@ -157,6 +163,9 @@ type Area struct {
 	// Watch: it hears of the pointers that come down in it even under
 	// another area, as a list does, to tell a swipe from a tap on a row.
 	Watch bool
+	// Block: what's under it hears nothing of a pointer that came down
+	// in it, watchers neither (a popup's backdrop).
+	Block bool
 }
 
 // Input adds a.
@@ -166,3 +175,33 @@ func Input(o *Ops, a Area) {
 
 // fixedP is x, y as a font.Drawer's dot.
 func fixedP(x, y int) fixed.Point26_6 { return fixed.P(x, y) }
+
+// Line draws a line through pts, w thick, gray g (an icon's strokes, a
+// check mark).
+func Line(o *Ops, w int, g uint8, pts ...image.Point) {
+	o.list = append(o.list, op{kind: opLine, pts: pts, t: max(w, 1), gray: g})
+}
+
+// Disc fills a circle of radius r about c.
+func Disc(o *Ops, c image.Point, r int, g uint8) {
+	o.list = append(o.list, op{kind: opDisc, off: c, t: r, gray: g})
+}
+
+// Ring draws a circle's edge, w thick, radius r about c.
+func Ring(o *Ops, c image.Point, r, w int, g uint8) {
+	o.list = append(o.list, op{kind: opDisc, off: c, t: r, gray: g, r: image.Rect(0, 0, w, 0)})
+}
+
+// Polygon fills the polygon pts (a triangle, an arrow head).
+func Polygon(o *Ops, g uint8, pts ...image.Point) {
+	o.list = append(o.list, op{kind: opPoly, pts: pts, gray: g})
+}
+
+// Popup puts call over everything else, size big, by anchor (where it
+// is now, in the ops' coordinates): under it if there's room in the
+// window, else over it, moved in from the window's edges. Its backdrop
+// is the whole window, an area of backdrop's (Block): a tap outside the
+// popup goes there and nowhere else.
+func Popup(o *Ops, anchor image.Rectangle, size image.Point, backdrop Tag, call CallOp) {
+	o.list = append(o.list, op{kind: opPopup, r: anchor, sp: size, tag: backdrop, call: call.ops})
+}

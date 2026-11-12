@@ -121,7 +121,7 @@ func (w *Window) frame(now time.Time) {
 	}
 	fill(w.back, w.back.Rect, White)
 	p := painter{dst: w.back}
-	p.run(w.ops.list, image.Point{}, w.back.Rect)
+	p.paint(w.ops.list)
 	w.areas, w.texts = p.areas, p.texts
 	w.byTag = map[Tag]image.Point{}
 	for _, a := range w.areas {
@@ -184,7 +184,7 @@ func (w *Window) Pointer(p Pointer) {
 	case Press:
 		w.ring = false
 		var to []contactTo
-		var target Tag
+		var focus Tag // the target, or the first focusable area under it
 		hit := false
 		for i := len(w.areas) - 1; i >= 0; i-- {
 			a := w.areas[i]
@@ -195,22 +195,30 @@ func (w *Window) Pointer(p Pointer) {
 				to = append(to, contactTo{a.Tag, a.off})
 				continue
 			}
+			if a.Block { // nothing under it hears, watchers neither: those over it do
+				if !hit && a.Tag != nil {
+					to = append(to, contactTo{a.Tag, a.off})
+				}
+				break
+			}
 			if hit {
-				continue // under the one it hit: only watchers hear of it
+				// Under the one it hit only watchers hear of it; but the
+				// keys go to what it's in (a popup's row: the popup).
+				if focus == nil && a.Focus && a.Tag != nil {
+					focus = a.Tag
+				}
+				continue
 			}
 			hit = true
 			if a.Tag == nil {
 				break // a backdrop: nothing under it hears
 			}
-			target = a.Tag
 			to = append([]contactTo{{a.Tag, a.off}}, to...)
 			if a.Focus {
-				w.setFocus(a.Tag)
+				focus = a.Tag
 			}
 		}
-		if target == nil || !w.focusable(target) {
-			w.setFocus(nil)
-		}
+		w.setFocus(focus)
 		w.contacts[p.ID] = to
 	}
 	to := w.contacts[p.ID]
@@ -399,4 +407,12 @@ func (w *Window) Texts() []string {
 		ss = append(ss, t.s)
 	}
 	return ss
+}
+
+// WindowSize is the window's size: a popup's room.
+func (c Ctx) WindowSize() image.Point {
+	if c.w == nil {
+		return c.Constraints.Max
+	}
+	return c.w.size
 }

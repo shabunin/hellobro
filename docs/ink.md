@@ -17,7 +17,7 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(theme.Toggle(th, &s.wifi, "Wi-Fi").Layout),
-		layout.Rigid(theme.Stepper(th, &s.size, "Page size", sizes[s.i]).Layout),
+		layout.Rigid(theme.Select(th, &s.size, "Page size", sizes...).Layout),
 		layout.Rigid(theme.Button(th, &s.ok, "ok").Layout))
 }
 ```
@@ -25,18 +25,22 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 ## The packages
 
 - `ink`: `Ctx`, `Constraints`, `Dims`, `Dp`; the ops (`Fill`, `Frame`,
-  `TextAt`, `Image`, `Draw` for what draws itself, `Invert`, `Offset`,
-  `Clip`, `Record`); input areas (`Input`); events (`Pointer`, `Key`,
+  `TextAt`, `Line`, `Disc`, `Ring`, `Polygon`, `Image`, `Draw` for what
+  draws itself, `Invert`, `Offset`, `Clip`, `Record`, `Popup` for what
+  opens over everything); input areas (`Input`); events (`Pointer`, `Key`,
   `Text`, `Focus`); the `Window` a host owns (input in, `Frame` out:
   `Update`s).
 - `ink/layout`: `Flex` (`Rigid`, `Flexed`), `Stack`, `Inset`, `Spacer`,
-  `Direction`, and a paged `List`: no pixel scrolling, a swipe turns
+  `Direction`, `Grid`, and a paged `List`: no pixel scrolling, a swipe turns
   the page.
 - `ink/widget`: the controls' state: `Clickable` (tap, Enter, long
-  press), `Bool`, `Enum`, `Stepper`, `Editor`.
+  press), `Bool`, `Enum`, `Editor`, `Choice` (a list opening over the
+  rest: a menu), `Select` (a dropdown), `Float` (a slider), `Toast`.
 - `ink/theme`: how they look: `Label`/`Body`/`Small`/`Title`,
-  `Button`, `Row`, `Toggle`, `Stepper`, `Tabs`, `Header`, `List` with
-  its bar, `Dialog`, `Divider`.
+  `Button`, `Row`, `Toggle`, `CheckBox`, `Radio`, `Select`, `Menu`,
+  `Slider`, `Progress`, `Section`, `Tile`, `Editor` (framed, with a
+  ×), `Tabs`, `Header`, `List` with its bar, `Dialog`, `Toast`,
+  `Divider`.
 - `ink/text`: faces by style and size, widths, wrapping, `Fit`.
 - `ink/inkkobo`: runs an ink UI as a Kobo app (a `kobo.Program`).
 - `ink/inktest`: drives a window without a screen: `Tap`, `Hold`,
@@ -57,6 +61,9 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 - A pointer goes to the topmost area under it; areas that `Watch` (a
   list) hear of it too, and may take it (`Ctx.Hand`): the others get a
   Cancel.
+- A popup (a dropdown's options, a menu) is painted last, under its
+  field or over it where there's no room, and takes the keys: ↑ ↓
+  Enter, Esc. A touch outside closes it and goes nowhere else.
 - A frame is laid out when input came, when it's asked for
   (`Invalidate`, `InvalidateAt`), and at most once a tick otherwise.
 
