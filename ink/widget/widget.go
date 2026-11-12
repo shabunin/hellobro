@@ -27,6 +27,9 @@ type Clickable struct {
 	// NoFocus: Tab passes it by (a popup's rows: the popup takes the
 	// keys).
 	NoFocus bool
+	// KeepFocus: a tap on it leaves the focus where it was, and Tab
+	// passes it by (a text's toolbar).
+	KeepFocus bool
 
 	clicks, longs int
 	typed         []ink.Key
@@ -158,7 +161,7 @@ func (b *Clickable) Layout(gtx ink.Ctx, w ink.Widget) ink.Dims {
 	b.size = d.Size
 	call.Add(gtx.Ops)
 	if !gtx.IsDisabled() {
-		ink.Input(gtx.Ops, ink.Area{Rect: image.Rectangle{Max: d.Size}, Tag: b, Focus: !b.NoFocus, Keys: b.Keys})
+		ink.Input(gtx.Ops, ink.Area{Rect: image.Rectangle{Max: d.Size}, Tag: b, Focus: !b.NoFocus && !b.KeepFocus, Keys: b.Keys, Keep: b.KeepFocus})
 	} else if !gtx.IsMeasuring() {
 		b.pressed = false
 	}

@@ -166,6 +166,13 @@ type Area struct {
 	// Block: what's under it hears nothing of a pointer that came down
 	// in it, watchers neither (a popup's backdrop).
 	Block bool
+	// Reveal: it scrolls what's laid out in it after it (in the same
+	// clip): when the keys move the focus to something in it that
+	// doesn't show, it's sent a Reveal.
+	Reveal bool
+	// Keep: a tap on it leaves the focus where it is (a toolbar's
+	// buttons, which act on the text in focus).
+	Keep bool
 }
 
 // Input adds a.

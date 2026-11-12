@@ -14,8 +14,8 @@ import (
 // closes it; open, ↑ ↓ go through the items, Enter picks, Esc closes.
 type Choice struct {
 	Popover
-	Items []Clickable // as many as there are items, made as needed
-	List  layout.List // the items, a page at a time if they don't fit
+	Items []Clickable   // as many as there are items, made as needed
+	List  layout.Scroll // the items, moving under the finger if they don't all fit
 
 	hi     int // the item ↑ ↓ got to
 	n      int // items, as last laid out

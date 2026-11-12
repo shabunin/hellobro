@@ -77,7 +77,7 @@ func mergeUpdates(us []Update) []Update {
 				a, b := us[i].R, us[j].R
 				u := a.Union(b)
 				if area(u) <= (area(a)+area(b))*5/4 || a.Inset(-1).Overlaps(b) && area(u) <= (area(a)+area(b))*3/2 {
-					us[i] = Update{R: u, Gray: us[i].Gray || us[j].Gray, Full: us[i].Full || us[j].Full}
+					us[i] = Update{R: u, Gray: us[i].Gray || us[j].Gray, Full: us[i].Full || us[j].Full, Pen: us[i].Pen || us[j].Pen}
 					us = append(us[:j], us[j+1:]...)
 					merged = true
 					j--

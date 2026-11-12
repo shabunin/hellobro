@@ -125,3 +125,19 @@ var keyRows = [][2]string{
 	{"Space on a range", "the other end"},
 	{"letters", "into the field in focus"},
 }
+
+// The text area's text, at first: each kind of paragraph.
+const noteText = `# Trip to the sea
+Three days by the water, the Kobo in the bag, nothing else to read.
+## To pack
+- [x] the Kobo, charged
+- [x] its pen
+- [ ] a jumper for the evenings
+- [ ] the charger, this time
+## What to read
+- the second half of Middlemarch
+- a book of short stories, for the train
+- the notes from last week, to tidy up
+> The sea, the sea, as the book says: nothing to do but look at it.
+## Notes
+Words typed here wrap to the room they have. Tap a box to tick it; Back at the start of a list's line takes it out of the list; Enter on an empty one ends it. The buttons over the text make the line the caret's in a title, a heading, a list, a to-do, a quote, or plain text again.`

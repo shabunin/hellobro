@@ -19,27 +19,32 @@ var (
 	models    = []string{"as ai.conf says", "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2",
 		"gpt-5.5", "gpt-5.5-mini", "gemini-3-pro", "gemini-3-flash", "qwen-4-coder", "kimi-k3", "glm-5", "deepseek-v4", "grok-5"}
 	actions = []string{"rename…", "duplicate", "export as PDF", "move to a folder…", "forget it…"}
-	tabs    = []string{"controls", "pickers", "text", "lists", "scroll", "table", "tree", "grid", "popups", "about"}
-	tabName = []string{"Controls", "Pickers", "Text", "Lists", "Scroll", "Table", "Tree", "Grid", "Popups", "About"}
+	apps    = []string{"components", "calendar", "mail"}
+	appName = []string{"Components", "Calendar", "Mail"}
+	tabs    = []string{"controls", "pickers", "text", "lists", "scroll", "table", "tree", "grid", "draw", "popups"}
+	tabName = []string{"Controls", "Pickers", "Text", "Lists", "Scroll", "Table", "Tree", "Grid", "Draw", "Popups"}
 )
 
 // Gallery is its state.
 type Gallery struct {
 	Th *theme.Theme
 
+	app  widget.Enum // the components, or a demo made of them
 	tab  widget.Enum
 	back widget.Clickable
+	cal  Calendar
+	mail Mail
 	Said string // what was done last, at the foot
 	Quit bool   // quit was pressed
 
 	// Controls
-	page               layout.List
+	page               layout.Scroll
 	wifi, sync         widget.Bool
 	size, pause, model widget.Select
 	erase, confirm     widget.Bool
 	finger             widget.Enum
 	// Pickers
-	picks          layout.List
+	picks          layout.Scroll
 	day            widget.Date
 	alarm          widget.Clock
 	light, letters widget.Float
@@ -47,6 +52,7 @@ type Gallery struct {
 	// Text
 	name, search widget.Editor
 	rename, clr  widget.Clickable
+	note         widget.TextArea
 	// Lists, the scroll box, the strip
 	list       layout.List
 	live       widget.Bool
@@ -54,13 +60,19 @@ type Gallery struct {
 	rows       []widget.Clickable
 	box, strip layout.Scroll
 	stripBtn   []widget.Clickable
+	mapView    layout.Flick
+	places     []widget.Clickable
+	// Draw
+	canvas               widget.Canvas
+	fingerDraws, rubbing widget.Bool
+	undo, clear          widget.Clickable
 	// The table, the tree, the grid
 	table    widget.Table
 	find     widget.Editor
 	findClr  widget.Clickable
 	shown    []int // the books the table shows, in its order
 	tree     widget.Tree
-	covers   layout.List
+	covers   layout.Scroll
 	coverBtn []widget.Clickable
 	tiles    []widget.Clickable
 	// Popups
@@ -74,10 +86,13 @@ type Gallery struct {
 // New is the gallery, in th.
 func New(th *theme.Theme) *Gallery {
 	v := layout.Vertical
-	g := &Gallery{Th: th, page: layout.List{Axis: v}, picks: layout.List{Axis: v}, list: layout.List{Axis: v},
+	g := &Gallery{Th: th, page: layout.Scroll{Axis: v}, picks: layout.Scroll{Axis: v}, list: layout.List{Axis: v},
 		liveList: layout.Scroll{Axis: v}, box: layout.Scroll{Axis: v}, strip: layout.Scroll{Axis: layout.Horizontal},
-		covers: layout.List{Axis: v}}
+		covers: layout.Scroll{Axis: v}}
+	g.live.Value = true // lists move under the finger; the switch makes this one paged
+	g.app.Value = "components"
 	g.tab.Value = "controls"
+	g.places = make([]widget.Clickable, len(places))
 	g.finger.Value = "turns"
 	g.light = widget.Float{Value: 30, Min: 0, Max: 100, Step: 1}
 	g.letters = widget.Float{Value: 18, Min: 10, Max: 36, Step: 2}
@@ -89,12 +104,14 @@ func New(th *theme.Theme) *Gallery {
 	g.coverBtn = make([]widget.Clickable, len(books))
 	g.tree.Open = map[string]bool{"nb": true}
 	g.name.SetText("Tom Riddle's diary")
+	g.note.SetText(noteText)
 	g.sortBooks()
 	return g
 }
 
-// Layout lays it out: a header, the tabs, the tab's page, a line saying
-// what was done; a dialog or a toast over it all.
+// Layout lays it out: a header (quit, and which app), the tabs, the
+// tab's page, a line saying what was done; a dialog or a toast over it
+// all.
 func (g *Gallery) Layout(gtx ink.Ctx) ink.Dims {
 	th := g.Th
 	said := g.Said
@@ -107,9 +124,12 @@ func (g *Gallery) Layout(gtx ink.Ctx) ink.Dims {
 		if k, ok := e.(ink.Key); ok {
 			switch k.Name {
 			case "Esc":
-				if g.asking {
+				switch {
+				case g.asking:
 					g.asking = false
-				} else {
+				case g.app.Value == "calendar" && g.cal.Esc():
+				case g.app.Value == "mail" && g.mail.Esc():
+				default:
 					g.Quit = true
 				}
 			case "PageDown", "PageUp":
@@ -122,42 +142,57 @@ func (g *Gallery) Layout(gtx ink.Ctx) ink.Dims {
 	if g.back.Clicked(gtx) {
 		g.Quit, g.Said = true, "quit"
 	}
+	g.app.Update(gtx)
 	g.tab.Update(gtx)
 	ink.Fill(gtx.Ops, image.Rectangle{Max: gtx.Constraints.Max}, th.Bg)
+	page := func(gtx ink.Ctx) ink.Dims {
+		switch g.app.Value {
+		case "calendar":
+			return g.cal.Layout(gtx, g)
+		case "mail":
+			return g.mail.Layout(gtx, g)
+		}
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(func(gtx ink.Ctx) ink.Dims {
+				return layout.UniformInset(th.Pad).Layout(gtx, theme.Tabs(th, &g.tab, tabs, tabName).Layout)
+			}),
+			layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+				return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+					switch g.tab.Value {
+					case "pickers":
+						return g.pickPage(gtx)
+					case "text":
+						return g.textPage(gtx)
+					case "lists":
+						return g.listPage(gtx)
+					case "scroll":
+						return g.scrollPage(gtx)
+					case "table":
+						return g.tablePage(gtx)
+					case "tree":
+						return g.treePage(gtx)
+					case "grid":
+						return g.gridPage(gtx)
+					case "draw":
+						return g.drawPage(gtx)
+					case "popups":
+						return g.popupPage(gtx)
+					}
+					return g.controlsPage(gtx)
+				})
+			}))
+	}
 	d := layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
-			h := theme.Header(th, "the controls")
-			h.Back, h.BackText = &g.back, "quit"
-			return h.Layout(gtx)
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx ink.Ctx) ink.Dims {
+					return layout.Inset{Left: th.Pad, Top: th.Pad}.Layout(gtx, theme.Button(th, &g.back, "‹ quit").Layout)
+				}),
+				layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+					return layout.Inset{Left: th.Pad, Right: th.Pad, Top: th.Pad}.Layout(gtx, theme.Tabs(th, &g.app, apps, appName).Layout)
+				}))
 		}),
-		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
-			return layout.UniformInset(th.Pad).Layout(gtx, theme.Tabs(th, &g.tab, tabs, tabName).Layout)
-		}),
-		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
-			return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
-				switch g.tab.Value {
-				case "pickers":
-					return g.pickPage(gtx)
-				case "text":
-					return g.textPage(gtx)
-				case "lists":
-					return g.listPage(gtx)
-				case "scroll":
-					return g.scrollPage(gtx)
-				case "table":
-					return g.tablePage(gtx)
-				case "tree":
-					return g.treePage(gtx)
-				case "grid":
-					return g.gridPage(gtx)
-				case "popups":
-					return g.popupPage(gtx)
-				case "about":
-					return g.aboutPage(gtx)
-				}
-				return g.controlsPage(gtx)
-			})
-		}),
+		layout.Flexed(1, page),
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
 			return layout.Inset{Left: th.Pad * 2, Bottom: th.Pad}.Layout(gtx, theme.Small(th, g.Said).Layout)
 		}),
@@ -166,6 +201,12 @@ func (g *Gallery) Layout(gtx ink.Ctx) ink.Dims {
 		yes, no := theme.Button(th, &g.yes, "forget it"), theme.Button(th, &g.no, "keep it")
 		yes.Strong = true
 		theme.Dialog(th, "Forget the notebook?", "Its pages go, and its answers. This can't be undone.", no, yes).Layout(gtx)
+	}
+	switch g.app.Value {
+	case "calendar":
+		g.cal.Over(gtx, g)
+	case "mail":
+		g.mail.Over(gtx, g)
 	}
 	theme.Toast(th, &g.toast).Layout(gtx)
 	return d
@@ -257,8 +298,12 @@ func (g *Gallery) textPage(gtx ink.Ctx) ink.Dims {
 	if g.search.Changed(gtx) {
 		g.Said = "looking for “" + g.search.Text() + "”"
 	}
+	if g.note.Changed(gtx) {
+		g.Said = fmt.Sprintf("the note: %d letters", len([]rune(g.note.Words())))
+	}
 	search := theme.Editor(th, &g.search, "find a notebook, a book…")
 	search.Clear = &g.clr
+	side := layout.Inset{Left: th.Pad * 1.5, Right: th.Pad * 1.5}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(theme.Section(th, "Fields")),
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
@@ -272,16 +317,10 @@ func (g *Gallery) textPage(gtx ink.Ctx) ink.Dims {
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
 			return layout.Inset{Left: th.Pad * 1.5, Right: th.Pad * 1.5, Top: th.Pad * 1.5, Bottom: th.Pad}.Layout(gtx, search.Layout)
 		}),
-		layout.Rigid(theme.Section(th, "Words")),
-		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
-			return layout.UniformInset(th.Pad*1.5).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
-				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-					layout.Rigid(theme.Title(th, "A title").Layout),
-					layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
-					layout.Rigid(theme.Body(th, "Body text, wrapped to the room it has: a notebook's settings, a book's details, what a dialog asks. Lines break at spaces, and a word too long for a line goes on in pieces.").Layout),
-					layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
-					layout.Rigid(theme.Small(th, "Small text, said aside: where a file is, when it was read.").Layout),
-				)
+		layout.Rigid(theme.Section(th, "A text to edit: a title, headings, lists, to-dos")),
+		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+			return side.Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+				return layout.Inset{Top: th.Pad, Bottom: th.Pad}.Layout(gtx, theme.TextArea(th, &g.note).Layout)
 			})
 		}),
 	)
@@ -325,6 +364,12 @@ func (g *Gallery) listScroller() layout.Scroller {
 
 // scroller is what PageDown and PageUp move on the page that shows.
 func (g *Gallery) scroller() layout.Scroller {
+	switch g.app.Value {
+	case "calendar":
+		return g.cal.scroller()
+	case "mail":
+		return g.mail.scroller()
+	}
 	switch g.tab.Value {
 	case "controls":
 		return &g.page
@@ -373,7 +418,7 @@ func (g *Gallery) gridPage(gtx ink.Ctx) ink.Dims {
 				})
 			})
 		}),
-		layout.Rigid(theme.Section(th, "Covers, a page of them at a time")),
+		layout.Rigid(theme.Section(th, "Covers")),
 		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
 			return layout.UniformInset(th.Pad).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
 				return theme.GridList(th, &g.covers, layout.Grid{MinWidth: 130, Gap: th.Pad}).Layout(gtx, len(books), func(gtx ink.Ctx, i int) ink.Dims {
@@ -447,20 +492,16 @@ func (g *Gallery) popupPage(gtx ink.Ctx) ink.Dims {
 				return layout.W.Layout(gtx, theme.Button(th, &g.toastBtn, "show a toast").Layout)
 			})
 		}),
+		layout.Rigid(theme.Section(th, "About ink")),
+		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
+			return layout.Inset{Left: th.Pad * 1.5, Right: th.Pad * 1.5, Top: th.Pad}.Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					layout.Rigid(theme.Body(th, "An immediate-mode UI for e-ink, after Gio: the program lays its UI out from its state each frame; ink paints it, compares it with the frame before, and sends the panel only what changed: black and white at once, grays after.").Layout),
+					layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
+					layout.Rigid(theme.Small(th, "Tab and Shift+Tab move the focus, the arrows too; Enter presses; Esc closes what's open, then quits.").Layout))
+			})
+		}),
 	)
-}
-
-func (g *Gallery) aboutPage(gtx ink.Ctx) ink.Dims {
-	th := g.Th
-	return layout.UniformInset(th.Pad*1.5).Layout(gtx, func(gtx ink.Ctx) ink.Dims {
-		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-			layout.Rigid(theme.Title(th, "ink").Layout),
-			layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
-			layout.Rigid(theme.Body(th, "An immediate-mode UI for e-ink, after Gio: the program lays its UI out from its state each frame; ink paints it, compares it with the frame before, and sends the panel only what changed: black and white at once, grays after.").Layout),
-			layout.Rigid(layout.Spacer{Height: th.Pad}.Layout),
-			layout.Rigid(theme.Small(th, "Tab and the arrows move the focus; Enter presses; a swipe turns a list's page; Esc closes what's open, then quits.").Layout),
-		)
-	})
 }
 
 func onOff(b bool) string {

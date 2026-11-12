@@ -24,25 +24,49 @@ func (g *Gallery) scrollPage(gtx ink.Ctx) ink.Dims {
 			g.Said = "the strip: " + books[i].Title
 		}
 	}
-	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(theme.Section(th, "A page of text: it moves under the finger")),
-		layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
-			return layout.Inset{Left: th.Pad * 1.5, Top: th.Pad}.Layout(gtx, theme.ScrollBox(th, &g.box, func(gtx ink.Ctx) ink.Dims {
-				return layout.Inset{Right: th.Pad * 1.5}.Layout(gtx, func(gtx ink.Ctx) ink.Dims {
-					ws := []layout.FlexChild{layout.Rigid(theme.Title(th, "Moving under the finger").Layout)}
-					for _, p := range longText {
-						ws = append(ws, layout.Rigid(layout.Spacer{Height: th.Pad * 1.5}.Layout), layout.Rigid(theme.Body(th, p).Layout))
-					}
-					ws = append(ws, layout.Rigid(layout.Spacer{Height: th.Pad * 3}.Layout), layout.Rigid(theme.Title(th, "The keys").Layout))
-					for _, k := range keyRows {
-						r := theme.Row(th, nil, k[0])
-						r.Value = k[1]
-						ws = append(ws, layout.Rigid(r.Layout))
-					}
-					return layout.Flex{Axis: layout.Vertical}.Layout(gtx, ws...)
-				})
-			}))
-		}),
+	textBox := func(gtx ink.Ctx) ink.Dims {
+		return layout.Inset{Left: th.Pad * 1.5, Top: th.Pad}.Layout(gtx, theme.ScrollBox(th, &g.box, func(gtx ink.Ctx) ink.Dims {
+			return layout.Inset{Right: th.Pad * 1.5}.Layout(gtx, func(gtx ink.Ctx) ink.Dims {
+				ws := []layout.FlexChild{layout.Rigid(theme.Title(th, "Moving under the finger").Layout)}
+				for _, p := range longText {
+					ws = append(ws, layout.Rigid(layout.Spacer{Height: th.Pad * 1.5}.Layout), layout.Rigid(theme.Body(th, p).Layout))
+				}
+				ws = append(ws, layout.Rigid(layout.Spacer{Height: th.Pad * 3}.Layout), layout.Rigid(theme.Title(th, "The keys").Layout))
+				for _, k := range keyRows {
+					r := theme.Row(th, nil, k[0])
+					r.Value = k[1]
+					ws = append(ws, layout.Rigid(r.Layout))
+				}
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx, ws...)
+			})
+		}))
+	}
+	mapBox := func(gtx ink.Ctx) ink.Dims { return layout.UniformInset(th.Pad).Layout(gtx, g.mapBox) }
+	const mapSays = "A map: it moves any way, and coasts on after a flick"
+	var top []layout.FlexChild
+	if gtx.Constraints.Max.X > gtx.Constraints.Max.Y*5/4 { // across: side by side
+		top = []layout.FlexChild{layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+			return layout.Flex{}.Layout(gtx,
+				layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+						layout.Rigid(theme.Section(th, "A page of text: it moves under the finger")),
+						layout.Flexed(1, textBox))
+				}),
+				layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+						layout.Rigid(theme.Section(th, mapSays)),
+						layout.Flexed(1, mapBox))
+				}))
+		})}
+	} else {
+		top = []layout.FlexChild{
+			layout.Rigid(theme.Section(th, "A page of text: it moves under the finger")),
+			layout.Flexed(1.2, textBox),
+			layout.Rigid(theme.Section(th, mapSays)),
+			layout.Flexed(1, mapBox),
+		}
+	}
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, append(top,
 		layout.Rigid(theme.Section(th, "A strip, sideways")),
 		layout.Rigid(func(gtx ink.Ctx) ink.Dims {
 			h := gtx.Dp(200)
@@ -56,7 +80,7 @@ func (g *Gallery) scrollPage(gtx ink.Ctx) ink.Dims {
 				})
 			})
 		}),
-	)
+	)...)
 }
 
 // cover draws book i as a cover to tap: a band across its top, its title,

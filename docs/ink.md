@@ -27,15 +27,19 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 - `ink`: `Ctx`, `Constraints`, `Dims`, `Dp`; the ops (`Fill`, `Frame`,
   `TextAt`, `Line`, `Disc`, `Ring`, `Polygon`, `Image`, `Draw` for what
   draws itself, `Invert`, `Offset`, `Clip`, `Record`, `Popup` for what
-  opens over everything); input areas (`Input`); events (`Pointer`, `Key`,
-  `Text`, `Focus`); the `Window` a host owns (input in, `Frame` out:
-  `Update`s).
+  opens over everything); input areas (`Input`); events (`Pointer`, with
+  the pen's pressure and eraser, `Key`, `Text`, `Focus`, `Reveal`); the
+  `Window` a host owns (input in, `Frame` out: `Update`s).
 - `ink/layout`: `Flex` (`Rigid`, `Flexed`), `Stack`, `Inset`, `Spacer`,
   `Direction`, `Grid`; lists: a paged `List` (a swipe turns the page)
-  and `Scroll`, which moves under the finger a pixel at a time. Both are
-  `Scroller`s, so a list, a table or a tree takes either.
+  and `Scroll`, which moves under the finger a pixel at a time and coasts
+  on after a flick. Both are `Scroller`s, so a list, a table or a tree
+  takes either. `Flick` is a view onto something bigger both ways (a map)
+  that moves any way the finger goes.
 - `ink/widget`: the controls' state: `Clickable` (tap, Enter, long
-  press), `Bool`, `Enum`, `Editor`, `Choice` (a list opening over the
+  press), `Bool`, `Enum`, `Editor` (a line), `TextArea` (many: titles,
+  headings, lists, to-dos, quotes, as Markdown's marks hidden), `Canvas`
+  (to draw on: the pen, or a finger), `Choice` (a list opening over the
   rest: a menu), `Select` (a dropdown), `Float` (a slider), `Range`
   (a span, two ends), `Date` (a calendar), `Clock` (hours and minutes),
   `Table` (heads that sort), `Tree` (`Node`s that open), `Toast`; what
@@ -43,14 +47,16 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 - `ink/theme`: how they look: `Label`/`Body`/`Small`/`Title`,
   `Button`, `Row`, `Toggle`, `CheckBox`, `Radio`, `Select`, `Menu`,
   `Slider` (with ticks), `RangeSlider`, `Date`, `Clock`, `Progress`,
-  `Section`, `Tile`, `Editor` (framed, with a ×), `Table` (a search
+  `Section`, `Tile`, `Editor` (framed, with a ×), `TextArea` (with its
+  toolbar of the paragraphs' kinds), `Table` (a search
   underlined in it), `Tree`, `Tabs`, `Header`, `List` with its bar,
   `GridList`, `ScrollBox`, `Dialog`, `Toast`, `Divider`.
 - `ink/text`: faces by style and size, widths, wrapping, `Fit`.
 - `ink/inkkobo`: runs an ink UI as a Kobo app (a `kobo.Program`).
 - `ink/inktest`: drives a window without a screen: `Tap`, `Hold`,
   `Swipe`, `Key`, `Type`, `Find` by words, `Save` a PNG.
-- `ink/gallery`: pages of every control; `cmd/gallery` shows them on the Kobo.
+- `ink/gallery`: pages of every control, and two demos made of them, a
+  Calendar and a Mail; `cmd/gallery` shows them on the Kobo.
 
 ## How it behaves
 
@@ -58,8 +64,10 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
   2 with the Sizes for fingers.
 - A held control is drawn inverted, and that frame asks for the fast
   waveform (`Ctx.Quick`); letting go puts it back in grays.
-- Focus: Tab and the arrows go through the focusable areas in the order
-  they were laid out; Enter and Space press. The ring is the host's to
+- Focus: Tab and Shift+Tab (and the arrows, an editor's ↑ ↓ at its
+  ends) go through the focusable areas in the order they were laid out,
+  into a list's rows that don't show too: the list moves to show the one
+  focused (`Reveal`). Enter and Space press; Esc leaves an editor. The ring is the host's to
   stamp (`Window.Ring`), never painted into the frame. A touch hides it.
 - Keys nobody in focus takes go to `ink.Root`; a window that asks for
   them there took them (Esc, its letters).
@@ -71,6 +79,11 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
   in black and white at once; the window keeps what quick frames drew
   and sends it again in grays with the next ordinary frame, the one
   after the finger lifts, even if nothing changed by then.
+- A list, a scroll box, a dropdown's options move under the finger by
+  default; `NoFling` stops them coasting on. A paged `List` is still
+  there for what wants pages.
+- Ink drawn (`Ctx.Pen`, a `Canvas`) is a quick frame marked `Pen`: the
+  host may send it in its quickest waveform.
 - Measuring (`Ctx.Measuring`) lays a widget out for its size only: no
   events, no areas, and its state left alone (a press stays a press).
 - A popup (a dropdown's options, a menu) is painted last, under its
@@ -84,7 +97,12 @@ func (s *page) Layout(gtx ink.Ctx) ink.Dims {
 `cmd/gallery` is an app of its own beside hellobro, as brotools is: its
 page is one ink window (`ink/inkkobo`), the header and its buttons the
 Kobo app's as ever. It's where the components are made and tried;
-hellobro doesn't use ink yet. The apps move onto it one window at a
+hellobro doesn't use ink yet. Its header switches between the components
+(a tab each: Controls, Pickers, Text, Lists, Scroll, Table, Tree,
+Grid, Draw, Popups) and the demos: a Calendar (a day, a week of hours,
+a month, an agenda; an event opened, a new one added) and a Mail (three
+columns across, two upright; search, reply, flag, archive, a new
+message). The apps move onto it one window at a
 time once the controls they need are in the gallery.
 
 ```sh

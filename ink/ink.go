@@ -146,6 +146,22 @@ func (c Ctx) InvalidateAt(t time.Time) {
 	}
 }
 
+// MoveFocus moves the focus step on (back, if negative), as Tab does,
+// the ring showing: an editor of one line hands ↑ ↓ on.
+func (c Ctx) MoveFocus(step int) {
+	if c.w != nil && c.w.moveFocus(step) {
+		c.w.ring = true
+	}
+}
+
+// Pen says this frame is ink being written: the host may use its pen
+// waveform, the quickest. It's a Quick frame too.
+func (c Ctx) Pen() {
+	if c.w != nil {
+		c.w.quick, c.w.pen = true, true
+	}
+}
+
 // Quick asks for this frame's changes in the fast black-and-white
 // waveform, grays rounded: a button held down shows at once, and the
 // frame that lets it up puts the grays back.

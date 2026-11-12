@@ -28,6 +28,7 @@ type Host struct {
 	next     int
 	mods     ink.Mods
 	caps     bool
+	inking   bool // the App's in its pen mode
 }
 
 const owner = 1 // a contact on the page: ink's
@@ -79,7 +80,16 @@ func (h *Host) flush() {
 	if h.Calibrating() || h.page.Empty() {
 		return
 	}
-	for _, u := range h.Win.Frame(time.Now()) {
+	us := h.Win.Frame(time.Now())
+	pen := false
+	for _, u := range us {
+		pen = pen || u.Pen
+	}
+	if len(us) > 0 && pen != h.inking { // ink written: the pen's waveform, the quickest
+		h.inking = pen
+		h.Ink(pen)
+	}
+	for _, u := range us {
 		r := u.R.Add(h.page.Min)
 		kobo.CopyGray(h.C.Gray, r, h.Win.Image(), u.R.Min)
 		h.Mark(r, u.Gray || u.Full)
@@ -159,6 +169,17 @@ func lower(s string) string {
 	return s
 }
 
+// pointer is ev as ink has it: the pen's pressure (the Elipsa's goes to
+// 4095) and its button.
+func pointer(k ink.PointerKind, id int, p image.Point, ev kobo.TouchEv) ink.Pointer {
+	e := ink.Pointer{Kind: k, ID: id, Pos: p, Source: source(ev), Time: ev.At}
+	if ev.Pen {
+		e.Pressure = min(float32(ev.Pressure)/4095, 1)
+		e.Eraser = ev.Button != kobo.PenNoButton
+	}
+	return e
+}
+
 func source(ev kobo.TouchEv) ink.Source {
 	if ev.Pen {
 		return ink.Pen
@@ -180,12 +201,12 @@ func (h *Host) Touch(ev kobo.TouchEv, p image.Point, g *kobo.Gesture) {
 		g.NoLight()
 		h.next++
 		h.contacts[g] = h.next
-		h.Win.Pointer(ink.Pointer{Kind: ink.Press, ID: h.next, Pos: p.Sub(h.page.Min), Source: source(ev), Time: ev.At})
+		h.Win.Pointer(pointer(ink.Press, h.next, p.Sub(h.page.Min), ev))
 		h.flush()
 	case kobo.TouchMove:
 		if id, ok := h.contacts[g]; ok {
 			// Laid out at the tick: a frame a move would be too many.
-			h.Win.Pointer(ink.Pointer{Kind: ink.Move, ID: id, Pos: p.Sub(h.page.Min), Source: source(ev), Time: ev.At})
+			h.Win.Pointer(pointer(ink.Move, id, p.Sub(h.page.Min), ev))
 		}
 	}
 }

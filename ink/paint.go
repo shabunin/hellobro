@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"slices"
 	"sync"
 
 	"golang.org/x/image/font"
@@ -16,8 +17,10 @@ import (
 
 type placed struct {
 	Area
-	r   image.Rectangle // on the image, clipped
-	off image.Point     // its origin there: pointers are told of relative to it
+	r    image.Rectangle // on the image, clipped
+	off  image.Point     // its origin there: pointers are told of relative to it
+	full image.Rectangle // on the image, not clipped: where it'd be
+	in   []Tag           // the areas that scroll it into view (Reveal), outermost first
 }
 
 // textBox is a text painted, where: inktest finds things by their words.
@@ -28,6 +31,7 @@ type textBox struct {
 
 type painter struct {
 	dst    *image.Gray
+	rev    []Tag // the Reveal areas the ops being run are in
 	areas  []placed
 	texts  []textBox
 	popups []popup // painted after the rest, in order
@@ -41,6 +45,8 @@ type popup struct {
 }
 
 func (p *painter) run(ops []op, off image.Point, clip image.Rectangle) {
+	saved := len(p.rev) // a Reveal area holds for the rest of its ops, its clip's
+	defer func() { p.rev = p.rev[:saved] }()
 	for i := 0; i < len(ops); i++ {
 		o := &ops[i]
 		switch o.kind {
@@ -82,9 +88,15 @@ func (p *painter) run(ops []op, off image.Point, clip image.Rectangle) {
 		case opCall:
 			p.run(o.call, off, clip)
 		case opArea:
-			r := o.area.Rect.Add(off).Intersect(clip)
-			if !r.Empty() {
-				p.areas = append(p.areas, placed{o.area, r, off})
+			full := o.area.Rect.Add(off)
+			r := full.Intersect(clip)
+			// One out of sight is kept if it's focusable: the keys may
+			// go to it, and it's scrolled into view then.
+			if !r.Empty() || o.area.Focus && len(p.rev) > 0 {
+				p.areas = append(p.areas, placed{o.area, r, off, full, slices.Clone(p.rev)})
+			}
+			if o.area.Reveal && o.area.Tag != nil {
+				p.rev = append(p.rev, o.area.Tag)
 			}
 		case opLine:
 			for k := 1; k < len(o.pts); k++ {
@@ -117,7 +129,7 @@ func (p *painter) paint(ops []op) {
 		}
 		at.X = max(win.Min.X, min(at.X, win.Max.X-pp.size.X))
 		at.Y = max(win.Min.Y, min(at.Y, win.Max.Y-pp.size.Y))
-		p.areas = append(p.areas, placed{Area{Rect: win, Tag: pp.tag, Block: true}, win, image.Point{}})
+		p.areas = append(p.areas, placed{Area: Area{Rect: win, Tag: pp.tag, Block: true}, r: win, full: win})
 		p.run(pp.ops, at, win)
 	}
 }

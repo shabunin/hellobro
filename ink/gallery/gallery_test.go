@@ -108,12 +108,12 @@ func TestControls(t *testing.T) {
 			if !g.model.IsOpen() {
 				t.Fatal("not open")
 			}
-			if n := g.model.List.Count(); n > 0 && n < len(models) { // paged: they don't all fit
+			if _, to := g.model.List.Span(); to < 1 { // they don't all fit: they move under the finger
 				save(t, it, name+"-select-long")
 				p, _ := it.Find(models[1])
-				it.Swipe(p.Add(image.Pt(0, 200)), p.Sub(image.Pt(0, 200)))
-				if g.model.List.First() == 0 || !g.model.IsOpen() {
-					t.Errorf("swiped: from %d, open %v", g.model.List.First(), g.model.IsOpen())
+				it.Swipe(p.Add(image.Pt(0, 100)), p.Sub(image.Pt(0, 100)))
+				if g.model.List.First() == 0 && g.model.List.Offset() == 0 || !g.model.IsOpen() {
+					t.Errorf("swiped: at %d+%d, open %v", g.model.List.First(), g.model.List.Offset(), g.model.IsOpen())
 				}
 			}
 			it.Key("Esc", 0)
@@ -167,6 +167,7 @@ func TestText(t *testing.T) {
 func TestListPages(t *testing.T) {
 	g, it := start(t, inktest.Elipsa)
 	must(t, it.TapText("Lists"))
+	must(t, it.TapText("Under the finger")) // off: by the page
 	save(t, it, "portrait-list")
 	first, n := g.list.First(), g.list.Count()
 	if first != 0 || n < 5 || n >= len(g.rows) {
@@ -272,8 +273,9 @@ func TestDamage(t *testing.T) {
 
 func TestAbout(t *testing.T) {
 	g, it := start(t, inktest.Elipsa)
-	must(t, it.TapText("About"))
-	save(t, it, "portrait-about")
+	must(t, it.TapText("Popups"))
+	must(t, it.TapText("About ink"))
+	save(t, it, "portrait-popups")
 	if !it.Key("Esc", 0) || !g.Quit {
 		t.Error("Esc didn't quit")
 	}

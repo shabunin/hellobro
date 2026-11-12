@@ -104,6 +104,12 @@ func (e *Editor) events(gtx ink.Ctx) {
 				}
 			case "Enter":
 				e.submitted = true
+			case "Up":
+				gtx.MoveFocus(-1) // one line: ↑ ↓ go on, as Tab does
+			case "Down":
+				gtx.MoveFocus(1)
+			case "Esc":
+				gtx.Focus(nil) // lets go of the keys; the next Esc is the program's
 			case "Space":
 				e.insert(" ")
 			}

@@ -33,11 +33,13 @@ const (
 // Pointer is a contact coming down, moving, lifting. Pos is in the
 // receiving area's coordinates (the window's when it's fed in).
 type Pointer struct {
-	Kind   PointerKind
-	ID     int // the contact: a finger's slot
-	Pos    image.Point
-	Source Source
-	Time   time.Time
+	Kind     PointerKind
+	ID       int // the contact: a finger's slot
+	Pos      image.Point
+	Source   Source
+	Time     time.Time
+	Pressure float32 // the pen's, 0 to 1; 0: not known (a finger)
+	Eraser   bool    // the pen's button held, or its eraser end down
 }
 
 // Mods are the modifier keys held.
@@ -70,10 +72,18 @@ type Focus struct {
 	On bool
 }
 
+// Reveal asks an area that scrolls (Area.Reveal) to show R, in its own
+// coordinates: the keys moved the focus to something in it that doesn't
+// show, or not all of it.
+type Reveal struct {
+	R image.Rectangle
+}
+
 func (Pointer) isEvent() {}
 func (Key) isEvent()     {}
 func (Text) isEvent()    {}
 func (Focus) isEvent()   {}
+func (Reveal) isEvent()  {}
 
 // Root is the tag that gets the keys no one in focus took: a program's
 // Esc, its letters.

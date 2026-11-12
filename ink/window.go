@@ -25,6 +25,7 @@ type Window struct {
 	ring     bool                // the focus shows: the keys moved it, no touch since
 	again    bool                // another frame, at once
 	quick    bool                // this frame's changes in the fast waveform
+	pen      bool                // and it's ink being written
 	bw       []Update            // what quick frames left in black and white, for the next frame to put back in grays
 	wake     time.Time           // and one then
 	input    bool                // input since the last frame
@@ -46,6 +47,7 @@ type Update struct {
 	R    image.Rectangle
 	Gray bool
 	Full bool
+	Pen  bool // ink being written: the pen's waveform, if the host has one
 }
 
 // NewWindow is a window size big, for ui.
@@ -109,7 +111,7 @@ func (w *Window) frame(now time.Time) {
 		w.wake = time.Time{}
 	}
 	clear(w.asked)
-	w.quick = false
+	w.quick, w.pen = false, false
 	for pass := 0; ; pass++ {
 		w.again = false
 		w.ops.Reset()
@@ -149,7 +151,7 @@ func (w *Window) frame(now time.Time) {
 		d := diff(w.front, w.back)
 		if w.quick {
 			for i := range d {
-				d[i].Gray = false
+				d[i].Gray, d[i].Pen = false, w.pen
 			}
 			w.bw = mergeUpdates(append(w.bw, d...))
 		} else {
@@ -195,7 +197,7 @@ func (w *Window) Pointer(p Pointer) {
 		w.ring = false
 		var to []contactTo
 		var focus Tag // the target, or the first focusable area under it
-		hit := false
+		hit, keep := false, false
 		for i := len(w.areas) - 1; i >= 0; i-- {
 			a := w.areas[i]
 			if !p.Pos.In(a.r) {
@@ -214,7 +216,7 @@ func (w *Window) Pointer(p Pointer) {
 			if hit {
 				// Under the one it hit only watchers hear of it; but the
 				// keys go to what it's in (a popup's row: the popup).
-				if focus == nil && a.Focus && a.Tag != nil {
+				if focus == nil && !keep && a.Focus && a.Tag != nil {
 					focus = a.Tag
 				}
 				continue
@@ -226,6 +228,10 @@ func (w *Window) Pointer(p Pointer) {
 			to = append([]contactTo{{a.Tag, a.off}}, to...)
 			if a.Focus {
 				focus = a.Tag
+			}
+			if a.Keep {
+				focus = w.focus
+				keep = true
 			}
 		}
 		w.setFocus(focus)
@@ -355,28 +361,69 @@ func (w *Window) toRoot(e Event) bool {
 }
 
 // moveFocus moves it step on (or back) through the focusable areas, in
-// the order they were laid out.
+// the order they were laid out. One out of sight in a list is a stop
+// only from within that list: Tab from the last row that shows goes on
+// to the next, which the list then scrolls to; Tab into the list goes to
+// its first row that shows.
 func (w *Window) moveFocus(step int) bool {
-	var fs []Tag
+	var fs []placed
+	seen := map[Tag]bool{}
 	for _, a := range w.areas {
-		if a.Focus && a.Tag != nil && !slices.Contains(fs, a.Tag) {
-			fs = append(fs, a.Tag)
+		if a.Focus && a.Tag != nil && !seen[a.Tag] {
+			seen[a.Tag] = true
+			fs = append(fs, a)
 		}
 	}
 	if len(fs) == 0 {
 		return false
 	}
-	i := slices.Index(fs, w.focus)
-	switch {
-	case i < 0 && step > 0:
-		i = 0
-	case i < 0:
-		i = len(fs) - 1
-	default:
-		i = (i + step + len(fs)) % len(fs)
+	i := slices.IndexFunc(fs, func(a placed) bool { return a.Tag == w.focus })
+	var list Tag // the list the focus is in, if it is
+	if i >= 0 {
+		list = innermost(fs[i])
 	}
-	w.setFocus(fs[i])
-	return true
+	for range fs {
+		switch {
+		case i < 0 && step > 0:
+			i = 0
+		case i < 0:
+			i = len(fs) - 1
+		default:
+			i = (i + step + len(fs)) % len(fs)
+		}
+		if a := fs[i]; !a.r.Empty() || list != nil && innermost(a) == list {
+			w.setFocus(a.Tag)
+			w.reveal()
+			return true
+		}
+	}
+	return false
+}
+
+func innermost(a placed) Tag {
+	if len(a.in) == 0 {
+		return nil
+	}
+	return a.in[len(a.in)-1]
+}
+
+// reveal asks the list the focus is in to show it, if it doesn't, or not
+// all of it.
+func (w *Window) reveal() {
+	f, ok := w.focused()
+	if !ok || f.r == f.full {
+		return
+	}
+	t := innermost(f)
+	if t == nil {
+		return
+	}
+	for _, a := range w.areas {
+		if a.Tag == t {
+			w.send(t, Reveal{f.full.Sub(a.off)})
+			return
+		}
+	}
 }
 
 // RingOut is how far out of its control the focus ring's outer edge

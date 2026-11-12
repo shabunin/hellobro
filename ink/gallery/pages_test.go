@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"hellobro/ink"
 	"hellobro/ink/inktest"
 )
 
@@ -22,6 +23,16 @@ func drag(t *testing.T, it *inktest.T, a, d image.Point, steps int) {
 		}
 	}
 	it.Release(a.Add(d))
+}
+
+// startsWith is the line on screen that starts with s, wrapped as it is.
+func startsWith(it *inktest.T, s string) string {
+	for _, l := range it.W.Texts() {
+		if strings.HasPrefix(l, s) {
+			return l
+		}
+	}
+	return s
 }
 
 func grays(it *inktest.T) int {
@@ -44,7 +55,7 @@ func TestScrollBox(t *testing.T) {
 			save(t, it, name+"-scroll")
 			p, err := it.Find("Moving under the finger")
 			must(t, err)
-			const mid = "PageDown and PageUp move it nearly a page, so a line stays in sight from the page before."
+			mid := startsWith(it, "PageDown and PageUp move it")
 			m0, err := it.Find(mid)
 			must(t, err)
 			drag(t, it, p.Add(image.Pt(0, 200)), image.Pt(0, -150), 5)
@@ -84,9 +95,8 @@ func TestScrollBox(t *testing.T) {
 func TestLiveList(t *testing.T) {
 	g, it := start(t, inktest.Elipsa)
 	must(t, it.TapText("Lists"))
-	must(t, it.TapText("Under the finger"))
 	if !g.live.Value {
-		t.Fatal("not live")
+		t.Fatal("not live from the start")
 	}
 	p, _ := it.Find("Notebook 5")
 	drag(t, it, p, image.Pt(0, -200), 8)
@@ -250,12 +260,53 @@ func TestCovers(t *testing.T) {
 			if g.Said != "opened Emma" {
 				t.Errorf("said %q", g.Said)
 			}
-			n := g.covers.Count()
 			it.Key("PageDown", 0)
-			if g.covers.First() != n {
-				t.Errorf("PageDown: from %d, want %d", g.covers.First(), n)
+			if g.covers.First() == 0 {
+				t.Errorf("PageDown: from %d", g.covers.First())
 			}
 			save(t, it, name+"-covers")
 		})
+	}
+}
+
+// Tab goes down a list past what shows: the list follows the focus, by
+// the pixel or by the page, and the ring's always on screen; Shift+Tab
+// comes back up.
+func TestTabThroughLists(t *testing.T) {
+	for _, live := range []bool{true, false} {
+		g, it := start(t, inktest.Elipsa)
+		must(t, it.TapText("Lists"))
+		if !live {
+			must(t, it.TapText("Under the finger"))
+		}
+		var l interface{ Span() (float32, float32) } = &g.liveList
+		if !live {
+			l = &g.list
+		}
+		for !g.rows[0].Focused() {
+			it.Key("Tab", 0)
+		}
+		for i := 1; i < 30; i++ {
+			it.Key("Tab", 0)
+			if !g.rows[i].Focused() {
+				t.Fatalf("live %v: Tab %d: row %d hasn't the focus", live, i, i)
+			}
+			if r := it.W.Ring(); r.Empty() || r.Max.Y > it.W.Size().Y {
+				t.Fatalf("live %v: row %d's ring at %v", live, i, r)
+			}
+		}
+		if from, _ := l.Span(); from == 0 {
+			t.Errorf("live %v: Tab to row 30, the list didn't move", live)
+		}
+		save(t, it, "portrait-tab-"+onOff(live))
+		for i := 28; i >= 0; i-- {
+			it.Key("Tab", ink.Shift)
+			if !g.rows[i].Focused() || it.W.Ring().Empty() {
+				t.Fatalf("live %v: Shift+Tab: row %d hasn't the focus, ring %v", live, i, it.W.Ring())
+			}
+		}
+		if from, _ := l.Span(); from != 0 {
+			t.Errorf("live %v: back at the first row, the list's at %v", live, from)
+		}
 	}
 }

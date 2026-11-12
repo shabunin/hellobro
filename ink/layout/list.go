@@ -57,6 +57,15 @@ func (l *List) events(gtx ink.Ctx) {
 	ax := l.axis()
 	slop := gtx.Dp(swipeSlop)
 	for _, e := range gtx.Events(l) {
+		if r, ok := e.(ink.Reveal); ok {
+			// The keys went to what's past the page: the page it's on.
+			if ax.main(r.R.Max) > ax.main(l.size) {
+				l.turn++
+			} else if ax.main(r.R.Min) < 0 {
+				l.turn--
+			}
+			continue
+		}
 		p, ok := e.(ink.Pointer)
 		if !ok {
 			continue
@@ -175,23 +184,38 @@ func (l *List) Layout(gtx ink.Ctx, n int, el func(gtx ink.Ctx, i int) ink.Dims) 
 	l.first = max(l.first, 0)
 
 	clip := ink.Clip(gtx.Ops, image.Rectangle{Max: size})
-	ink.Input(gtx.Ops, ink.Area{Rect: image.Rectangle{Max: size}, Tag: l, Watch: true})
+	ink.Input(gtx.Ops, ink.Area{Rect: image.Rectangle{Max: size}, Tag: l, Watch: true, Reveal: true})
+	at := func(call ink.CallOp, pos int) {
+		st := ink.Offset(gtx.Ops, ax.pt(pos, 0))
+		call.Add(gtx.Ops)
+		st.Pop()
+	}
+	// The item before the page, out of sight: Shift+Tab goes to it.
+	if l.first > 0 {
+		call, d := item(gtx, l.first-1)
+		at(call, -ax.main(d.Size))
+	}
 	used, cross := 0, 0
 	l.count = 0
-	for i := l.first; i < n; i++ {
+	i := l.first
+	for ; i < n; i++ {
 		call, d := item(gtx, i)
 		if used+ax.main(d.Size) > room && l.count > 0 {
 			break
 		}
-		st := ink.Offset(gtx.Ops, ax.pt(used, 0))
-		call.Add(gtx.Ops)
-		st.Pop()
+		at(call, used)
 		used += ax.main(d.Size)
 		cross = max(cross, ax.cross(d.Size))
 		l.count++
 		if used >= room {
+			i++
 			break
 		}
+	}
+	// And the one after it, past the page's end: Tab goes to it.
+	if i < n {
+		call, _ := item(gtx, i)
+		at(call, room)
 	}
 	clip.Pop()
 	return ink.Dims{Size: gtx.Constraints.Constrain(ax.pt(room, cross))}

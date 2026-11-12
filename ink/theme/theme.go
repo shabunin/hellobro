@@ -326,16 +326,18 @@ func Tabs(th *Theme, e *widget.Enum, keys, names []string) TabsStyle {
 	return TabsStyle{Theme: th, Enum: e, Keys: keys, Names: names}
 }
 
-// Layout lays them out, sharing the row.
+// Layout lays them out, sharing the row as their names are long.
 func (t TabsStyle) Layout(gtx ink.Ctx) ink.Dims {
 	th := t.Theme
 	var kids []layout.FlexChild
+	bold := th.Face(gtx, th.TextSize, text.Bold)
+	pad := gtx.Dp(th.Pad * 2)
 	for i, k := range t.Keys {
 		name := k
 		if i < len(t.Names) {
 			name = t.Names[i]
 		}
-		kids = append(kids, layout.Flexed(1, func(gtx ink.Ctx) ink.Dims {
+		kids = append(kids, layout.Flexed(float32(text.Width(bold, name)+2*pad), func(gtx ink.Ctx) ink.Dims {
 			return t.Enum.Layout(gtx, k, func(gtx ink.Ctx) ink.Dims {
 				f := th.Face(gtx, th.TextSize, text.Regular)
 				on := t.Enum.Value == k
