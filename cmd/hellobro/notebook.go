@@ -392,6 +392,7 @@ type noteWin struct {
 	opts       []barBtn
 	optsPane   *inkkobo.Pane // their paint
 	selPane    *inkkobo.Pane // the selection's buttons' paint
+	ovPane     *inkkobo.Pane // the pages small (notepages.go)
 	settings   bool          // its settings shown, over it (notesettings.go)
 	set        *noteSetUI    // and their ink
 	barUI      *barUI        // the bar's ink

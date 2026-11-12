@@ -16,6 +16,8 @@ import (
 	"slices"
 	"time"
 
+	"hellobro/ink"
+	"hellobro/ink/text"
 	"hellobro/kobo"
 )
 
@@ -123,56 +125,80 @@ func (w *noteWin) openPage(a *bro, n int) {
 	}
 }
 
-// drawOverview draws the pages small, in clip.
+// drawOverview paints the pages small in ink, all of them that show
+// (clip's the caller's to mark): each page drawn as the notebook draws
+// it into an image of its own, then laid out with its frame, its ×
+// and its number; the chosen framed thick; a tile for a new one.
 func (w *noteWin) drawOverview(a *bro, clip image.Rectangle) {
-	c := a.C
-	clip = clip.Intersect(w.paperArea())
-	c.Fill(clip, kobo.White)
+	area := w.paperArea()
+	if area.Empty() {
+		return
+	}
 	tiles, _ := w.ovLayout()
-	scale := w.scale
-	defer func() { w.scale = scale }()
+	thumbs := make([]*image.Gray, len(tiles))
+	screen, scale := a.C.Gray, w.scale
 	for i, t := range tiles {
 		n := w.ovFirst + i
-		if n > len(w.nb.pages) || !t.Inset(-noteThumbGap).Overlaps(clip) {
-			continue
+		if n >= len(w.nb.pages) {
+			break
 		}
-		lab := image.Rect(t.Min.X, t.Max.Y, t.Max.X, t.Max.Y+noteThumbLab)
-		if n == len(w.nb.pages) { // the tile for a new one
-			for _, s := range frameStrips(t, 2) {
-				c.Fill(s.Intersect(clip), kobo.Mid)
-			}
-			c.Text(a.F.Small, t, "+ new page", kobo.Dark, kobo.AlignCenter)
-			continue
-		}
+		img := image.NewGray(t) // where it is on the screen, as drawPage draws
+		a.C.Gray = img
+		a.C.Fill(t, kobo.White)
 		w.scale = float64(t.Dx()) / float64(w.pageSize(n).X)
-		w.drawPage(a, n, t, t.Intersect(clip), false)
-		frame, ink := 1, uint8(kobo.Mid)
-		if n == w.ovSel {
-			frame, ink = 5, kobo.Black
-		}
-		for _, s := range frameStrips(t.Inset(-frame), frame) {
-			c.Fill(s.Intersect(clip), ink)
-		}
-		num := fmt.Sprint(n + 1)
-		if n == w.ovSel {
-			num = fmt.Sprintf("page %d: tap again to open", n+1)
-		}
-		if w.ovDelOK(n) {
-			x := ovCloseBox(t)
-			fg, bg := uint8(kobo.White), uint8(kobo.Black)
-			c.Fill(x.Intersect(clip), kobo.Black)
-			if w.ovDelArmed(n) { // lit: again deletes
-				c.Fill(x.Inset(3).Intersect(clip), kobo.White)
-				fg, bg = kobo.Black, kobo.White
-				num = "tap × again: delete it"
-				if len(w.nb.pages) == 1 {
-					num = "tap × again: clear it"
-				}
-			}
-			drawIcon(c, iconCross, x, fg, bg)
-		}
-		c.Text(a.F.Small, lab, num, kobo.Black, kobo.AlignCenter)
+		w.drawPage(a, n, t, t, false)
+		thumbs[i] = img
 	}
+	a.C.Gray, w.scale = screen, scale
+	a.inkPaint(&w.ovPane, area, func(gtx ink.Ctx) ink.Dims {
+		th := a.theme()
+		size := gtx.Constraints.Max
+		ink.Fill(gtx.Ops, image.Rectangle{Max: size}, th.Bg)
+		small := th.Face(gtx, th.TextSize*0.85, text.Regular)
+		label := func(r image.Rectangle, s string, g uint8) {
+			s = text.Fit(small, s, r.Dx())
+			ink.TextAt(gtx.Ops, small, r.Min.X+(r.Dx()-text.Width(small, s))/2, r.Min.Y+(r.Dy()-text.Height(small))/2+text.Ascent(small), s, g)
+		}
+		for i, at := range tiles {
+			n, t := w.ovFirst+i, at.Sub(area.Min)
+			if n > len(w.nb.pages) {
+				break
+			}
+			if n == len(w.nb.pages) { // the tile for a new one
+				ink.Frame(gtx.Ops, t, 2, ink.Mid)
+				label(t, "+ new page", ink.Dark)
+				continue
+			}
+			ink.Image(gtx.Ops, t, thumbs[i], thumbs[i].Rect.Min)
+			frame, gray := 1, uint8(ink.Mid)
+			if n == w.ovSel {
+				frame, gray = 5, th.Fg
+			}
+			ink.Frame(gtx.Ops, t.Inset(-frame), frame, gray)
+			num := fmt.Sprint(n + 1)
+			if n == w.ovSel {
+				num = fmt.Sprintf("page %d: tap again to open", n+1)
+			}
+			if w.ovDelOK(n) {
+				x := ovCloseBox(t)
+				fg, bg := th.Bg, th.Fg
+				ink.Fill(gtx.Ops, x, th.Fg)
+				if w.ovDelArmed(n) { // lit: again deletes
+					ink.Fill(gtx.Ops, x.Inset(3), th.Bg)
+					fg, bg = th.Fg, th.Bg
+					num = "tap × again: delete it"
+					if len(w.nb.pages) == 1 {
+						num = "tap × again: clear it"
+					}
+				}
+				ink.Draw(gtx.Ops, x, func(dst *image.Gray, r image.Rectangle) {
+					drawIcon(kobo.Canvas{Gray: dst}, iconCross, r, fg, bg)
+				})
+			}
+			label(image.Rect(t.Min.X, t.Max.Y, t.Max.X, t.Max.Y+noteThumbLab), num, th.Fg)
+		}
+		return ink.Dims{Size: size}
+	})
 }
 
 // ovTap takes a tap on the pages small: one chosen, or opened if it
