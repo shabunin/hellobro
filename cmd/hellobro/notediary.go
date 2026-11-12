@@ -29,6 +29,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -202,12 +203,14 @@ type noteDiary struct {
 	box     image.Rectangle
 	nextAt  time.Time
 
-	// While it's asked, dots where the answer will go, one more at a
-	// time: it's at work. On screen only.
-	think     image.Rectangle // page units; empty: none
+	// While it's asked, a badge where the answer will go: black, a
+	// spinner turning, "thinking", and how long it's been at it. On
+	// screen only.
+	think     image.Rectangle // page units: its top left; empty: none
 	thinkPage int
-	dots      int
+	dots      int // steps so far: the spinner's, the dots'
 	dotAt     time.Time
+	thinkAt   time.Time
 }
 
 const diaryDotEvery = 700 * time.Millisecond
@@ -319,7 +322,7 @@ func (a *bro) diaryTick() {
 			}
 		case d.asked != 0:
 			if !d.think.Empty() && time.Since(d.dotAt) >= diaryDotEvery {
-				d.dots, d.dotAt = d.dots%3+1, time.Now()
+				d.dots, d.dotAt = d.dots+1, time.Now()
 				w.diaryShowDots(a, false)
 			}
 		case d.asked == 0 && !d.wroteAt.IsZero() && a.diaryPause() > 0 && time.Since(d.wroteAt) >= a.diaryPause() &&
@@ -899,7 +902,7 @@ func (w *noteWin) diaryThink(a *bro, page int, below image.Rectangle, size float
 	x, y := float64(diaryLeft(below, w.pageSize(page))), float64(below.Max.Y)+hand.LineHeight(size)*0.5+size*0.75
 	r, gap := size*0.09, size*0.55
 	d.think = image.Rect(int(x-r), int(y-r), int(x+2*gap+r)+1, int(y+r)+1)
-	d.thinkPage, d.dots, d.dotAt = page, 1, time.Now()
+	d.thinkPage, d.dots, d.dotAt, d.thinkAt = page, 0, time.Now(), time.Now()
 	w.diaryShowDots(a, false)
 }
 
@@ -911,7 +914,7 @@ func (w *noteWin) diaryUnthink(a *bro) {
 	}
 }
 
-// thinkRect is where the dots are on screen; empty if their page
+// thinkRect is where the badge is on screen; empty if its page
 // doesn't show.
 func (w *noteWin) thinkRect() image.Rectangle {
 	d := w.diary
@@ -922,11 +925,22 @@ func (w *noteWin) thinkRect() image.Rectangle {
 	if i < 0 || i >= len(w.slots) {
 		return image.Rectangle{}
 	}
-	return w.toScreenRect(d.think, w.slots[i]).Intersect(w.paperArea())
+	at := w.toScreen(notePt{int16(d.think.Min.X), int16(d.think.Min.Y), 0}, w.slots[i])
+	r := image.Rectangle{Max: thinkSize()}.Add(at)
+	area := w.paperArea().Inset(8)
+	return r.Add(into(r, area)).Intersect(area)
 }
 
-// diaryShowDots draws the dots again where they are (gone, if they're
-// to go), quick: and with the page's grays when they go.
+// thinkSize is the badge's: as wide as its longest words.
+var thinkSize = sync.OnceValue(func() image.Point {
+	f := kobo.LoadFonts().TabBold
+	return image.Pt(thinkH+kobo.TextWidth(f, "thinking...  999 s")+thinkH/2, thinkH)
+})
+
+const thinkH = 60 // px, the badge's height
+
+// diaryShowDots draws the badge again where it is (gone, if it's to
+// go), quick: and with the page's grays when it goes.
 func (w *noteWin) diaryShowDots(a *bro, gone bool) {
 	r := w.thinkRect()
 	if r.Empty() || a == nil || w.p.Outer.Empty() || !a.shows(w) {
@@ -939,19 +953,35 @@ func (w *noteWin) diaryShowDots(a *bro, gone bool) {
 	a.Mark(r, gone)
 }
 
-// drawThinking draws the dots, if they're up, where they're in clip.
+// drawThinking draws the badge, if it's up, where it's in clip: a
+// spinner of eight dots, one big and turning; "thinking", a dot more
+// each step; the seconds since it was asked.
 func (w *noteWin) drawThinking(a *bro, clip image.Rectangle) {
 	r := w.thinkRect()
 	if r.Empty() || !r.Overlaps(clip) {
 		return
 	}
 	d := w.diary
-	at := w.slots[d.thinkPage-w.cur]
-	rad := max(2, d.think.Dy()/2)
-	for i := range d.dots {
-		c := image.Pt(d.think.Min.X+rad+i*(d.think.Dx()-2*rad)/2, d.think.Min.Y+rad)
-		a.C.Disc(w.toScreen(notePt{int16(c.X), int16(c.Y), 0}, at), max(2, int(float64(rad)*w.scale+0.5)), kobo.Black, clip)
+	clip = clip.Intersect(r)
+	c := a.C
+	c.Fill(clip, kobo.Black)
+	c.Frame(r.Inset(4), 2, kobo.White)
+	mid := image.Pt(r.Min.X+thinkH/2+4, r.Min.Y+thinkH/2)
+	for k := range 8 {
+		t := float64(k) * math.Pi / 4
+		p := mid.Add(image.Pt(int(15*math.Cos(t)), int(15*math.Sin(t))))
+		rad := 3
+		if k == d.dots%8 {
+			rad = 7
+		}
+		c.Disc(p, rad, kobo.White, clip)
 	}
+	words := "thinking" + strings.Repeat(".", d.dots%3+1)
+	if secs := int(time.Since(d.thinkAt).Seconds()); secs >= 1 {
+		words += fmt.Sprintf("  %d s", secs)
+	}
+	f := a.F.TabBold
+	c.TextAt(f, r.Min.X+thinkH+8, r.Min.Y+(thinkH+f.Metrics().Ascent.Ceil()-f.Metrics().Descent.Ceil())/2, words, kobo.White, clip)
 }
 
 // --- what it's cost ---

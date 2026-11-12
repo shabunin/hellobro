@@ -1096,7 +1096,8 @@ text, and pictures pasted there (a book's cut, say: sent as sharp as
 the screen shows it). If it reads as finished (it ends with a question
 mark, a full stop or an exclamation mark) the answer is written under
 it, a word at a time; if not, it waits for more, and writing on sends
-it all again. While it thinks, three dots under the question say so.
+it all again. While it thinks, a black badge under the question, where the answer
+goes, says so: a spinner turning, "thinking", and the seconds so far.
 Three quick taps of a finger on the page (once a pen has written, when
 a finger turns pages) ask at once, finished or not (**AI asks on
 taps**: three, two, or off). With the pause off, only taps ask. A full
